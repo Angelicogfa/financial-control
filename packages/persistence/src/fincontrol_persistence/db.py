@@ -46,4 +46,3 @@ def build_session_factory(engine: Engine) -> sessionmaker[Session]:
 def get_default_session_factory() -> sessionmaker[Session]:
     """Return a singleton session factory bound to the default DATABASE_URL engine."""
     return build_session_factory(build_engine())
-

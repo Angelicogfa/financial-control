@@ -10,7 +10,7 @@ import httpx
 import pandas as pd
 import pytest
 from fincontrol_core.analytics import (
-     analyze_return_series,
+    analyze_return_series,
     annualized_volatility,
     beta_alpha,
     build_base100_curve,

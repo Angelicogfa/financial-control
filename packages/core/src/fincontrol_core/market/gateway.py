@@ -127,9 +127,7 @@ class CachedMarketGateway:
             points = self.yfinance.get_history(norm_sym, range_period=range_period, market=mkt)
 
         if points:
-            self.cache.set_json(
-                cache_key, [p.to_dict() for p in points], self.history_ttl
-            )
+            self.cache.set_json(cache_key, [p.to_dict() for p in points], self.history_ttl)
         return points
 
     def get_fundamentals(

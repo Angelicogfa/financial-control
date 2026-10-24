@@ -141,9 +141,7 @@ class YFinanceProvider:
         except Exception:
             return []
 
-    def get_fundamentals(
-        self, symbol: str, market: Market | None = None
-    ) -> Fundamentals | None:
+    def get_fundamentals(self, symbol: str, market: Market | None = None) -> Fundamentals | None:
         """Fetch fundamental indicators from Yahoo Finance `Ticker.info`."""
         yf_sym = resolve_yahoo_symbol(symbol, market)
         try:

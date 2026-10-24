@@ -250,9 +250,7 @@ def to_contribution_plan_dto(plan: ContributionPlan) -> ContributionPlanResponse
             )
             for o in plan.orders
         ],
-        projected_allocations=[
-            ClassAllocationDTO(**asdict(a)) for a in plan.projected_allocations
-        ],
+        projected_allocations=[ClassAllocationDTO(**asdict(a)) for a in plan.projected_allocations],
     )
 
 
@@ -275,9 +273,7 @@ def to_risk_summary_dto(summary: RiskReturnSummary) -> RiskReturnSummaryDTO:
     )
 
 
-def to_asset_analysis_dto(
-    asset: AssetEntity, raw: dict[str, Any]
-) -> dict[str, Any]:
+def to_asset_analysis_dto(asset: AssetEntity, raw: dict[str, Any]) -> dict[str, Any]:
     return {
         "asset": to_asset_dto(asset),
         "position": (

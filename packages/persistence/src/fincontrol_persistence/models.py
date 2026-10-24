@@ -216,9 +216,7 @@ class ArcaTargetModel(Base):
 
     __tablename__ = "arca_targets"
     __table_args__ = (
-        CheckConstraint(
-            "target_pct >= 0 AND target_pct <= 100", name="ck_arca_targets_pct_bounds"
-        ),
+        CheckConstraint("target_pct >= 0 AND target_pct <= 100", name="ck_arca_targets_pct_bounds"),
     )
 
     arca_class: Mapped[str] = mapped_column(String(32), primary_key=True)

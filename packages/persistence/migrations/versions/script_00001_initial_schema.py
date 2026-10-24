@@ -67,13 +67,9 @@ def upgrade() -> None:
         sa.Column("issue_date", sa.Date(), nullable=False),
         sa.Column("maturity_date", sa.Date(), nullable=True),
         sa.Column("tax_exempt", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column(
-            "liquidity", sa.String(length=24), nullable=False, server_default="AT_MATURITY"
-        ),
+        sa.Column("liquidity", sa.String(length=24), nullable=False, server_default="AT_MATURITY"),
         sa.Column("issuer", sa.String(length=120), nullable=True),
-        sa.CheckConstraint(
-            "contracted_rate >= 0", name="ck_fixed_income_terms_rate_non_negative"
-        ),
+        sa.CheckConstraint("contracted_rate >= 0", name="ck_fixed_income_terms_rate_non_negative"),
     )
 
     op.create_table(
@@ -101,9 +97,7 @@ def upgrade() -> None:
     op.create_index("ix_transactions_asset_id", "transactions", ["asset_id"])
     op.create_index("ix_transactions_kind", "transactions", ["kind"])
     op.create_index("ix_transactions_trade_date", "transactions", ["trade_date"])
-    op.create_index(
-        "ix_transactions_asset_trade_date", "transactions", ["asset_id", "trade_date"]
-    )
+    op.create_index("ix_transactions_asset_trade_date", "transactions", ["asset_id", "trade_date"])
 
     op.create_table(
         "earnings",

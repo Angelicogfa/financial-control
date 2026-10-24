@@ -116,8 +116,8 @@ def test_full_api_end_to_end_workflow(tmp_path: Path, monkeypatch) -> None:
     app = create_app()
     app.dependency_overrides[require_user] = lambda: "tester"
     test_gw = _build_test_gateway()
-    app.dependency_overrides[get_uow_factory] = lambda: lambda: SqlAlchemyUnitOfWork(
-        session_factory=factory
+    app.dependency_overrides[get_uow_factory] = lambda: (
+        lambda: SqlAlchemyUnitOfWork(session_factory=factory)
     )
     app.dependency_overrides[get_market_gateway] = lambda: test_gw
 

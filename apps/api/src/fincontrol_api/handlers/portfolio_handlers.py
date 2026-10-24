@@ -88,8 +88,7 @@ class TransactionHandler:
             )
             return PaginatedResponse(
                 items=[
-                    to_transaction_dto(t, ticker=assets_map.get(t.asset_id))
-                    for t in result.items
+                    to_transaction_dto(t, ticker=assets_map.get(t.asset_id)) for t in result.items
                 ],
                 meta=to_page_meta_dto(result.meta),
             )
@@ -180,9 +179,7 @@ class EarningHandler:
                 date_to=date_to,
             )
             return PaginatedResponse(
-                items=[
-                    to_earning_dto(e, ticker=assets_map.get(e.asset_id)) for e in result.items
-                ],
+                items=[to_earning_dto(e, ticker=assets_map.get(e.asset_id)) for e in result.items],
                 meta=to_page_meta_dto(result.meta),
             )
 
@@ -322,9 +319,7 @@ class PortfolioHandler:
                 for r in rows
             ]
 
-    def update_arca_targets(
-        self, req: ArcaTargetsUpdateRequest
-    ) -> list[ArcaTargetItemDTO]:
+    def update_arca_targets(self, req: ArcaTargetsUpdateRequest) -> list[ArcaTargetItemDTO]:
         weights_float = {item.arca_class: item.target_pct for item in req.targets}
         # Validate sum == 100% and all 4 ARCA classes present via domain object
         ArcaTargets(weights_float)

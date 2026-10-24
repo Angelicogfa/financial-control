@@ -147,9 +147,7 @@ class PortfolioApplicationService:
             strategy_override=strategy_override,
         )
 
-    def analyze_single_asset(
-        self, uow: AbstractUnitOfWork, asset: AssetEntity
-    ) -> dict[str, Any]:
+    def analyze_single_asset(self, uow: AbstractUnitOfWork, asset: AssetEntity) -> dict[str, Any]:
         """Produce deep fundamental, valuation, Cerrado, and risk/return analysis for an asset."""
         report = self.build_portfolio_report(uow)
         pos: ValuedAssetPosition | None = next(
@@ -164,8 +162,10 @@ class PortfolioApplicationService:
             use_cerrado=asset.use_cerrado,
         )
 
-        current_price = pos.current_unit_price if pos else (
-            float(asset.manual_price) if asset.manual_price is not None else None
+        current_price = (
+            pos.current_unit_price
+            if pos
+            else (float(asset.manual_price) if asset.manual_price is not None else None)
         )
         valuation_summary = summarize_valuation(current_price, fund)
 
@@ -177,10 +177,14 @@ class PortfolioApplicationService:
         )
 
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()
-        benchmark_symbol = "IFIX" if asset.asset_type == AssetType.FII else (
-            "SP500"
-            if asset.asset_type in (AssetType.STOCK_INTL, AssetType.ETF_INTL, AssetType.REIT)
-            else "IBOV"
+        benchmark_symbol = (
+            "IFIX"
+            if asset.asset_type == AssetType.FII
+            else (
+                "SP500"
+                if asset.asset_type in (AssetType.STOCK_INTL, AssetType.ETF_INTL, AssetType.REIT)
+                else "IBOV"
+            )
         )
         bench_pts = (
             uow.market_series.list_series(

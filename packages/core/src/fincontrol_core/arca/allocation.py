@@ -31,9 +31,7 @@ class ArcaTargets:
             raise InvalidTargetsError("Target weights cannot be negative")
         total = sum(self.weights.values())
         if abs(total - 100.0) > _TOLERANCE:
-            raise InvalidTargetsError(
-                f"ARCA target weights must sum to 100% (got {total:.2f}%)"
-            )
+            raise InvalidTargetsError(f"ARCA target weights must sum to 100% (got {total:.2f}%)")
 
     @classmethod
     def default(cls) -> ArcaTargets:
@@ -113,9 +111,7 @@ def distribute_by_targets[K: Hashable](
 
     current_total = sum(max(current.get(k, 0.0), 0.0) for k in keys)
     new_total = current_total + amount
-    deficits = {
-        k: max(weights[k] * new_total - max(current.get(k, 0.0), 0.0), 0.0) for k in keys
-    }
+    deficits = {k: max(weights[k] * new_total - max(current.get(k, 0.0), 0.0), 0.0) for k in keys}
     deficit_sum = sum(deficits.values())
 
     if deficit_sum <= 0:

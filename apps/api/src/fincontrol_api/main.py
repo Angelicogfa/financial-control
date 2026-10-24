@@ -44,8 +44,7 @@ def create_app() -> FastAPI:
         title="Financial Control API",
         version="0.1.0",
         description=(
-            "Investment portfolio control with ARCA methodology "
-            "and optional Diagrama do Cerrado"
+            "Investment portfolio control with ARCA methodology and optional Diagrama do Cerrado"
         ),
     )
 
@@ -96,9 +95,7 @@ def create_app() -> FastAPI:
         return _error_response(status.HTTP_409_CONFLICT, exc)
 
     @app.exception_handler(AuthenticationError)
-    async def unauthenticated_handler(
-        _request: Request, exc: AuthenticationError
-    ) -> JSONResponse:
+    async def unauthenticated_handler(_request: Request, exc: AuthenticationError) -> JSONResponse:
         return _error_response(status.HTTP_401_UNAUTHORIZED, exc)
 
     @app.exception_handler(AuthNotConfiguredError)

@@ -99,9 +99,7 @@ def test_repositories_standardized_pagination_sorting_and_filtering(
 
     with SqlAlchemyUnitOfWork(session_factory) as uow:
         for ticker, name, asset_type in sample_assets:
-            created = uow.assets.add(
-                AssetEntity(ticker=ticker, name=name, asset_type=asset_type)
-            )
+            created = uow.assets.add(AssetEntity(ticker=ticker, name=name, asset_type=asset_type))
             assert created.id is not None
             uow.transactions.add(
                 TransactionEntity(

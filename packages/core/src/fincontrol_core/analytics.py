@@ -309,9 +309,7 @@ def conditional_var(returns: Sequence[float], confidence: float = 0.95) -> float
     return max(0.0, -_mean(tail))
 
 
-def pearson_correlation(
-    x: Sequence[float | None], y: Sequence[float | None]
-) -> float | None:
+def pearson_correlation(x: Sequence[float | None], y: Sequence[float | None]) -> float | None:
     """Pearson correlation over positions where both series have a value.
 
     Series must already be aligned by date (see `align_to_base`); None marks a gap.

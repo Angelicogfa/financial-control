@@ -24,9 +24,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-def test_phase3_gateway_persistence_and_analytics_integration(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_phase3_gateway_persistence_and_analytics_integration(tmp_path: Path, monkeypatch) -> None:
     db_file = tmp_path / "phase3_test.db"
     db_url = f"sqlite:///{db_file.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)

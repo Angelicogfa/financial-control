@@ -48,9 +48,7 @@ def build_position(
       (`qty * (sell_price - avg) - fees`) and reduce `total_cost` proportionally.
     - On the same date, BUY trades are processed before SELL trades.
     """
-    filtered = [
-        tx for tx in transactions if up_to_date is None or tx.trade_date <= up_to_date
-    ]
+    filtered = [tx for tx in transactions if up_to_date is None or tx.trade_date <= up_to_date]
     ordered = sorted(
         filtered,
         key=lambda t: (t.trade_date, t.kind != TransactionKind.BUY, t.id or 0),

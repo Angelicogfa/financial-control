@@ -124,9 +124,7 @@ def list_assets(
     )
 
 
-@assets_router.post(
-    "", response_model=AssetResponseDTO, status_code=status.HTTP_201_CREATED
-)
+@assets_router.post("", response_model=AssetResponseDTO, status_code=status.HTTP_201_CREATED)
 def create_asset(
     payload: AssetCreateRequest,
     handler: AssetHandler = Depends(get_asset_handler),
@@ -248,9 +246,7 @@ def list_earnings(
     )
 
 
-@earnings_router.post(
-    "", response_model=EarningResponseDTO, status_code=status.HTTP_201_CREATED
-)
+@earnings_router.post("", response_model=EarningResponseDTO, status_code=status.HTTP_201_CREATED)
 def create_earning(
     payload: EarningCreateRequest,
     handler: EarningHandler = Depends(get_earning_handler),

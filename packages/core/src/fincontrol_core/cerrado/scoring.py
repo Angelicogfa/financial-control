@@ -129,9 +129,7 @@ def resolve_intra_class_weights[K: Hashable](
         return equal
 
     if strategy == IntraClassStrategy.MANUAL_WEIGHT and manual_weights:
-        positive_manuals = {
-            k: max(float(manual_weights.get(k) or 0.0), 0.0) for k in asset_keys
-        }
+        positive_manuals = {k: max(float(manual_weights.get(k) or 0.0), 0.0) for k in asset_keys}
         total_manual = sum(positive_manuals.values())
         if total_manual > 0:
             return {k: v / total_manual for k, v in positive_manuals.items()}

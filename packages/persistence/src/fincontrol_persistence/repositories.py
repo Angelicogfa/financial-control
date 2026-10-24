@@ -221,9 +221,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             stmt = stmt.where(AssetModel.use_cerrado.is_(use_cerrado))
         if params.search:
             pattern = f"%{params.search.strip()}%"
-            stmt = stmt.where(
-                or_(AssetModel.ticker.ilike(pattern), AssetModel.name.ilike(pattern))
-            )
+            stmt = stmt.where(or_(AssetModel.ticker.ilike(pattern), AssetModel.name.ilike(pattern)))
 
         rows, meta = _apply_sort_and_paginate(
             self.session, stmt, params, self.SORT_COLUMNS, AssetModel.ticker, AssetModel.id
@@ -567,9 +565,7 @@ class SqlAlchemyMarketSeriesRepository(AbstractMarketSeriesRepository):
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> list[MarketSeriesPoint]:
-        stmt = select(MarketSeriesModel).where(
-            MarketSeriesModel.symbol == symbol.strip().upper()
-        )
+        stmt = select(MarketSeriesModel).where(MarketSeriesModel.symbol == symbol.strip().upper())
         if date_from is not None:
             stmt = stmt.where(MarketSeriesModel.reference_date >= date_from)
         if date_to is not None:

@@ -174,9 +174,7 @@ def build_rows(data: dict) -> list[dict[str, object]]:
             values = value_fixed_income(asset, cal, data, as_of)
         else:
             values = value_variable_income(asset, data["usd_brl_rate"])
-        earnings = _cents(
-            sum(float(e["gross"]) - float(e["tax"]) for e in asset["earnings"])
-        )
+        earnings = _cents(sum(float(e["gross"]) - float(e["tax"]) for e in asset["earnings"]))
         values["received_earnings_brl"] = earnings
         values["unrealized_pnl_brl"] = _cents(
             values["current_value_brl"] - values["invested_value_brl"]

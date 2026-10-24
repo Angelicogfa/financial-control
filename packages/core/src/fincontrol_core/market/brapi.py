@@ -166,9 +166,7 @@ class BrapiProvider:
         summary = item.get("summaryDetail") or {}
         profile = item.get("summaryProfile") or {}
 
-        pe = _float_or_none(item.get("priceEarnings")) or _float_or_none(
-            summary.get("trailingPE")
-        )
+        pe = _float_or_none(item.get("priceEarnings")) or _float_or_none(summary.get("trailingPE"))
         pb = _float_or_none(stats.get("priceToBook"))
         eps = _float_or_none(item.get("earningsPerShare")) or _float_or_none(
             stats.get("trailingEps")
