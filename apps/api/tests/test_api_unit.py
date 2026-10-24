@@ -85,13 +85,19 @@ def test_dto_serializers_for_asset_and_transaction() -> None:
 
 
 def test_arca_targets_update_validation_rejects_sum_not_100() -> None:
-    from fincontrol_api.handlers.portfolio_handlers import PortfolioHandler
-    from fincontrol_api.services.portfolio_service import PortfolioApplicationService
-    from fincontrol_core.market.gateway import CachedMarketGateway
+    from types import SimpleNamespace
 
-    gw = CachedMarketGateway()
-    svc = PortfolioApplicationService(gateway=gw)
-    handler = PortfolioHandler(uow_factory=lambda: None, portfolio_service=svc)  # type: ignore[arg-type]
+    from fincontrol_api.handlers.policy_handlers import PolicyHandler
+
+    class _UoW(SimpleNamespace):
+        def __enter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        def __exit__(self, *_exc):  # type: ignore[no-untyped-def]
+            return None
+
+    uow = _UoW(policies=SimpleNamespace(get_current=lambda: None))
+    handler = PolicyHandler(uow_factory=lambda: uow)  # type: ignore[arg-type]
 
     bad_req = ArcaTargetsUpdateRequest(
         targets=[

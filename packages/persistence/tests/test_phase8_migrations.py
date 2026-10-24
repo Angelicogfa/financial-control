@@ -221,3 +221,39 @@ def test_pagination_breaks_ties_by_id(db: tuple[Config, Engine]) -> None:
         ]
     ids = [tx.id for page in pages for tx in page]
     assert ids == [5, 4, 3, 2, 1]
+
+
+def test_script_00007_turns_arca_targets_into_policy_version(db: tuple[Config, Engine]) -> None:
+    cfg, engine = db
+    command.upgrade(cfg, "script_00006")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE arca_targets SET target_pct = 35 WHERE arca_class = 'ACOES'"))
+        conn.execute(text("UPDATE arca_targets SET target_pct = 15 WHERE arca_class = 'CAIXA'"))
+        conn.execute(
+            text(
+                "UPDATE arca_targets SET intra_class_strategy = 'EQUAL_WEIGHT' "
+                "WHERE arca_class = 'REAL_ESTATE'"
+            )
+        )
+
+    command.upgrade(cfg, "script_00007")
+
+    from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy
+    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from sqlalchemy.orm import sessionmaker
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        policy = uow.policies.get_current()
+    assert policy is not None and policy.version == 1
+    assert policy.arca.classes[ArcaClass.ACOES].target_pct == 35.0
+    assert policy.arca.classes[ArcaClass.CAIXA].target_pct == 15.0
+    assert (
+        policy.arca.classes[ArcaClass.REAL_ESTATE].intra_class_strategy
+        == IntraClassStrategy.EQUAL_WEIGHT
+    )
+
+    command.downgrade(cfg, "script_00006")
+    with engine.connect() as conn:
+        rows = dict(conn.execute(text("SELECT arca_class, target_pct FROM arca_targets")).all())
+    assert float(rows["ACOES"]) == 35.0

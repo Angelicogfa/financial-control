@@ -12,7 +12,6 @@ from typing import Any
 from fincontrol_core.domain.enums import (
     ArcaClass,
     AssetType,
-    IntraClassStrategy,
     default_arca_class,
     default_currency,
 )
@@ -211,22 +210,18 @@ class EarningModel(Base):
     asset: Mapped[AssetModel] = relationship("AssetModel", back_populates="earnings")
 
 
-class ArcaTargetModel(Base):
-    """Configured target weight and intra-class contribution strategy per ARCA class."""
+class InvestmentPolicyModel(Base):
+    """Append-only versions of the investment policy (ARCA, eligibility, valuation rules)."""
 
-    __tablename__ = "arca_targets"
-    __table_args__ = (
-        CheckConstraint("target_pct >= 0 AND target_pct <= 100", name="ck_arca_targets_pct_bounds"),
-    )
+    __tablename__ = "investment_policies"
 
-    arca_class: Mapped[str] = mapped_column(String(32), primary_key=True)
-    target_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    intra_class_strategy: Mapped[str] = mapped_column(
-        String(24), nullable=False, default=IntraClassStrategy.CERRADO.value
+    version: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utc_now, onupdate=_utc_now
-    )
+    arca: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    eligibility: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    valuation: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
 class MarketSeriesModel(Base):

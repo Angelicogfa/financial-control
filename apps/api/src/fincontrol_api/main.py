@@ -20,6 +20,7 @@ from fincontrol_api.controllers import (
     earnings_router,
     health_router,
     market_router,
+    policy_router,
     portfolio_router,
     settings_router,
     transactions_router,
@@ -129,6 +130,7 @@ def create_app() -> FastAPI:
         portfolio_router,
         settings_router,
         market_router,
+        policy_router,
     ):
         app.include_router(router, prefix=api_prefix, dependencies=protected)
 

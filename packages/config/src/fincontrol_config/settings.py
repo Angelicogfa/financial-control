@@ -58,13 +58,6 @@ class Settings(BaseSettings):
     default_annual_ipca: float = 0.045
     default_usd_brl: float = 5.15
 
-    # 12-month projection assumptions (annual fractions)
-    projection_equity_growth_rate: float = 0.08
-    projection_fund_growth_rate: float = 0.10
-    projection_real_estate_yield_rate: float = 0.085
-    projection_cash_cdi_multiplier: float = 1.0
-    projection_cash_income_tax_rate: float = 0.175
-
     # Cache TTLs (seconds)
     quote_cache_ttl: int = 300
     fundamentals_cache_ttl: int = 86400

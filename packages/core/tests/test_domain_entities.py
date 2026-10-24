@@ -8,7 +8,6 @@ from decimal import Decimal
 import pytest
 from fincontrol_core.domain import (
     ArcaClass,
-    ArcaTargetEntity,
     AssetEntity,
     AssetType,
     EarningEntity,
@@ -102,9 +101,6 @@ def test_transaction_and_earning_entity_validation() -> None:
         issue_date=date(2026, 1, 1),
     )
     assert term.contracted_rate == Decimal("1.10")
-
-    target = ArcaTargetEntity(arca_class=ArcaClass.ACOES, target_pct=Decimal("25"))
-    assert target.target_pct == Decimal("25")
 
 
 @pytest.mark.unit

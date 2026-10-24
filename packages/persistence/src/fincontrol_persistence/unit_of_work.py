@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from fincontrol_persistence.db import get_default_session_factory
 from fincontrol_persistence.repositories import (
-    SqlAlchemyArcaTargetRepository,
     SqlAlchemyAssetRepository,
     SqlAlchemyEarningRepository,
     SqlAlchemyJobRunRepository,
     SqlAlchemyMarketSeriesRepository,
+    SqlAlchemyPolicyRepository,
     SqlAlchemyPortfolioSnapshotRepository,
     SqlAlchemyTransactionRepository,
 )
@@ -31,7 +31,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.assets = SqlAlchemyAssetRepository(self.session)
         self.transactions = SqlAlchemyTransactionRepository(self.session)
         self.earnings = SqlAlchemyEarningRepository(self.session)
-        self.arca_targets = SqlAlchemyArcaTargetRepository(self.session)
+        self.policies = SqlAlchemyPolicyRepository(self.session)
         self.market_series = SqlAlchemyMarketSeriesRepository(self.session)
         self.snapshots = SqlAlchemyPortfolioSnapshotRepository(self.session)
         self.job_runs = SqlAlchemyJobRunRepository(self.session)

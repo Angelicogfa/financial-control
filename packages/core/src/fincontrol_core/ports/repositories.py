@@ -7,10 +7,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import date
-from decimal import Decimal
 
 from fincontrol_core.domain.entities import (
-    ArcaTargetEntity,
     AssetEntity,
     EarningEntity,
     JobRunEntity,
@@ -18,8 +16,9 @@ from fincontrol_core.domain.entities import (
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy, SeriesUnit
+from fincontrol_core.domain.enums import SeriesUnit
 from fincontrol_core.domain.pagination import PaginatedResult, PaginationParams
+from fincontrol_core.policy.models import InvestmentPolicy
 
 
 class AbstractAssetRepository(ABC):
@@ -134,23 +133,21 @@ class AbstractEarningRepository(ABC):
         raise NotImplementedError
 
 
-class AbstractArcaTargetRepository(ABC):
-    """Repository port for ARCA macro-allocation targets."""
+class AbstractPolicyRepository(ABC):
+    """Repository port for versioned investment policies (append-only)."""
 
     @abstractmethod
-    def get_all(self) -> list[ArcaTargetEntity]:
+    def get_current(self) -> InvestmentPolicy | None:
         raise NotImplementedError
 
     @abstractmethod
-    def seed_defaults(self) -> list[ArcaTargetEntity]:
+    def add(self, policy: InvestmentPolicy) -> InvestmentPolicy:
+        """Store `policy` as the next version and return it with version and timestamp."""
         raise NotImplementedError
 
     @abstractmethod
-    def upsert_targets(
-        self,
-        targets: dict[ArcaClass, Decimal],
-        strategies: dict[ArcaClass, IntraClassStrategy] | None = None,
-    ) -> list[ArcaTargetEntity]:
+    def list_versions(self, limit: int = 20) -> list[InvestmentPolicy]:
+        """Most recent versions first."""
         raise NotImplementedError
 
 

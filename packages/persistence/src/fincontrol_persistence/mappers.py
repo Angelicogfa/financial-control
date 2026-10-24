@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from decimal import Decimal
 
 from fincontrol_core.domain.entities import (
-    ArcaTargetEntity,
     AssetEntity,
     EarningEntity,
     FixedIncomeTermEntity,
@@ -26,12 +26,20 @@ from fincontrol_core.domain.enums import (
     SeriesUnit,
     TransactionKind,
 )
+from fincontrol_core.policy.models import (
+    ArcaPolicy,
+    ClassPolicy,
+    EligibilityPolicy,
+    InvestmentPolicy,
+    ValuationPolicy,
+)
+from fincontrol_core.portfolio.consolidation import ProjectionAssumptions
 
 from fincontrol_persistence.models import (
-    ArcaTargetModel,
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    InvestmentPolicyModel,
     JobRunModel,
     MarketSeriesModel,
     PortfolioSnapshotModel,
@@ -137,12 +145,44 @@ def to_asset_entity(
     )
 
 
-def to_arca_target_entity(model: ArcaTargetModel) -> ArcaTargetEntity:
-    return ArcaTargetEntity(
-        arca_class=ArcaClass(model.arca_class),
-        target_pct=Decimal(model.target_pct),
-        intra_class_strategy=IntraClassStrategy(model.intra_class_strategy),
-        updated_at=model.updated_at,
+def policy_payload(policy: InvestmentPolicy) -> dict[str, dict]:
+    """JSON-serializable sections of a policy for storage."""
+    return {
+        "arca": {
+            c.value: {
+                "target_pct": p.target_pct,
+                "band_pct": p.band_pct,
+                "intra_class_strategy": p.intra_class_strategy.value,
+            }
+            for c, p in policy.arca.classes.items()
+        },
+        "eligibility": asdict(policy.eligibility),
+        "valuation": {
+            "bazin_required_yield": policy.valuation.bazin_required_yield,
+            "graham_multiplier": policy.valuation.graham_multiplier,
+            "projections": policy.valuation.projections.as_dict(),
+        },
+    }
+
+
+def to_investment_policy(model: InvestmentPolicyModel) -> InvestmentPolicy:
+    valuation = dict(model.valuation)
+    projections = ProjectionAssumptions(**valuation.pop("projections", {}))
+    return InvestmentPolicy(
+        arca=ArcaPolicy(
+            {
+                ArcaClass(c): ClassPolicy(
+                    target_pct=float(p["target_pct"]),
+                    band_pct=float(p.get("band_pct", 5.0)),
+                    intra_class_strategy=IntraClassStrategy(p["intra_class_strategy"]),
+                )
+                for c, p in model.arca.items()
+            }
+        ),
+        eligibility=EligibilityPolicy(**model.eligibility),
+        valuation=ValuationPolicy(projections=projections, **valuation),
+        version=model.version,
+        created_at=model.created_at,
     )
 
 

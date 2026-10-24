@@ -1,7 +1,6 @@
 """Core domain enumerations, entities, and pagination primitives."""
 
 from fincontrol_core.domain.entities import (
-    ArcaTargetEntity,
     AssetEntity,
     EarningEntity,
     FixedIncomeTermEntity,
@@ -40,7 +39,6 @@ __all__ = [
     "INTEGER_QUANTITY_TYPES",
     "MARKET_BY_TYPE",
     "ArcaClass",
-    "ArcaTargetEntity",
     "AssetEntity",
     "AssetType",
     "EarningEntity",

@@ -13,10 +13,11 @@ from fincontrol_persistence.health import check_database
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_api.auth import SESSION_COOKIE
-from fincontrol_api.config import AppSettings, get_settings, projection_assumptions
+from fincontrol_api.config import AppSettings, get_settings
 from fincontrol_api.handlers.asset_handlers import AssetHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
+from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.portfolio_handlers import (
     EarningHandler,
     PortfolioHandler,
@@ -52,7 +53,6 @@ def get_portfolio_service(
     """Provide the PortfolioApplicationService instance."""
     return PortfolioApplicationService(
         gateway=gateway,
-        assumptions=projection_assumptions(settings),
         fetch_workers=settings.market_fetch_workers,
         fetch_timeout_seconds=settings.market_fetch_timeout_seconds,
     )
@@ -116,6 +116,13 @@ def get_market_data_handler(
 ) -> MarketDataHandler:
     """Provide the MarketDataHandler instance."""
     return MarketDataHandler(uow_factory=uow_factory)
+
+
+def get_policy_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+) -> PolicyHandler:
+    """Provide the PolicyHandler instance."""
+    return PolicyHandler(uow_factory=uow_factory)
 
 
 def get_portfolio_handler(

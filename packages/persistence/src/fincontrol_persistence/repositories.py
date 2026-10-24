@@ -10,9 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from fincontrol_core.arca.allocation import InvalidTargetsError
 from fincontrol_core.domain.entities import (
-    ArcaTargetEntity,
     AssetEntity,
     EarningEntity,
     JobRunEntity,
@@ -20,15 +18,16 @@ from fincontrol_core.domain.entities import (
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy, SeriesUnit
+from fincontrol_core.domain.enums import SeriesUnit
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
 from fincontrol_core.errors import NotFoundError, ValidationError
+from fincontrol_core.policy.models import InvestmentPolicy
 from fincontrol_core.ports.repositories import (
-    AbstractArcaTargetRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
     AbstractJobRunRepository,
     AbstractMarketSeriesRepository,
+    AbstractPolicyRepository,
     AbstractPortfolioSnapshotRepository,
     AbstractTransactionRepository,
 )
@@ -36,20 +35,21 @@ from sqlalchemy import Select, asc, delete, desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from fincontrol_persistence.mappers import (
-    to_arca_target_entity,
+    policy_payload,
     to_asset_entity,
     to_earning_entity,
     to_fixed_income_term_model,
+    to_investment_policy,
     to_job_run_entity,
     to_market_series_point,
     to_portfolio_snapshot_entity,
     to_transaction_entity,
 )
 from fincontrol_persistence.models import (
-    ArcaTargetModel,
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    InvestmentPolicyModel,
     JobRunModel,
     MarketSeriesModel,
     PortfolioSnapshotModel,
@@ -449,63 +449,30 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
         return PaginatedResult(items=[to_earning_entity(m) for m in rows], meta=meta)
 
 
-class SqlAlchemyArcaTargetRepository(AbstractArcaTargetRepository):
-    """SQLAlchemy implementation of AbstractArcaTargetRepository."""
+class SqlAlchemyPolicyRepository(AbstractPolicyRepository):
+    """SQLAlchemy implementation of AbstractPolicyRepository (append-only versions)."""
 
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get_all(self) -> list[ArcaTargetEntity]:
-        stmt = select(ArcaTargetModel).order_by(ArcaTargetModel.arca_class.asc())
-        rows = list(self.session.scalars(stmt).all())
-        if not rows:
-            return self.seed_defaults()
-        return [to_arca_target_entity(r) for r in rows]
+    def get_current(self) -> InvestmentPolicy | None:
+        stmt = select(InvestmentPolicyModel).order_by(InvestmentPolicyModel.version.desc())
+        model = self.session.scalars(stmt.limit(1)).first()
+        return to_investment_policy(model) if model else None
 
-    def seed_defaults(self) -> list[ArcaTargetEntity]:
-        rows: list[ArcaTargetModel] = []
-        for arca_class in ArcaClass:
-            row = ArcaTargetModel(
-                arca_class=arca_class.value,
-                target_pct=Decimal("25.00"),
-                intra_class_strategy=IntraClassStrategy.CERRADO.value,
-            )
-            self.session.add(row)
-            rows.append(row)
+    def add(self, policy: InvestmentPolicy) -> InvestmentPolicy:
+        model = InvestmentPolicyModel(**policy_payload(policy))
+        self.session.add(model)
         self.session.flush()
-        return [to_arca_target_entity(r) for r in rows]
+        return to_investment_policy(model)
 
-    def upsert_targets(
-        self,
-        targets: dict[ArcaClass, Decimal],
-        strategies: dict[ArcaClass, IntraClassStrategy] | None = None,
-    ) -> list[ArcaTargetEntity]:
-        total = sum(targets.values(), Decimal("0"))
-        if abs(total - Decimal("100")) > Decimal("0.01"):
-            raise InvalidTargetsError(f"ARCA target percentages must sum to 100 (got {total})")
-        stmt = select(ArcaTargetModel)
-        existing = {row.arca_class: row for row in self.session.scalars(stmt).all()}
-        result: list[ArcaTargetModel] = []
-        for arca_class, pct in targets.items():
-            strategy = (
-                strategies.get(arca_class, IntraClassStrategy.CERRADO)
-                if strategies
-                else IntraClassStrategy.CERRADO
-            )
-            row = existing.get(arca_class.value)
-            if row is None:
-                row = ArcaTargetModel(
-                    arca_class=arca_class.value,
-                    target_pct=pct,
-                    intra_class_strategy=strategy.value,
-                )
-                self.session.add(row)
-            else:
-                row.target_pct = pct
-                row.intra_class_strategy = strategy.value
-            result.append(row)
-        self.session.flush()
-        return [to_arca_target_entity(r) for r in result]
+    def list_versions(self, limit: int = 20) -> list[InvestmentPolicy]:
+        stmt = (
+            select(InvestmentPolicyModel)
+            .order_by(InvestmentPolicyModel.version.desc())
+            .limit(limit)
+        )
+        return [to_investment_policy(m) for m in self.session.scalars(stmt).all()]
 
 
 class SqlAlchemyMarketSeriesRepository(AbstractMarketSeriesRepository):
@@ -681,21 +648,21 @@ class SqlAlchemyJobRunRepository(AbstractJobRunRepository):
 AssetRepository = SqlAlchemyAssetRepository
 TransactionRepository = SqlAlchemyTransactionRepository
 EarningRepository = SqlAlchemyEarningRepository
-ArcaTargetRepository = SqlAlchemyArcaTargetRepository
+PolicyRepository = SqlAlchemyPolicyRepository
 MarketSeriesRepository = SqlAlchemyMarketSeriesRepository
 PortfolioSnapshotRepository = SqlAlchemyPortfolioSnapshotRepository
 
 __all__ = [
-    "ArcaTargetRepository",
     "AssetRepository",
     "EarningRepository",
     "FixedIncomeTermModel",
     "MarketSeriesRepository",
+    "PolicyRepository",
     "PortfolioSnapshotRepository",
-    "SqlAlchemyArcaTargetRepository",
     "SqlAlchemyAssetRepository",
     "SqlAlchemyEarningRepository",
     "SqlAlchemyMarketSeriesRepository",
+    "SqlAlchemyPolicyRepository",
     "SqlAlchemyPortfolioSnapshotRepository",
     "SqlAlchemyTransactionRepository",
     "TransactionRepository",

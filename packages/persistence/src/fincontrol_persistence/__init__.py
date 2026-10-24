@@ -2,24 +2,24 @@
 
 from fincontrol_persistence.db import Base, build_engine, build_session_factory
 from fincontrol_persistence.models import (
-    ArcaTargetModel,
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    InvestmentPolicyModel,
     MarketSeriesModel,
     PortfolioSnapshotModel,
     TransactionModel,
 )
 from fincontrol_persistence.repositories import (
-    ArcaTargetRepository,
     AssetRepository,
     EarningRepository,
     MarketSeriesRepository,
+    PolicyRepository,
     PortfolioSnapshotRepository,
-    SqlAlchemyArcaTargetRepository,
     SqlAlchemyAssetRepository,
     SqlAlchemyEarningRepository,
     SqlAlchemyMarketSeriesRepository,
+    SqlAlchemyPolicyRepository,
     SqlAlchemyPortfolioSnapshotRepository,
     SqlAlchemyTransactionRepository,
     TransactionRepository,
@@ -27,8 +27,8 @@ from fincontrol_persistence.repositories import (
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 __all__ = [
-    "ArcaTargetModel",
-    "ArcaTargetRepository",
+    "InvestmentPolicyModel",
+    "PolicyRepository",
     "AssetModel",
     "AssetRepository",
     "Base",
@@ -39,7 +39,7 @@ __all__ = [
     "MarketSeriesRepository",
     "PortfolioSnapshotModel",
     "PortfolioSnapshotRepository",
-    "SqlAlchemyArcaTargetRepository",
+    "SqlAlchemyPolicyRepository",
     "SqlAlchemyAssetRepository",
     "SqlAlchemyEarningRepository",
     "SqlAlchemyMarketSeriesRepository",

@@ -11,11 +11,13 @@ GRAHAM_CONSTANT = 22.5
 BAZIN_DEFAULT_YIELD = 0.06
 
 
-def graham_fair_value(eps: float | None, bvps: float | None) -> float | None:
+def graham_fair_value(
+    eps: float | None, bvps: float | None, multiplier: float = GRAHAM_CONSTANT
+) -> float | None:
     """Benjamin Graham fair price: sqrt(22.5 * EPS * BVPS). Undefined when EPS or BVPS <= 0."""
     if eps is None or bvps is None or eps <= 0 or bvps <= 0:
         return None
-    return math.sqrt(GRAHAM_CONSTANT * eps * bvps)
+    return math.sqrt(multiplier * eps * bvps)
 
 
 def bazin_ceiling_price(
@@ -47,15 +49,21 @@ class ValuationSummary:
     earnings_yield: float | None
 
 
-def summarize_valuation(price: float | None, f: Fundamentals | None) -> ValuationSummary:
+def summarize_valuation(
+    price: float | None,
+    f: Fundamentals | None,
+    *,
+    bazin_required_yield: float = BAZIN_DEFAULT_YIELD,
+    graham_multiplier: float = GRAHAM_CONSTANT,
+) -> ValuationSummary:
     """Compute Graham, Bazin, margins of safety, and earnings yield from fundamentals."""
     if f is None:
         return ValuationSummary(price, None, None, None, None, None)
-    graham = graham_fair_value(f.earnings_per_share, f.book_value_per_share)
+    graham = graham_fair_value(f.earnings_per_share, f.book_value_per_share, graham_multiplier)
     dps = f.dividends_per_share_ttm
     if dps is None and f.dividend_yield is not None and price:
         dps = f.dividend_yield * price
-    bazin = bazin_ceiling_price(dps)
+    bazin = bazin_ceiling_price(dps, bazin_required_yield)
     ey = 1.0 / f.price_to_earnings if f.price_to_earnings and f.price_to_earnings > 0 else None
     return ValuationSummary(
         price=price,

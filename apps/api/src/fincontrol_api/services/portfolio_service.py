@@ -15,20 +15,18 @@ from fincontrol_core.analytics import (
     dated_simple_returns,
     dated_time_weighted_returns,
 )
-from fincontrol_core.arca.allocation import ArcaTargets
 from fincontrol_core.cerrado.scoring import CerradoEvaluation, evaluate
-from fincontrol_core.domain.entities import ArcaTargetEntity, AssetEntity
+from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import (
-    ArcaClass,
     AssetType,
     IntraClassStrategy,
 )
 from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
+from fincontrol_core.policy import InvestmentPolicy, current_policy
 from fincontrol_core.portfolio.consolidation import (
     ConsolidatedPortfolioReport,
     ContributionPlan,
-    ProjectionAssumptions,
     ValuedAssetPosition,
     consolidate_portfolio,
     plan_contribution,
@@ -50,26 +48,17 @@ class PortfolioApplicationService:
     def __init__(
         self,
         gateway: CachedMarketGateway,
-        assumptions: ProjectionAssumptions | None = None,
         *,
         fetch_workers: int = 8,
         fetch_timeout_seconds: float = 20.0,
     ) -> None:
         self.gateway = gateway
-        self.assumptions = assumptions or ProjectionAssumptions()
         self.fetch_workers = fetch_workers
         self.fetch_timeout_seconds = fetch_timeout_seconds
 
-    def load_arca_targets(
-        self, uow: AbstractUnitOfWork
-    ) -> tuple[ArcaTargets, dict[ArcaClass, IntraClassStrategy]]:
-        """Load persisted ARCA target weights and intra-class strategies (or defaults)."""
-        rows: list[ArcaTargetEntity] = uow.arca_targets.get_all()
-        if not rows or len(rows) < len(ArcaClass):
-            return ArcaTargets.default(), {c: IntraClassStrategy.CERRADO for c in ArcaClass}
-        weights = {r.arca_class: float(r.target_pct) for r in rows}
-        strategies = {r.arca_class: r.intra_class_strategy for r in rows}
-        return ArcaTargets(weights), strategies
+    def load_policy(self, uow: AbstractUnitOfWork) -> InvestmentPolicy:
+        """Current investment policy (defaults when none was saved)."""
+        return current_policy(uow.policies)
 
     def ledger_curves(
         self, uow: AbstractUnitOfWork, asset: AssetEntity, as_of: date
@@ -96,7 +85,7 @@ class PortfolioApplicationService:
         """Fetch active assets, quotes, fundamentals, FX, and BCB curves to consolidate."""
         ref_date = as_of_date or date.today()
         assets = uow.assets.list_all(active_only=True)
-        targets, intra_strategies = self.load_arca_targets(uow)
+        policy = self.load_policy(uow)
 
         market = fetch_market_data(
             self.gateway,
@@ -119,13 +108,13 @@ class PortfolioApplicationService:
 
         return consolidate_portfolio(
             assets=assets,
-            targets=targets,
+            targets=policy.arca.targets,
             quotes=quotes,
             fundamentals_by_ticker=fundamentals,
-            intra_strategies=intra_strategies,
+            intra_strategies=policy.arca.strategies,
             usd_brl_rate=usd_brl,
             curves=curves,
-            assumptions=self.assumptions,
+            assumptions=policy.valuation.projections,
             as_of_date=ref_date,
             date_from=date_from,
         )
@@ -139,10 +128,9 @@ class PortfolioApplicationService:
     ) -> ContributionPlan:
         """Build a 2-level contribution plan from the current consolidated portfolio."""
         report = self.build_portfolio_report(uow)
-        targets, _ = self.load_arca_targets(uow)
         return plan_contribution(
             report=report,
-            targets=targets,
+            targets=self.load_policy(uow).arca.targets,
             amount_brl=amount_brl,
             strategy_override=strategy_override,
         )
@@ -167,7 +155,13 @@ class PortfolioApplicationService:
             if pos
             else (float(asset.manual_price) if asset.manual_price is not None else None)
         )
-        valuation_summary = summarize_valuation(current_price, fund)
+        valuation_policy = self.load_policy(uow).valuation
+        valuation_summary = summarize_valuation(
+            current_price,
+            fund,
+            bazin_required_yield=valuation_policy.bazin_required_yield,
+            graham_multiplier=valuation_policy.graham_multiplier,
+        )
 
         history = self.gateway.get_history(
             asset.ticker, range_period="1y", asset_type=asset.asset_type

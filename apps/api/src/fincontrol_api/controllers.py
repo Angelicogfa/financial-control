@@ -13,6 +13,7 @@ from fincontrol_api.dependencies import (
     get_auth_handler,
     get_earning_handler,
     get_market_data_handler,
+    get_policy_handler,
     get_portfolio_handler,
     get_system_handler,
     get_transaction_handler,
@@ -26,6 +27,7 @@ from fincontrol_api.handlers import (
 )
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
+from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
     ArcaTargetItemDTO,
@@ -44,6 +46,8 @@ from fincontrol_api.schemas import (
     JobRunDTO,
     LoginRequest,
     PaginatedResponse,
+    PolicyDTO,
+    PolicyUpdateRequest,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
     ReadinessDTO,
@@ -60,6 +64,7 @@ earnings_router = APIRouter(prefix="/earnings", tags=["Earnings"])
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
 settings_router = APIRouter(prefix="/settings", tags=["Settings"])
 market_router = APIRouter(prefix="/market", tags=["Market Data"])
+policy_router = APIRouter(prefix="/policy", tags=["Investment Policy"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
@@ -315,7 +320,7 @@ def get_portfolio_analytics(
 # ---------------------------------------------------------------------------
 @settings_router.get("/arca-targets", response_model=list[ArcaTargetItemDTO])
 def get_arca_targets(
-    handler: PortfolioHandler = Depends(get_portfolio_handler),
+    handler: PolicyHandler = Depends(get_policy_handler),
 ) -> list[ArcaTargetItemDTO]:
     return handler.get_arca_targets()
 
@@ -323,9 +328,33 @@ def get_arca_targets(
 @settings_router.put("/arca-targets", response_model=list[ArcaTargetItemDTO])
 def update_arca_targets(
     payload: ArcaTargetsUpdateRequest,
-    handler: PortfolioHandler = Depends(get_portfolio_handler),
+    handler: PolicyHandler = Depends(get_policy_handler),
 ) -> list[ArcaTargetItemDTO]:
     return handler.update_arca_targets(payload)
+
+
+# ---------------------------------------------------------------------------
+# Investment Policy Controller (Estratégia)
+# ---------------------------------------------------------------------------
+@policy_router.get("", response_model=PolicyDTO)
+def get_policy(handler: PolicyHandler = Depends(get_policy_handler)) -> PolicyDTO:
+    return handler.get_current()
+
+
+@policy_router.put("", response_model=PolicyDTO)
+def update_policy(
+    payload: PolicyUpdateRequest,
+    handler: PolicyHandler = Depends(get_policy_handler),
+) -> PolicyDTO:
+    return handler.update(payload)
+
+
+@policy_router.get("/versions", response_model=list[PolicyDTO])
+def list_policy_versions(
+    limit: int = Query(default=20, ge=1, le=200),
+    handler: PolicyHandler = Depends(get_policy_handler),
+) -> list[PolicyDTO]:
+    return handler.list_versions(limit)
 
 
 # ---------------------------------------------------------------------------

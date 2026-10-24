@@ -5,18 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import date
-from decimal import Decimal
 
-from fincontrol_core.arca.allocation import ArcaTargets
 from fincontrol_core.domain.entities import (
     AssetEntity,
     EarningEntity,
     TransactionEntity,
 )
 from fincontrol_core.domain.enums import (
-    ArcaClass,
     EarningKind,
-    IntraClassStrategy,
 )
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.errors import NotFoundError
@@ -37,8 +33,6 @@ from fincontrol_api.handlers.serializers import (
     to_transaction_dto,
 )
 from fincontrol_api.schemas import (
-    ArcaTargetItemDTO,
-    ArcaTargetsUpdateRequest,
     ContributionPlanResponseDTO,
     ContributionSimulationRequest,
     EarningCreateRequest,
@@ -298,45 +292,3 @@ class PortfolioHandler:
                 curves=raw["curves"],
             )
 
-    def get_arca_targets(self) -> list[ArcaTargetItemDTO]:
-        with self.uow_factory() as uow:
-            rows = uow.arca_targets.get_all()
-            if not rows:
-                return [
-                    ArcaTargetItemDTO(
-                        arca_class=c,
-                        target_pct=25.0,
-                        intra_class_strategy=IntraClassStrategy.CERRADO,
-                    )
-                    for c in ArcaClass
-                ]
-            return [
-                ArcaTargetItemDTO(
-                    arca_class=r.arca_class,
-                    target_pct=float(r.target_pct),
-                    intra_class_strategy=r.intra_class_strategy,
-                )
-                for r in rows
-            ]
-
-    def update_arca_targets(self, req: ArcaTargetsUpdateRequest) -> list[ArcaTargetItemDTO]:
-        weights_float = {item.arca_class: item.target_pct for item in req.targets}
-        # Validate sum == 100% and all 4 ARCA classes present via domain object
-        ArcaTargets(weights_float)
-
-        weights_dec = {
-            item.arca_class: Decimal(str(round(item.target_pct, 4))) for item in req.targets
-        }
-        strategies = {item.arca_class: item.intra_class_strategy for item in req.targets}
-
-        with self.uow_factory() as uow:
-            saved = uow.arca_targets.upsert_targets(weights_dec, strategies)
-            uow.commit()
-            return [
-                ArcaTargetItemDTO(
-                    arca_class=r.arca_class,
-                    target_pct=float(r.target_pct),
-                    intra_class_strategy=r.intra_class_strategy,
-                )
-                for r in saved
-            ]

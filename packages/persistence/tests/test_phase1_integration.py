@@ -22,6 +22,7 @@ from fincontrol_core.domain import (
     TransactionEntity,
     TransactionKind,
 )
+from fincontrol_core.policy import ArcaPolicy, ClassPolicy, InvestmentPolicy
 from fincontrol_persistence import SqlAlchemyUnitOfWork, build_engine, build_session_factory
 from sqlalchemy import inspect
 
@@ -54,7 +55,7 @@ def test_alembic_migration_script_00001_upgrade_and_downgrade(
         "fixed_income_terms",
         "transactions",
         "earnings",
-        "arca_targets",
+        "investment_policies",
         "market_series",
         "portfolio_snapshots",
         "alembic_version",
@@ -63,9 +64,10 @@ def test_alembic_migration_script_00001_upgrade_and_downgrade(
 
     session_factory = build_session_factory(engine)
     with SqlAlchemyUnitOfWork(session_factory) as uow:
-        seeded_targets = uow.arca_targets.get_all()
-        assert len(seeded_targets) == 4
-        assert sum(t.target_pct for t in seeded_targets) == Decimal("100.00")
+        seeded = uow.policies.get_current()
+        assert seeded is not None and seeded.version == 1
+        assert sum(p.target_pct for p in seeded.arca.classes.values()) == 100.0
+        assert set(seeded.arca.bands.values()) == {5.0}
 
     command.downgrade(cfg, "base")
     inspector_after = inspect(engine)
@@ -119,14 +121,19 @@ def test_repositories_standardized_pagination_sorting_and_filtering(
                 )
             )
 
-        uow.arca_targets.upsert_targets(
-            {
-                ArcaClass.ACOES: Decimal("30.00"),
-                ArcaClass.REAL_ESTATE: Decimal("25.00"),
-                ArcaClass.CAIXA: Decimal("25.00"),
-                ArcaClass.ATIVOS_INTERNACIONAIS: Decimal("20.00"),
-            },
-            {ArcaClass.CAIXA: IntraClassStrategy.EQUAL_WEIGHT},
+        uow.policies.add(
+            InvestmentPolicy(
+                arca=ArcaPolicy(
+                    {
+                        ArcaClass.ACOES: ClassPolicy(30.0),
+                        ArcaClass.REAL_ESTATE: ClassPolicy(25.0),
+                        ArcaClass.CAIXA: ClassPolicy(
+                            25.0, intra_class_strategy=IntraClassStrategy.EQUAL_WEIGHT
+                        ),
+                        ArcaClass.ATIVOS_INTERNACIONAIS: ClassPolicy(20.0),
+                    }
+                )
+            )
         )
         uow.market_series.upsert_points(
             "^BVSP",

@@ -19,7 +19,6 @@ from fincontrol_core.domain.enums import (
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
     FixedIncomeLiquidity,
-    IntraClassStrategy,
     JobRunStatus,
     Market,
     SeriesUnit,
@@ -181,20 +180,6 @@ class AssetEntity:
     @property
     def market(self) -> Market:
         return market_for(self.asset_type)
-
-
-@dataclass(frozen=True)
-class ArcaTargetEntity:
-    """Target allocation percentage and intra-class strategy for an ARCA class."""
-
-    arca_class: ArcaClass
-    target_pct: Decimal
-    intra_class_strategy: IntraClassStrategy = IntraClassStrategy.CERRADO
-    updated_at: datetime | None = None
-
-    def __post_init__(self) -> None:
-        if self.target_pct < Decimal("0") or self.target_pct > Decimal("100"):
-            raise ValidationError("target_pct must be between 0 and 100")
 
 
 @dataclass(frozen=True)
