@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { EvolutionProjectionCard } from "./components/EvolutionProjectionCard";
+import { LoginPage } from "./components/LoginPage";
+import { type AuthState, UNAUTHORIZED_EVENT, fetchSession, logout } from "./services/authClient";
 import { AppViewId, HamburgerDrawer } from "./components/HamburgerDrawer";
 import {
   StandardColumn,
@@ -63,7 +65,7 @@ type TransactionRow = TransactionDTO & Record<string, unknown>;
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
-export const App: React.FC = () => {
+const PortfolioApp: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const [activeView, setActiveView] = useState<AppViewId>("dashboard");
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
 
@@ -760,6 +762,7 @@ export const App: React.FC = () => {
         onToggle={() => setDrawerOpen((v) => !v)}
         onClose={() => setDrawerOpen(false)}
         onSelectView={setActiveView}
+        onLogout={onLogout}
       />
 
       <main className="page-canvas">
@@ -1689,5 +1692,42 @@ export const App: React.FC = () => {
         )}
       </main>
     </div>
+  );
+};
+
+/** Authentication gate: shows the login screen until the API accepts the session. */
+export const App: React.FC = () => {
+  const [auth, setAuth] = useState<AuthState>({ status: "checking" });
+
+  useEffect(() => {
+    let active = true;
+    void fetchSession().then((state) => {
+      if (active) setAuth(state);
+    });
+    const onUnauthorized = () => setAuth({ status: "anonymous", reason: "Sua sessão expirou. Entre novamente." });
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => {
+      active = false;
+      window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    };
+  }, []);
+
+  if (auth.status === "checking") {
+    return <main className="login-canvas" aria-busy="true" />;
+  }
+  if (auth.status === "anonymous") {
+    return (
+      <LoginPage
+        notice={auth.reason}
+        onLoggedIn={(username) => setAuth({ status: "authenticated", username })}
+      />
+    );
+  }
+  return (
+    <PortfolioApp
+      onLogout={() => {
+        void logout().finally(() => setAuth({ status: "anonymous" }));
+      }}
+    />
   );
 };

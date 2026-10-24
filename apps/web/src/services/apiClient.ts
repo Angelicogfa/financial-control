@@ -1,5 +1,6 @@
 /** API Client for communicating with the FastAPI backend (/api/v1) with clean empty initial state. */
 
+import { apiFetch } from "./authClient";
 import type {
   ArcaTargetItemDTO,
   AssetCreatePayload,
@@ -214,7 +215,7 @@ async function parseError(resp: Response): Promise<string> {
 
 export async function fetchPortfolioReport(): Promise<PortfolioReportDTO> {
   try {
-    const resp = await fetch("/api/v1/portfolio/consolidated");
+    const resp = await apiFetch("/api/v1/portfolio/consolidated");
     if (resp.ok) {
       return (await resp.json()) as PortfolioReportDTO;
     }
@@ -226,7 +227,7 @@ export async function fetchPortfolioReport(): Promise<PortfolioReportDTO> {
 
 export async function fetchAssets(): Promise<AssetDTO[]> {
   try {
-    const resp = await fetch("/api/v1/assets?page=1&page_size=200&sort_by=ticker&sort_order=asc");
+    const resp = await apiFetch("/api/v1/assets?page=1&page_size=200&sort_by=ticker&sort_order=asc");
     if (resp.ok) {
       const data = (await resp.json()) as PaginatedResponse<AssetDTO>;
       return data.items;
@@ -238,7 +239,7 @@ export async function fetchAssets(): Promise<AssetDTO[]> {
 }
 
 export async function createAsset(payload: AssetCreatePayload): Promise<AssetDTO> {
-  const resp = await fetch("/api/v1/assets", {
+  const resp = await apiFetch("/api/v1/assets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -250,7 +251,7 @@ export async function createAsset(payload: AssetCreatePayload): Promise<AssetDTO
 }
 
 export async function deleteAsset(assetId: number): Promise<void> {
-  const resp = await fetch(`/api/v1/assets/${assetId}?hard=true`, {
+  const resp = await apiFetch(`/api/v1/assets/${assetId}?hard=true`, {
     method: "DELETE",
   });
   if (!resp.ok) {
@@ -262,7 +263,7 @@ export async function updateAssetCerrado(
   assetId: number,
   payload: CerradoUpdatePayload,
 ): Promise<AssetDTO> {
-  const resp = await fetch(`/api/v1/assets/${assetId}/cerrado`, {
+  const resp = await apiFetch(`/api/v1/assets/${assetId}/cerrado`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -275,7 +276,7 @@ export async function updateAssetCerrado(
 
 export async function fetchTransactions(): Promise<TransactionDTO[]> {
   try {
-    const resp = await fetch(
+    const resp = await apiFetch(
       "/api/v1/transactions?page=1&page_size=200&sort_by=trade_date&sort_order=desc",
     );
     if (resp.ok) {
@@ -291,7 +292,7 @@ export async function fetchTransactions(): Promise<TransactionDTO[]> {
 export async function createTransaction(
   payload: TransactionCreatePayload,
 ): Promise<TransactionDTO> {
-  const resp = await fetch("/api/v1/transactions", {
+  const resp = await apiFetch("/api/v1/transactions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -303,7 +304,7 @@ export async function createTransaction(
 }
 
 export async function deleteTransaction(txId: number): Promise<void> {
-  const resp = await fetch(`/api/v1/transactions/${txId}`, {
+  const resp = await apiFetch(`/api/v1/transactions/${txId}`, {
     method: "DELETE",
   });
   if (!resp.ok) {
@@ -313,7 +314,7 @@ export async function deleteTransaction(txId: number): Promise<void> {
 
 export async function fetchEarnings(): Promise<EarningDTO[]> {
   try {
-    const resp = await fetch(
+    const resp = await apiFetch(
       "/api/v1/earnings?page=1&page_size=200&sort_by=payment_date&sort_order=desc",
     );
     if (resp.ok) {
@@ -327,7 +328,7 @@ export async function fetchEarnings(): Promise<EarningDTO[]> {
 }
 
 export async function createEarning(payload: EarningCreatePayload): Promise<EarningDTO> {
-  const resp = await fetch("/api/v1/earnings", {
+  const resp = await apiFetch("/api/v1/earnings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -339,7 +340,7 @@ export async function createEarning(payload: EarningCreatePayload): Promise<Earn
 }
 
 export async function deleteEarning(earningId: number): Promise<void> {
-  const resp = await fetch(`/api/v1/earnings/${earningId}`, {
+  const resp = await apiFetch(`/api/v1/earnings/${earningId}`, {
     method: "DELETE",
   });
   if (!resp.ok) {
@@ -352,7 +353,7 @@ export async function simulateContribution(
   strategy: IntraClassStrategy,
 ): Promise<ContributionPlanDTO | null> {
   try {
-    const resp = await fetch("/api/v1/portfolio/contribution", {
+    const resp = await apiFetch("/api/v1/portfolio/contribution", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -371,7 +372,7 @@ export async function simulateContribution(
 
 export async function fetchPortfolioAnalytics(): Promise<PortfolioAnalyticsDTO> {
   try {
-    const resp = await fetch("/api/v1/portfolio/analytics");
+    const resp = await apiFetch("/api/v1/portfolio/analytics");
     if (resp.ok) {
       return (await resp.json()) as PortfolioAnalyticsDTO;
     }
@@ -383,7 +384,7 @@ export async function fetchPortfolioAnalytics(): Promise<PortfolioAnalyticsDTO> 
 
 export async function fetchArcaTargets(): Promise<ArcaTargetItemDTO[]> {
   try {
-    const resp = await fetch("/api/v1/settings/arca-targets");
+    const resp = await apiFetch("/api/v1/settings/arca-targets");
     if (resp.ok) {
       return (await resp.json()) as ArcaTargetItemDTO[];
     }
@@ -401,7 +402,7 @@ export async function fetchArcaTargets(): Promise<ArcaTargetItemDTO[]> {
 export async function updateArcaTargets(
   targets: ArcaTargetItemDTO[],
 ): Promise<ArcaTargetItemDTO[]> {
-  const resp = await fetch("/api/v1/settings/arca-targets", {
+  const resp = await apiFetch("/api/v1/settings/arca-targets", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ targets }),

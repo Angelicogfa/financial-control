@@ -6,15 +6,17 @@ import logging
 import time
 import uuid
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fincontrol_config.logging import configure_logging, request_id_var
 from fincontrol_core.errors import ConflictError, DomainError, NotFoundError, ValidationError
 
+from fincontrol_api.auth import AuthenticationError, AuthNotConfiguredError
 from fincontrol_api.config import get_settings
 from fincontrol_api.controllers import (
     assets_router,
+    auth_router,
     earnings_router,
     health_router,
     market_router,
@@ -22,6 +24,7 @@ from fincontrol_api.controllers import (
     settings_router,
     transactions_router,
 )
+from fincontrol_api.dependencies import require_user
 
 logger = logging.getLogger("fincontrol_api")
 access_logger = logging.getLogger("fincontrol_api.access")
@@ -92,6 +95,19 @@ def create_app() -> FastAPI:
     async def conflict_error_handler(_request: Request, exc: ConflictError) -> JSONResponse:
         return _error_response(status.HTTP_409_CONFLICT, exc)
 
+    @app.exception_handler(AuthenticationError)
+    async def unauthenticated_handler(
+        _request: Request, exc: AuthenticationError
+    ) -> JSONResponse:
+        return _error_response(status.HTTP_401_UNAUTHORIZED, exc)
+
+    @app.exception_handler(AuthNotConfiguredError)
+    async def auth_not_configured_handler(
+        _request: Request, exc: AuthNotConfiguredError
+    ) -> JSONResponse:
+        logger.error(exc.message)
+        return _error_response(status.HTTP_503_SERVICE_UNAVAILABLE, exc)
+
     @app.exception_handler(Exception)
     async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
         request_id = getattr(request.state, "request_id", None)
@@ -107,12 +123,17 @@ def create_app() -> FastAPI:
 
     api_prefix = "/api/v1"
     app.include_router(health_router, prefix=api_prefix)
-    app.include_router(assets_router, prefix=api_prefix)
-    app.include_router(transactions_router, prefix=api_prefix)
-    app.include_router(earnings_router, prefix=api_prefix)
-    app.include_router(portfolio_router, prefix=api_prefix)
-    app.include_router(settings_router, prefix=api_prefix)
-    app.include_router(market_router, prefix=api_prefix)
+    app.include_router(auth_router, prefix=api_prefix)
+    protected = [Depends(require_user)]
+    for router in (
+        assets_router,
+        transactions_router,
+        earnings_router,
+        portfolio_router,
+        settings_router,
+        market_router,
+    ):
+        app.include_router(router, prefix=api_prefix, dependencies=protected)
 
     return app
 

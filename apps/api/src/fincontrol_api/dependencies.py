@@ -5,15 +5,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import lru_cache
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fincontrol_core.market.factory import build_market_gateway
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 from fincontrol_persistence.health import check_database
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
+from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.config import AppSettings, get_settings, projection_assumptions
 from fincontrol_api.handlers.asset_handlers import AssetHandler
+from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.portfolio_handlers import (
     EarningHandler,
@@ -77,6 +79,23 @@ def get_earning_handler(
 ) -> EarningHandler:
     """Provide the EarningHandler instance."""
     return EarningHandler(uow_factory=uow_factory)
+
+
+def get_auth_handler(settings: AppSettings = Depends(get_settings)) -> AuthHandler:
+    """Provide the AuthHandler instance."""
+    return AuthHandler(settings=settings)
+
+
+def require_user(
+    request: Request,
+    handler: AuthHandler = Depends(get_auth_handler),
+) -> str:
+    """Authenticate the request from the session cookie or a Bearer token."""
+    token = request.cookies.get(SESSION_COOKIE)
+    header = request.headers.get("Authorization", "")
+    if not token and header.lower().startswith("bearer "):
+        token = header[7:].strip()
+    return handler.authenticate(token)
 
 
 def get_database_probe() -> DatabaseProbe:

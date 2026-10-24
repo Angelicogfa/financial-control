@@ -67,7 +67,8 @@ describe("App UI/UX Integration (Clean Empty State, Hamburger Drawer & API Data)
   it("starts with a clean empty portfolio awaiting user input when database is empty", async () => {
     render(<App />);
 
-    expect(screen.getByText("Patrimônio Atual Líquido")).toBeInTheDocument();
+    // The authentication gate resolves first (API offline here), then the dashboard renders.
+    expect(await screen.findByText("Patrimônio Atual Líquido")).toBeInTheDocument();
     expect(screen.getByText("Rendimento Estimado Até Hoje")).toBeInTheDocument();
     expect(screen.getByText("Ganho / Perda Consolidado")).toBeInTheDocument();
     expect(screen.getByText("Proventos Recebidos (MVP)")).toBeInTheDocument();

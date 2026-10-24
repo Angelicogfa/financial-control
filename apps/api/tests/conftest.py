@@ -12,7 +12,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from fincontrol_api.dependencies import get_market_gateway, get_uow_factory
+from fincontrol_api.dependencies import get_market_gateway, get_uow_factory, require_user
 from fincontrol_api.main import create_app
 from fincontrol_core.market.bcb import BcbSgsProvider
 from fincontrol_core.market.brapi import BrapiProvider
@@ -69,6 +69,7 @@ def api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[SimpleNames
     gateway = offline_gateway()
     app.dependency_overrides[get_uow_factory] = lambda: uow_factory
     app.dependency_overrides[get_market_gateway] = lambda: gateway
+    app.dependency_overrides[require_user] = lambda: "tester"
 
     yield SimpleNamespace(app=app, client=TestClient(app), uow_factory=uow_factory)
     engine.dispose()

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from fincontrol_api.dependencies import get_asset_handler
+from fincontrol_api.dependencies import get_asset_handler, require_user
 from fincontrol_api.main import create_app
 from fincontrol_core.arca.allocation import InvalidTargetsError
 from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
@@ -18,6 +18,7 @@ def _client_raising(exc: BaseException) -> TestClient:
         raise exc
 
     app = create_app()
+    app.dependency_overrides[require_user] = lambda: "tester"
     app.dependency_overrides[get_asset_handler] = lambda: SimpleNamespace(get_by_id=boom)
     return TestClient(app, raise_server_exceptions=False)
 

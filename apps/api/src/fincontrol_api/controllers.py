@@ -7,13 +7,16 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, Response, status
 from fincontrol_core.domain.pagination import PaginationParams
 
+from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.dependencies import (
     get_asset_handler,
+    get_auth_handler,
     get_earning_handler,
     get_market_data_handler,
     get_portfolio_handler,
     get_system_handler,
     get_transaction_handler,
+    require_user,
 )
 from fincontrol_api.handlers import (
     AssetHandler,
@@ -21,6 +24,7 @@ from fincontrol_api.handlers import (
     PortfolioHandler,
     TransactionHandler,
 )
+from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
@@ -33,9 +37,11 @@ from fincontrol_api.schemas import (
     CerradoUpdateRequest,
     ContributionPlanResponseDTO,
     ContributionSimulationRequest,
+    CurrentUserDTO,
     EarningCreateRequest,
     EarningResponseDTO,
     EarningUpdateRequest,
+    LoginRequest,
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
@@ -53,6 +59,7 @@ earnings_router = APIRouter(prefix="/earnings", tags=["Earnings"])
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
 settings_router = APIRouter(prefix="/settings", tags=["Settings"])
 market_router = APIRouter(prefix="/market", tags=["Market Data"])
+auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 def pagination_query(
@@ -332,3 +339,37 @@ def get_series_status(
     handler: MarketDataHandler = Depends(get_market_data_handler),
 ) -> list[SeriesStatusDTO]:
     return handler.series_status()
+
+
+# ---------------------------------------------------------------------------
+# Authentication Controller (single user)
+# ---------------------------------------------------------------------------
+@auth_router.post("/login", response_model=CurrentUserDTO)
+def login(
+    payload: LoginRequest,
+    response: Response,
+    handler: AuthHandler = Depends(get_auth_handler),
+) -> CurrentUserDTO:
+    session = handler.login(payload)
+    response.set_cookie(
+        SESSION_COOKIE,
+        session.token,
+        max_age=handler.cookie_max_age_seconds,
+        httponly=True,
+        secure=handler.cookie_secure,
+        samesite="strict",
+        path="/",
+    )
+    return CurrentUserDTO(username=session.username, expires_at=session.expires_at)
+
+
+@auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout() -> Response:
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
+
+
+@auth_router.get("/me", response_model=CurrentUserDTO)
+def me(username: str = Depends(require_user)) -> CurrentUserDTO:
+    return CurrentUserDTO(username=username)

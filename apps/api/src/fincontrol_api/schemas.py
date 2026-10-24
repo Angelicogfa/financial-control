@@ -399,6 +399,16 @@ class PortfolioAnalyticsResponseDTO(BaseModel):
     curves: dict[str, list[dict[str, Any]]]
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=120)
+    password: str = Field(..., min_length=1, max_length=256)
+
+
+class CurrentUserDTO(BaseModel):
+    username: str
+    expires_at: datetime | None = None
+
+
 class ReadinessCheckDTO(BaseModel):
     ok: bool
     detail: str

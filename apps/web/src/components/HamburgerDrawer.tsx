@@ -49,6 +49,7 @@ interface HamburgerDrawerProps {
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
+  onLogout?: () => void;
   onSelectView: (view: AppViewId) => void;
 }
 
@@ -57,6 +58,7 @@ export const HamburgerDrawer: React.FC<HamburgerDrawerProps> = ({
   isOpen,
   onToggle,
   onClose,
+  onLogout,
   onSelectView,
 }) => {
   const activeItem = NAV_ITEMS.find((i) => i.id === activeView) ?? NAV_ITEMS[0];
@@ -97,6 +99,11 @@ export const HamburgerDrawer: React.FC<HamburgerDrawerProps> = ({
             <span className="live-dot" />
             CDI 10,75% a.a. • IPCA 4,50% • USD R$ 5,15
           </span>
+          {onLogout && (
+            <button type="button" className="btn btn-ghost" onClick={onLogout}>
+              Sair
+            </button>
+          )}
         </div>
       </header>
 
