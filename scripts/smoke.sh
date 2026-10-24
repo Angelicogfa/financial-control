@@ -57,7 +57,9 @@ expect_status() {
 }
 
 echo "==> building and starting $PROJECT"
-"${COMPOSE[@]}" up -d --build --wait --wait-timeout 300
+if ! "${COMPOSE[@]}" up -d --build --wait --wait-timeout 300; then
+  fail "stack did not become healthy"
+fi
 
 echo "==> readiness"
 READY="$(curl -s "$BASE/api/v1/ready")"

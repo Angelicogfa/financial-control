@@ -23,7 +23,7 @@
 | **Fase 7** | Fundação de Correção: Git, rede de testes de regressão, convenções de unidades (ADR 0006) | `[x]` Concluída | 100% |
 | **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[x]` Concluída | 100% |
 | **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[x]` Concluída | 100% |
-| **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[ ]` Pendente | 0% |
+| **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[x]` Concluída | 100% |
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[ ]` Pendente | 0% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[ ]` Pendente | 0% |
 | **Fase 13** | Frontend por Contexto de Operação (ADR 0005) | `[ ]` Pendente | 0% |
@@ -271,7 +271,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ### Consolidação e câmbio
 - `[x]` **8.6** (C-02) Custo em BRL pelo câmbio de cada compra (`total_cost_brl`), lucro realizado em BRL pelo câmbio da venda, valor atual pelo câmbio atual; novo campo `fx_pnl_brl` separando efeito câmbio de efeito preço. Proventos em moeda estrangeira ganham `fx_rate` (migration `script_00004_earnings_fx_rate.py`, default 1 para BRL e câmbio histórico do dia para USD via backfill). Lançamentos e proventos de ativos em moeda estrangeira passam a exigir câmbio (`400 FX_RATE_REQUIRED`).
-- `[x]` **8.7** (I-11) Projeções 12m lidas da `ValuationPolicy` (Fase 10) — até lá, de settings; resposta da API inclui as premissas usadas. Premissas em `ProjectionAssumptions`, configuráveis por `PROJECTION_*` no `.env` e devolvidas em `projection_assumptions`.
+- `[x]` **8.7** (I-11) Projeções 12m lidas da `ValuationPolicy` (Fase 10) — até lá, de settings; resposta da API inclui as premissas usadas. Premissas em `ProjectionAssumptions`, devolvidas em `projection_assumptions` (desde a Fase 10 vivem na `ValuationPolicy`; as variáveis `PROJECTION_*` foram removidas).
 
 ### Analytics
 - `[x]` **8.8** (C-03) Remover o fallback para IBOV. Sem histórico suficiente, a API devolve `status: "INSUFFICIENT_HISTORY"` com `available_points`; a UI mostra estado vazio explicativo.
@@ -315,18 +315,20 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 10 — Domínio do Framework Operacional (`[ ]` Pendente)
+## Fase 10 — Domínio do Framework Operacional (`[x]` Concluída)
 
 **Objetivo:** implementar a ADR 0005 no backend.
 
-- `[ ]` **10.1** Agregado `InvestmentPolicy` (`ArcaPolicy`, `EligibilityPolicy`, `ValuationPolicy`) em `packages/core/policy/`; tabela `investment_policy` versionada (`script_00007_investment_policy.py`) migrando `arca_targets`; endpoints `GET/PUT /api/v1/policy` com validação (metas somam 100%, bandas ≥ 0).
-- `[ ]` **10.2** (A-01) Bandas de tolerância por classe; `compute_allocation` devolve `band_status` (`WITHIN`, `BELOW`, `ABOVE`); aporte prioriza classes abaixo da banda.
-- `[ ]` **10.3** (A-02) Campo `exposure_class` separado de `asset_type`/mercado de listagem; sugestão automática para ETFs conhecidos (lista curada em `packages/core/catalog/etf_exposure.py`) e confirmação no cadastro.
-- `[ ]` **10.4** (A-03) Campo `purpose` (`ARCA`, `EMERGENCY_RESERVE`, `OTHER`); apenas `ARCA` entra na alocação e no aporte; reserva aparece separada no Início e na Carteira.
-- `[ ]` **10.5** (D-01) Entidade `accounts` (corretora/banco/custódia) e `account_id` em transações e proventos (`script_00008_accounts.py`, conta "Principal" para dados existentes); unicidade de `ticker` apenas para ativos negociados em bolsa; renda fixa identificada por código gerado + emissor + vencimento.
-- `[ ]` **10.6** Ciclo de vida `WATCHLIST → ELIGIBLE → HELD → REVIEW → ARCHIVED` calculado por `AssetLifecycleService` a partir da política, da posição e da avaliação fundamentalista; exposto em todas as respostas de ativo.
+- `[x]` **10.1** Agregado `InvestmentPolicy` (`ArcaPolicy`, `EligibilityPolicy`, `ValuationPolicy`) em `packages/core/policy/`; tabela `investment_policy` versionada (`script_00007_investment_policy.py`) migrando `arca_targets`; endpoints `GET/PUT /api/v1/policy` com validação (metas somam 100%, bandas ≥ 0). Tabela `investment_policies` é append-only (cada alteração cria uma versão); `GET /api/v1/policy/versions` lista o histórico. `/settings/arca-targets` virou fachada que cria nova versão mantendo bandas e demais regras. As premissas de projeção saíram do `.env` (`PROJECTION_*` removidas) e passaram para `ValuationPolicy`.
+- `[x]` **10.2** (A-01) Bandas de tolerância por classe; `compute_allocation` devolve `band_status` (`WITHIN`, `BELOW`, `ABOVE`); aporte prioriza classes abaixo da banda. `distribute_with_bands` leva as classes abaixo da banda até a meta antes de distribuir o restante pelas metas.
+- `[x]` **10.3** (A-02) Campo `exposure_class` separado de `asset_type`/mercado de listagem; sugestão automática para ETFs conhecidos (lista curada em `packages/core/catalog/etf_exposure.py`) e confirmação no cadastro. **Desvio:** não foi criada coluna `exposure_class`; o próprio `arca_class` é a classe de exposição e uma segunda coluna duplicaria a informação. O problema (padrão pelo local de listagem) foi resolvido com o catálogo e `GET /api/v1/assets/classification`, usado no cadastro quando a classe não é informada. A confirmação visual fica para a Fase 13.
+- `[x]` **10.4** (A-03) Campo `purpose` (`ARCA`, `EMERGENCY_RESERVE`, `OTHER`); apenas `ARCA` entra na alocação e no aporte; reserva aparece separada no Início e na Carteira. Migration `script_00008_asset_purpose.py`; relatório traz `value_by_purpose_brl` (patrimônio total inclui a reserva; alocação e aporte só o ARCA).
+- `[x]` **10.5** (D-01) Entidade `accounts` (corretora/banco/custódia) e `account_id` em transações e proventos (`script_00008_accounts.py`, conta "Principal" para dados existentes); unicidade de `ticker` apenas para ativos negociados em bolsa; renda fixa identificada por código gerado + emissor + vencimento. Migration renumerada para `script_00009_accounts.py`. Endpoints `/api/v1/accounts`; `account_id` em lançamentos, proventos e no filtro de `/portfolio`. **Desvio:** a unicidade de `ticker` continua valendo para todos, mas renda fixa e caixa podem omitir o ticker e recebem código gerado (`CDB-BANCOINTER-20270115`, `-2`…), o que resolve os tickers inventados.
+- `[x]` **10.6** Ciclo de vida `WATCHLIST → ELIGIBLE → HELD → REVIEW → ARCHIVED` calculado por `AssetLifecycleService` a partir da política, da posição e da avaliação fundamentalista; exposto em todas as respostas de ativo. Regras em `fincontrol_core.policy.lifecycle`; elegibilidade opcional por padrão (ativo nunca avaliado é elegível, ADR 0002) com `require_evaluation`, `min_score` e `min_coverage_pct` na política. Só `ELIGIBLE` e `HELD` recebem aporte; livro inválido aparece como `REVIEW`.
 
 **Aceite:** carteira de referência consolidada com bandas, exposição, reserva separada e status de ciclo de vida corretos; testes de unidade e integração verdes.
+
+**Validação (2026-10-25):** `scripts/check.sh --smoke` → 279 testes de backend (cobertura total 94%, `packages/core` 88,5% só em memória), web com ESLint, `tsc`, 10 testes e build; stack isolada do zero com `/ready` = ready em `script_00009`. Migrations `script_00007`–`script_00009` aplicadas e revertidas em PostgreSQL 16 descartável com dados legados (metas ARCA personalizadas viraram a versão 1 da política; lançamentos e proventos foram para a conta Principal; sequência de `accounts` correta). O primeiro smoke revelou um import circular (`policy` ↔ `consolidation`) que a suíte não pegava; corrigido e coberto por `test_import_graph.py`, que importa cada módulo com o cache limpo.
 
 ---
 
