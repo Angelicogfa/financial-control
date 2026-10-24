@@ -14,6 +14,7 @@ from fincontrol_core.domain.enums import (
     FixedIncomeInstrumentKind,
     FixedIncomeLiquidity,
     IntraClassStrategy,
+    SeriesUnit,
     TransactionKind,
 )
 from fincontrol_core.market.models import QuoteFreshness
@@ -396,6 +397,18 @@ class PortfolioAnalyticsResponseDTO(BaseModel):
     summary: RiskReturnSummaryDTO
     correlation_matrix: dict[str, dict[str, float]]
     curves: dict[str, list[dict[str, Any]]]
+
+
+class SeriesStatusDTO(BaseModel):
+    """Freshness diagnostics of a persisted market or macro series."""
+
+    symbol: str
+    unit: SeriesUnit | None = None
+    points: int
+    first_date: date | None = None
+    last_date: date | None = None
+    stale: bool
+    missing_business_days: int
 
 
 class AssetAnalysisResponseDTO(BaseModel):

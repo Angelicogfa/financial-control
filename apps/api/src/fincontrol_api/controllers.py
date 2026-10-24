@@ -10,6 +10,7 @@ from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_api.dependencies import (
     get_asset_handler,
     get_earning_handler,
+    get_market_data_handler,
     get_portfolio_handler,
     get_transaction_handler,
 )
@@ -19,6 +20,7 @@ from fincontrol_api.handlers import (
     PortfolioHandler,
     TransactionHandler,
 )
+from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.schemas import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -35,6 +37,7 @@ from fincontrol_api.schemas import (
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
+    SeriesStatusDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
     TransactionUpdateRequest,
@@ -46,6 +49,7 @@ transactions_router = APIRouter(prefix="/transactions", tags=["Transactions"])
 earnings_router = APIRouter(prefix="/earnings", tags=["Earnings"])
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
 settings_router = APIRouter(prefix="/settings", tags=["Settings"])
+market_router = APIRouter(prefix="/market", tags=["Market Data"])
 
 
 def pagination_query(
@@ -303,3 +307,13 @@ def update_arca_targets(
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> list[ArcaTargetItemDTO]:
     return handler.update_arca_targets(payload)
+
+
+# ---------------------------------------------------------------------------
+# Market Data Diagnostics Controller
+# ---------------------------------------------------------------------------
+@market_router.get("/series-status", response_model=list[SeriesStatusDTO])
+def get_series_status(
+    handler: MarketDataHandler = Depends(get_market_data_handler),
+) -> list[SeriesStatusDTO]:
+    return handler.series_status()

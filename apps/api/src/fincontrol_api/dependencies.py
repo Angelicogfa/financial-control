@@ -16,6 +16,7 @@ from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_api.config import AppSettings, get_settings
 from fincontrol_api.handlers.asset_handlers import AssetHandler
+from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.portfolio_handlers import (
     EarningHandler,
     PortfolioHandler,
@@ -91,6 +92,13 @@ def get_earning_handler(
 ) -> EarningHandler:
     """Provide the EarningHandler instance."""
     return EarningHandler(uow_factory=uow_factory)
+
+
+def get_market_data_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+) -> MarketDataHandler:
+    """Provide the MarketDataHandler instance."""
+    return MarketDataHandler(uow_factory=uow_factory)
 
 
 def get_portfolio_handler(
