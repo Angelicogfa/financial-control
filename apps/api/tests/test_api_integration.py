@@ -151,7 +151,7 @@ def test_full_api_end_to_end_workflow(tmp_path: Path, monkeypatch) -> None:
             "fixed_income_term": {
                 "instrument_kind": "CDB",
                 "indexer": "CDI",
-                "contracted_rate": "110.0",
+                "contracted_rate": "1.10",
                 "issue_date": "2024-06-01",
                 "tax_exempt": False,
                 "liquidity": "DAILY",

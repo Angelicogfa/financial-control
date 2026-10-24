@@ -14,6 +14,7 @@ from fincontrol_core.domain.entities import (
     AssetEntity,
     EarningEntity,
     FixedIncomeTermEntity,
+    MarketSeriesPoint,
     TransactionEntity,
 )
 from fincontrol_core.domain.enums import (
@@ -21,13 +22,16 @@ from fincontrol_core.domain.enums import (
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
+    SeriesUnit,
     TransactionKind,
 )
 from fincontrol_core.market.models import Quote
+from fincontrol_core.market.units import daily_rates, monthly_rates
 from fincontrol_core.portfolio.consolidation import (
     ConsolidatedPortfolioReport,
     consolidate_portfolio,
 )
+from fincontrol_core.portfolio.fixed_income import RateCurves
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 
@@ -36,18 +40,32 @@ def _load_reference_data() -> dict[str, Any]:
     return json.loads((GOLDEN_DIR / "reference_portfolio.json").read_text(encoding="utf-8"))
 
 
-def _daily_cdi_series(data: dict[str, Any]) -> dict[date, float]:
-    """Expand monthly daily-CDI percentages into one BCB-style point per business day."""
+def _rate_curves(data: dict[str, Any]) -> RateCurves:
+    """Build curves from BCB-style percentage points (one CDI point per business day)."""
     holidays = {date.fromisoformat(h) for h in data["holidays"]}
     months = sorted(data["cdi_daily_pct_by_month"])
     current = date.fromisoformat(f"{months[0]}-01")
     end = date.fromisoformat(data["as_of_date"])
-    series: dict[date, float] = {}
+    cdi_points: list[MarketSeriesPoint] = []
     while current <= end:
         if current.weekday() < 5 and current not in holidays:
-            series[current] = data["cdi_daily_pct_by_month"][current.strftime("%Y-%m")]
+            pct = data["cdi_daily_pct_by_month"][current.strftime("%Y-%m")]
+            cdi_points.append(
+                MarketSeriesPoint("CDI", current, pct, unit=SeriesUnit.PERCENT_PER_DAY)
+            )
         current += timedelta(days=1)
-    return series
+    ipca_points = [
+        MarketSeriesPoint(
+            "IPCA", date.fromisoformat(f"{month}-01"), pct, unit=SeriesUnit.PERCENT_PER_MONTH
+        )
+        for month, pct in data["ipca_monthly_pct"].items()
+    ]
+    return RateCurves(
+        cdi_daily=daily_rates(cdi_points),
+        ipca_monthly=monthly_rates(ipca_points),
+        annual_cdi_rate=data["annual_cdi_rate_fallback"],
+        annual_ipca_rate=data["annual_ipca_rate_fallback"],
+    )
 
 
 def _build_asset(raw: dict[str, Any]) -> AssetEntity:
@@ -123,8 +141,6 @@ def reference_report(
         ArcaTargets.default(),
         quotes=quotes,
         usd_brl_rate=data["usd_brl_rate"],
-        annual_cdi_rate=data["annual_cdi_rate_fallback"],
-        annual_ipca_rate=data["annual_ipca_rate_fallback"],
-        daily_cdi_series=_daily_cdi_series(data),
+        curves=_rate_curves(data),
         as_of_date=date.fromisoformat(data["as_of_date"]),
     )

@@ -45,28 +45,8 @@ KNOWN_FINDINGS: dict[tuple[str, str], str] = {
     **{("VOO", "consolidated_pnl_brl"): "C-02"},
     **{("BTC", m): "C-02" for m in ("invested_value_brl", "unrealized_pnl_brl")},
     **{("BTC", "consolidated_pnl_brl"): "C-02"},
-    **{
-        ("LCI-95CDI", m): "C-01"
-        for m in (
-            "gross_value_brl",
-            "current_value_brl",
-            "unrealized_pnl_brl",
-            "consolidated_pnl_brl",
-        )
-    },
-    **{
-        ("TD-IPCA2035", m): "I-01"
-        for m in (
-            "gross_value_brl",
-            "estimated_tax_brl",
-            "current_value_brl",
-            "unrealized_pnl_brl",
-            "consolidated_pnl_brl",
-        )
-    },
     ("PORTFOLIO", "total_invested_brl"): "C-02",
-    ("PORTFOLIO", "total_current_value_brl"): "C-01 I-01",
-    ("PORTFOLIO", "total_consolidated_pnl_brl"): "C-01 C-02 I-01",
+    ("PORTFOLIO", "total_consolidated_pnl_brl"): "C-02",
 }
 
 

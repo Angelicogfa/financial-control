@@ -32,6 +32,7 @@ from fincontrol_core.portfolio.consolidation import (
     consolidate_portfolio,
     plan_contribution,
 )
+from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_rate_curves
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 from fincontrol_core.valuation import summarize_valuation
 
@@ -81,8 +82,13 @@ class PortfolioApplicationService:
         usd_brl = self.gateway.get_usd_brl_rate()
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()
 
-        cdi_points = uow.market_series.list_series("CDI", date_to=ref_date)
-        daily_cdi_map = {p.reference_date: p.value for p in cdi_points} if cdi_points else None
+        curves = load_rate_curves(
+            uow.market_series,
+            date_from=earliest_fixed_income_start(assets),
+            date_to=ref_date,
+            annual_cdi_rate=annual_cdi,
+            annual_ipca_rate=annual_ipca,
+        )
 
         return consolidate_portfolio(
             assets=assets,
@@ -91,9 +97,7 @@ class PortfolioApplicationService:
             fundamentals_by_ticker=fundamentals,
             intra_strategies=intra_strategies,
             usd_brl_rate=usd_brl,
-            annual_cdi_rate=annual_cdi,
-            annual_ipca_rate=annual_ipca,
-            daily_cdi_series=daily_cdi_map,
+            curves=curves,
             as_of_date=ref_date,
             date_from=date_from,
         )

@@ -31,6 +31,7 @@ from fincontrol_core.errors import ValidationError
 from fincontrol_core.market.models import Fundamentals, Quote, QuoteFreshness
 from fincontrol_core.portfolio.fixed_income import (
     FixedIncomeValuation,
+    RateCurves,
     value_fixed_income_position,
 )
 from fincontrol_core.portfolio.positions import PositionState, build_position
@@ -243,14 +244,13 @@ def consolidate_portfolio(
     fundamentals_by_ticker: Mapping[str, Fundamentals] | None = None,
     intra_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
     usd_brl_rate: float = 5.0,
-    annual_cdi_rate: float = 0.1075,
-    annual_ipca_rate: float = 0.045,
-    daily_cdi_series: Mapping[date, float] | None = None,
+    curves: RateCurves | None = None,
     as_of_date: date | None = None,
     date_from: date | None = None,
 ) -> ConsolidatedPortfolioReport:
     """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations."""
     ref_date = as_of_date or date.today()
+    rate_curves = curves or RateCurves()
     quotes_map = quotes or {}
     fund_map = fundamentals_by_ticker or {}
     strategy_map = intra_strategies or {}
@@ -297,10 +297,9 @@ def consolidate_portfolio(
                 asset.transactions,
                 asset.fixed_income_term,
                 ref_date,
-                annual_cdi_rate=annual_cdi_rate,
-                annual_ipca_rate=annual_ipca_rate,
-                daily_cdi_series=daily_cdi_series,
+                curves=rate_curves,
             )
+            realized_brl = fi_val.realized_pnl
             invested_brl = fi_val.invested_principal
             gross_brl = fi_val.gross_value
             tax_brl = round(fi_val.iof_tax + fi_val.income_tax, 2)
@@ -341,7 +340,7 @@ def consolidate_portfolio(
                 earnings_12m_brl=earnings_12m_brl,
                 fundamentals=fund,
                 fi_valuation=fi_val,
-                annual_cdi_rate=annual_cdi_rate,
+                annual_cdi_rate=rate_curves.annual_cdi_rate,
             )
         )
 

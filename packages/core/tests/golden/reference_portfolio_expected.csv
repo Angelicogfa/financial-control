@@ -32,23 +32,23 @@ CDB-110CDI,received_earnings_brl,0.00,
 CDB-110CDI,unrealized_pnl_brl,84.35,
 CDB-110CDI,consolidated_pnl_brl,84.35,
 LCI-95CDI,invested_value_brl,5000.00,
-LCI-95CDI,gross_value_brl,5301.18,C-01
+LCI-95CDI,gross_value_brl,5301.18,
 LCI-95CDI,estimated_tax_brl,0.00,
-LCI-95CDI,current_value_brl,5301.18,C-01
+LCI-95CDI,current_value_brl,5301.18,
 LCI-95CDI,realized_pnl_brl,0.00,
 LCI-95CDI,received_earnings_brl,0.00,
-LCI-95CDI,unrealized_pnl_brl,301.18,C-01
-LCI-95CDI,consolidated_pnl_brl,301.18,C-01
+LCI-95CDI,unrealized_pnl_brl,301.18,
+LCI-95CDI,consolidated_pnl_brl,301.18,
 TD-IPCA2035,invested_value_brl,3000.00,
-TD-IPCA2035,gross_value_brl,3184.39,I-01
-TD-IPCA2035,estimated_tax_brl,41.49,I-01
-TD-IPCA2035,current_value_brl,3142.90,I-01
+TD-IPCA2035,gross_value_brl,3184.39,
+TD-IPCA2035,estimated_tax_brl,41.49,
+TD-IPCA2035,current_value_brl,3142.90,
 TD-IPCA2035,realized_pnl_brl,0.00,
 TD-IPCA2035,received_earnings_brl,0.00,
-TD-IPCA2035,unrealized_pnl_brl,142.90,I-01
-TD-IPCA2035,consolidated_pnl_brl,142.90,I-01
+TD-IPCA2035,unrealized_pnl_brl,142.90,
+TD-IPCA2035,consolidated_pnl_brl,142.90,
 PORTFOLIO,total_invested_brl,31389.00,C-02
-PORTFOLIO,total_current_value_brl,36408.43,C-01 I-01
+PORTFOLIO,total_current_value_brl,36408.43,
 PORTFOLIO,total_realized_pnl_brl,468.00,
 PORTFOLIO,total_received_earnings_brl,74.00,
-PORTFOLIO,total_consolidated_pnl_brl,5561.43,C-01 C-02 I-01
+PORTFOLIO,total_consolidated_pnl_brl,5561.43,C-02

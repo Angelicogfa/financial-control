@@ -59,7 +59,7 @@ def test_dto_serializers_for_asset_and_transaction() -> None:
         fixed_income_term=FixedIncomeTermEntity(
             instrument_kind=FixedIncomeInstrumentKind.CDB,
             indexer=FixedIncomeIndexer.CDI,
-            contracted_rate=Decimal("112"),
+            contracted_rate=Decimal("1.12"),
             issue_date=date(2024, 5, 1),
         ),
     )
@@ -67,7 +67,7 @@ def test_dto_serializers_for_asset_and_transaction() -> None:
     assert dto.id == 7
     assert dto.use_cerrado is False
     assert dto.fixed_income_term is not None
-    assert dto.fixed_income_term.contracted_rate == Decimal("112")
+    assert dto.fixed_income_term.contracted_rate == Decimal("1.12")
 
     tx = TransactionEntity(
         id=15,

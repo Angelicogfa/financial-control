@@ -18,6 +18,7 @@ from fincontrol_core.arca.allocation import ArcaTargets
 from fincontrol_core.domain.entities import (
     AssetEntity,
     FixedIncomeTermEntity,
+    MarketSeriesPoint,
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
@@ -27,12 +28,15 @@ from fincontrol_core.domain.enums import (
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
     IntraClassStrategy,
+    SeriesUnit,
     TransactionKind,
 )
 from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.models import Quote
+from fincontrol_core.market.units import daily_rates
 from fincontrol_core.portfolio.consolidation import consolidate_portfolio, plan_contribution
 from fincontrol_core.portfolio.fixed_income import (
+    RateCurves,
     count_business_days,
     value_fixed_income_position,
 )
@@ -98,23 +102,26 @@ def _sell(asset_id: int, on: date, qty: str, price: str, fx: str = "1") -> Trans
 def _accrue_cdi(daily_pct: float, days: int = 10) -> float:
     issue = date(2024, 3, 1)
     dates = _business_days(issue, days)
+    # Points exactly as BCB SGS 12 returns them: percent per business day.
+    points = [
+        MarketSeriesPoint("CDI", d, daily_pct, unit=SeriesUnit.PERCENT_PER_DAY) for d in dates
+    ]
     valuation = value_fixed_income_position(
         [_buy(1, issue, "1", "1000")],
         _cdi_term(issue),
         dates[-1],
-        daily_cdi_series={d: daily_pct for d in dates},
+        curves=RateCurves(cdi_daily=daily_rates(points)),
     )
     return valuation.gross_value
 
 
 def test_c01_daily_cdi_above_heuristic_threshold_is_read_as_percentage() -> None:
-    # 0.0551% per day (~14.9% a.a.) happens to be above the 0.05 threshold and works today.
+    # 0.0551% per day (~14.9% a.a.) was above the old 0.05 threshold and always worked.
     assert _accrue_cdi(0.0551) == pytest.approx(1000 * (1 + 0.000551) ** 10, abs=0.01)
 
 
-@_xfail("C-01", "daily CDI <= 0.05 is treated as a fraction, inflating accrual ~100x")
 def test_c01_daily_cdi_below_heuristic_threshold_is_read_as_percentage() -> None:
-    # 0.0393% per day (~10.4% a.a., 2024 levels) is read as 3.93% per day today.
+    # 0.0393% per day (~10.4% a.a., 2024 levels) used to be read as 3.93% per day.
     assert _accrue_cdi(0.0393) == pytest.approx(1000 * (1 + 0.000393) ** 10, abs=0.01)
 
 
@@ -168,7 +175,6 @@ def test_c02_realized_pnl_uses_trade_date_fx() -> None:
 # ---------------------------------------------------------------------------
 # C-04 — Fixed income sells must reduce principal proportionally
 # ---------------------------------------------------------------------------
-@_xfail("C-04", "sale proceeds (principal + yield) are deducted from principal")
 def test_c04_fixed_income_sell_reduces_principal_proportionally() -> None:
     issue = date(2024, 1, 2)
     sell_day = date(2025, 1, 2)
@@ -189,7 +195,6 @@ def test_c04_fixed_income_sell_reduces_principal_proportionally() -> None:
 # ---------------------------------------------------------------------------
 # I-01 — Business-day calendar and 12-month projection
 # ---------------------------------------------------------------------------
-@_xfail("I-01", "business-day count ignores national holidays")
 @pytest.mark.parametrize(
     ("start", "end"),
     [
@@ -202,16 +207,19 @@ def test_i01_business_days_skip_national_holidays(start: date, end: date) -> Non
     assert count_business_days(start, end) == 0
 
 
-@_xfail("I-01", "12m projection uses hard-coded 2026->2027 window (261 weekdays)")
 def test_i01_projection_for_pre_fixed_rate_matches_one_year() -> None:
     issue = date(2027, 3, 1)
     as_of = date(2027, 9, 1)
     valuation = value_fixed_income_position(
         [_buy(1, issue, "1", "1000")], _pre_term(issue, "0.10"), as_of
     )
-    # One year of a 10% a.a. pre-fixed bond, net of the 15% long-term income tax.
-    expected = valuation.net_value * 0.10 * (1 - 0.15)
-    assert valuation.projected_12m_net_yield == pytest.approx(expected, rel=0.002)
+    # Net value one year (252 business days) ahead minus net value today. The yield accrued
+    # by then is taxed at the bracket of the horizon: 184 + 365 = 549 days -> 17.5%.
+    # (The original expectation of a flat 15% ignored the regressive table.)
+    gross_in_one_year = valuation.gross_value * 1.10
+    net_in_one_year = gross_in_one_year - (gross_in_one_year - 1000.0) * 0.175
+    expected = net_in_one_year - valuation.net_value
+    assert valuation.projected_12m_net_yield == pytest.approx(expected, abs=0.02)
 
 
 # ---------------------------------------------------------------------------

@@ -29,6 +29,30 @@ from fincontrol_core.domain.enums import (
 )
 from fincontrol_core.errors import ValidationError
 
+# Accepted `contracted_rate` range and meaning per indexer (ADR 0006).
+CONTRACTED_RATE_BOUNDS: dict[FixedIncomeIndexer, tuple[Decimal, Decimal, str]] = {
+    FixedIncomeIndexer.CDI: (
+        Decimal("0.5"),
+        Decimal("3.0"),
+        "a multiplier of the index (1.10 = 110% of CDI)",
+    ),
+    FixedIncomeIndexer.SELIC: (
+        Decimal("0.5"),
+        Decimal("3.0"),
+        "a multiplier of the index (1.00 = 100% of SELIC)",
+    ),
+    FixedIncomeIndexer.PRE: (
+        Decimal("0"),
+        Decimal("0.5"),
+        "an annual fraction (0.12 = 12% a.a.)",
+    ),
+    FixedIncomeIndexer.IPCA: (
+        Decimal("0"),
+        Decimal("0.5"),
+        "an annual real-rate fraction (0.065 = IPCA + 6.5% a.a.)",
+    ),
+}
+
 
 @dataclass(frozen=True)
 class FixedIncomeTermEntity:
@@ -46,8 +70,13 @@ class FixedIncomeTermEntity:
     asset_id: int | None = None
 
     def __post_init__(self) -> None:
-        if self.contracted_rate < Decimal("0"):
-            raise ValidationError("contracted_rate cannot be negative")
+        low, high, meaning = CONTRACTED_RATE_BOUNDS[self.indexer]
+        if not low <= self.contracted_rate <= high:
+            raise ValidationError(
+                f"contracted_rate {self.contracted_rate} is outside [{low}, {high}] for "
+                f"{self.indexer.value}: it must be {meaning} (ADR 0006)",
+                code="INVALID_CONTRACTED_RATE",
+            )
 
 
 @dataclass(frozen=True)

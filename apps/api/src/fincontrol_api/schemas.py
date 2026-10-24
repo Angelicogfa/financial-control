@@ -47,7 +47,13 @@ class FixedIncomeTermPayload(BaseModel):
 
     instrument_kind: FixedIncomeInstrumentKind
     indexer: FixedIncomeIndexer
-    contracted_rate: Decimal = Field(..., ge=Decimal("0"))
+    contracted_rate: Decimal = Field(
+        ...,
+        description=(
+            "ADR 0006: multiplier for CDI/SELIC (1.10 = 110% of CDI); "
+            "annual fraction for PRE/IPCA (0.065 = 6.5% a.a.)"
+        ),
+    )
     issue_date: date
     maturity_date: date | None = None
     tax_exempt: bool = False
@@ -210,6 +216,8 @@ class FixedIncomeValuationDTO(BaseModel):
     net_yield: float
     net_yield_pct: float
     projected_12m_net_yield: float
+    realized_pnl: float = 0.0
+    curve_coverage: float = 1.0
 
 
 class ValuedPositionDTO(BaseModel):

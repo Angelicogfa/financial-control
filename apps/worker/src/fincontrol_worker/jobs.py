@@ -17,6 +17,7 @@ from fincontrol_core.domain.enums import (
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.units import BCB_SERIES_UNITS
 from fincontrol_core.portfolio.consolidation import consolidate_portfolio
+from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_rate_curves
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
@@ -129,8 +130,13 @@ def record_daily_snapshot_job(
             if fund is not None:
                 fundamentals[asset.ticker] = fund
 
-        cdi_pts = uow.market_series.list_series("CDI", date_to=ref_date)
-        daily_cdi_map = {p.reference_date: p.value for p in cdi_pts} if cdi_pts else None
+        curves = load_rate_curves(
+            uow.market_series,
+            date_from=earliest_fixed_income_start(assets),
+            date_to=ref_date,
+            annual_cdi_rate=annual_cdi,
+            annual_ipca_rate=annual_ipca,
+        )
 
         report = consolidate_portfolio(
             assets=assets,
@@ -139,9 +145,7 @@ def record_daily_snapshot_job(
             fundamentals_by_ticker=fundamentals,
             intra_strategies=intra_strategies,
             usd_brl_rate=usd_brl,
-            annual_cdi_rate=annual_cdi,
-            annual_ipca_rate=annual_ipca,
-            daily_cdi_series=daily_cdi_map,
+            curves=curves,
             as_of_date=ref_date,
         )
 

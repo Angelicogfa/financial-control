@@ -58,3 +58,54 @@ def test_script_00002_tags_existing_series_with_units(db: tuple[Config, Engine])
     with engine.connect() as conn:
         columns = [row[1] for row in conn.execute(text("PRAGMA table_info(market_series)"))]
     assert "unit" not in columns
+
+
+def test_script_00003_normalizes_percent_scaled_contracted_rates(
+    db: tuple[Config, Engine],
+) -> None:
+    cfg, engine = db
+    command.upgrade(cfg, "script_00002")
+    rows = [
+        (1, "CDI", 110.0),
+        (2, "CDI", 1.10),
+        (3, "SELIC", 100.0),
+        (4, "IPCA", 6.5),
+        (5, "IPCA", 0.065),
+        (6, "PRE", 12.0),
+    ]
+    with engine.begin() as conn:
+        for asset_id, indexer, rate in rows:
+            conn.execute(
+                text(
+                    "INSERT INTO assets (id, ticker, name, asset_type, arca_class, currency, "
+                    "cerrado_answers, created_at, updated_at) VALUES (:id, :t, :t, "
+                    "'FIXED_INCOME', 'CAIXA', 'BRL', '{}', '2025-01-01', '2025-01-01')"
+                ),
+                {"id": asset_id, "t": f"RF-{asset_id}"},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO fixed_income_terms (asset_id, instrument_kind, indexer, "
+                    "contracted_rate, issue_date, tax_exempt, liquidity) VALUES "
+                    "(:id, 'CDB', :ix, :rate, '2025-01-02', 0, 'AT_MATURITY')"
+                ),
+                {"id": asset_id, "ix": indexer, "rate": rate},
+            )
+
+    command.upgrade(cfg, "script_00003")
+
+    with engine.connect() as conn:
+        rates = {
+            asset_id: float(rate)
+            for asset_id, rate in conn.execute(
+                text("SELECT asset_id, contracted_rate FROM fixed_income_terms")
+            )
+        }
+    assert rates == {
+        1: pytest.approx(1.10),
+        2: pytest.approx(1.10),
+        3: pytest.approx(1.00),
+        4: pytest.approx(0.065),
+        5: pytest.approx(0.065),
+        6: pytest.approx(0.12),
+    }

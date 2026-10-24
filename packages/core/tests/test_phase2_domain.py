@@ -40,6 +40,7 @@ from fincontrol_core.portfolio.consolidation import (
     plan_contribution,
 )
 from fincontrol_core.portfolio.fixed_income import (
+    RateCurves,
     count_business_days,
     regressive_iof_rate,
     regressive_ir_rate,
@@ -139,7 +140,7 @@ def test_value_fixed_income_cdi_and_tax_exempt_lci() -> None:
     cdb_term = FixedIncomeTermEntity(
         instrument_kind=FixedIncomeInstrumentKind.CDB,
         indexer=FixedIncomeIndexer.CDI,
-        contracted_rate=Decimal("110"),
+        contracted_rate=Decimal("1.10"),
         issue_date=date(2024, 1, 2),
         tax_exempt=False,
     )
@@ -147,7 +148,7 @@ def test_value_fixed_income_cdi_and_tax_exempt_lci() -> None:
         transactions=txs,
         term=cdb_term,
         as_of_date=date(2025, 1, 2),
-        annual_cdi_rate=0.1125,
+        curves=RateCurves(annual_cdi_rate=0.1125),
     )
     assert val_cdb.gross_value > 11000.0
     assert val_cdb.income_tax > 0.0
@@ -157,7 +158,7 @@ def test_value_fixed_income_cdi_and_tax_exempt_lci() -> None:
     lci_term = FixedIncomeTermEntity(
         instrument_kind=FixedIncomeInstrumentKind.LCI,
         indexer=FixedIncomeIndexer.CDI,
-        contracted_rate=Decimal("95"),
+        contracted_rate=Decimal("0.95"),
         issue_date=date(2024, 1, 2),
         tax_exempt=True,
     )
@@ -165,7 +166,7 @@ def test_value_fixed_income_cdi_and_tax_exempt_lci() -> None:
         transactions=txs,
         term=lci_term,
         as_of_date=date(2025, 1, 2),
-        annual_cdi_rate=0.1125,
+        curves=RateCurves(annual_cdi_rate=0.1125),
     )
     assert val_lci.income_tax == 0.0
     assert val_lci.net_value == val_lci.gross_value
@@ -353,7 +354,7 @@ def test_consolidate_portfolio_and_contribution_planner() -> None:
             fixed_income_term=FixedIncomeTermEntity(
                 instrument_kind=FixedIncomeInstrumentKind.CDB,
                 indexer=FixedIncomeIndexer.CDI,
-                contracted_rate=Decimal("110"),
+                contracted_rate=Decimal("1.10"),
                 issue_date=date(2024, 6, 1),
             ),
             transactions=(

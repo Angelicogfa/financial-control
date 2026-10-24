@@ -67,7 +67,7 @@ def test_uow_and_domain_consolidation_end_to_end(tmp_path: Path, monkeypatch) ->
                 fixed_income_term=FixedIncomeTermEntity(
                     instrument_kind=FixedIncomeInstrumentKind.TESOURO_SELIC,
                     indexer=FixedIncomeIndexer.SELIC,
-                    contracted_rate=Decimal("100"),
+                    contracted_rate=Decimal("1.00"),
                     issue_date=date(2024, 3, 10),
                 ),
             )

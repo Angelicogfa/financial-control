@@ -145,7 +145,6 @@ def test_c03_analytics_without_history_does_not_fabricate_portfolio_curve() -> N
 # ---------------------------------------------------------------------------
 # I-02 — contracted_rate must follow ADR 0006 (fraction / multiplier), not be guessed
 # ---------------------------------------------------------------------------
-@_xfail("I-02", "API accepts percent-scaled contracted rates and guesses the scale later")
 @pytest.mark.parametrize(
     ("indexer", "rate"),
     [("IPCA", "6.5"), ("CDI", "110.0")],
