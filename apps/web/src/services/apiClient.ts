@@ -84,6 +84,8 @@ export const EMPTY_PORTFOLIO_REPORT: PortfolioReportDTO = {
 };
 
 export const EMPTY_ANALYTICS: PortfolioAnalyticsDTO = {
+  status: "INSUFFICIENT_HISTORY",
+  available_points: 0,
   summary: {
     observations: 0,
     cumulative_return: 0.0,

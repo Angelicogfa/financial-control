@@ -159,6 +159,10 @@ export interface ValuedPositionDTO {
   cerrado_evaluation: CerradoEvaluationDTO;
   class_target_weight_pct: number;
   class_current_weight_pct: number;
+  fx_pnl_brl?: number;
+  custom_class_weight?: number | null;
+  ledger_status?: "VALID" | "INVALID";
+  ledger_message?: string | null;
 }
 
 export interface ClassAllocationDTO {
@@ -193,6 +197,8 @@ export interface PortfolioReportDTO {
   allocations: ClassAllocationDTO[];
   positions: ValuedPositionDTO[];
   earnings_by_month: Record<string, number>;
+  total_fx_pnl_brl?: number;
+  projection_assumptions?: Record<string, number>;
 }
 
 export interface AssetContributionOrderDTO {
@@ -254,6 +260,7 @@ export interface EarningCreatePayload {
   net_amount?: number | null;
   ex_date?: string | null;
   notes?: string | null;
+  fx_rate?: number;
 }
 
 export interface EarningDTO {
@@ -266,6 +273,8 @@ export interface EarningDTO {
   gross_amount: number;
   withholding_tax: number;
   net_amount: number;
+  fx_rate?: number;
+  net_amount_brl?: number;
   notes?: string | null;
 }
 
@@ -285,6 +294,8 @@ export interface BenchmarkComparisonDTO {
 }
 
 export interface PortfolioAnalyticsDTO {
+  status?: "OK" | "INSUFFICIENT_HISTORY";
+  available_points?: number;
   summary: {
     observations: number;
     cumulative_return: number;

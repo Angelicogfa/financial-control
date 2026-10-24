@@ -53,6 +53,7 @@ import {
   formatPercent,
   formatQuantity,
 } from "./utils/formatters";
+import { DEFAULT_RATE_PERCENT, percentToContractedRate } from "./utils/rates";
 
 type PositionRow = ValuedPositionDTO & Record<string, unknown>;
 type AssetRow = AssetDTO & Record<string, unknown>;
@@ -94,7 +95,7 @@ export const App: React.FC = () => {
   // Fixed income contract state
   const [fiKind, setFiKind] = useState<FixedIncomeInstrumentKind>("CDB");
   const [fiIndexer, setFiIndexer] = useState<FixedIncomeIndexer>("CDI");
-  const [fiRate, setFiRate] = useState<string>("1.10");
+  const [fiRate, setFiRate] = useState<string>(DEFAULT_RATE_PERCENT.CDI);
   const [fiIssueDate, setFiIssueDate] = useState<string>(TODAY_ISO);
   const [fiMaturityDate, setFiMaturityDate] = useState<string>("");
   const [fiTaxExempt, setFiTaxExempt] = useState<boolean>(false);
@@ -118,6 +119,7 @@ export const App: React.FC = () => {
   const [earnGross, setEarnGross] = useState<string>("");
   const [earnTax, setEarnTax] = useState<string>("0");
   const [earnNotes, setEarnNotes] = useState<string>("");
+  const [earnFxRate, setEarnFxRate] = useState<string>("1");
 
   // Contribution simulator state
   const [contributionAmount, setContributionAmount] = useState<number>(5000);
@@ -170,6 +172,11 @@ export const App: React.FC = () => {
 
   const displayedContributionOrders = remoteContributionOrders ?? contributionPlan.orders;
 
+  const invalidLedgerPositions = report.positions.filter((p) => p.ledger_status === "INVALID");
+
+  const earnAssetIsForeign =
+    (assets.find((a) => a.id === earnAssetId)?.currency ?? "BRL").toUpperCase() !== "BRL";
+
   const isFixedIncomeSelected = assetType === "FIXED_INCOME" || assetType === "TREASURY";
 
   const handleAssetTypeChange = (nextType: AssetType) => {
@@ -207,7 +214,7 @@ export const App: React.FC = () => {
           ? {
               instrument_kind: fiKind,
               indexer: fiIndexer,
-              contracted_rate: Number(fiRate),
+              contracted_rate: percentToContractedRate(Number(fiRate)),
               issue_date: fiIssueDate,
               maturity_date: fiMaturityDate || null,
               tax_exempt: fiTaxExempt,
@@ -332,6 +339,7 @@ export const App: React.FC = () => {
         gross_amount: Number(earnGross),
         withholding_tax: Number(earnTax || 0),
         notes: earnNotes.trim() || null,
+        fx_rate: earnAssetIsForeign ? Number(earnFxRate || 1) : 1,
       });
       setEarnGross("");
       setEarnTax("0");
@@ -770,6 +778,14 @@ export const App: React.FC = () => {
           </div>
         )}
 
+        {invalidLedgerPositions.length > 0 && (
+          <div className="alert alert-error" role="alert">
+            Lançamentos inconsistentes em{" "}
+            {invalidLedgerPositions.map((p) => p.ticker).join(", ")}: esses ativos ficaram fora
+            dos totais até a correção em Lançamentos.
+          </div>
+        )}
+
         {errorMessage && (
           <div
             className="panel-card"
@@ -1110,20 +1126,25 @@ export const App: React.FC = () => {
                             id="fi-indexer"
                             className="std-select"
                             value={fiIndexer}
-                            onChange={(e) => setFiIndexer(e.target.value as FixedIncomeIndexer)}
+                            onChange={(e) => {
+                              const next = e.target.value as FixedIncomeIndexer;
+                              setFiIndexer(next);
+                              setFiRate(DEFAULT_RATE_PERCENT[next]);
+                            }}
                           >
-                            <option value="CDI">% do CDI (Ex: 1.12 = 112% CDI)</option>
-                            <option value="IPCA">IPCA + Taxa a.a. (Ex: 0.062 = +6,2%)</option>
-                            <option value="SELIC">% da SELIC (Ex: 1.00 = 100% SELIC)</option>
-                            <option value="PRE">Prefixado a.a. (Ex: 0.125 = 12,5% a.a.)</option>
+                            <option value="CDI">% do CDI (Ex: 112 = 112% do CDI)</option>
+                            <option value="IPCA">IPCA + taxa a.a. (Ex: 6,2 = IPCA + 6,2%)</option>
+                            <option value="SELIC">% da SELIC (Ex: 100 = 100% da SELIC)</option>
+                            <option value="PRE">Prefixado a.a. (Ex: 12,5 = 12,5% a.a.)</option>
                           </select>
                         </div>
                         <div className="form-field">
-                          <label htmlFor="fi-rate">Taxa Contratada (Decimal)</label>
+                          <label htmlFor="fi-rate">Taxa Contratada (%)</label>
                           <input
                             id="fi-rate"
                             type="number"
-                            step="0.0001"
+                            step="0.01"
+                            min="0"
                             required
                             className="std-input mono"
                             value={fiRate}
@@ -1369,7 +1390,7 @@ export const App: React.FC = () => {
                   />
                 </div>
                 <div className="form-field">
-                  <label htmlFor="earn-tax">IR Retido (R$)</label>
+                  <label htmlFor="earn-tax">IR Retido</label>
                   <input
                     id="earn-tax"
                     type="number"
@@ -1379,6 +1400,21 @@ export const App: React.FC = () => {
                     onChange={(e) => setEarnTax(e.target.value)}
                   />
                 </div>
+                {earnAssetIsForeign && (
+                  <div className="form-field">
+                    <label htmlFor="earn-fx">Câmbio na data do pagamento</label>
+                    <input
+                      id="earn-fx"
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      required
+                      className="std-input mono"
+                      value={earnFxRate}
+                      onChange={(e) => setEarnFxRate(e.target.value)}
+                    />
+                  </div>
+                )}
                 <div className="form-field" style={{ justifyContent: "flex-end" }}>
                   <label>&nbsp;</label>
                   <button type="submit" className="btn btn-primary">
@@ -1557,6 +1593,14 @@ export const App: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {analytics.status === "INSUFFICIENT_HISTORY" && (
+                <div className="alert alert-info" role="status">
+                  Ainda não há histórico suficiente da sua carteira para calcular rentabilidade e
+                  risco ({analytics.available_points ?? 0} fechamento(s) diário(s) registrado(s)).
+                  Os benchmarks abaixo são apenas referência de mercado.
+                </div>
+              )}
 
               <div className="arca-grid" style={{ marginBottom: "20px" }}>
                 <div className="arca-box">
