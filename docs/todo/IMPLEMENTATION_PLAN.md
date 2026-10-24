@@ -26,7 +26,7 @@
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[x]` Concluída | 100% |
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[ ]` Pendente | 0% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[ ]` Pendente | 0% |
-| **Fase 13** | Frontend por Contexto de Operação (ADR 0005) | `[ ]` Pendente | 0% |
+| **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[ ]` Pendente | 0% |
 | **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[ ]` Pendente | 0% |
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
@@ -334,10 +334,10 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ## Fase 11 — Módulo Fundamentalista (`[ ]` Pendente)
 
-- `[ ]` **11.1** (F-02) Tabela `fundamental_snapshots` (ativo, data de referência, período `ANNUAL`/`TTM`, métricas normalizadas em fração) — `script_00009_fundamental_snapshots.py`; adaptadores brapi/yfinance para demonstrativos anuais; job semanal de atualização para carteira + watchlist.
+- `[ ]` **11.1** (F-02) Tabela `fundamental_snapshots` (ativo, data de referência, período `ANNUAL`/`TTM`, métricas normalizadas em fração) — `script_00010_fundamental_snapshots.py`; adaptadores brapi/yfinance para demonstrativos anuais; job semanal de atualização para carteira + watchlist.
 - `[ ]` **11.2** (F-02) Métricas históricas derivadas: ROE médio 5a, CAGR de receita e lucro 5a, anos com lucro, regularidade de proventos, payout médio.
 - `[ ]` **11.3** (F-03) Checklists versionados por tipo e setor (`STOCK`, `BANK`, `FII_BRICK`, `FII_PAPER`, `ETF`, `INTL_STOCK`, `CRYPTO`, `FIXED_INCOME`), com perguntas `N/A` quando não aplicáveis; Cerrado como modelo padrão; ETFs com checklist próprio (taxa, índice, liquidez, tracking).
-- `[ ]` **11.4** (F-04) Tabela `checklist_answers` (pergunta, valor, origem `MANUAL`/`AUTO`, evidência, `answered_at`, versão) — `script_00010_checklist_answers.py`, migrando `cerrado_answers`; score normalizado (`score / respondidas`) e elegibilidade exigindo cobertura mínima da política.
+- `[ ]` **11.4** (F-04) Tabela `checklist_answers` (pergunta, valor, origem `MANUAL`/`AUTO`, evidência, `answered_at`, versão) — `script_00011_checklist_answers.py`, migrando `cerrado_answers`; score normalizado (`score / respondidas`) e elegibilidade exigindo cobertura mínima da política.
 - `[ ]` **11.5** (F-03) Valuation por tipo: ações não financeiras (Graham, Bazin, P/L, EV/EBITDA), bancos (Bazin, P/VP, ROE), FII (P/VP, DY vs NTN-B, Bazin), ETF/cripto sem preço justo; yield do Bazin e aplicabilidade vindos da `ValuationPolicy`.
 - `[ ]` **11.6** (F-01) Catálogo de instrumentos `instrument_catalog` sincronizado diariamente (lista de ativos B3 via brapi; cadastro manual para internacionais), com campos básicos (setor, preço, volume financeiro, valor de mercado).
 - `[ ]` **11.7** (F-01) Screener `GET /api/v1/research/screener` com filtros por classe ARCA, setor, liquidez, indicadores e status de elegibilidade; métricas profundas calculadas sob demanda para a watchlist (respeitando limites do plano gratuito da brapi, com cache).
@@ -350,34 +350,34 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ## Fase 12 — Operação: Aporte, Alertas, Importação e Eventos (`[ ]` Pendente)
 
-- `[ ]` **12.1** (I-07) Aporte persistido como `contribution_plans` (`DRAFT`, `CONFIRMED`, `DISCARDED`) — `script_00011_contribution_plans.py`; nível 2 só com ativos elegíveis; confirmação gera os lançamentos com preço/quantidade executados editáveis pelo usuário.
+- `[ ]` **12.1** (I-07) Aporte persistido como `contribution_plans` (`DRAFT`, `CONFIRMED`, `DISCARDED`) — `script_00012_contribution_plans.py`; nível 2 só com ativos elegíveis; confirmação gera os lançamentos com preço/quantidade executados editáveis pelo usuário.
 - `[ ]` **12.2** Motor de alertas (`packages/core/alerts.py`): classe fora da banda, ativo em `REVIEW`, preço abaixo do teto, cotação em fallback, série BCB desatualizada, livro inválido, snapshot ausente; endpoint `GET /api/v1/alerts` e dispensa por usuário.
 - `[ ]` **12.3** (D-03) Importação B3 (Área do Investidor: planilhas de Negociação e Movimentação) com pré-visualização, deduplicação por hash e mapeamento de ativos desconhecidos para cadastro/watchlist.
-- `[ ]` **12.4** (D-03, TD-03) Entidade `corporate_events` (desdobramento, grupamento, bonificação com custo atribuído) — `script_00012_corporate_events.py`; motor de posições aplica fatores por data; importação de eventos da Movimentação B3.
+- `[ ]` **12.4** (D-03, TD-03) Entidade `corporate_events` (desdobramento, grupamento, bonificação com custo atribuído) — `script_00013_corporate_events.py`; motor de posições aplica fatores por data; importação de eventos da Movimentação B3.
 
 **Aceite:** importar extrato B3 de exemplo, confirmar um aporte e ver posições, alocação e alertas atualizados sem lançamentos manuais.
 
 ---
 
-## Fase 13 — Frontend por Contexto de Operação (`[ ]` Pendente)
+## Fase 13 — Frontend no Modelo de Referência (`[ ]` Pendente)
 
-**Objetivo:** implementar a navegação e as telas da ADR 0005.
+**Objetivo:** reescrever `apps/web` seguindo a ADR 0007 — shell, menu e conteúdo interno no padrão do web do `dynamic-research`, **home como tela de analytics** e telas de operação apenas com o domínio da operação (gráficos só quando específicos da operação).
 
-- `[ ]` **13.1** (O-06) Fundação: `react-router`, TanStack Query (cache, loading, erros), biblioteca de gráficos (Recharts), `react-hook-form` + `zod`, ESLint; estrutura `src/features/<contexto>/`, `src/shared/`; `App.tsx` reduzido a layout + rotas.
-- `[ ]` **13.2** (I-06) Cliente HTTP tipado que propaga erros; componentes padronizados de erro, vazio e carregamento; indicador global de frescor dos dados (a partir de `job_runs`); remoção de `computeLocalContributionPlan`.
-- `[ ]` **13.3** Shell: trilho lateral persistente com **Início, Carteira, Pesquisar, Aportar, Lançamentos, Desempenho, Estratégia**; drawer no mobile; topbar com macro (CDI, IPCA, USD, IBOV), frescor e `+ Lançamento`; login.
-- `[ ]` **13.4** **Início:** KPIs (patrimônio, resultado total, TWR vs CDI, proventos 12m), ARCA atual vs meta com bandas, reserva de emergência separada, card do próximo aporte, lista de alertas acionáveis.
-- `[ ]` **13.5** **Carteira:** posições agrupadas por classe ARCA com peso atual/alvo, status de ciclo de vida, score e margem de segurança por linha; filtro por conta; consolidação de ganho/perda (preço, câmbio, proventos, realizado).
-- `[ ]` **13.6** **Detalhe do ativo** (`/assets/:id`): cabeçalho com preço/posição/status; abas Resumo, Fundamentos (gráficos históricos), Valuation, Checklist (com evidência e histórico do score), Proventos, Lançamentos.
-- `[ ]` **13.7** **Pesquisar:** screener com filtros e atalho "classes abaixo da meta", watchlist, comparação lado a lado de até 4 ativos.
-- `[ ]` **13.8** **Aportar:** fluxo em 4 passos (valor → distribuição por classe → ativos elegíveis e quantidades → revisar e confirmar lançamentos), com debounce e antes/depois por classe.
-- `[ ]` **13.9** **Lançamentos:** livro único (ordens, proventos, eventos corporativos) com edição, exclusão validada, filtros server-side, importação B3.
-- `[ ]` **13.10** **Desempenho:** curva base 100 vs benchmarks, retorno por classe vs benchmark da classe, risco (volatilidade, drawdown, VaR), proventos por mês; estado "histórico insuficiente" explícito.
-- `[ ]` **13.11** **Estratégia:** metas e bandas ARCA, finalidade dos ativos, critérios de elegibilidade e checklists por tipo, premissas de valuation/projeção, contas.
-- `[ ]` **13.12** Testes: Vitest + Testing Library por componente/página com MSW mockando a API; acessibilidade básica (axe) nas páginas principais.
-- `[ ]` **13.13** Atualizar `docs/architecture/FRONTEND_UI_UX.md` para a nova navegação, mantendo a paleta Azul/Branco/Cinza.
+- `[ ]` **13.1** (O-06) Fundação: `react-router-dom`, estrutura `src/layout`, `src/pages/<contexto>`, `src/viz`, `src/api`; tema com tokens de espaço/tipografia e papéis `--app-*` (claro e escuro); ícones SVG em linha; `App.tsx` reduzido a rotas.
+- `[ ]` **13.2** (I-06, I-07) Cliente HTTP tipado que propaga erros e hook `useApi` (carregando, erro, recarregar); componentes padronizados de erro, vazio e esqueleto; remoção de `computeLocalContributionPlan` e de qualquer regra de negócio no frontend.
+- `[ ]` **13.3** Shell de referência: sidebar fixa com seções **Visão geral** (Início, Desempenho), **Operação** (Carteira, Pesquisar, Aportar, Lançamentos) e **Configuração** (Estratégia, Contas, Dados de mercado); grupos recolhíveis; rodapé com usuário e sair; topbar com título da rota e indicador de frescor dos dados; gaveta no celular; 404 para rota desconhecida; login fora do shell.
+- `[ ]` **13.4** **Início (analytics):** manchete gerada dos números; indicadores com variação e sparkline (patrimônio, resultado, TWR vs CDI, proventos 12m, reserva); alocação ARCA × meta com bandas; alertas acionáveis; curva base 100 vs benchmarks e proventos por mês.
+- `[ ]` **13.5** **Desempenho:** curva base 100, retorno e risco por classe vs benchmark da classe, drawdown e VaR; estado "histórico insuficiente" explícito.
+- `[ ]` **13.6** **Carteira:** posições agrupadas por classe ARCA (peso atual/alvo, ciclo de vida, score, margem), filtro por conta, composição da classe; sem KPIs gerais.
+- `[ ]` **13.7** **Detalhe do ativo** (`/assets/:id`): cabeçalho com preço/posição/status; abas Resumo, Fundamentos (gráfico histórico), Valuation, Checklist (evidências e histórico do score), Proventos, Lançamentos.
+- `[ ]` **13.8** **Pesquisar:** screener com filtros e atalho "classes abaixo da banda", watchlist, adicionar à watchlist.
+- `[ ]` **13.9** **Aportar:** fluxo em passos (valor → distribuição por classe → ativos elegíveis → revisar e confirmar), com gráfico antes/depois por classe e planos salvos.
+- `[ ]` **13.10** **Lançamentos:** ordens, proventos e eventos corporativos com edição e exclusão validadas, filtros por conta/ativo/período e importação B3 com pré-visualização.
+- `[ ]` **13.11** **Configuração:** Estratégia (metas, bandas, elegibilidade, valuation, versões), Contas e Dados de mercado (frescor das séries e execuções do worker).
+- `[ ]` **13.12** Testes Vitest + Testing Library por página e componente de visualização; ESLint sem avisos; build.
+- `[ ]` **13.13** Atualizar `docs/architecture/FRONTEND_UI_UX.md` para a ADR 0007.
 
-**Aceite:** todas as rotas funcionam contra a API real; nenhuma regra de negócio no frontend; `npm run lint && npm test && npm run build` verdes.
+**Aceite:** todas as rotas funcionam contra a API real; home só com analytics e operações só com seu domínio; nenhuma regra de negócio no frontend; `npm run lint && npm test && npm run build` verdes.
 
 ---
 
@@ -388,7 +388,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **14.3** Teste de recuperação: provedores externos offline (cotação em fallback, alertas de frescor, nenhuma tela quebrada); Redis offline (cache em memória).
 - `[ ]` **14.4** (O-07) Revisão da documentação: `OVERVIEW.md`, `FEATURES_SPEC.md`, `FRONTEND_UI_UX.md`, ADRs 0002/0005/0006, `TECH_DEBT.md` (encerrar TD-01 e TD-03; manter TD-02 e TD-04) e este plano com status reais.
 - `[ ]` **14.5** Piso de cobertura final: `packages/core` ≥ 90%, API/worker ≥ 80%, frontend ≥ 70%.
-- `[ ]` **14.6** Encerramento: todos os achados da auditoria com item e teste correspondentes; `docker compose build` e CI verdes; push para o GitHub mediante confirmação do usuário (6.4).
+- `[ ]` **14.6** Encerramento: todos os achados da auditoria com item e teste correspondentes; portão local `scripts/check.sh --smoke` verde (GitHub Actions sem créditos); push para o GitHub mediante confirmação do usuário (6.4).
 
 **Definição de "100% operacional":** a stack sobe do zero com um comando; o usuário consegue executar o ciclo completo Estratégia → Pesquisar → Aportar → Lançamentos → Carteira/Desempenho sem editar banco ou arquivos; todos os valores da carteira de referência batem com a planilha golden; falhas externas aparecem como avisos e nunca como números falsos.
 
