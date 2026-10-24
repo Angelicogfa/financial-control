@@ -41,6 +41,7 @@ Percentuais na escala 0–100 só existem nas bordas de apresentação (API de l
 ### 3. Tipos numéricos
 - **Dinheiro e quantidades:** `Decimal` nas entidades de domínio, `Numeric` no banco e `Decimal` serializado como string/number nos DTOs. Colunas monetárias de `portfolio_snapshots` migram de `Float` para `Numeric(20, 2)`.
 - **Estatística e séries de preço/índice:** `float` é permitido (retornos, volatilidade, correlação, cotações históricas).
+- **Snapshots diários da carteira** são uma série estatística derivada (insumo do TWR): a entidade usa `float`, mas o banco guarda `Numeric(20, 2)` e o repositório arredonda para centavos na escrita.
 - Arredondamento só na borda de saída (DTO/relatório), nunca em resultados intermediários de cálculo.
 
 ### 4. Nomenclatura

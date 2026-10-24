@@ -21,7 +21,7 @@
 | **Fase 5** | Frontend Web (`apps/web` React + TypeScript): Menu Hambúrguer, Cards Evolução/Projeção e Tabelas Paginadas | `[x]` Concluída | 100% |
 | **Fase 6** | Validação End-to-End no Docker Compose, CI/CD GitHub Actions e Publicação no GitHub Privado | `[~]` Em andamento | 95% |
 | **Fase 7** | Fundação de Correção: Git, rede de testes de regressão, convenções de unidades (ADR 0006) | `[x]` Concluída | 100% |
-| **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[ ]` Pendente | 0% |
+| **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[x]` Concluída | 100% |
 | **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[ ]` Pendente | 0% |
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[ ]` Pendente | 0% |
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[ ]` Pendente | 0% |
@@ -256,38 +256,42 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 8 — Correção dos Motores de Cálculo (`[ ]` Pendente)
+## Fase 8 — Correção dos Motores de Cálculo (`[x]` Concluída)
 
 **Objetivo:** todos os números exibidos corretos e auditáveis.
 
 ### Séries e unidades
-- `[ ]` **8.1** (C-01, I-02) `market_series` ganha coluna `unit` (`PERCENT_PER_DAY`, `PERCENT_PER_MONTH`, `PRICE`, `INDEX_POINTS`) — migration `script_00002_market_series_unit.py` marcando CDI/SELIC/IPCA existentes. `BcbSgsProvider` devolve pontos com unidade; o domínio converte explicitamente para fração. Remover toda heurística de escala de `_compound_factor`.
-- `[ ]` **8.2** (I-02) `contracted_rate` com semântica fixa por indexador (ADR 0006): validação de faixa na API (CDI/SELIC: 0,5–3,0; PRE/IPCA: 0–0,5) e migration `script_00003_normalize_contracted_rate.py` convertendo dados existentes. Remover `as_fraction` genérico: cada adaptador de provedor declara a unidade de cada campo.
-- `[ ]` **8.3** (I-03) Sincronização BCB incremental desde a menor data entre `issue_date` de renda fixa e primeira transação (com teto de 10 anos), detecção de lacunas e reprocessamento. Endpoint de status de frescor por série.
+- `[x]` **8.1** (C-01, I-02) `market_series` ganha coluna `unit` (`PERCENT_PER_DAY`, `PERCENT_PER_MONTH`, `PRICE`, `INDEX_POINTS`) — migration `script_00002_market_series_unit.py` marcando CDI/SELIC/IPCA existentes. `BcbSgsProvider` devolve pontos com unidade; o domínio converte explicitamente para fração. Remover toda heurística de escala de `_compound_factor`.
+- `[x]` **8.2** (I-02) `contracted_rate` com semântica fixa por indexador (ADR 0006): validação de faixa na API (CDI/SELIC: 0,5–3,0; PRE/IPCA: 0–0,5) e migration `script_00003_normalize_contracted_rate.py` convertendo dados existentes. Remover `as_fraction` genérico: cada adaptador de provedor declara a unidade de cada campo.
+- `[x]` **8.3** (I-03) Sincronização BCB incremental desde a menor data entre `issue_date` de renda fixa e primeira transação (com teto de 10 anos), detecção de lacunas e reprocessamento. Endpoint de status de frescor por série. Implementado com `date_range()` no repositório e `GET /api/v1/market/series-status` (último ponto, defasagem e dias úteis faltantes).
 
 ### Renda fixa
-- `[ ]` **8.4** (C-04) Venda de renda fixa: FIFO por lote, abatendo o principal proporcional ao valor bruto do lote (`principal × valor_vendido / valor_bruto_lote`); IR/IOF da venda e lucro realizado de RF calculados por lote.
-- `[ ]` **8.5** (I-01) IPCA+ pela série mensal 433 com pró-rata do mês corrente (último IPCA conhecido ou projeção da política); SELIC pela série 11; calendário de feriados nacionais (fixos + móveis via Páscoa) em `packages/core/calendar.py`; projeção 12m relativa a `as_of_date`.
+- `[x]` **8.4** (C-04) Venda de renda fixa: FIFO por lote, abatendo o principal proporcional ao valor bruto do lote (`principal × valor_vendido / valor_bruto_lote`); IR/IOF da venda e lucro realizado de RF calculados por lote.
+- `[x]` **8.5** (I-01) IPCA+ pela série mensal 433 com pró-rata do mês corrente (último IPCA conhecido ou projeção da política); SELIC pela série 11; calendário de feriados nacionais (fixos + móveis via Páscoa) em `packages/core/calendar.py`; projeção 12m relativa a `as_of_date`. Convenção: IPCA do mês aplicado pró-rata por dias úteis do mês; mês sem índice usa a taxa anual de fallback e reduz `curve_coverage`. Projeção = variação do valor líquido em 252 dias úteis (ou até o vencimento), incluindo a mudança de faixa do IR.
 
 ### Consolidação e câmbio
-- `[ ]` **8.6** (C-02) Custo em BRL pelo câmbio de cada compra (`total_cost_brl`), lucro realizado em BRL pelo câmbio da venda, valor atual pelo câmbio atual; novo campo `fx_pnl_brl` separando efeito câmbio de efeito preço. Proventos em moeda estrangeira ganham `fx_rate` (migration `script_00004_earnings_fx_rate.py`, default 1 para BRL e câmbio histórico do dia para USD via backfill).
-- `[ ]` **8.7** (I-11) Projeções 12m lidas da `ValuationPolicy` (Fase 10) — até lá, de settings; resposta da API inclui as premissas usadas.
+- `[x]` **8.6** (C-02) Custo em BRL pelo câmbio de cada compra (`total_cost_brl`), lucro realizado em BRL pelo câmbio da venda, valor atual pelo câmbio atual; novo campo `fx_pnl_brl` separando efeito câmbio de efeito preço. Proventos em moeda estrangeira ganham `fx_rate` (migration `script_00004_earnings_fx_rate.py`, default 1 para BRL e câmbio histórico do dia para USD via backfill). Lançamentos e proventos de ativos em moeda estrangeira passam a exigir câmbio (`400 FX_RATE_REQUIRED`).
+- `[x]` **8.7** (I-11) Projeções 12m lidas da `ValuationPolicy` (Fase 10) — até lá, de settings; resposta da API inclui as premissas usadas. Premissas em `ProjectionAssumptions`, configuráveis por `PROJECTION_*` no `.env` e devolvidas em `projection_assumptions`.
 
 ### Analytics
-- `[ ]` **8.8** (C-03) Remover o fallback para IBOV. Sem histórico suficiente, a API devolve `status: "INSUFFICIENT_HISTORY"` com `available_points`; a UI mostra estado vazio explicativo.
-- `[ ]` **8.9** (C-03, I-09) Job de **backfill de snapshots** que reconstrói a série diária desde a primeira transação usando histórico de preços, câmbio histórico e curva de RF; snapshots só em dias úteis B3.
-- `[ ]` **8.10** (I-09) TWR com proventos como retorno (`r_t = (V_t − V_{t−1} − CF_t + D_t) / V_{t−1}`); `net_flow` derivado do livro entre snapshots consecutivos; Beta, Alpha e correlação com junção por data (interseção de calendários).
-- `[ ]` **8.11** (I-10) Liquidez = volume médio × preço (volume financeiro).
+- `[x]` **8.8** (C-03) Remover o fallback para IBOV. Sem histórico suficiente, a API devolve `status: "INSUFFICIENT_HISTORY"` com `available_points`; a UI mostra estado vazio explicativo.
+- `[x]` **8.9** (C-03, I-09) Job de **backfill de snapshots** que reconstrói a série diária desde a primeira transação usando histórico de preços, câmbio histórico e curva de RF; snapshots só em dias úteis B3. `backfill_snapshots_job` roda na inicialização do worker; o snapshot diário só roda em dias úteis.
+- `[x]` **8.10** (I-09) TWR com proventos como retorno (`r_t = (V_t − V_{t−1} − CF_t + D_t) / V_{t−1}`); `net_flow` derivado do livro entre snapshots consecutivos; Beta, Alpha e correlação com junção por data (interseção de calendários).
+- `[x]` **8.11** (I-10) Liquidez = volume médio × preço (volume financeiro).
 
 ### Integridade e contrato
-- `[ ]` **8.12** (I-04) Validação do livro inteiro em criação, edição e exclusão de lançamentos (simula o livro resultante antes de persistir). Novo `PUT /transactions/{id}` e `PUT /earnings/{id}`.
-- `[ ]` **8.13** (I-04) Consolidação tolerante: ativo com livro inválido aparece com `ledger_status: "INVALID"` e mensagem, sem derrubar a carteira.
-- `[ ]` **8.14** (I-05) Hierarquia de exceções de domínio (`DomainError`, `NotFoundError`, `ValidationError`, `ConflictError`) em `packages/core/errors.py`; handlers mapeiam só essas; demais exceções viram 500 com `request_id` e log.
-- `[ ]` **8.15** (A-04) Override `MANUAL_WEIGHT` usa `custom_class_weight`; sobra de arredondamento redistribuída entre classes por ordem de déficit.
-- `[ ]` **8.16** (D-02, D-04) Colunas monetárias de `portfolio_snapshots` para `Numeric(20, 2)` (`script_00005_snapshot_numeric.py`); `id` como desempate em toda ordenação paginada.
-- `[ ]` **8.17** Reprocessamento: comando `uv run python -m fincontrol_worker.rebuild` que ressincroniza séries e reconstrói snapshots após as correções.
+- `[x]` **8.12** (I-04) Validação do livro inteiro em criação, edição e exclusão de lançamentos (simula o livro resultante antes de persistir). Novo `PUT /transactions/{id}` e `PUT /earnings/{id}`. Exclusões/edições que quebram o livro retornam `409 LEDGER_CONFLICT`.
+- `[x]` **8.13** (I-04) Consolidação tolerante: ativo com livro inválido aparece com `ledger_status: "INVALID"` e mensagem, sem derrubar a carteira.
+- `[x]` **8.14** (I-05) Hierarquia de exceções de domínio (`DomainError`, `NotFoundError`, `ValidationError`, `ConflictError`) em `packages/core/errors.py`; handlers mapeiam só essas; demais exceções viram 500 com `request_id` e log.
+- `[x]` **8.15** (A-04) Override `MANUAL_WEIGHT` usa `custom_class_weight`; sobra de arredondamento redistribuída entre classes por ordem de déficit.
+- `[x]` **8.16** (D-02, D-04) Colunas monetárias de `portfolio_snapshots` para `Numeric(20, 2)` (`script_00005_snapshot_numeric.py`); `id` como desempate em toda ordenação paginada. O domínio mantém `float` nos snapshots (série estatística derivada, exceção registrada na ADR 0006); o repositório arredonda para centavos.
+- `[x]` **8.17** Reprocessamento: comando `uv run python -m fincontrol_worker.rebuild` que ressincroniza séries e reconstrói snapshots após as correções. Também reprecifica lançamentos e proventos em USD gravados com `fx_rate = 1` usando o USD/BRL histórico. **Ação pendente na base real:** rodar `docker compose run --rm worker uv run --no-sync python -m fincontrol_worker.rebuild` após aplicar as migrations.
 
 **Aceite:** todos os `xfail` da 7.2 passam; carteira de referência (7.4) bate com a planilha golden em ±R$ 0,01; integração + `docker compose build` verdes.
+
+**Validação (2026-10-24):** os 23 testes de caracterização e as 53 linhas da carteira de referência passam sem `xfail`; `uv run pytest` → 202 passed (cobertura: `packages/core` 88,6% só com testes em memória, backend total 93%); `npm test` 7/7 e `npm run build`; migrations `script_00002`–`script_00005` aplicadas com dados legados e revertidas em PostgreSQL 16 descartável; `docker compose build` dos 4 serviços concluído.
+
+**Testes ajustados durante a fase (expectativas que codificavam defeitos):** `total_invested_brl` da fase 2 (17200 → 17000, C-02); projeção da caracterização I-01 (IR de 15% fixo → faixa regressiva no horizonte); dados do teste de beta I-09 (movimento de 50% em 03/01 → 0%, para manter beta 1 com composição por intervalo); taxas contratadas dos testes antigos convertidas para a escala da ADR 0006.
 
 ---
 
