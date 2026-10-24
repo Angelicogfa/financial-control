@@ -391,6 +391,8 @@ class RiskReturnSummaryDTO(BaseModel):
 
 
 class PortfolioAnalyticsResponseDTO(BaseModel):
+    status: str = "OK"
+    available_points: int = 0
     summary: RiskReturnSummaryDTO
     correlation_matrix: dict[str, dict[str, float]]
     curves: dict[str, list[dict[str, Any]]]

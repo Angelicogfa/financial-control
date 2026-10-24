@@ -82,20 +82,85 @@ def cumulative_return(returns: Sequence[float]) -> float:
     return factor - 1.0
 
 
-def time_weighted_return(snapshots: Sequence[PortfolioSnapshotEntity]) -> list[float]:
-    """Compute daily sub-period returns isolating external cash flows (TWR).
+def dated_time_weighted_returns(
+    snapshots: Sequence[PortfolioSnapshotEntity],
+) -> tuple[list[date], list[float]]:
+    """Sub-period TWR returns, each dated by the snapshot that closes the period.
 
-    Formula per period t: r_t = (V_t - V_{t-1} - CF_t) / V_{t-1}.
+    r_t = (V_t - V_{t-1} - CF_t + D_t) / V_{t-1}, where CF_t is the net external flow
+    (purchases minus sale proceeds) and D_t the earnings received in the period, taken
+    from the change in cumulative earnings (finding I-09).
     """
     if len(snapshots) < 2:
-        return []
+        return [], []
     ordered = sorted(snapshots, key=lambda s: s.snapshot_date)
+    dates: list[date] = []
     sub_returns: list[float] = []
     for prev, curr in zip(ordered[:-1], ordered[1:], strict=False):
         if prev.market_value > 0:
-            r_t = (curr.market_value - prev.market_value - curr.net_flow) / prev.market_value
+            income = curr.earnings_cum - prev.earnings_cum
+            r_t = (
+                curr.market_value - prev.market_value - curr.net_flow + income
+            ) / prev.market_value
+            dates.append(curr.snapshot_date)
             sub_returns.append(r_t)
-    return sub_returns
+    return dates, sub_returns
+
+
+def time_weighted_return(snapshots: Sequence[PortfolioSnapshotEntity]) -> list[float]:
+    """Compute sub-period returns isolating external cash flows and adding income (TWR)."""
+    return dated_time_weighted_returns(snapshots)[1]
+
+
+def dated_simple_returns(
+    dates: Sequence[date], prices: Sequence[float]
+) -> tuple[list[date], list[float]]:
+    """Simple returns of a price series, each dated by the price that closes the period."""
+    returns = simple_returns(prices)
+    return list(dates[1 : len(returns) + 1]), returns
+
+
+def align_to_base(
+    base_dates: Sequence[date],
+    other_dates: Sequence[date],
+    other_returns: Sequence[float],
+) -> list[float | None]:
+    """Re-express `other` returns over the base periods by compounding (finding I-09).
+
+    For base period i ending on base_dates[i], the aligned value compounds every `other`
+    return dated in (base_dates[i-1], base_dates[i]] (for i = 0, only the return dated on
+    base_dates[0]). Periods with no `other` observation are None.
+    """
+    pairs = sorted(zip(other_dates, other_returns, strict=False))
+    aligned: list[float | None] = []
+    cursor = 0
+    previous: date | None = None
+    for end in base_dates:
+        factor = 1.0
+        seen = False
+        while cursor < len(pairs) and pairs[cursor][0] <= end:
+            other_date, other_ret = pairs[cursor]
+            if (previous is None and other_date == end) or (
+                previous is not None and other_date > previous
+            ):
+                factor *= 1.0 + other_ret
+                seen = True
+            cursor += 1
+        aligned.append(factor - 1.0 if seen else None)
+        previous = end
+    return aligned
+
+
+def _paired(
+    base: Sequence[float], aligned: Sequence[float | None]
+) -> tuple[list[float], list[float]]:
+    xs: list[float] = []
+    ys: list[float] = []
+    for x, y in zip(base, aligned, strict=False):
+        if y is not None:
+            xs.append(x)
+            ys.append(y)
+    return xs, ys
 
 
 def cagr(
@@ -244,13 +309,19 @@ def conditional_var(returns: Sequence[float], confidence: float = 0.95) -> float
     return max(0.0, -_mean(tail))
 
 
-def pearson_correlation(x: Sequence[float], y: Sequence[float]) -> float | None:
-    """Compute Pearson correlation coefficient between two equal-length series."""
-    n = min(len(x), len(y))
+def pearson_correlation(
+    x: Sequence[float | None], y: Sequence[float | None]
+) -> float | None:
+    """Pearson correlation over positions where both series have a value.
+
+    Series must already be aligned by date (see `align_to_base`); None marks a gap.
+    """
+    pairs = [(a, b) for a, b in zip(x, y, strict=False) if a is not None and b is not None]
+    n = len(pairs)
     if n < 2:
         return None
-    xs = x[-n:]
-    ys = y[-n:]
+    xs = [a for a, _ in pairs]
+    ys = [b for _, b in pairs]
     mx = _mean(xs)
     my = _mean(ys)
     num = sum((a - mx) * (b - my) for a, b in zip(xs, ys, strict=False))
@@ -266,13 +337,25 @@ def beta_alpha(
     benchmark_returns: Sequence[float],
     annual_risk_free_rate: float = 0.1075,
     periods_per_year: float = TRADING_DAYS_PER_YEAR,
+    *,
+    asset_dates: Sequence[date] | None = None,
+    benchmark_dates: Sequence[date] | None = None,
 ) -> tuple[float | None, float | None]:
-    """Compute (Beta, annualized Jensen's Alpha) of `asset_returns` against `benchmark_returns`."""
-    n = min(len(asset_returns), len(benchmark_returns))
+    """Compute (Beta, annualized Jensen's Alpha) of `asset_returns` against `benchmark_returns`.
+
+    With both date sequences the benchmark is aligned to the asset periods by date;
+    without them the series are assumed to be already aligned (same length).
+    """
+    if asset_dates is not None and benchmark_dates is not None:
+        a_ret, b_ret = _paired(
+            asset_returns, align_to_base(asset_dates, benchmark_dates, benchmark_returns)
+        )
+    else:
+        n = min(len(asset_returns), len(benchmark_returns))
+        a_ret, b_ret = list(asset_returns[-n:]), list(benchmark_returns[-n:])
+    n = len(a_ret)
     if n < 2:
         return None, None
-    a_ret = asset_returns[-n:]
-    b_ret = benchmark_returns[-n:]
     mb = _mean(b_ret)
     ma = _mean(a_ret)
     var_b = sum((b - mb) ** 2 for b in b_ret) / (n - 1)
@@ -288,9 +371,9 @@ def beta_alpha(
 
 
 def correlation_matrix(
-    series_by_symbol: Mapping[str, Sequence[float]],
+    series_by_symbol: Mapping[str, Sequence[float | None]],
 ) -> dict[str, dict[str, float]]:
-    """Build a symmetric Pearson correlation matrix across multiple return series."""
+    """Symmetric Pearson correlation matrix of return series aligned to the same periods."""
     symbols = list(series_by_symbol.keys())
     matrix: dict[str, dict[str, float]] = {s: {} for s in symbols}
     for i, sym_a in enumerate(symbols):
@@ -325,8 +408,14 @@ def analyze_return_series(
     annual_cdi_rate: float = 0.1075,
     annual_ipca_rate: float = 0.045,
     periods_per_year: float = TRADING_DAYS_PER_YEAR,
+    dates: Sequence[date] | None = None,
+    benchmark_dates_map: Mapping[str, Sequence[date]] | None = None,
 ) -> RiskReturnSummary:
-    """Compute full statistical summary and compare against IBOV, IFIX, S&P 500, CDI, and IPCA."""
+    """Compute full statistical summary and compare against IBOV, IFIX, S&P 500, CDI, and IPCA.
+
+    When `dates` and a benchmark's dates are given, the benchmark is aligned to the
+    portfolio periods by date before computing its return, beta, alpha and correlation.
+    """
     n = len(returns)
     cum_ret = cumulative_return(returns)
     ann_cagr = cagr(cum_ret, n, periods_per_year)
@@ -349,9 +438,16 @@ def analyze_return_series(
         for b_name, b_rets in benchmark_returns_map.items():
             if not b_rets:
                 continue
-            b_cum = cumulative_return(b_rets)
-            beta, alpha = beta_alpha(returns, b_rets, annual_cdi_rate, periods_per_year)
-            corr = pearson_correlation(returns, b_rets)
+            b_dates = (benchmark_dates_map or {}).get(b_name)
+            if dates is not None and b_dates is not None:
+                base_rets, b_aligned = _paired(returns, align_to_base(dates, b_dates, b_rets))
+                if not b_aligned:
+                    continue
+            else:
+                base_rets, b_aligned = list(returns), list(b_rets)
+            b_cum = cumulative_return(b_aligned)
+            beta, alpha = beta_alpha(base_rets, b_aligned, annual_cdi_rate, periods_per_year)
+            corr = pearson_correlation(base_rets, b_aligned)
             comparisons.append(
                 BenchmarkComparison(
                     benchmark=b_name,

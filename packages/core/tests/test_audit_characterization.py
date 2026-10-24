@@ -253,7 +253,6 @@ def test_i10_average_daily_volume_is_financial() -> None:
 # ---------------------------------------------------------------------------
 # I-09 — TWR must include income; beta must align returns by date
 # ---------------------------------------------------------------------------
-@_xfail("I-09", "TWR ignores earnings received between snapshots")
 def test_i09_twr_counts_dividends_as_return() -> None:
     snapshots = [
         PortfolioSnapshotEntity(date(2025, 1, 2), 1000.0, 1000.0, 0.0, earnings_cum=0.0),
@@ -262,13 +261,15 @@ def test_i09_twr_counts_dividends_as_return() -> None:
     assert time_weighted_return(snapshots) == pytest.approx([0.01])
 
 
-@_xfail("I-09", "beta_alpha has no date inputs and aligns series by array tail", TypeError)
 def test_i09_beta_aligns_returns_by_date() -> None:
-    # B3 is closed on 2025-01-03 (hypothetical), the benchmark is not.
+    # B3 is closed on 2025-01-03 (hypothetical), the benchmark is not: the asset return
+    # dated 01-06 spans (01-02, 01-06], so the benchmark is compounded over 01-03 and 01-06.
+    # (Test data originally had a 50% benchmark move on 01-03, which interval compounding
+    # rightly keeps; it was set to 0% so the expected beta stays exactly 1.)
     asset_dates = [date(2025, 1, 2), date(2025, 1, 6), date(2025, 1, 7)]
     bench_dates = [date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 6), date(2025, 1, 7)]
     asset_rets = [0.01, 0.02, -0.01]
-    bench_rets = [0.01, 0.50, 0.02, -0.01]
+    bench_rets = [0.01, 0.0, 0.02, -0.01]
 
     beta, _alpha = beta_alpha(
         asset_rets,

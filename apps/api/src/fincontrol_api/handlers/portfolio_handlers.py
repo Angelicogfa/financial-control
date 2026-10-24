@@ -294,6 +294,8 @@ class PortfolioHandler:
                 uow, date_from=date_from, date_to=date_to
             )
             return PortfolioAnalyticsResponseDTO(
+                status=raw["status"],
+                available_points=raw["available_points"],
                 summary=to_risk_summary_dto(raw["summary"]),
                 correlation_matrix=raw["correlation_matrix"],
                 curves=raw["curves"],

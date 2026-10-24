@@ -52,7 +52,6 @@ def _trade(client: TestClient, asset_id: int, kind: str, on: str, qty: str) -> i
 # ---------------------------------------------------------------------------
 # C-03 — Analytics must never present a benchmark as the user's portfolio
 # ---------------------------------------------------------------------------
-@_xfail("C-03", "with < 2 snapshots the IBOV return series is labelled PORTFOLIO")
 def test_c03_analytics_without_history_does_not_fabricate_portfolio_curve() -> None:
     ibov = [
         MarketSeriesPoint("IBOV", date(2025, 1, 2), 120_000.0),

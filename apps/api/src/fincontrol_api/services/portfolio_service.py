@@ -8,11 +8,12 @@ from typing import Any
 
 from fincontrol_core.analytics import (
     RiskReturnSummary,
+    align_to_base,
     analyze_return_series,
     build_base100_curve,
     correlation_matrix,
-    simple_returns,
-    time_weighted_return,
+    dated_simple_returns,
+    dated_time_weighted_returns,
 )
 from fincontrol_core.arca.allocation import ArcaTargets
 from fincontrol_core.cerrado.scoring import CerradoEvaluation, evaluate
@@ -37,6 +38,11 @@ from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_r
 from fincontrol_core.portfolio.fixed_income import RateCurves
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 from fincontrol_core.valuation import summarize_valuation
+
+ANALYTICS_OK = "OK"
+ANALYTICS_INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+MIN_PORTFOLIO_RETURNS = 2
+BENCHMARK_SYMBOLS = ("IBOV", "IFIX", "SP500")
 
 
 class PortfolioApplicationService:
@@ -167,8 +173,9 @@ class PortfolioApplicationService:
         history = self.gateway.get_history(
             asset.ticker, range_period="1y", asset_type=asset.asset_type
         )
-        prices = [p.close for p in history]
-        asset_rets = simple_returns(prices)
+        asset_dates, asset_rets = dated_simple_returns(
+            [p.date for p in history], [p.close for p in history]
+        )
 
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()
         benchmark_symbol = "IFIX" if asset.asset_type == AssetType.FII else (
@@ -176,13 +183,22 @@ class PortfolioApplicationService:
             if asset.asset_type in (AssetType.STOCK_INTL, AssetType.ETF_INTL, AssetType.REIT)
             else "IBOV"
         )
-        bench_pts = uow.market_series.list_series(benchmark_symbol)
-        bench_rets = simple_returns([p.value for p in bench_pts])
-        bench_map = {benchmark_symbol: bench_rets} if bench_rets else {}
+        bench_pts = (
+            uow.market_series.list_series(
+                benchmark_symbol, date_from=history[0].date, date_to=history[-1].date
+            )
+            if history
+            else []
+        )
+        bench_dates, bench_rets = dated_simple_returns(
+            [p.reference_date for p in bench_pts], [p.value for p in bench_pts]
+        )
 
         risk_summary: RiskReturnSummary = analyze_return_series(
             asset_rets,
-            benchmark_returns_map=bench_map,
+            benchmark_returns_map={benchmark_symbol: bench_rets} if bench_rets else {},
+            benchmark_dates_map={benchmark_symbol: bench_dates},
+            dates=asset_dates,
             annual_cdi_rate=annual_cdi,
             annual_ipca_rate=annual_ipca,
         )
@@ -203,52 +219,81 @@ class PortfolioApplicationService:
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> dict[str, Any]:
-        """Compute portfolio TWR, risk metrics, correlation matrix, and Base-100 curves."""
+        """Compute portfolio TWR, risk metrics, correlation matrix, and Base-100 curves.
+
+        Only the user's own snapshots feed the PORTFOLIO series. Without enough history the
+        result carries status INSUFFICIENT_HISTORY and no portfolio curve (finding C-03).
+        """
         end = date_to or date.today()
         start = date_from or (end - timedelta(days=365))
 
-        snapshots = uow.snapshots.list_range(date_from=start, date_to=end)
-        port_returns = time_weighted_return(snapshots)
-        dates = [s.snapshot_date for s in snapshots]
+        snapshots = sorted(
+            uow.snapshots.list_range(date_from=start, date_to=end),
+            key=lambda s: s.snapshot_date,
+        )
+        port_dates, port_returns = dated_time_weighted_returns(snapshots)
+        has_history = len(port_returns) >= MIN_PORTFOLIO_RETURNS
+        if not has_history:
+            port_dates, port_returns = [], []
 
-        # If fewer than 2 snapshots exist, synthesize a series from asset histories or report
-        if len(port_returns) < 2:
-            ibov_pts = uow.market_series.list_series("IBOV", date_from=start, date_to=end)
-            if len(ibov_pts) >= 2:
-                port_returns = simple_returns([p.value for p in ibov_pts])
-                dates = [p.reference_date for p in ibov_pts]
-
-        bench_returns_map: dict[str, list[float]] = {}
         curves: dict[str, list[dict[str, Any]]] = {}
+        if has_history:
+            first_index = next(
+                i for i, s in enumerate(snapshots) if s.snapshot_date == port_dates[0]
+            )
+            curves["PORTFOLIO"] = build_base100_curve(
+                [snapshots[first_index - 1].snapshot_date, *port_dates], port_returns
+            )
 
-        if dates and port_returns:
-            curves["PORTFOLIO"] = build_base100_curve(dates, port_returns)
-
-        for sym in ("IBOV", "IFIX", "SP500"):
+        bench_returns: dict[str, list[float]] = {}
+        bench_dates: dict[str, list[date]] = {}
+        for sym in BENCHMARK_SYMBOLS:
             pts = uow.market_series.list_series(sym, date_from=start, date_to=end)
-            if len(pts) >= 2:
-                b_rets = simple_returns([p.value for p in pts])
-                bench_returns_map[sym] = b_rets
-                curves[sym] = build_base100_curve([p.reference_date for p in pts], b_rets)
+            if len(pts) < 2:
+                continue
+            level_dates = [p.reference_date for p in pts]
+            bench_dates[sym], bench_returns[sym] = dated_simple_returns(
+                level_dates, [p.value for p in pts]
+            )
+            curves[sym] = build_base100_curve(level_dates, bench_returns[sym])
 
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()
         summary = analyze_return_series(
             port_returns,
-            benchmark_returns_map=bench_returns_map,
+            benchmark_returns_map=bench_returns if has_history else {},
+            benchmark_dates_map=bench_dates,
+            dates=port_dates,
             annual_cdi_rate=annual_cdi,
             annual_ipca_rate=annual_ipca,
         )
 
-        corr_inputs: dict[str, list[float]] = {}
-        if port_returns:
-            corr_inputs["PORTFOLIO"] = port_returns
-        for sym, b_rets in bench_returns_map.items():
-            if b_rets:
-                corr_inputs[sym] = b_rets
-        corr_mat = correlation_matrix(corr_inputs) if corr_inputs else {}
-
         return {
+            "status": ANALYTICS_OK if has_history else ANALYTICS_INSUFFICIENT_HISTORY,
+            "available_points": len(snapshots),
             "summary": summary,
-            "correlation_matrix": corr_mat,
+            "correlation_matrix": _aligned_correlation_matrix(
+                port_dates, port_returns, bench_dates, bench_returns
+            ),
             "curves": curves,
         }
+
+
+def _aligned_correlation_matrix(
+    port_dates: list[date],
+    port_returns: list[float],
+    bench_dates: dict[str, list[date]],
+    bench_returns: dict[str, list[float]],
+) -> dict[str, dict[str, float]]:
+    """Correlations with every series re-expressed over the same base periods."""
+    if port_returns:
+        base_name, base_dates, base_returns = "PORTFOLIO", port_dates, port_returns
+    elif bench_returns:
+        base_name = next(iter(bench_returns))
+        base_dates, base_returns = bench_dates[base_name], bench_returns[base_name]
+    else:
+        return {}
+    series: dict[str, list[float | None]] = {base_name: list(base_returns)}
+    for sym, rets in bench_returns.items():
+        if sym != base_name:
+            series[sym] = align_to_base(base_dates, bench_dates[sym], rets)
+    return correlation_matrix(series)
