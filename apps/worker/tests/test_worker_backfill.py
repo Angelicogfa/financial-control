@@ -141,3 +141,54 @@ def test_bcb_sync_only_requests_missing_windows(uow_factory: UoWFactory) -> None
     assert first_run == 3
     cdi = [r for r in requests if r[0] == "12"]
     assert cdi == [("12", date(2025, 1, 11), date(2025, 1, 20))]
+
+
+def test_series_coverage_fetches_early_gap_only_once(uow_factory: UoWFactory) -> None:
+    from fincontrol_core.domain.enums import SeriesUnit
+    from fincontrol_worker.jobs import ensure_series_coverage_job
+
+    with uow_factory() as uow:
+        for symbol in ("CDI", "SELIC"):
+            uow.market_series.upsert_points(
+                symbol, [(date(2024, 7, 1), 0.05)], unit=SeriesUnit.PERCENT_PER_DAY
+            )
+        uow.market_series.upsert_points(
+            "IPCA", [(date(2024, 6, 1), 0.16)], unit=SeriesUnit.PERCENT_PER_MONTH
+        )
+        uow.commit()
+
+    requests: list[tuple[str, date]] = []
+
+    def bcb_handler(request: httpx.Request) -> httpx.Response:
+        code = request.url.path.split("bcdata.sgs.")[1].split("/")[0]
+        start = datetime.strptime(request.url.params["dataInicial"], "%d/%m/%Y").date()
+        requests.append((code, start))
+        return httpx.Response(200, json=[{"data": start.strftime("%d/%m/%Y"), "valor": "0.05"}])
+
+    gateway = _gateway(bcb_handler)
+    # The stored history already covers the default one-year window.
+    assert ensure_series_coverage_job(uow_factory, gateway, as_of_date=date(2025, 6, 30)) == {}
+
+    _seed_stock(uow_factory)  # trades from 2025-01-02 do not need more history
+    with uow_factory() as uow:
+        asset = uow.assets.get_by_ticker("ITUB4")
+        assert asset is not None
+        uow.transactions.add(
+            TransactionEntity(
+                asset_id=asset.id or 0,
+                kind=TransactionKind.BUY,
+                trade_date=date(2024, 3, 1),
+                quantity=Decimal("1"),
+                unit_price=Decimal("30"),
+            )
+        )
+        uow.commit()
+
+    counts = ensure_series_coverage_job(uow_factory, gateway, as_of_date=date(2025, 6, 30))
+
+    assert counts["CDI"] >= 1
+    assert ("12", date(2024, 3, 1)) in requests
+    assert "IBOV" not in counts
+    requests.clear()
+    assert ensure_series_coverage_job(uow_factory, gateway, as_of_date=date(2025, 6, 30)) == {}
+    assert requests == []

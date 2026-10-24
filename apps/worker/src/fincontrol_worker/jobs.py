@@ -41,6 +41,8 @@ logger = logging.getLogger("fincontrol_worker")
 BCB_SYMBOLS = ("CDI", "SELIC", "IPCA")
 BENCHMARK_TICKERS = {"IBOV": "^BVSP", "IFIX": "IFIX.SA", "SP500": "^GSPC"}
 USD_BRL_SYMBOL = "USDBRL=X"
+# Weekends/holidays at the start of a window never get a point; do not refetch for them.
+COVERAGE_TOLERANCE = timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,7 @@ def sync_bcb_and_benchmarks_job(
     *,
     as_of_date: date | None = None,
     full: bool = False,
+    include_benchmarks: bool = True,
 ) -> dict[str, int]:
     """Persist BCB series (CDI, SELIC, IPCA) and benchmarks (IBOV, IFIX, SP500).
 
@@ -108,7 +111,7 @@ def sync_bcb_and_benchmarks_job(
                     unit=BCB_SERIES_UNITS[symbol],
                 )
 
-        for label, yahoo_symbol in BENCHMARK_TICKERS.items():
+        for label, yahoo_symbol in BENCHMARK_TICKERS.items() if include_benchmarks else ():
             history = gateway.get_history(
                 yahoo_symbol,
                 range_period=history_range_for(start, end),
@@ -123,6 +126,36 @@ def sync_bcb_and_benchmarks_job(
 
         uow.commit()
     return counts
+
+
+def ensure_series_coverage_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    as_of_date: date | None = None,
+) -> dict[str, int]:
+    """Back-fill BCB history right after an older position is recorded.
+
+    Cheap check run on the quote interval: when the oldest position starts before the stored
+    CDI/SELIC/IPCA history, the missing early window is fetched at once instead of waiting
+    for the nightly sync (keeps `curve_coverage` complete).
+    """
+    end = as_of_date or date.today()
+    with uow_factory() as uow:
+        assets = uow.assets.list_all(active_only=False)
+        start = history_start(end, earliest_fixed_income_start(assets), first_trade_date(assets))
+        gaps = [
+            symbol
+            for symbol in BCB_SYMBOLS
+            if (stored := uow.market_series.date_range(symbol)) is not None
+            and (date(start.year, start.month, 1) if symbol == "IPCA" else start)
+            < stored[0] - COVERAGE_TOLERANCE
+        ]
+    if not gaps:
+        return {}
+    return sync_bcb_and_benchmarks_job(
+        uow_factory, gateway, as_of_date=end, include_benchmarks=False
+    )
 
 
 def warm_portfolio_quotes_job(

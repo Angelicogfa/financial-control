@@ -17,6 +17,7 @@ from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.jobs import (
     UoWFactory,
     backfill_snapshots_job,
+    ensure_series_coverage_job,
     record_daily_snapshot_job,
     sync_bcb_and_benchmarks_job,
     warm_portfolio_quotes_job,
@@ -74,6 +75,14 @@ def create_scheduler(
         trigger="interval",
         minutes=cfg.quote_refresh_minutes,
         id="warm_portfolio_quotes",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("ensure_series_coverage", ensure_series_coverage_job),
+        trigger="interval",
+        minutes=cfg.quote_refresh_minutes,
+        id="ensure_series_coverage",
         replace_existing=True,
         **defaults,
     )
