@@ -22,10 +22,9 @@ from fincontrol_core.domain.enums import (
     ArcaClass,
     AssetType,
     IntraClassStrategy,
-    Market,
 )
+from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
-from fincontrol_core.market.models import Fundamentals, Quote
 from fincontrol_core.portfolio.consolidation import (
     ConsolidatedPortfolioReport,
     ContributionPlan,
@@ -99,18 +98,13 @@ class PortfolioApplicationService:
         assets = uow.assets.list_all(active_only=True)
         targets, intra_strategies = self.load_arca_targets(uow)
 
-        quotes: dict[str, Quote] = {}
-        fundamentals: dict[str, Fundamentals] = {}
-
-        for asset in assets:
-            if asset.market in (Market.MANUAL, Market.FIXED_INCOME_CURVE):
-                continue
-            q = self.gateway.get_quote(asset.ticker, asset_type=asset.asset_type)
-            if q is not None:
-                quotes[asset.ticker] = q
-            fund = self.gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
-            if fund is not None:
-                fundamentals[asset.ticker] = fund
+        market = fetch_market_data(
+            self.gateway,
+            assets,
+            max_workers=self.fetch_workers,
+            timeout_seconds=self.fetch_timeout_seconds,
+        )
+        quotes, fundamentals = market.quotes, market.fundamentals
 
         usd_brl = self.gateway.get_usd_brl_rate()
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()

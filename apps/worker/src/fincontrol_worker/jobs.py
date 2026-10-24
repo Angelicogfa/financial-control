@@ -16,6 +16,7 @@ from fincontrol_core.domain.enums import (
     Market,
     SeriesUnit,
 )
+from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.models import Quote, QuoteFreshness
 from fincontrol_core.market.units import BCB_SERIES_UNITS
@@ -203,13 +204,7 @@ def record_daily_snapshot_job(
 
     with uow_factory() as uow:
         assets = uow.assets.list_all(active_only=True)
-        quotes: dict[str, Quote] = {}
-        for asset in assets:
-            if asset.market in (Market.MANUAL, Market.FIXED_INCOME_CURVE):
-                continue
-            quote = gateway.get_quote(asset.ticker, asset_type=asset.asset_type)
-            if quote is not None:
-                quotes[asset.ticker] = quote
+        quotes = fetch_market_data(gateway, assets, include_fundamentals=False).quotes
 
         previous = uow.snapshots.latest_before(ref_date)
         saved = _snapshot(
