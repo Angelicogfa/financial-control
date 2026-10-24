@@ -252,11 +252,11 @@ class PortfolioSnapshotModel(Base):
     __tablename__ = "portfolio_snapshots"
 
     snapshot_date: Mapped[date] = mapped_column(Date, primary_key=True)
-    invested_value: Mapped[float] = mapped_column(Float, nullable=False)
-    market_value: Mapped[float] = mapped_column(Float, nullable=False)
-    unrealized_pnl: Mapped[float] = mapped_column(Float, nullable=False)
-    realized_pnl_cum: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    earnings_cum: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    consolidated_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    net_flow: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    invested_value: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    market_value: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    unrealized_pnl: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    realized_pnl_cum: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False, default=0)
+    earnings_cum: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False, default=0)
+    consolidated_pnl: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False, default=0)
+    net_flow: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False, default=0)
     by_class: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)

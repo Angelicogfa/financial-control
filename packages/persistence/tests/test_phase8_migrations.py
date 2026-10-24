@@ -139,3 +139,85 @@ def test_script_00004_adds_earning_fx_rate_with_default(db: tuple[Config, Engine
     with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
         (legacy,) = uow.earnings.list_for_asset(1)
         assert float(legacy.fx_rate) == 1.0
+
+
+def test_script_00005_keeps_snapshot_values_as_numeric(db: tuple[Config, Engine]) -> None:
+    cfg, engine = db
+    command.upgrade(cfg, "script_00004")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO portfolio_snapshots (snapshot_date, invested_value, market_value, "
+                "unrealized_pnl, realized_pnl_cum, earnings_cum, consolidated_pnl, net_flow, "
+                "by_class) VALUES ('2025-01-02', 1000.1, 1100.25, 100.15, 0, 0, 100.15, 0, '{}')"
+            )
+        )
+
+    command.upgrade(cfg, "head")
+
+    from fincontrol_core.domain.entities import PortfolioSnapshotEntity
+    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from sqlalchemy.orm import sessionmaker
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        (legacy,) = uow.snapshots.list_range()
+        assert legacy.market_value == 1100.25
+        uow.snapshots.upsert(
+            PortfolioSnapshotEntity(
+                snapshot_date=legacy.snapshot_date,
+                invested_value=0.1 + 0.2,
+                market_value=1100.255,
+                unrealized_pnl=0.0,
+            )
+        )
+        uow.commit()
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        (saved,) = uow.snapshots.list_range()
+    assert saved.invested_value == 0.3
+    assert saved.market_value in (1100.25, 1100.26)
+
+    command.downgrade(cfg, "script_00004")
+
+
+def test_pagination_breaks_ties_by_id(db: tuple[Config, Engine]) -> None:
+    cfg, engine = db
+    command.upgrade(cfg, "head")
+
+    from datetime import date
+    from decimal import Decimal
+
+    from fincontrol_core.domain import (
+        AssetEntity,
+        AssetType,
+        PaginationParams,
+        TransactionEntity,
+        TransactionKind,
+    )
+    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from sqlalchemy.orm import sessionmaker
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        asset = uow.assets.add(AssetEntity(ticker="X", name="X", asset_type=AssetType.STOCK_BR))
+        assert asset.id is not None
+        for _ in range(5):
+            uow.transactions.add(
+                TransactionEntity(
+                    asset_id=asset.id,
+                    kind=TransactionKind.BUY,
+                    trade_date=date(2025, 1, 2),
+                    quantity=Decimal("1"),
+                    unit_price=Decimal("1"),
+                )
+            )
+        uow.commit()
+
+        pages = [
+            uow.transactions.list_paginated(
+                PaginationParams(page=page, page_size=2, sort_by="trade_date", sort_order="desc")
+            ).items
+            for page in (1, 2, 3)
+        ]
+    ids = [tx.id for page in pages for tx in page]
+    assert ids == [5, 4, 3, 2, 1]

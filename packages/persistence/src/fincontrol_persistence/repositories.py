@@ -53,20 +53,28 @@ from fincontrol_persistence.models import (
 )
 
 
+def _money(value: float) -> Decimal:
+    return Decimal(str(round(value, 2)))
+
+
 def _apply_sort_and_paginate(
     session: Session,
     stmt: Select[Any],
     params: PaginationParams,
     allowed_sort_columns: dict[str, Any],
     default_column: Any,
+    tie_breaker: Any,
 ) -> tuple[list[Any], PageMeta]:
     count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
     total_items = int(session.scalar(count_stmt) or 0)
 
     sort_col = allowed_sort_columns.get(params.sort_by, default_column)
     direction = desc if params.is_descending else asc
+    # The primary key breaks ties so equal sort values never shuffle between pages (D-04).
     paginated_stmt = (
-        stmt.order_by(direction(sort_col)).offset(params.offset).limit(params.page_size)
+        stmt.order_by(direction(sort_col), direction(tie_breaker))
+        .offset(params.offset)
+        .limit(params.page_size)
     )
     items = list(session.scalars(paginated_stmt).all())
     meta = PageMeta.build(params, total_items)
@@ -214,7 +222,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             )
 
         rows, meta = _apply_sort_and_paginate(
-            self.session, stmt, params, self.SORT_COLUMNS, AssetModel.ticker
+            self.session, stmt, params, self.SORT_COLUMNS, AssetModel.ticker, AssetModel.id
         )
         return PaginatedResult(
             items=[to_asset_entity(m, include_children=False) for m in rows],
@@ -325,7 +333,12 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
             )
 
         rows, meta = _apply_sort_and_paginate(
-            self.session, stmt, params, self.SORT_COLUMNS, TransactionModel.trade_date
+            self.session,
+            stmt,
+            params,
+            self.SORT_COLUMNS,
+            TransactionModel.trade_date,
+            TransactionModel.id,
         )
         return PaginatedResult(items=[to_transaction_entity(m) for m in rows], meta=meta)
 
@@ -424,7 +437,12 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
             )
 
         rows, meta = _apply_sort_and_paginate(
-            self.session, stmt, params, self.SORT_COLUMNS, EarningModel.payment_date
+            self.session,
+            stmt,
+            params,
+            self.SORT_COLUMNS,
+            EarningModel.payment_date,
+            EarningModel.id,
         )
         return PaginatedResult(items=[to_earning_entity(m) for m in rows], meta=meta)
 
@@ -565,13 +583,13 @@ class SqlAlchemyPortfolioSnapshotRepository(AbstractPortfolioSnapshotRepository)
     def upsert(self, snapshot: PortfolioSnapshotEntity) -> PortfolioSnapshotEntity:
         model = PortfolioSnapshotModel(
             snapshot_date=snapshot.snapshot_date,
-            invested_value=snapshot.invested_value,
-            market_value=snapshot.market_value,
-            unrealized_pnl=snapshot.unrealized_pnl,
-            realized_pnl_cum=snapshot.realized_pnl_cum,
-            earnings_cum=snapshot.earnings_cum,
-            consolidated_pnl=snapshot.consolidated_pnl,
-            net_flow=snapshot.net_flow,
+            invested_value=_money(snapshot.invested_value),
+            market_value=_money(snapshot.market_value),
+            unrealized_pnl=_money(snapshot.unrealized_pnl),
+            realized_pnl_cum=_money(snapshot.realized_pnl_cum),
+            earnings_cum=_money(snapshot.earnings_cum),
+            consolidated_pnl=_money(snapshot.consolidated_pnl),
+            net_flow=_money(snapshot.net_flow),
             by_class=snapshot.by_class,
         )
         merged = self.session.merge(model)
