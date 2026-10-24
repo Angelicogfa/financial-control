@@ -216,7 +216,11 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
         use_cerrado: bool | None = None,
         active_only: bool = True,
     ) -> PaginatedResult[AssetEntity]:
-        stmt = select(AssetModel).options(selectinload(AssetModel.fixed_income_term))
+        stmt = select(AssetModel).options(
+            selectinload(AssetModel.fixed_income_term),
+            selectinload(AssetModel.transactions),
+            selectinload(AssetModel.earnings),
+        )
         if active_only:
             stmt = stmt.where(AssetModel.is_active.is_(True))
         if arca_class:
@@ -233,7 +237,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             self.session, stmt, params, self.SORT_COLUMNS, AssetModel.ticker, AssetModel.id
         )
         return PaginatedResult(
-            items=[to_asset_entity(m, include_children=False) for m in rows],
+            items=[to_asset_entity(m, include_children=True) for m in rows],
             meta=meta,
         )
 

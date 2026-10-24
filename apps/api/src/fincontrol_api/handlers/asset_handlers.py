@@ -8,7 +8,7 @@ from dataclasses import replace
 from fincontrol_core.catalog.etf_exposure import suggest_arca_class
 from fincontrol_core.domain.codes import CODE_ASSET_TYPES, generated_asset_code
 from fincontrol_core.domain.entities import AssetEntity, FixedIncomeTermEntity
-from fincontrol_core.domain.enums import AssetType
+from fincontrol_core.domain.enums import AssetLifecycle, AssetType
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
@@ -58,8 +58,9 @@ class AssetHandler:
                 use_cerrado=use_cerrado,
                 active_only=active_only,
             )
+            lifecycles = self.portfolio_service.asset_lifecycles(uow, result.items)
             return PaginatedResponse(
-                items=[to_asset_dto(a) for a in result.items],
+                items=[_with_lifecycle(to_asset_dto(a), lifecycles) for a in result.items],
                 meta=to_page_meta_dto(result.meta),
             )
 
@@ -79,7 +80,8 @@ class AssetHandler:
             entity = uow.assets.get_by_id(asset_id)
             if entity is None:
                 raise NotFoundError(f"Asset id={asset_id} not found")
-            return to_asset_dto(entity)
+            lifecycles = self.portfolio_service.asset_lifecycles(uow, [entity])
+            return _with_lifecycle(to_asset_dto(entity), lifecycles)
 
     def create(self, req: AssetCreateRequest) -> AssetResponseDTO:
         with self.uow_factory() as uow:
@@ -213,3 +215,10 @@ class AssetHandler:
             raw = self.portfolio_service.analyze_single_asset(uow, asset)
             payload = to_asset_analysis_dto(asset, raw)
             return AssetAnalysisResponseDTO(**payload)
+
+
+def _with_lifecycle(
+    dto: AssetResponseDTO, lifecycles: dict[int, tuple[AssetLifecycle, bool]]
+) -> AssetResponseDTO:
+    status, eligible = lifecycles.get(dto.id, (None, None))
+    return dto.model_copy(update={"lifecycle_status": status, "eligible": eligible})

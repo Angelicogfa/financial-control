@@ -101,3 +101,44 @@ def test_classification_suggestion_and_default_on_create(api: SimpleNamespace) -
         json={"ticker": "IVVB11", "name": "S&P", "asset_type": "ETF_BR", "arca_class": "ACOES"},
     ).json()
     assert overridden["arca_class"] == "ACOES"
+
+
+def test_assets_expose_lifecycle_under_policy(api: SimpleNamespace) -> None:
+    held = api.client.post(
+        "/api/v1/assets",
+        json={
+            "ticker": "WEGE3",
+            "name": "WEG",
+            "asset_type": "STOCK_BR",
+            "cerrado_answers": {"roe": True, "governance": True},
+        },
+    ).json()
+    api.client.post(
+        "/api/v1/transactions",
+        json={
+            "asset_id": held["id"],
+            "kind": "BUY",
+            "trade_date": "2025-01-02",
+            "quantity": "10",
+            "unit_price": "40",
+        },
+    )
+    api.client.post(
+        "/api/v1/assets",
+        json={
+            "ticker": "MGLU3",
+            "name": "Magalu",
+            "asset_type": "STOCK_BR",
+            "cerrado_answers": {"roe": False, "debt": False},
+        },
+    )
+
+    listed = {a["ticker"]: a for a in api.client.get("/api/v1/assets").json()["items"]}
+    single = api.client.get(f"/api/v1/assets/{held['id']}").json()
+    position = api.client.get("/api/v1/portfolio").json()["positions"]
+
+    assert listed["WEGE3"]["lifecycle_status"] == "HELD"
+    assert listed["MGLU3"]["lifecycle_status"] == "WATCHLIST"
+    assert listed["MGLU3"]["eligible"] is False
+    assert single["lifecycle_status"] == "HELD"
+    assert {p["ticker"]: p["lifecycle_status"] for p in position}["WEGE3"] == "HELD"

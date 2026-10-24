@@ -18,12 +18,14 @@ from fincontrol_core.analytics import (
 from fincontrol_core.cerrado.scoring import CerradoEvaluation, evaluate
 from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import (
+    AssetLifecycle,
     AssetType,
     IntraClassStrategy,
 )
 from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.policy import InvestmentPolicy, current_policy
+from fincontrol_core.policy.lifecycle import asset_lifecycle
 from fincontrol_core.portfolio.consolidation import (
     ConsolidatedPortfolioReport,
     ContributionPlan,
@@ -70,6 +72,29 @@ class PortfolioApplicationService:
     def load_policy(self, uow: AbstractUnitOfWork) -> InvestmentPolicy:
         """Current investment policy (defaults when none was saved)."""
         return current_policy(uow.policies)
+
+    def asset_lifecycles(
+        self, uow: AbstractUnitOfWork, assets: list[AssetEntity]
+    ) -> dict[int, tuple[AssetLifecycle, bool]]:
+        """Lifecycle status and eligibility of each asset under the current policy."""
+        policy = self.load_policy(uow).eligibility
+        fundamentals = fetch_market_data(
+            self.gateway,
+            assets,
+            include_quotes=False,
+            max_workers=self.fetch_workers,
+            timeout_seconds=self.fetch_timeout_seconds,
+        ).fundamentals
+        result: dict[int, tuple[AssetLifecycle, bool]] = {}
+        for asset in assets:
+            evaluation = evaluate(
+                asset.asset_type,
+                asset.cerrado_answers,
+                fundamentals.get(asset.ticker),
+                use_cerrado=asset.use_cerrado,
+            )
+            result[asset.id or 0] = asset_lifecycle(asset, evaluation, policy)
+        return result
 
     def ledger_curves(
         self, uow: AbstractUnitOfWork, asset: AssetEntity, as_of: date
@@ -130,6 +155,7 @@ class PortfolioApplicationService:
             fundamentals_by_ticker=fundamentals,
             intra_strategies=policy.arca.strategies,
             bands=policy.arca.bands,
+            eligibility=policy.eligibility,
             usd_brl_rate=usd_brl,
             curves=curves,
             assumptions=policy.valuation.projections,

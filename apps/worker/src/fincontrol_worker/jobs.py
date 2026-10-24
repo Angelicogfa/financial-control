@@ -20,7 +20,7 @@ from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.models import Quote, QuoteFreshness
 from fincontrol_core.market.units import BCB_SERIES_UNITS
-from fincontrol_core.policy import current_policy
+from fincontrol_core.policy import EligibilityPolicy, current_policy
 from fincontrol_core.portfolio.consolidation import consolidate_portfolio
 from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_rate_curves
 from fincontrol_core.portfolio.fixed_income import RateCurves
@@ -51,11 +51,13 @@ class _Targets:
     targets: ArcaTargets
     strategies: dict[ArcaClass, IntraClassStrategy]
     bands: dict[ArcaClass, float]
+    eligibility: EligibilityPolicy
 
 
 def _load_targets(uow: AbstractUnitOfWork) -> _Targets:
-    arca = current_policy(uow.policies).arca
-    return _Targets(arca.targets, arca.strategies, arca.bands)
+    policy = current_policy(uow.policies)
+    arca = policy.arca
+    return _Targets(arca.targets, arca.strategies, arca.bands, policy.eligibility)
 
 
 def _missing_windows(
@@ -204,6 +206,7 @@ def _snapshot(
         quotes=quotes,
         intra_strategies=targets.strategies,
         bands=targets.bands,
+        eligibility=targets.eligibility,
         usd_brl_rate=usd_brl,
         curves=curves,
         as_of_date=day,

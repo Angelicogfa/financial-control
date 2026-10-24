@@ -36,7 +36,7 @@ from fincontrol_core.policy.models import (
     InvestmentPolicy,
     ValuationPolicy,
 )
-from fincontrol_core.portfolio.consolidation import ProjectionAssumptions
+from fincontrol_core.portfolio.assumptions import ProjectionAssumptions
 
 from fincontrol_persistence.models import (
     AccountModel,

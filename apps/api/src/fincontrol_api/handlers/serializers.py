@@ -201,6 +201,8 @@ def to_valued_position_dto(pos: ValuedAssetPosition) -> ValuedPositionDTO:
         ledger_status=pos.ledger_status,
         ledger_message=pos.ledger_message,
         purpose=pos.purpose,
+        lifecycle_status=pos.lifecycle_status,
+        eligible=pos.eligible,
     )
 
 

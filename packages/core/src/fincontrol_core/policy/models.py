@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from fincontrol_core.arca.allocation import ArcaTargets, InvalidTargetsError
 from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy
 from fincontrol_core.errors import ValidationError
-from fincontrol_core.portfolio.consolidation import ProjectionAssumptions
+from fincontrol_core.portfolio.assumptions import ProjectionAssumptions
 
 if TYPE_CHECKING:
     from fincontrol_core.ports.repositories import AbstractPolicyRepository

@@ -123,6 +123,16 @@ class AssetPurpose(StrEnum):
     OTHER = "OTHER"
 
 
+class AssetLifecycle(StrEnum):
+    """Operational status of an asset under the investment policy (ADR 0005)."""
+
+    WATCHLIST = "WATCHLIST"
+    ELIGIBLE = "ELIGIBLE"
+    HELD = "HELD"
+    REVIEW = "REVIEW"
+    ARCHIVED = "ARCHIVED"
+
+
 class JobRunStatus(StrEnum):
     """Lifecycle of a background job execution."""
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
@@ -34,6 +34,7 @@ from fincontrol_core.domain.entities import AssetEntity, EarningEntity
 from fincontrol_core.domain.enums import (
     INTEGER_QUANTITY_TYPES,
     ArcaClass,
+    AssetLifecycle,
     AssetPurpose,
     AssetType,
     IntraClassStrategy,
@@ -41,6 +42,14 @@ from fincontrol_core.domain.enums import (
 )
 from fincontrol_core.errors import ValidationError
 from fincontrol_core.market.models import Fundamentals, Quote, QuoteFreshness
+from fincontrol_core.policy.lifecycle import (
+    CONTRIBUTION_STATUSES,
+    has_position,
+    is_eligible,
+    lifecycle_status,
+)
+from fincontrol_core.policy.models import EligibilityPolicy
+from fincontrol_core.portfolio.assumptions import ProjectionAssumptions
 from fincontrol_core.portfolio.fixed_income import (
     FixedIncomeValuation,
     RateCurves,
@@ -52,24 +61,6 @@ LEDGER_VALID = "VALID"
 LEDGER_INVALID = "INVALID"
 
 FIXED_INCOME_TYPES = frozenset({AssetType.FIXED_INCOME, AssetType.TREASURY})
-
-
-@dataclass(frozen=True)
-class ProjectionAssumptions:
-    """Forward-looking assumptions for 12-month projections (finding I-11).
-
-    Rates are annual fractions (ADR 0006). They are surfaced in every report so the user
-    always sees which premises produced a projection.
-    """
-
-    equity_capital_growth_rate: float = 0.08
-    fund_capital_growth_rate: float = 0.10
-    real_estate_default_yield_rate: float = 0.085
-    cash_cdi_multiplier: float = 1.0
-    cash_income_tax_rate: float = 0.175
-
-    def as_dict(self) -> dict[str, float]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -112,6 +103,8 @@ class ValuedAssetPosition:
     ledger_status: str = LEDGER_VALID
     ledger_message: str | None = None
     purpose: AssetPurpose = AssetPurpose.ARCA
+    lifecycle_status: AssetLifecycle = AssetLifecycle.HELD
+    eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -357,6 +350,7 @@ def consolidate_portfolio(
     fundamentals_by_ticker: Mapping[str, Fundamentals] | None = None,
     intra_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
     bands: Mapping[ArcaClass, float] | None = None,
+    eligibility: EligibilityPolicy | None = None,
     usd_brl_rate: float = 5.0,
     curves: RateCurves | None = None,
     assumptions: ProjectionAssumptions | None = None,
@@ -367,6 +361,7 @@ def consolidate_portfolio(
     ref_date = as_of_date or date.today()
     rate_curves = curves or RateCurves()
     premises = assumptions or ProjectionAssumptions()
+    eligibility_policy = eligibility or EligibilityPolicy()
     quotes_map = quotes or {}
     fund_map = fundamentals_by_ticker or {}
     strategy_map = intra_strategies or {}
@@ -421,8 +416,21 @@ def consolidate_portfolio(
             else (0.0, 0.0, "Invalid ledger", 0.0)
         )
         consolidated = round(unrealized_brl + v.realized_brl + received_brl, 2)
+        eligible = is_eligible(cerrado_eval, eligibility_policy, asset.purpose)
+        holds = (
+            v.invested_brl > 0 or v.qty > 0
+            if v.is_valid
+            else has_position(asset.transactions, fixed_income=asset.fixed_income_term is not None)
+        )
+        status = lifecycle_status(
+            is_active=asset.is_active, holds_position=holds, eligible=eligible
+        )
+        if not v.is_valid and status == AssetLifecycle.HELD:
+            status = AssetLifecycle.REVIEW
         rows.append(
             {
+                "eligible": eligible,
+                "lifecycle": status,
                 "v": v,
                 "cerrado": cerrado_eval,
                 "received": received_brl,
@@ -566,6 +574,8 @@ def _to_position(
         ledger_status=LEDGER_VALID if v.is_valid else LEDGER_INVALID,
         ledger_message=v.ledger_message,
         purpose=a.purpose,
+        lifecycle_status=row["lifecycle"],
+        eligible=row["eligible"],
     )
 
 
@@ -681,6 +691,7 @@ def plan_contribution(
             if p.arca_class == arca_class
             and p.ledger_status == LEDGER_VALID
             and p.purpose == AssetPurpose.ARCA
+            and p.lifecycle_status in CONTRIBUTION_STATUSES
         ]
         if class_budget <= 0 or not class_positions:
             leftover += max(class_budget, 0.0)

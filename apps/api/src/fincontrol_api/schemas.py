@@ -9,6 +9,7 @@ from typing import Any
 from fincontrol_core.domain.enums import (
     AccountKind,
     ArcaClass,
+    AssetLifecycle,
     AssetPurpose,
     AssetType,
     EarningKind,
@@ -152,6 +153,8 @@ class AssetResponseDTO(BaseModel):
     is_active: bool
     notes: str | None = None
     purpose: AssetPurpose = AssetPurpose.ARCA
+    lifecycle_status: AssetLifecycle | None = None
+    eligible: bool | None = None
     fixed_income_term: FixedIncomeTermPayload | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -324,6 +327,8 @@ class ValuedPositionDTO(BaseModel):
     ledger_status: str = "VALID"
     ledger_message: str | None = None
     purpose: AssetPurpose = AssetPurpose.ARCA
+    lifecycle_status: AssetLifecycle = AssetLifecycle.HELD
+    eligible: bool = True
 
 
 class ClassAllocationDTO(BaseModel):

@@ -33,6 +33,7 @@ def fetch_market_data(
     gateway: CachedMarketGateway,
     assets: Iterable[AssetEntity],
     *,
+    include_quotes: bool = True,
     include_fundamentals: bool = True,
     max_workers: int = 8,
     timeout_seconds: float = 20.0,
@@ -46,10 +47,11 @@ def fetch_market_data(
     executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="market")
     futures: dict[Future, tuple[str, str]] = {}
     for asset in tradable:
-        futures[executor.submit(gateway.get_quote, asset.ticker, asset_type=asset.asset_type)] = (
-            "quote",
-            asset.ticker,
-        )
+        if include_quotes:
+            quote_future = executor.submit(
+                gateway.get_quote, asset.ticker, asset_type=asset.asset_type
+            )
+            futures[quote_future] = ("quote", asset.ticker)
         if include_fundamentals:
             future = executor.submit(
                 gateway.get_fundamentals, asset.ticker, asset_type=asset.asset_type
