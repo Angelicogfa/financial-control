@@ -21,6 +21,7 @@ from fincontrol_core.domain.enums import (
     FixedIncomeInstrumentKind,
     FixedIncomeLiquidity,
     IntraClassStrategy,
+    SeriesUnit,
     TransactionKind,
 )
 
@@ -147,6 +148,7 @@ def to_market_series_point(model: MarketSeriesModel) -> MarketSeriesPoint:
         symbol=model.symbol,
         reference_date=model.reference_date,
         value=float(model.value),
+        unit=SeriesUnit(model.unit),
     )
 
 

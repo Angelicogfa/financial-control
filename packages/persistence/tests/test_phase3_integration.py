@@ -14,6 +14,7 @@ from fincontrol_core.analytics import (
     time_weighted_return,
 )
 from fincontrol_core.domain.entities import PortfolioSnapshotEntity
+from fincontrol_core.domain.enums import SeriesUnit
 from fincontrol_core.market.bcb import BcbSgsProvider
 from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import InMemoryCache
@@ -60,7 +61,9 @@ def test_phase3_gateway_persistence_and_analytics_integration(
 
     with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
         uow.market_series.upsert_points(
-            "CDI", [(p.reference_date, p.value) for p in cdi_series]
+            "CDI",
+            [(p.reference_date, p.value) for p in cdi_series],
+            unit=SeriesUnit.PERCENT_PER_DAY,
         )
         uow.market_series.upsert_points(
             "IBOV",
@@ -69,6 +72,7 @@ def test_phase3_gateway_persistence_and_analytics_integration(
                 (date(2025, 1, 3), 121200.0),
                 (date(2025, 1, 6), 122412.0),
             ],
+            unit=SeriesUnit.INDEX_POINTS,
         )
         uow.market_series.upsert_points(
             "IFIX",
@@ -77,6 +81,7 @@ def test_phase3_gateway_persistence_and_analytics_integration(
                 (date(2025, 1, 3), 3115.5),
                 (date(2025, 1, 6), 3131.0),
             ],
+            unit=SeriesUnit.INDEX_POINTS,
         )
         uow.snapshots.upsert(
             PortfolioSnapshotEntity(

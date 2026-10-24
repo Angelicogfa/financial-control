@@ -7,10 +7,14 @@ from datetime import date, datetime, timedelta
 import httpx
 
 from fincontrol_core.domain.entities import MarketSeriesPoint
+from fincontrol_core.market.units import BCB_SERIES_UNITS, rate_fraction
 
 BCB_SERIES_CDI_DAILY = 12
 BCB_SERIES_SELIC_DAILY = 11
 BCB_SERIES_IPCA_MONTHLY = 433
+
+# BCB SGS rejects daily-series requests spanning more than 10 years.
+MAX_WINDOW_DAYS = 3650
 
 SYMBOL_TO_SERIES_CODE: dict[str, int] = {
     "CDI": BCB_SERIES_CDI_DAILY,
@@ -49,6 +53,18 @@ class BcbSgsProvider:
 
         end = end_date or date.today()
         start = start_date or (end - timedelta(days=365))
+        points: list[MarketSeriesPoint] = []
+        window_start = start
+        while window_start <= end:
+            window_end = min(end, window_start + timedelta(days=MAX_WINDOW_DAYS - 1))
+            points.extend(self._fetch_window(norm_symbol, series_code, window_start, window_end))
+            window_start = window_end + timedelta(days=1)
+        points.sort(key=lambda p: p.reference_date)
+        return points
+
+    def _fetch_window(
+        self, symbol: str, series_code: int, start: date, end: date
+    ) -> list[MarketSeriesPoint]:
         url = f"{self.base_url}/bcdata.sgs.{series_code}/dados"
         params = {
             "formato": "json",
@@ -76,14 +92,14 @@ class BcbSgsProvider:
                 val = float(str(raw_val).replace(",", "."))
                 points.append(
                     MarketSeriesPoint(
-                        symbol=norm_symbol,
+                        symbol=symbol,
                         reference_date=pt_date,
                         value=val,
+                        unit=BCB_SERIES_UNITS[symbol],
                     )
                 )
             except ValueError:
                 continue
-        points.sort(key=lambda p: p.reference_date)
         return points
 
     def get_annualized_cdi_rate(self) -> float:
@@ -92,8 +108,7 @@ class BcbSgsProvider:
         pts = self.fetch_series("CDI", start_date=today - timedelta(days=30), end_date=today)
         if not pts:
             return self.default_cdi_annual
-        latest_daily_pct = pts[-1].value  # e.g. 0.0402 (% per business day)
-        daily_frac = latest_daily_pct / 100.0
+        daily_frac = rate_fraction(pts[-1].value, pts[-1].unit)
         annual = (1.0 + daily_frac) ** 252.0 - 1.0
         return round(annual, 6)
 
@@ -106,7 +121,7 @@ class BcbSgsProvider:
         last_12 = pts[-12:]
         factor = 1.0
         for p in last_12:
-            factor *= 1.0 + (p.value / 100.0)
+            factor *= 1.0 + rate_fraction(p.value, p.unit)
         if len(last_12) < 12 and len(last_12) > 0:
             factor = factor ** (12.0 / len(last_12))
         return round(factor - 1.0, 6)

@@ -21,6 +21,7 @@ from fincontrol_core.domain.enums import (
     FixedIncomeLiquidity,
     IntraClassStrategy,
     Market,
+    SeriesUnit,
     TransactionKind,
     default_arca_class,
     default_currency,
@@ -170,6 +171,7 @@ class MarketSeriesPoint:
     symbol: str
     reference_date: date
     value: float
+    unit: SeriesUnit | None = None
     id: int | None = None
 
 

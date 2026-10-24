@@ -97,6 +97,15 @@ class FixedIncomeLiquidity(StrEnum):
     AT_MATURITY = "AT_MATURITY"
 
 
+class SeriesUnit(StrEnum):
+    """Unit in which a market/macro series value is stored (ADR 0006)."""
+
+    PERCENT_PER_DAY = "PERCENT_PER_DAY"
+    PERCENT_PER_MONTH = "PERCENT_PER_MONTH"
+    PRICE = "PRICE"
+    INDEX_POINTS = "INDEX_POINTS"
+
+
 class IntraClassStrategy(StrEnum):
     """How contributions are distributed among assets inside an ARCA class."""
 

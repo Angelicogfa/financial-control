@@ -19,7 +19,7 @@ from fincontrol_core.domain.entities import (
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy
+from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy, SeriesUnit
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
 from fincontrol_core.errors import NotFoundError, ValidationError
 from fincontrol_core.ports.repositories import (
@@ -464,27 +464,49 @@ class SqlAlchemyMarketSeriesRepository(AbstractMarketSeriesRepository):
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def upsert_points(self, symbol: str, points: list[tuple[date, float]]) -> int:
+    def upsert_points(
+        self, symbol: str, points: list[tuple[date, float]], *, unit: SeriesUnit
+    ) -> int:
+        if not points:
+            return 0
         normalized = symbol.strip().upper()
+        dates = [ref_date for ref_date, _ in points]
         existing_rows = {
             row.reference_date: row
             for row in self.session.scalars(
-                select(MarketSeriesModel).where(MarketSeriesModel.symbol == normalized)
+                select(MarketSeriesModel).where(
+                    MarketSeriesModel.symbol == normalized,
+                    MarketSeriesModel.reference_date >= min(dates),
+                    MarketSeriesModel.reference_date <= max(dates),
+                )
             ).all()
         }
-        count = 0
         for ref_date, value in points:
-            if ref_date in existing_rows:
-                existing_rows[ref_date].value = float(value)
+            row = existing_rows.get(ref_date)
+            if row is not None:
+                row.value = float(value)
+                row.unit = unit.value
             else:
-                self.session.add(
-                    MarketSeriesModel(
-                        symbol=normalized, reference_date=ref_date, value=float(value)
-                    )
+                row = MarketSeriesModel(
+                    symbol=normalized,
+                    reference_date=ref_date,
+                    value=float(value),
+                    unit=unit.value,
                 )
-            count += 1
+                self.session.add(row)
+                existing_rows[ref_date] = row
         self.session.flush()
-        return count
+        return len(points)
+
+    def date_range(self, symbol: str) -> tuple[date, date] | None:
+        stmt = select(
+            func.min(MarketSeriesModel.reference_date),
+            func.max(MarketSeriesModel.reference_date),
+        ).where(MarketSeriesModel.symbol == symbol.strip().upper())
+        first, last = self.session.execute(stmt).one()
+        if first is None or last is None:
+            return None
+        return first, last
 
     def list_series(
         self,

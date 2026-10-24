@@ -11,9 +11,11 @@ from fincontrol_core.domain.enums import (
     ArcaClass,
     IntraClassStrategy,
     Market,
+    SeriesUnit,
     TransactionKind,
 )
 from fincontrol_core.market.gateway import CachedMarketGateway
+from fincontrol_core.market.units import BCB_SERIES_UNITS
 from fincontrol_core.portfolio.consolidation import consolidate_portfolio
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
@@ -36,7 +38,9 @@ def sync_bcb_and_benchmarks_job(
             pts = gateway.fetch_bcb_series(bcb_sym, start_date=start, end_date=end)
             if pts:
                 counts[bcb_sym] = uow.market_series.upsert_points(
-                    bcb_sym, [(p.reference_date, p.value) for p in pts]
+                    bcb_sym,
+                    [(p.reference_date, p.value) for p in pts],
+                    unit=BCB_SERIES_UNITS[bcb_sym],
                 )
             else:
                 counts[bcb_sym] = 0
@@ -52,7 +56,9 @@ def sync_bcb_and_benchmarks_job(
             )
             if hist:
                 counts[sym_label] = uow.market_series.upsert_points(
-                    sym_label, [(p.date, p.close) for p in hist]
+                    sym_label,
+                    [(p.date, p.close) for p in hist],
+                    unit=SeriesUnit.INDEX_POINTS,
                 )
             else:
                 counts[sym_label] = 0

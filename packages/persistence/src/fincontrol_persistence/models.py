@@ -241,6 +241,7 @@ class MarketSeriesModel(Base):
     symbol: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     reference_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     value: Mapped[float] = mapped_column(Float, nullable=False)
+    unit: Mapped[str] = mapped_column(String(24), nullable=False)
 
 
 class PortfolioSnapshotModel(Base):

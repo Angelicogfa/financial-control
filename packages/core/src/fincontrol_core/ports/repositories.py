@@ -17,7 +17,7 @@ from fincontrol_core.domain.entities import (
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy
+from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy, SeriesUnit
 from fincontrol_core.domain.pagination import PaginatedResult, PaginationParams
 
 
@@ -149,7 +149,14 @@ class AbstractMarketSeriesRepository(ABC):
     """Repository port for historical prices and macroeconomic benchmark series."""
 
     @abstractmethod
-    def upsert_points(self, symbol: str, points: list[tuple[date, float]]) -> int:
+    def upsert_points(
+        self, symbol: str, points: list[tuple[date, float]], *, unit: SeriesUnit
+    ) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def date_range(self, symbol: str) -> tuple[date, date] | None:
+        """Return (first, last) stored reference dates for a symbol, or None if empty."""
         raise NotImplementedError
 
     @abstractmethod

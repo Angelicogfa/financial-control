@@ -18,6 +18,7 @@ from fincontrol_core.domain import (
     IntraClassStrategy,
     PaginationParams,
     PortfolioSnapshotEntity,
+    SeriesUnit,
     TransactionEntity,
     TransactionKind,
 )
@@ -130,7 +131,9 @@ def test_repositories_standardized_pagination_sorting_and_filtering(
             {ArcaClass.CAIXA: IntraClassStrategy.EQUAL_WEIGHT},
         )
         uow.market_series.upsert_points(
-            "^BVSP", [(date(2026, 1, 2), 128000.0), (date(2026, 1, 3), 129500.0)]
+            "^BVSP",
+            [(date(2026, 1, 2), 128000.0), (date(2026, 1, 3), 129500.0)],
+            unit=SeriesUnit.INDEX_POINTS,
         )
         uow.snapshots.upsert(
             PortfolioSnapshotEntity(
