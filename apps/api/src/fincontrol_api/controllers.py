@@ -31,11 +31,13 @@ from fincontrol_api.schemas import (
     ContributionSimulationRequest,
     EarningCreateRequest,
     EarningResponseDTO,
+    EarningUpdateRequest,
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
+    TransactionUpdateRequest,
 )
 
 health_router = APIRouter(tags=["Health"])
@@ -180,6 +182,15 @@ def create_transaction(
     return handler.create(payload)
 
 
+@transactions_router.put("/{tx_id}", response_model=TransactionResponseDTO)
+def update_transaction(
+    tx_id: int,
+    payload: TransactionUpdateRequest,
+    handler: TransactionHandler = Depends(get_transaction_handler),
+) -> TransactionResponseDTO:
+    return handler.update(tx_id, payload)
+
+
 @transactions_router.delete("/{tx_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transaction(
     tx_id: int,
@@ -218,6 +229,15 @@ def create_earning(
     handler: EarningHandler = Depends(get_earning_handler),
 ) -> EarningResponseDTO:
     return handler.create(payload)
+
+
+@earnings_router.put("/{earning_id}", response_model=EarningResponseDTO)
+def update_earning(
+    earning_id: int,
+    payload: EarningUpdateRequest,
+    handler: EarningHandler = Depends(get_earning_handler),
+) -> EarningResponseDTO:
+    return handler.update(earning_id, payload)
 
 
 @earnings_router.delete("/{earning_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -137,6 +137,18 @@ class TransactionCreateRequest(BaseModel):
     notes: str | None = None
 
 
+class TransactionUpdateRequest(BaseModel):
+    """Payload to correct a recorded trade (the asset cannot change)."""
+
+    kind: TransactionKind
+    trade_date: date
+    quantity: Decimal = Field(..., gt=Decimal("0"))
+    unit_price: Decimal = Field(..., ge=Decimal("0"))
+    fees: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
+    notes: str | None = None
+
+
 class TransactionResponseDTO(BaseModel):
     """Serialized Transaction domain entity."""
 
@@ -158,6 +170,19 @@ class EarningCreateRequest(BaseModel):
     """Payload to record received dividends, JCP, FII yields, or fixed income coupons."""
 
     asset_id: int
+    kind: EarningKind
+    payment_date: date
+    gross_amount: Decimal = Field(..., gt=Decimal("0"))
+    withholding_tax: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    net_amount: Decimal | None = Field(default=None, ge=Decimal("0"))
+    ex_date: date | None = None
+    notes: str | None = None
+    fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
+
+
+class EarningUpdateRequest(BaseModel):
+    """Payload to correct a recorded earning (the asset cannot change)."""
+
     kind: EarningKind
     payment_date: date
     gross_amount: Decimal = Field(..., gt=Decimal("0"))

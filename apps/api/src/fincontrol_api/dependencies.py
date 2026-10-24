@@ -80,9 +80,10 @@ def get_asset_handler(
 
 def get_transaction_handler(
     uow_factory: UoWFactory = Depends(get_uow_factory),
+    portfolio_service: PortfolioApplicationService = Depends(get_portfolio_service),
 ) -> TransactionHandler:
     """Provide the TransactionHandler instance."""
-    return TransactionHandler(uow_factory=uow_factory)
+    return TransactionHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
 
 
 def get_earning_handler(

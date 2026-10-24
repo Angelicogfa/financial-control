@@ -34,6 +34,7 @@ from fincontrol_core.portfolio.consolidation import (
     plan_contribution,
 )
 from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_rate_curves
+from fincontrol_core.portfolio.fixed_income import RateCurves
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 from fincontrol_core.valuation import summarize_valuation
 
@@ -59,6 +60,21 @@ class PortfolioApplicationService:
         weights = {r.arca_class: float(r.target_pct) for r in rows}
         strategies = {r.arca_class: r.intra_class_strategy for r in rows}
         return ArcaTargets(weights), strategies
+
+    def ledger_curves(
+        self, uow: AbstractUnitOfWork, asset: AssetEntity, as_of: date
+    ) -> RateCurves | None:
+        """Rate curves needed to validate a fixed income ledger (None for market assets)."""
+        if asset.fixed_income_term is None:
+            return None
+        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        return load_rate_curves(
+            uow.market_series,
+            date_from=earliest_fixed_income_start([asset]),
+            date_to=as_of,
+            annual_cdi_rate=annual_cdi,
+            annual_ipca_rate=annual_ipca,
+        )
 
     def build_portfolio_report(
         self,

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 
 from fincontrol_core.arca.allocation import ArcaTargets
 from fincontrol_core.domain.entities import (
+    AssetEntity,
     EarningEntity,
     TransactionEntity,
 )
@@ -15,11 +17,15 @@ from fincontrol_core.domain.enums import (
     ArcaClass,
     EarningKind,
     IntraClassStrategy,
-    TransactionKind,
 )
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.errors import NotFoundError
-from fincontrol_core.portfolio.positions import build_position
+from fincontrol_core.portfolio.fixed_income import RateCurves
+from fincontrol_core.portfolio.ledger import (
+    require_fx_rate,
+    validate_ledger,
+    validate_ledger_change,
+)
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 from fincontrol_api.handlers.serializers import (
@@ -37,11 +43,13 @@ from fincontrol_api.schemas import (
     ContributionSimulationRequest,
     EarningCreateRequest,
     EarningResponseDTO,
+    EarningUpdateRequest,
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
+    TransactionUpdateRequest,
 )
 from fincontrol_api.services.portfolio_service import PortfolioApplicationService
 
@@ -49,10 +57,16 @@ UoWFactory = Callable[[], AbstractUnitOfWork]
 
 
 class TransactionHandler:
-    """Application handler for buy/sell Transaction commands and paginated queries."""
+    """Application handler for buy/sell Transaction commands and paginated queries.
 
-    def __init__(self, uow_factory: UoWFactory) -> None:
+    Every command validates the whole resulting ledger of the asset (finding I-04).
+    """
+
+    def __init__(
+        self, uow_factory: UoWFactory, portfolio_service: PortfolioApplicationService
+    ) -> None:
         self.uow_factory = uow_factory
+        self.portfolio_service = portfolio_service
 
     def list_paginated(
         self,
@@ -80,12 +94,16 @@ class TransactionHandler:
                 meta=to_page_meta_dto(result.meta),
             )
 
+    def _curves(
+        self, uow: AbstractUnitOfWork, asset: AssetEntity, entries: list[TransactionEntity]
+    ) -> RateCurves | None:
+        as_of = max((t.trade_date for t in entries), default=date.today())
+        return self.portfolio_service.ledger_curves(uow, asset, as_of)
+
     def create(self, req: TransactionCreateRequest) -> TransactionResponseDTO:
         with self.uow_factory() as uow:
-            asset = uow.assets.get_by_id(req.asset_id)
-            if asset is None:
-                raise NotFoundError(f"Asset id={req.asset_id} not found")
-
+            asset = _get_asset(uow, req.asset_id)
+            require_fx_rate(asset, req.fx_rate)
             candidate = TransactionEntity(
                 asset_id=req.asset_id,
                 kind=req.kind,
@@ -96,19 +114,43 @@ class TransactionHandler:
                 fx_rate=req.fx_rate,
                 notes=req.notes,
             )
-            # Validate short-selling constraint before persisting
-            if req.kind == TransactionKind.SELL:
-                build_position([*asset.transactions, candidate])
+            entries = [*asset.transactions, candidate]
+            validate_ledger(asset, entries, curves=self._curves(uow, asset, entries))
 
             saved = uow.transactions.add(candidate)
             uow.commit()
             return to_transaction_dto(saved, ticker=asset.ticker)
 
+    def update(self, tx_id: int, req: TransactionUpdateRequest) -> TransactionResponseDTO:
+        with self.uow_factory() as uow:
+            current = _get_transaction(uow, tx_id)
+            asset = _get_asset(uow, current.asset_id)
+            require_fx_rate(asset, req.fx_rate)
+            edited = replace(
+                current,
+                kind=req.kind,
+                trade_date=req.trade_date,
+                quantity=req.quantity,
+                unit_price=req.unit_price,
+                fees=req.fees,
+                fx_rate=req.fx_rate,
+                notes=req.notes,
+            )
+            entries = [edited if t.id == tx_id else t for t in asset.transactions]
+            validate_ledger_change(asset, entries, curves=self._curves(uow, asset, entries))
+
+            saved = uow.transactions.update(edited)
+            uow.commit()
+            return to_transaction_dto(saved, ticker=asset.ticker)
+
     def delete(self, tx_id: int) -> None:
         with self.uow_factory() as uow:
-            deleted = uow.transactions.delete(tx_id)
-            if not deleted:
-                raise NotFoundError(f"Transaction id={tx_id} not found")
+            current = _get_transaction(uow, tx_id)
+            asset = _get_asset(uow, current.asset_id)
+            entries = [t for t in asset.transactions if t.id != tx_id]
+            validate_ledger_change(asset, entries, curves=self._curves(uow, asset, entries))
+
+            uow.transactions.delete(tx_id)
             uow.commit()
 
 
@@ -146,10 +188,8 @@ class EarningHandler:
 
     def create(self, req: EarningCreateRequest) -> EarningResponseDTO:
         with self.uow_factory() as uow:
-            asset = uow.assets.get_by_id(req.asset_id)
-            if asset is None:
-                raise NotFoundError(f"Asset id={req.asset_id} not found")
-
+            asset = _get_asset(uow, req.asset_id)
+            require_fx_rate(asset, req.fx_rate)
             entity = EarningEntity(
                 asset_id=req.asset_id,
                 kind=req.kind,
@@ -165,12 +205,50 @@ class EarningHandler:
             uow.commit()
             return to_earning_dto(saved, ticker=asset.ticker)
 
+    def update(self, earning_id: int, req: EarningUpdateRequest) -> EarningResponseDTO:
+        with self.uow_factory() as uow:
+            current = uow.earnings.get_by_id(earning_id)
+            if current is None:
+                raise NotFoundError(f"Earning id={earning_id} not found")
+            asset = _get_asset(uow, current.asset_id)
+            require_fx_rate(asset, req.fx_rate)
+            edited = EarningEntity(
+                id=current.id,
+                asset_id=current.asset_id,
+                kind=req.kind,
+                payment_date=req.payment_date,
+                gross_amount=req.gross_amount,
+                withholding_tax=req.withholding_tax,
+                net_amount=req.net_amount,
+                ex_date=req.ex_date,
+                notes=req.notes,
+                fx_rate=req.fx_rate,
+                created_at=current.created_at,
+            )
+            saved = uow.earnings.update(edited)
+            uow.commit()
+            return to_earning_dto(saved, ticker=asset.ticker)
+
     def delete(self, earning_id: int) -> None:
         with self.uow_factory() as uow:
             deleted = uow.earnings.delete(earning_id)
             if not deleted:
                 raise NotFoundError(f"Earning id={earning_id} not found")
             uow.commit()
+
+
+def _get_asset(uow: AbstractUnitOfWork, asset_id: int) -> AssetEntity:
+    asset = uow.assets.get_by_id(asset_id)
+    if asset is None:
+        raise NotFoundError(f"Asset id={asset_id} not found")
+    return asset
+
+
+def _get_transaction(uow: AbstractUnitOfWork, tx_id: int) -> TransactionEntity:
+    tx = uow.transactions.get_by_id(tx_id)
+    if tx is None:
+        raise NotFoundError(f"Transaction id={tx_id} not found")
+    return tx
 
 
 class PortfolioHandler:

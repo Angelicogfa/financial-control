@@ -73,6 +73,10 @@ class AbstractTransactionRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def update(self, transaction: TransactionEntity) -> TransactionEntity:
+        raise NotImplementedError
+
+    @abstractmethod
     def delete(self, transaction_id: int) -> bool:
         raise NotImplementedError
 
@@ -102,6 +106,10 @@ class AbstractEarningRepository(ABC):
 
     @abstractmethod
     def get_by_id(self, earning_id: int) -> EarningEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, earning: EarningEntity) -> EarningEntity:
         raise NotImplementedError
 
     @abstractmethod

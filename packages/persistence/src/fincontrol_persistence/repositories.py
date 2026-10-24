@@ -266,6 +266,20 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
         model = self.session.get(TransactionModel, transaction_id)
         return to_transaction_entity(model) if model else None
 
+    def update(self, transaction: TransactionEntity) -> TransactionEntity:
+        model = self.session.get(TransactionModel, transaction.id) if transaction.id else None
+        if model is None:
+            raise NotFoundError(f"Transaction id={transaction.id} not found")
+        model.kind = transaction.kind.value
+        model.trade_date = transaction.trade_date
+        model.quantity = transaction.quantity
+        model.unit_price = transaction.unit_price
+        model.fees = transaction.fees
+        model.fx_rate = transaction.fx_rate
+        model.notes = transaction.notes
+        self.session.flush()
+        return to_transaction_entity(model)
+
     def delete(self, transaction_id: int) -> bool:
         model = self.session.get(TransactionModel, transaction_id)
         if model is None:
@@ -349,6 +363,21 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
     def get_by_id(self, earning_id: int) -> EarningEntity | None:
         model = self.session.get(EarningModel, earning_id)
         return to_earning_entity(model) if model else None
+
+    def update(self, earning: EarningEntity) -> EarningEntity:
+        model = self.session.get(EarningModel, earning.id) if earning.id else None
+        if model is None:
+            raise NotFoundError(f"Earning id={earning.id} not found")
+        model.kind = earning.kind.value
+        model.payment_date = earning.payment_date
+        model.ex_date = earning.ex_date
+        model.gross_amount = earning.gross_amount
+        model.withholding_tax = earning.withholding_tax
+        model.net_amount = earning.net_amount or (earning.gross_amount - earning.withholding_tax)
+        model.fx_rate = earning.fx_rate
+        model.notes = earning.notes
+        self.session.flush()
+        return to_earning_entity(model)
 
     def delete(self, earning_id: int) -> bool:
         model = self.session.get(EarningModel, earning_id)
