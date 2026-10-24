@@ -42,6 +42,7 @@ from fincontrol_core.domain.enums import (
 )
 from fincontrol_core.errors import ValidationError
 from fincontrol_core.market.models import Fundamentals, Quote, QuoteFreshness
+from fincontrol_core.policy.assumptions import ProjectionAssumptions
 from fincontrol_core.policy.lifecycle import (
     CONTRIBUTION_STATUSES,
     has_position,
@@ -49,7 +50,6 @@ from fincontrol_core.policy.lifecycle import (
     lifecycle_status,
 )
 from fincontrol_core.policy.models import EligibilityPolicy
-from fincontrol_core.portfolio.assumptions import ProjectionAssumptions
 from fincontrol_core.portfolio.fixed_income import (
     FixedIncomeValuation,
     RateCurves,

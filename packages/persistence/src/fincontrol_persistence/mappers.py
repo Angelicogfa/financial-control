@@ -29,6 +29,7 @@ from fincontrol_core.domain.enums import (
     SeriesUnit,
     TransactionKind,
 )
+from fincontrol_core.policy.assumptions import ProjectionAssumptions
 from fincontrol_core.policy.models import (
     ArcaPolicy,
     ClassPolicy,
@@ -36,7 +37,6 @@ from fincontrol_core.policy.models import (
     InvestmentPolicy,
     ValuationPolicy,
 )
-from fincontrol_core.portfolio.assumptions import ProjectionAssumptions
 
 from fincontrol_persistence.models import (
     AccountModel,

@@ -17,7 +17,7 @@ from fincontrol_core.policy import (
     ValuationPolicy,
     current_policy,
 )
-from fincontrol_core.portfolio.assumptions import ProjectionAssumptions
+from fincontrol_core.policy.assumptions import ProjectionAssumptions
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 from fincontrol_api.schemas import (
