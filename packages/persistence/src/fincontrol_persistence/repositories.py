@@ -15,6 +15,7 @@ from fincontrol_core.domain.entities import (
     ArcaTargetEntity,
     AssetEntity,
     EarningEntity,
+    JobRunEntity,
     MarketSeriesPoint,
     PortfolioSnapshotEntity,
     TransactionEntity,
@@ -26,6 +27,7 @@ from fincontrol_core.ports.repositories import (
     AbstractArcaTargetRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
+    AbstractJobRunRepository,
     AbstractMarketSeriesRepository,
     AbstractPortfolioSnapshotRepository,
     AbstractTransactionRepository,
@@ -38,6 +40,7 @@ from fincontrol_persistence.mappers import (
     to_asset_entity,
     to_earning_entity,
     to_fixed_income_term_model,
+    to_job_run_entity,
     to_market_series_point,
     to_portfolio_snapshot_entity,
     to_transaction_entity,
@@ -47,6 +50,7 @@ from fincontrol_persistence.models import (
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    JobRunModel,
     MarketSeriesModel,
     PortfolioSnapshotModel,
     TransactionModel,
@@ -629,6 +633,52 @@ class SqlAlchemyPortfolioSnapshotRepository(AbstractPortfolioSnapshotRepository)
         result = self.session.execute(stmt)
         self.session.flush()
         return int(result.rowcount or 0)
+
+
+class SqlAlchemyJobRunRepository(AbstractJobRunRepository):
+    """SQLAlchemy implementation of AbstractJobRunRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, run: JobRunEntity) -> JobRunEntity:
+        model = JobRunModel(
+            job_name=run.job_name,
+            status=run.status.value,
+            attempts=run.attempts,
+            started_at=run.started_at,
+            finished_at=run.finished_at,
+            details=dict(run.details),
+            error=run.error,
+        )
+        self.session.add(model)
+        self.session.flush()
+        return to_job_run_entity(model)
+
+    def update(self, run: JobRunEntity) -> JobRunEntity:
+        model = self.session.get(JobRunModel, run.id) if run.id else None
+        if model is None:
+            raise NotFoundError(f"Job run id={run.id} not found")
+        model.status = run.status.value
+        model.attempts = run.attempts
+        model.finished_at = run.finished_at
+        model.details = dict(run.details)
+        model.error = run.error
+        self.session.flush()
+        return to_job_run_entity(model)
+
+    def latest_per_job(self) -> list[JobRunEntity]:
+        latest = (
+            select(JobRunModel.job_name, func.max(JobRunModel.id).label("max_id"))
+            .group_by(JobRunModel.job_name)
+            .subquery()
+        )
+        stmt = (
+            select(JobRunModel)
+            .join(latest, JobRunModel.id == latest.c.max_id)
+            .order_by(JobRunModel.job_name.asc())
+        )
+        return [to_job_run_entity(m) for m in self.session.scalars(stmt).all()]
 
 
 # Backward-compatible aliases within persistence package

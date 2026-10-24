@@ -106,6 +106,15 @@ class SeriesUnit(StrEnum):
     INDEX_POINTS = "INDEX_POINTS"
 
 
+class JobRunStatus(StrEnum):
+    """Lifecycle of a background job execution."""
+
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
 class IntraClassStrategy(StrEnum):
     """How contributions are distributed among assets inside an ARCA class."""
 

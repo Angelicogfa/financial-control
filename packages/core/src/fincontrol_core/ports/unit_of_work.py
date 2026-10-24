@@ -9,6 +9,7 @@ from fincontrol_core.ports.repositories import (
     AbstractArcaTargetRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
+    AbstractJobRunRepository,
     AbstractMarketSeriesRepository,
     AbstractPortfolioSnapshotRepository,
     AbstractTransactionRepository,
@@ -24,6 +25,7 @@ class AbstractUnitOfWork(ABC):
     arca_targets: AbstractArcaTargetRepository
     market_series: AbstractMarketSeriesRepository
     snapshots: AbstractPortfolioSnapshotRepository
+    job_runs: AbstractJobRunRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

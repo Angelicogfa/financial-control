@@ -13,6 +13,7 @@ from fincontrol_core.domain.entities import (
     ArcaTargetEntity,
     AssetEntity,
     EarningEntity,
+    JobRunEntity,
     MarketSeriesPoint,
     PortfolioSnapshotEntity,
     TransactionEntity,
@@ -201,4 +202,21 @@ class AbstractPortfolioSnapshotRepository(ABC):
 
     @abstractmethod
     def delete_range(self, *, date_from: date | None = None, date_to: date | None = None) -> int:
+        raise NotImplementedError
+
+
+class AbstractJobRunRepository(ABC):
+    """Repository port for background job executions."""
+
+    @abstractmethod
+    def add(self, run: JobRunEntity) -> JobRunEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, run: JobRunEntity) -> JobRunEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def latest_per_job(self) -> list[JobRunEntity]:
+        """Most recent execution of each job name."""
         raise NotImplementedError

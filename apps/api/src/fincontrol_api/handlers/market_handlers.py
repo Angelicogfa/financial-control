@@ -8,7 +8,7 @@ from datetime import date
 from fincontrol_core.market.series_status import evaluate_series_status
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
-from fincontrol_api.schemas import SeriesStatusDTO
+from fincontrol_api.schemas import JobRunDTO, SeriesStatusDTO
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
 
@@ -33,4 +33,20 @@ class MarketDataHandler:
                     )
                 )
                 for symbol in TRACKED_SERIES
+            ]
+
+    def job_runs(self) -> list[JobRunDTO]:
+        """Latest execution of each worker job (data freshness indicator)."""
+        with self.uow_factory() as uow:
+            return [
+                JobRunDTO(
+                    job_name=run.job_name,
+                    status=run.status.value,
+                    attempts=run.attempts,
+                    started_at=run.started_at,
+                    finished_at=run.finished_at,
+                    details=run.details,
+                    error=run.error,
+                )
+                for run in uow.job_runs.latest_per_job()
             ]

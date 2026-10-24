@@ -9,6 +9,7 @@ from fincontrol_core.domain.entities import (
     AssetEntity,
     EarningEntity,
     FixedIncomeTermEntity,
+    JobRunEntity,
     MarketSeriesPoint,
     PortfolioSnapshotEntity,
     TransactionEntity,
@@ -21,6 +22,7 @@ from fincontrol_core.domain.enums import (
     FixedIncomeInstrumentKind,
     FixedIncomeLiquidity,
     IntraClassStrategy,
+    JobRunStatus,
     SeriesUnit,
     TransactionKind,
 )
@@ -30,6 +32,7 @@ from fincontrol_persistence.models import (
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    JobRunModel,
     MarketSeriesModel,
     PortfolioSnapshotModel,
     TransactionModel,
@@ -164,4 +167,17 @@ def to_portfolio_snapshot_entity(model: PortfolioSnapshotModel) -> PortfolioSnap
         consolidated_pnl=float(model.consolidated_pnl),
         net_flow=float(model.net_flow),
         by_class=dict(model.by_class or {}),
+    )
+
+
+def to_job_run_entity(model: JobRunModel) -> JobRunEntity:
+    return JobRunEntity(
+        id=model.id,
+        job_name=model.job_name,
+        status=JobRunStatus(model.status),
+        attempts=model.attempts,
+        started_at=model.started_at,
+        finished_at=model.finished_at,
+        details=dict(model.details or {}),
+        error=model.error,
     )

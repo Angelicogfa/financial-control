@@ -20,6 +20,7 @@ from fincontrol_core.domain.enums import (
     FixedIncomeInstrumentKind,
     FixedIncomeLiquidity,
     IntraClassStrategy,
+    JobRunStatus,
     Market,
     SeriesUnit,
     TransactionKind,
@@ -220,3 +221,17 @@ class PortfolioSnapshotEntity:
     consolidated_pnl: float = 0.0
     net_flow: float = 0.0
     by_class: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class JobRunEntity:
+    """One execution of a background job (worker freshness and audit trail)."""
+
+    job_name: str
+    started_at: datetime
+    status: JobRunStatus = JobRunStatus.RUNNING
+    attempts: int = 0
+    finished_at: datetime | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    id: int | None = None

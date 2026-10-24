@@ -41,6 +41,7 @@ from fincontrol_api.schemas import (
     EarningCreateRequest,
     EarningResponseDTO,
     EarningUpdateRequest,
+    JobRunDTO,
     LoginRequest,
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
@@ -334,6 +335,13 @@ def update_arca_targets(
 # ---------------------------------------------------------------------------
 # Market Data Diagnostics Controller
 # ---------------------------------------------------------------------------
+@market_router.get("/job-runs", response_model=list[JobRunDTO])
+def get_job_runs(
+    handler: MarketDataHandler = Depends(get_market_data_handler),
+) -> list[JobRunDTO]:
+    return handler.job_runs()
+
+
 @market_router.get("/series-status", response_model=list[SeriesStatusDTO])
 def get_series_status(
     handler: MarketDataHandler = Depends(get_market_data_handler),

@@ -421,6 +421,18 @@ class ReadinessDTO(BaseModel):
     checks: dict[str, ReadinessCheckDTO]
 
 
+class JobRunDTO(BaseModel):
+    """Latest execution of a background job."""
+
+    job_name: str
+    status: str
+    attempts: int
+    started_at: datetime
+    finished_at: datetime | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+
+
 class SeriesStatusDTO(BaseModel):
     """Freshness diagnostics of a persisted market or macro series."""
 

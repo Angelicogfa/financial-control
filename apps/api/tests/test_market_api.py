@@ -33,3 +33,29 @@ def test_series_status_reports_every_tracked_series(api: SimpleNamespace) -> Non
         "stale": True,
         "missing_business_days": 0,
     }
+
+
+def test_job_runs_lists_latest_execution_per_job(api: SimpleNamespace) -> None:
+    from datetime import UTC, datetime
+
+    from fincontrol_core.domain.entities import JobRunEntity
+    from fincontrol_core.domain.enums import JobRunStatus
+
+    with api.uow_factory() as uow:
+        for status in (JobRunStatus.FAILED, JobRunStatus.SUCCESS):
+            uow.job_runs.add(
+                JobRunEntity(
+                    job_name="sync_bcb_and_benchmarks",
+                    started_at=datetime(2025, 1, 2, tzinfo=UTC),
+                    status=status,
+                    attempts=1,
+                    details={"CDI": 2},
+                )
+            )
+        uow.commit()
+
+    (run,) = api.client.get("/api/v1/market/job-runs").json()
+
+    assert run["job_name"] == "sync_bcb_and_benchmarks"
+    assert run["status"] == "SUCCESS"
+    assert run["details"] == {"CDI": 2}
