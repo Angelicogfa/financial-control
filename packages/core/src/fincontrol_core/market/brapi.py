@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.market.models import (
     Fundamentals,
     PricePoint,
@@ -142,6 +143,20 @@ class BrapiProvider:
         points.sort(key=lambda p: p.date)
         return points
 
+    def get_annual_statements(self, symbol: str) -> list[FundamentalSnapshot]:
+        """Yearly statement history for a B3 symbol (empty when unavailable)."""
+        clean = symbol.strip().upper().removesuffix(".SA")
+        params = {"modules": "incomeStatementHistory,balanceSheetHistory,cashflowHistory"}
+        try:
+            resp = self._client.get(
+                f"{self.base_url}/quote/{clean}", params=params, headers=self._headers()
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results") or []
+        except Exception:
+            return []
+        return parse_brapi_statements(clean, results[0]) if results else []
+
     def get_fundamentals(self, symbol: str) -> Fundamentals | None:
         """Fetch fundamental indicators for B3 stocks/FIIs from brapi.dev."""
         clean = symbol.strip().upper().removesuffix(".SA")
@@ -208,3 +223,70 @@ class BrapiProvider:
             market_cap=_float_or_none(item.get("marketCap")),
             avg_daily_volume=financial_volume(volume_shares, price),
         )
+
+
+def _statement_rows(item: dict[str, Any], module: str, inner: str) -> list[dict[str, Any]]:
+    """brapi returns either a plain list or Yahoo's `{module: {inner: [...]}}` shape."""
+    raw = item.get(module)
+    if isinstance(raw, dict):
+        raw = raw.get(inner)
+    return [row for row in raw or [] if isinstance(row, dict)]
+
+
+def _row_date(row: dict[str, Any]) -> date | None:
+    raw = row.get("endDate")
+    if isinstance(raw, dict):
+        raw = raw.get("raw", raw.get("fmt"))
+    if isinstance(raw, int | float):
+        return datetime.fromtimestamp(float(raw), tz=UTC).date()
+    if isinstance(raw, str) and len(raw) >= 10:
+        try:
+            return date.fromisoformat(raw[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def parse_brapi_statements(symbol: str, item: dict[str, Any]) -> list[FundamentalSnapshot]:
+    """Annual snapshots from brapi's income statement, balance sheet and cash flow modules."""
+    by_year: dict[date, dict[str, float | None]] = {}
+
+    def put(rows: list[dict[str, Any]], fields: dict[str, tuple[str, ...]]) -> None:
+        for row in rows:
+            ref = _row_date(row)
+            if ref is None:
+                continue
+            metrics = by_year.setdefault(ref, {})
+            for key, candidates in fields.items():
+                for candidate in candidates:
+                    value = _float_or_none(row.get(candidate))
+                    if value is not None:
+                        metrics[key] = value
+                        break
+
+    put(
+        _statement_rows(item, "incomeStatementHistory", "incomeStatementHistory"),
+        {"revenue": ("totalRevenue",), "net_income": ("netIncome",), "ebitda": ("ebitda", "ebit")},
+    )
+    put(
+        _statement_rows(item, "balanceSheetHistory", "balanceSheetStatements"),
+        {
+            "equity": ("totalStockholderEquity", "stockholdersEquity"),
+            "cash": ("cash", "cashAndCashEquivalents"),
+            "total_debt": ("totalDebt", "longTermDebt"),
+        },
+    )
+    put(
+        _statement_rows(item, "cashflowHistory", "cashflowStatements"),
+        {"dividends_paid": ("dividendsPaid",)},
+    )
+    return [
+        FundamentalSnapshot(
+            ticker=symbol,
+            reference_date=ref,
+            period=FundamentalPeriod.ANNUAL,
+            metrics=metrics,
+            source=BrapiProvider.PROVIDER_NAME,
+        )
+        for ref, metrics in sorted(by_year.items())
+    ]

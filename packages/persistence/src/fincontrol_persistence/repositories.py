@@ -6,7 +6,7 @@ and never call `session.commit()` (transaction boundaries belong to `SqlAlchemyU
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -22,11 +22,13 @@ from fincontrol_core.domain.entities import (
 from fincontrol_core.domain.enums import SeriesUnit
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
 from fincontrol_core.errors import NotFoundError, ValidationError
+from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.policy.models import InvestmentPolicy
 from fincontrol_core.ports.repositories import (
     AbstractAccountRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
+    AbstractFundamentalsRepository,
     AbstractJobRunRepository,
     AbstractMarketSeriesRepository,
     AbstractPolicyRepository,
@@ -42,6 +44,7 @@ from fincontrol_persistence.mappers import (
     to_asset_entity,
     to_earning_entity,
     to_fixed_income_term_model,
+    to_fundamental_snapshot,
     to_investment_policy,
     to_job_run_entity,
     to_market_series_point,
@@ -53,6 +56,7 @@ from fincontrol_persistence.models import (
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    FundamentalSnapshotModel,
     InvestmentPolicyModel,
     JobRunModel,
     MarketSeriesModel,
@@ -735,6 +739,60 @@ class SqlAlchemyAccountRepository(AbstractAccountRepository):
         )
         model = self.session.scalar(stmt)
         return to_account_entity(model) if model else None
+
+
+class SqlAlchemyFundamentalsRepository(AbstractFundamentalsRepository):
+    """SQLAlchemy implementation of AbstractFundamentalsRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def upsert(self, snapshots: list[FundamentalSnapshot]) -> int:
+        for snapshot in snapshots:
+            ticker = snapshot.ticker.strip().upper()
+            model = self.session.scalar(
+                select(FundamentalSnapshotModel).where(
+                    FundamentalSnapshotModel.ticker == ticker,
+                    FundamentalSnapshotModel.reference_date == snapshot.reference_date,
+                    FundamentalSnapshotModel.period == snapshot.period.value,
+                )
+            )
+            if model is None:
+                model = FundamentalSnapshotModel(
+                    ticker=ticker,
+                    reference_date=snapshot.reference_date,
+                    period=snapshot.period.value,
+                )
+                self.session.add(model)
+            model.metrics = dict(snapshot.metrics)
+            model.source = snapshot.source
+            model.fetched_at = datetime.now(UTC)
+        self.session.flush()
+        return len(snapshots)
+
+    def list_for(
+        self, ticker: str, *, period: FundamentalPeriod = FundamentalPeriod.ANNUAL
+    ) -> list[FundamentalSnapshot]:
+        return self.list_for_many([ticker], period=period).get(ticker.strip().upper(), [])
+
+    def list_for_many(
+        self, tickers: list[str], *, period: FundamentalPeriod = FundamentalPeriod.ANNUAL
+    ) -> dict[str, list[FundamentalSnapshot]]:
+        normalized = sorted({t.strip().upper() for t in tickers})
+        if not normalized:
+            return {}
+        stmt = (
+            select(FundamentalSnapshotModel)
+            .where(
+                FundamentalSnapshotModel.ticker.in_(normalized),
+                FundamentalSnapshotModel.period == period.value,
+            )
+            .order_by(FundamentalSnapshotModel.reference_date.asc())
+        )
+        result: dict[str, list[FundamentalSnapshot]] = {}
+        for model in self.session.scalars(stmt).all():
+            result.setdefault(model.ticker, []).append(to_fundamental_snapshot(model))
+        return result
 
 
 # Backward-compatible aliases within persistence package

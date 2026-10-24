@@ -12,6 +12,7 @@ from fincontrol_persistence.repositories import (
     SqlAlchemyAccountRepository,
     SqlAlchemyAssetRepository,
     SqlAlchemyEarningRepository,
+    SqlAlchemyFundamentalsRepository,
     SqlAlchemyJobRunRepository,
     SqlAlchemyMarketSeriesRepository,
     SqlAlchemyPolicyRepository,
@@ -37,6 +38,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.market_series = SqlAlchemyMarketSeriesRepository(self.session)
         self.snapshots = SqlAlchemyPortfolioSnapshotRepository(self.session)
         self.job_runs = SqlAlchemyJobRunRepository(self.session)
+        self.fundamentals = SqlAlchemyFundamentalsRepository(self.session)
         return self
 
     def __exit__(

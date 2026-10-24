@@ -19,6 +19,7 @@ from fincontrol_core.domain.entities import (
 )
 from fincontrol_core.domain.enums import SeriesUnit
 from fincontrol_core.domain.pagination import PaginatedResult, PaginationParams
+from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.policy.models import InvestmentPolicy
 
 
@@ -244,4 +245,26 @@ class AbstractAccountRepository(ABC):
     @abstractmethod
     def get_default(self) -> AccountEntity | None:
         """Oldest active account, used when a trade does not name one."""
+        raise NotImplementedError
+
+
+class AbstractFundamentalsRepository(ABC):
+    """Repository port for yearly statement snapshots, keyed by ticker."""
+
+    @abstractmethod
+    def upsert(self, snapshots: list[FundamentalSnapshot]) -> int:
+        """Insert or replace snapshots by (ticker, reference_date, period)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_for(
+        self, ticker: str, *, period: FundamentalPeriod = FundamentalPeriod.ANNUAL
+    ) -> list[FundamentalSnapshot]:
+        """Snapshots of a ticker, oldest first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_for_many(
+        self, tickers: list[str], *, period: FundamentalPeriod = FundamentalPeriod.ANNUAL
+    ) -> dict[str, list[FundamentalSnapshot]]:
         raise NotImplementedError

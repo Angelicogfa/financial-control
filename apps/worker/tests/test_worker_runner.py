@@ -157,7 +157,9 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "ensure_series_coverage",
         "sync_bcb_and_benchmarks",
         "record_daily_snapshot",
+        "refresh_fundamentals",
     }
+    assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"
     snapshot_trigger = str(jobs["record_daily_snapshot"].trigger)
     assert "hour='20'" in snapshot_trigger and "minute='5'" in snapshot_trigger

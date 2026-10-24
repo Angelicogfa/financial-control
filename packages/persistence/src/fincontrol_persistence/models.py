@@ -291,3 +291,22 @@ class AccountModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
+
+
+class FundamentalSnapshotModel(Base):
+    """Yearly (or TTM) statement figures of a ticker; metrics follow `METRIC_KEYS`."""
+
+    __tablename__ = "fundamental_snapshots"
+    __table_args__ = (
+        UniqueConstraint("ticker", "reference_date", "period", name="uq_fundamental_snapshots_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    reference_date: Mapped[date] = mapped_column(Date, nullable=False)
+    period: Mapped[str] = mapped_column(String(8), nullable=False)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )

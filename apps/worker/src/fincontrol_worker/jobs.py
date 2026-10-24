@@ -12,6 +12,7 @@ from fincontrol_core.calendar import business_days_between, is_business_day
 from fincontrol_core.domain.entities import AssetEntity, PortfolioSnapshotEntity
 from fincontrol_core.domain.enums import (
     ArcaClass,
+    AssetType,
     IntraClassStrategy,
     Market,
     SeriesUnit,
@@ -174,6 +175,36 @@ def warm_portfolio_quotes_job(
         if q is not None:
             warmed += 1
     return warmed
+
+
+# Asset types whose issuers publish income statements and balance sheets.
+STATEMENT_TYPES = frozenset({AssetType.STOCK_BR, AssetType.STOCK_INTL, AssetType.BDR})
+
+
+def refresh_fundamentals_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    extra_tickers: Iterable[str] = (),
+) -> dict[str, int]:
+    """Store the yearly statement history of every active company (holdings and watchlist)."""
+    with uow_factory() as uow:
+        assets = uow.assets.list_all(active_only=True)
+    targets = {a.ticker: a.asset_type for a in assets if a.asset_type in STATEMENT_TYPES}
+    for ticker in extra_tickers:
+        targets.setdefault(ticker.strip().upper(), AssetType.STOCK_BR)
+
+    stored: dict[str, int] = {}
+    for ticker, asset_type in sorted(targets.items()):
+        snapshots = gateway.get_annual_statements(ticker, asset_type=asset_type, bypass_cache=True)
+        if not snapshots:
+            stored[ticker] = 0
+            continue
+        with uow_factory() as uow:
+            stored[ticker] = uow.fundamentals.upsert(snapshots)
+            uow.commit()
+    logger.info("Fundamentals refreshed", extra={"job": "refresh_fundamentals"})
+    return stored
 
 
 def _rate_curves(

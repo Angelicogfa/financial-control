@@ -7,6 +7,11 @@ from datetime import date
 
 from fincontrol_core.domain.entities import MarketSeriesPoint
 from fincontrol_core.domain.enums import AssetType, Market, market_for
+from fincontrol_core.fundamentals.history import (
+    FundamentalSnapshot,
+    snapshot_from_dict,
+    snapshot_to_dict,
+)
 from fincontrol_core.market.bcb import BcbSgsProvider
 from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import AbstractCacheBackend, InMemoryCache
@@ -161,6 +166,36 @@ class CachedMarketGateway:
         if fund is not None:
             self.cache.set_json(cache_key, fund.to_dict(), self.fundamentals_ttl)
         return fund
+
+    def get_annual_statements(
+        self,
+        symbol: str,
+        *,
+        asset_type: AssetType | None = None,
+        bypass_cache: bool = False,
+    ) -> list[FundamentalSnapshot]:
+        """Yearly statement history (brapi first for B3, Yahoo otherwise), cached like
+        fundamentals."""
+        norm_sym = symbol.strip().upper()
+        mkt = self._resolve_market(norm_sym, asset_type, None)
+        if mkt not in (Market.B3, Market.US):
+            return []
+        cache_key = f"statements:{mkt.value}:{norm_sym}"
+        if not bypass_cache:
+            cached = self.cache.get_json(cache_key)
+            if isinstance(cached, list):
+                return [snapshot_from_dict(item) for item in cached]
+
+        snapshots: list[FundamentalSnapshot] = []
+        if mkt == Market.B3:
+            snapshots = self.brapi.get_annual_statements(norm_sym)
+        if not snapshots:
+            snapshots = self.yfinance.get_annual_statements(norm_sym, market=mkt)
+        if snapshots:
+            self.cache.set_json(
+                cache_key, [snapshot_to_dict(s) for s in snapshots], self.fundamentals_ttl
+            )
+        return snapshots
 
     def get_usd_brl_rate(self) -> float:
         """Fetch live or cached USD/BRL exchange rate with safe fallback."""

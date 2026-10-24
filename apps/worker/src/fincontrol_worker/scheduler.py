@@ -19,6 +19,7 @@ from fincontrol_worker.jobs import (
     backfill_snapshots_job,
     ensure_series_coverage_job,
     record_daily_snapshot_job,
+    refresh_fundamentals_job,
     sync_bcb_and_benchmarks_job,
     warm_portfolio_quotes_job,
 )
@@ -102,6 +103,16 @@ def create_scheduler(
         hour=cfg.snapshot_cron_hour,
         minute=cfg.snapshot_cron_minute,
         id="record_daily_snapshot",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("refresh_fundamentals", refresh_fundamentals_job),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=cfg.fundamentals_cron_hour,
+        minute=0,
+        id="refresh_fundamentals",
         replace_existing=True,
         **defaults,
     )

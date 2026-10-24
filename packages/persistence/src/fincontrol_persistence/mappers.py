@@ -29,6 +29,7 @@ from fincontrol_core.domain.enums import (
     SeriesUnit,
     TransactionKind,
 )
+from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.policy.assumptions import ProjectionAssumptions
 from fincontrol_core.policy.models import (
     ArcaPolicy,
@@ -43,6 +44,7 @@ from fincontrol_persistence.models import (
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
+    FundamentalSnapshotModel,
     InvestmentPolicyModel,
     JobRunModel,
     MarketSeriesModel,
@@ -238,4 +240,15 @@ def to_account_entity(model: AccountModel) -> AccountEntity:
         kind=AccountKind(model.kind),
         is_active=bool(model.is_active),
         created_at=model.created_at,
+    )
+
+
+def to_fundamental_snapshot(model: FundamentalSnapshotModel) -> FundamentalSnapshot:
+    return FundamentalSnapshot(
+        id=model.id,
+        ticker=model.ticker,
+        reference_date=model.reference_date,
+        period=FundamentalPeriod(model.period),
+        metrics=dict(model.metrics or {}),
+        source=model.source,
     )

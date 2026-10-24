@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from fincontrol_core.domain.enums import Market
+from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.market.models import (
     Fundamentals,
     PricePoint,
@@ -141,6 +142,17 @@ class YFinanceProvider:
         except Exception:
             return []
 
+    def get_annual_statements(
+        self, symbol: str, market: Market | None = None
+    ) -> list[FundamentalSnapshot]:
+        """Yearly statement history from Yahoo Finance (empty when unavailable)."""
+        try:
+            return parse_yfinance_statements(
+                symbol, self._get_ticker(resolve_yahoo_symbol(symbol, market))
+            )
+        except Exception:
+            return []
+
     def get_fundamentals(self, symbol: str, market: Market | None = None) -> Fundamentals | None:
         """Fetch fundamental indicators from Yahoo Finance `Ticker.info`."""
         yf_sym = resolve_yahoo_symbol(symbol, market)
@@ -190,3 +202,41 @@ class YFinanceProvider:
             )
         except Exception:
             return None
+
+
+_YF_ROWS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "revenue": ("income_stmt", ("Total Revenue",)),
+    "net_income": ("income_stmt", ("Net Income", "Net Income Common Stockholders")),
+    "ebitda": ("income_stmt", ("EBITDA", "Normalized EBITDA")),
+    "equity": ("balance_sheet", ("Stockholders Equity", "Common Stock Equity")),
+    "total_debt": ("balance_sheet", ("Total Debt",)),
+    "cash": ("balance_sheet", ("Cash And Cash Equivalents",)),
+    "dividends_paid": ("cashflow", ("Cash Dividends Paid", "Common Stock Dividend Paid")),
+}
+
+
+def parse_yfinance_statements(symbol: str, ticker_obj: Any) -> list[FundamentalSnapshot]:
+    """Annual snapshots from yfinance statement DataFrames (rows = items, columns = dates)."""
+    by_year: dict[Any, dict[str, float | None]] = {}
+    for key, (attribute, labels) in _YF_ROWS.items():
+        frame = getattr(ticker_obj, attribute, None)
+        if frame is None or getattr(frame, "empty", True):
+            continue
+        label = next((name for name in labels if name in frame.index), None)
+        if label is None:
+            continue
+        for column, value in frame.loc[label].items():
+            ref = column.date() if hasattr(column, "date") else column
+            number = _safe_float(value)
+            if number is not None:
+                by_year.setdefault(ref, {})[key] = number
+    return [
+        FundamentalSnapshot(
+            ticker=symbol.strip().upper(),
+            reference_date=ref,
+            period=FundamentalPeriod.ANNUAL,
+            metrics=metrics,
+            source=YFinanceProvider.PROVIDER_NAME,
+        )
+        for ref, metrics in sorted(by_year.items())
+    ]
