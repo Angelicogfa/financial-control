@@ -8,6 +8,8 @@ from decimal import Decimal
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
+    ChecklistAnswer,
+    ChecklistEvaluationRecord,
     EarningEntity,
     FixedIncomeTermEntity,
     JobRunEntity,
@@ -17,9 +19,12 @@ from fincontrol_core.domain.entities import (
 )
 from fincontrol_core.domain.enums import (
     AccountKind,
+    AnswerSource,
+    AnswerValue,
     ArcaClass,
     AssetPurpose,
     AssetType,
+    ChecklistProfile,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -42,6 +47,8 @@ from fincontrol_core.policy.models import (
 from fincontrol_persistence.models import (
     AccountModel,
     AssetModel,
+    ChecklistAnswerModel,
+    ChecklistEvaluationModel,
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
@@ -114,6 +121,42 @@ def to_earning_entity(model: EarningModel) -> EarningEntity:
     )
 
 
+def to_checklist_answer(model: ChecklistAnswerModel) -> ChecklistAnswer:
+    return ChecklistAnswer(
+        id=model.id,
+        question_id=model.question_id,
+        value=AnswerValue(model.value) if model.value else None,
+        source=AnswerSource(model.source),
+        evidence=model.evidence,
+        answered_at=model.answered_at,
+        checklist_version=model.checklist_version,
+    )
+
+
+def current_answers(rows: list[ChecklistAnswerModel]) -> dict[str, ChecklistAnswer]:
+    """Latest answer per question (rows are ordered oldest first); cleared answers drop out."""
+    latest: dict[str, ChecklistAnswer] = {}
+    for row in rows:
+        latest[row.question_id] = to_checklist_answer(row)
+    return {qid: answer for qid, answer in latest.items() if answer.value is not None}
+
+
+def to_checklist_evaluation(model: ChecklistEvaluationModel) -> ChecklistEvaluationRecord:
+    return ChecklistEvaluationRecord(
+        id=model.id,
+        asset_id=model.asset_id,
+        evaluated_at=model.evaluated_at,
+        profile=ChecklistProfile(model.profile),
+        score=model.score,
+        normalized_score=model.normalized_score,
+        coverage_pct=model.coverage_pct,
+        answered=model.answered,
+        applicable=model.applicable,
+        recommendation=model.recommendation,
+        checklist_version=model.checklist_version,
+    )
+
+
 def to_asset_entity(
     model: AssetModel,
     *,
@@ -142,7 +185,10 @@ def to_asset_entity(
             Decimal(model.custom_class_weight) if model.custom_class_weight is not None else None
         ),
         use_cerrado=bool(model.use_cerrado),
-        cerrado_answers=dict(model.cerrado_answers or {}),
+        cerrado_answers=current_answers(model.checklist_answers),
+        checklist_profile=(
+            ChecklistProfile(model.checklist_profile) if model.checklist_profile else None
+        ),
         is_active=bool(model.is_active),
         notes=model.notes,
         purpose=AssetPurpose(model.purpose),

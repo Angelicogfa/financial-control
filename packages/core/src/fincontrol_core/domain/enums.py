@@ -150,6 +150,33 @@ class IntraClassStrategy(StrEnum):
     EQUAL_WEIGHT = "EQUAL_WEIGHT"
 
 
+class ChecklistProfile(StrEnum):
+    """Fundamentalist checklist profile; each one asks the questions that fit the instrument."""
+
+    STOCK = "STOCK"
+    BANK = "BANK"
+    FII_BRICK = "FII_BRICK"
+    FII_PAPER = "FII_PAPER"
+    ETF = "ETF"
+    INTL_STOCK = "INTL_STOCK"
+    CRYPTO = "CRYPTO"
+    FIXED_INCOME = "FIXED_INCOME"
+
+
+class AnswerValue(StrEnum):
+    """Checklist answer: YES (+1), NO (-1) or NA (question does not apply to the asset)."""
+
+    YES = "YES"
+    NO = "NO"
+    NA = "NA"
+
+
+class AnswerSource(StrEnum):
+    MANUAL = "MANUAL"
+    AUTO = "AUTO"
+    PENDING = "PENDING"
+
+
 DEFAULT_ARCA_BY_TYPE: dict[AssetType, ArcaClass] = {
     AssetType.STOCK_BR: ArcaClass.ACOES,
     AssetType.ETF_BR: ArcaClass.ACOES,
@@ -185,6 +212,20 @@ DEFAULT_CURRENCY_BY_TYPE: dict[AssetType, str] = {
     AssetType.CRYPTO: "USD",
 }
 
+DEFAULT_PROFILE_BY_TYPE: dict[AssetType, ChecklistProfile] = {
+    AssetType.STOCK_BR: ChecklistProfile.STOCK,
+    AssetType.ETF_BR: ChecklistProfile.ETF,
+    AssetType.FII: ChecklistProfile.FII_BRICK,
+    AssetType.REIT: ChecklistProfile.FII_BRICK,
+    AssetType.BDR: ChecklistProfile.INTL_STOCK,
+    AssetType.STOCK_INTL: ChecklistProfile.INTL_STOCK,
+    AssetType.ETF_INTL: ChecklistProfile.ETF,
+    AssetType.CRYPTO: ChecklistProfile.CRYPTO,
+    AssetType.FIXED_INCOME: ChecklistProfile.FIXED_INCOME,
+    AssetType.TREASURY: ChecklistProfile.FIXED_INCOME,
+    AssetType.CASH: ChecklistProfile.FIXED_INCOME,
+}
+
 INTEGER_QUANTITY_TYPES: frozenset[AssetType] = frozenset(
     {AssetType.STOCK_BR, AssetType.ETF_BR, AssetType.FII, AssetType.BDR}
 )
@@ -203,3 +244,8 @@ def market_for(asset_type: AssetType) -> Market:
 def default_currency(asset_type: AssetType) -> str:
     """Return the default trading currency ('BRL' or 'USD') for a given asset type."""
     return DEFAULT_CURRENCY_BY_TYPE.get(asset_type, "BRL")
+
+
+def default_checklist_profile(asset_type: AssetType) -> ChecklistProfile:
+    """Checklist profile used when the asset does not choose one (e.g. BANK, FII_PAPER)."""
+    return DEFAULT_PROFILE_BY_TYPE[asset_type]

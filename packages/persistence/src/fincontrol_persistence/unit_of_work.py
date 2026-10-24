@@ -11,6 +11,7 @@ from fincontrol_persistence.db import get_default_session_factory
 from fincontrol_persistence.repositories import (
     SqlAlchemyAccountRepository,
     SqlAlchemyAssetRepository,
+    SqlAlchemyChecklistRepository,
     SqlAlchemyEarningRepository,
     SqlAlchemyFundamentalsRepository,
     SqlAlchemyJobRunRepository,
@@ -39,6 +40,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.snapshots = SqlAlchemyPortfolioSnapshotRepository(self.session)
         self.job_runs = SqlAlchemyJobRunRepository(self.session)
         self.fundamentals = SqlAlchemyFundamentalsRepository(self.session)
+        self.checklists = SqlAlchemyChecklistRepository(self.session)
         return self
 
     def __exit__(

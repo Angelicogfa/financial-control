@@ -171,7 +171,8 @@ def update_asset(
     return handler.update(asset_id, payload)
 
 
-@assets_router.put("/{asset_id}/cerrado", response_model=AssetResponseDTO)
+@assets_router.put("/{asset_id}/checklist", response_model=AssetResponseDTO)
+@assets_router.put("/{asset_id}/cerrado", response_model=AssetResponseDTO, deprecated=True)
 def update_asset_cerrado(
     asset_id: int,
     payload: CerradoUpdateRequest,

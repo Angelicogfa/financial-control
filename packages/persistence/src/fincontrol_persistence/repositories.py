@@ -6,6 +6,7 @@ and never call `session.commit()` (transaction boundaries belong to `SqlAlchemyU
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -13,13 +14,15 @@ from typing import Any
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
+    ChecklistAnswer,
+    ChecklistEvaluationRecord,
     EarningEntity,
     JobRunEntity,
     MarketSeriesPoint,
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import SeriesUnit
+from fincontrol_core.domain.enums import AnswerSource, SeriesUnit
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
 from fincontrol_core.errors import NotFoundError, ValidationError
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
@@ -27,6 +30,7 @@ from fincontrol_core.policy.models import InvestmentPolicy
 from fincontrol_core.ports.repositories import (
     AbstractAccountRepository,
     AbstractAssetRepository,
+    AbstractChecklistRepository,
     AbstractEarningRepository,
     AbstractFundamentalsRepository,
     AbstractJobRunRepository,
@@ -39,9 +43,12 @@ from sqlalchemy import Select, asc, delete, desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from fincontrol_persistence.mappers import (
+    current_answers,
     policy_payload,
     to_account_entity,
     to_asset_entity,
+    to_checklist_answer,
+    to_checklist_evaluation,
     to_earning_entity,
     to_fixed_income_term_model,
     to_fundamental_snapshot,
@@ -54,6 +61,8 @@ from fincontrol_persistence.mappers import (
 from fincontrol_persistence.models import (
     AccountModel,
     AssetModel,
+    ChecklistAnswerModel,
+    ChecklistEvaluationModel,
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
@@ -93,6 +102,37 @@ def _apply_sort_and_paginate(
     return items, meta
 
 
+def _append_changed_answers(model: AssetModel, answers: Mapping[str, ChecklistAnswer]) -> None:
+    """Append a row for every answer that differs from the stored one (append-only, 11.4).
+
+    Questions answered before and missing from `answers` get a cleared (NULL) row.
+    """
+    current = current_answers(model.checklist_answers)
+    now = datetime.now(UTC)
+    for qid in sorted(set(current) | set(answers)):
+        new = answers.get(qid)
+        old = current.get(qid)
+        if new is None and old is None:
+            continue
+        if (
+            new is not None
+            and old is not None
+            and new.value == old.value
+            and new.evidence in (None, old.evidence)
+        ):
+            continue
+        model.checklist_answers.append(
+            ChecklistAnswerModel(
+                question_id=qid,
+                value=new.value.value if new is not None and new.value else None,
+                source=(new.source if new is not None else AnswerSource.MANUAL).value,
+                evidence=new.evidence if new is not None else None,
+                answered_at=(new.answered_at if new is not None and new.answered_at else now),
+                checklist_version=new.checklist_version if new is not None else 2,
+            )
+        )
+
+
 class SqlAlchemyAssetRepository(AbstractAssetRepository):
     """SQLAlchemy implementation of AbstractAssetRepository."""
 
@@ -118,14 +158,16 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             manual_price=asset.manual_price,
             custom_class_weight=asset.custom_class_weight,
             use_cerrado=asset.use_cerrado,
-            cerrado_answers=asset.cerrado_answers,
             is_active=asset.is_active,
             notes=asset.notes,
         )
         model.purpose = asset.purpose.value
+        model.checklist_profile = asset.checklist_profile.value if asset.checklist_profile else None
         if asset.fixed_income_term is not None:
             model.fixed_income_term = to_fixed_income_term_model(asset.fixed_income_term)
         self.session.add(model)
+        self.session.flush()
+        _append_changed_answers(model, asset.cerrado_answers)
         self.session.flush()
         return to_asset_entity(model, include_children=False)
 
@@ -134,7 +176,10 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             raise ValidationError("Cannot update AssetEntity without id")
         stmt = (
             select(AssetModel)
-            .options(selectinload(AssetModel.fixed_income_term))
+            .options(
+                selectinload(AssetModel.fixed_income_term),
+                selectinload(AssetModel.checklist_answers),
+            )
             .where(AssetModel.id == asset.id)
         )
         model = self.session.scalar(stmt)
@@ -149,7 +194,8 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
         model.manual_price = asset.manual_price
         model.custom_class_weight = asset.custom_class_weight
         model.use_cerrado = asset.use_cerrado
-        model.cerrado_answers = dict(asset.cerrado_answers)
+        model.checklist_profile = asset.checklist_profile.value if asset.checklist_profile else None
+        _append_changed_answers(model, asset.cerrado_answers)
         model.is_active = asset.is_active
         model.notes = asset.notes
         model.purpose = asset.purpose.value
@@ -180,6 +226,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
                 selectinload(AssetModel.fixed_income_term),
                 selectinload(AssetModel.transactions),
                 selectinload(AssetModel.earnings),
+                selectinload(AssetModel.checklist_answers),
             )
             .where(AssetModel.id == asset_id)
         )
@@ -193,6 +240,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
                 selectinload(AssetModel.fixed_income_term),
                 selectinload(AssetModel.transactions),
                 selectinload(AssetModel.earnings),
+                selectinload(AssetModel.checklist_answers),
             )
             .where(AssetModel.ticker == ticker.strip().upper())
         )
@@ -204,6 +252,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             selectinload(AssetModel.fixed_income_term),
             selectinload(AssetModel.transactions),
             selectinload(AssetModel.earnings),
+            selectinload(AssetModel.checklist_answers),
         )
         if active_only:
             stmt = stmt.where(AssetModel.is_active.is_(True))
@@ -224,6 +273,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             selectinload(AssetModel.fixed_income_term),
             selectinload(AssetModel.transactions),
             selectinload(AssetModel.earnings),
+            selectinload(AssetModel.checklist_answers),
         )
         if active_only:
             stmt = stmt.where(AssetModel.is_active.is_(True))
@@ -793,6 +843,56 @@ class SqlAlchemyFundamentalsRepository(AbstractFundamentalsRepository):
         for model in self.session.scalars(stmt).all():
             result.setdefault(model.ticker, []).append(to_fundamental_snapshot(model))
         return result
+
+
+class SqlAlchemyChecklistRepository(AbstractChecklistRepository):
+    """SQLAlchemy implementation of AbstractChecklistRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def answer_history(self, asset_id: int) -> list[ChecklistAnswer]:
+        stmt = (
+            select(ChecklistAnswerModel)
+            .where(ChecklistAnswerModel.asset_id == asset_id)
+            .order_by(ChecklistAnswerModel.answered_at.desc(), ChecklistAnswerModel.id.desc())
+        )
+        return [to_checklist_answer(m) for m in self.session.scalars(stmt).all()]
+
+    def record_evaluation(self, record: ChecklistEvaluationRecord) -> ChecklistEvaluationRecord:
+        model = ChecklistEvaluationModel(
+            asset_id=record.asset_id,
+            evaluated_at=record.evaluated_at,
+            profile=record.profile.value,
+            checklist_version=record.checklist_version,
+            score=record.score,
+            normalized_score=record.normalized_score,
+            coverage_pct=record.coverage_pct,
+            answered=record.answered,
+            applicable=record.applicable,
+            recommendation=record.recommendation,
+        )
+        self.session.add(model)
+        self.session.flush()
+        return to_checklist_evaluation(model)
+
+    def latest_evaluation(self, asset_id: int) -> ChecklistEvaluationRecord | None:
+        history = self.evaluation_history(asset_id, limit=1)
+        return history[-1] if history else None
+
+    def evaluation_history(
+        self, asset_id: int, *, limit: int = 104
+    ) -> list[ChecklistEvaluationRecord]:
+        stmt = (
+            select(ChecklistEvaluationModel)
+            .where(ChecklistEvaluationModel.asset_id == asset_id)
+            .order_by(
+                ChecklistEvaluationModel.evaluated_at.desc(), ChecklistEvaluationModel.id.desc()
+            )
+            .limit(limit)
+        )
+        rows = [to_checklist_evaluation(m) for m in self.session.scalars(stmt).all()]
+        return rows[::-1]
 
 
 # Backward-compatible aliases within persistence package

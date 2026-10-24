@@ -60,7 +60,7 @@ class AssetModel(Base):
     manual_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     custom_class_weight: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
     use_cerrado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    cerrado_answers: Mapped[dict[str, bool]] = mapped_column(JSON, nullable=False, default=dict)
+    checklist_profile: Mapped[str | None] = mapped_column(String(16), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     purpose: Mapped[str] = mapped_column(String(24), nullable=False, default="ARCA")
@@ -89,6 +89,11 @@ class AssetModel(Base):
         cascade="all, delete-orphan",
         order_by="EarningModel.payment_date.asc(), EarningModel.id.asc()",
     )
+    checklist_answers: Mapped[list[ChecklistAnswerModel]] = relationship(
+        "ChecklistAnswerModel",
+        cascade="all, delete-orphan",
+        order_by="ChecklistAnswerModel.answered_at.asc(), ChecklistAnswerModel.id.asc()",
+    )
 
     @classmethod
     def create(
@@ -102,7 +107,6 @@ class AssetModel(Base):
         manual_price: Decimal | None = None,
         custom_class_weight: Decimal | None = None,
         use_cerrado: bool = True,
-        cerrado_answers: dict[str, bool] | None = None,
         is_active: bool = True,
         notes: str | None = None,
     ) -> AssetModel:
@@ -118,7 +122,6 @@ class AssetModel(Base):
             manual_price=manual_price,
             custom_class_weight=custom_class_weight,
             use_cerrado=use_cerrado,
-            cerrado_answers=dict(cerrado_answers or {}),
             is_active=is_active,
             notes=notes,
         )
@@ -310,3 +313,46 @@ class FundamentalSnapshotModel(Base):
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
+
+
+class ChecklistAnswerModel(Base):
+    """Append-only checklist answers; the latest row per question is the current answer."""
+
+    __tablename__ = "checklist_answers"
+    __table_args__ = (
+        Index("ix_checklist_answers_asset_question", "asset_id", "question_id", "answered_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
+    question_id: Mapped[str] = mapped_column(String(48), nullable=False)
+    value: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    source: Mapped[str] = mapped_column(String(8), nullable=False)
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
+    checklist_version: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+
+
+class ChecklistEvaluationModel(Base):
+    """History of checklist evaluations (score and coverage over time)."""
+
+    __tablename__ = "checklist_evaluations"
+    __table_args__ = (Index("ix_checklist_evaluations_asset_at", "asset_id", "evaluated_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    profile: Mapped[str] = mapped_column(String(16), nullable=False)
+    checklist_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    normalized_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    coverage_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    answered: Mapped[int] = mapped_column(Integer, nullable=False)
+    applicable: Mapped[int] = mapped_column(Integer, nullable=False)
+    recommendation: Mapped[str] = mapped_column(String(16), nullable=False)

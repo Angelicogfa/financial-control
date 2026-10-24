@@ -215,7 +215,7 @@ def test_cerrado_scoring_and_optional_intra_class_strategies() -> None:
         avg_daily_volume=150_000_000.0,
     )
     eval_on = evaluate(
-        asset_type=AssetType.STOCK_BR,
+        AssetType.STOCK_BR,
         manual_answers={"governance": True, "perennial_sector": True},
         fundamentals=fundamentals,
         use_cerrado=True,
@@ -224,7 +224,7 @@ def test_cerrado_scoring_and_optional_intra_class_strategies() -> None:
     assert eval_on.recommendation == Recommendation.APTO
 
     eval_off = evaluate(
-        asset_type=AssetType.STOCK_BR,
+        AssetType.STOCK_BR,
         manual_answers={"governance": True},
         fundamentals=fundamentals,
         use_cerrado=False,

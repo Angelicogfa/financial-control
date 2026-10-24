@@ -41,6 +41,7 @@ from fincontrol_core.domain.enums import (
     TransactionKind,
 )
 from fincontrol_core.errors import ValidationError
+from fincontrol_core.fundamentals.history import HistoricalMetrics
 from fincontrol_core.market.models import Fundamentals, Quote, QuoteFreshness
 from fincontrol_core.policy.assumptions import ProjectionAssumptions
 from fincontrol_core.policy.lifecycle import (
@@ -348,6 +349,7 @@ def consolidate_portfolio(
     *,
     quotes: Mapping[str, Quote] | None = None,
     fundamentals_by_ticker: Mapping[str, Fundamentals] | None = None,
+    history_by_ticker: Mapping[str, HistoricalMetrics] | None = None,
     intra_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
     bands: Mapping[ArcaClass, float] | None = None,
     eligibility: EligibilityPolicy | None = None,
@@ -364,6 +366,7 @@ def consolidate_portfolio(
     eligibility_policy = eligibility or EligibilityPolicy()
     quotes_map = quotes or {}
     fund_map = fundamentals_by_ticker or {}
+    history_map = history_by_ticker or {}
     strategy_map = intra_strategies or {}
 
     valuations: list[_Valuation] = []
@@ -386,7 +389,11 @@ def consolidate_portfolio(
         asset = v.asset
         fund = fund_map.get(asset.ticker)
         cerrado_eval = evaluate(
-            asset.asset_type, asset.cerrado_answers, fund, use_cerrado=asset.use_cerrado
+            asset.profile,
+            asset.cerrado_answers,
+            fund,
+            use_cerrado=asset.use_cerrado,
+            history=history_map.get(asset.ticker),
         )
         received_brl, earnings_12m_brl, monthly = (
             _sum_earnings(asset.earnings, as_of_date=ref_date, date_from=date_from)

@@ -8,10 +8,13 @@ from typing import Any
 
 from fincontrol_core.domain.enums import (
     AccountKind,
+    AnswerSource,
+    AnswerValue,
     ArcaClass,
     AssetLifecycle,
     AssetPurpose,
     AssetType,
+    ChecklistProfile,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -22,6 +25,9 @@ from fincontrol_core.domain.enums import (
 )
 from fincontrol_core.market.models import QuoteFreshness
 from pydantic import BaseModel, ConfigDict, Field
+
+# A checklist answer: YES/NO/NA, a legacy boolean, or None (pending).
+AnswerInput = AnswerValue | bool | None
 
 
 class PageMetaDTO(BaseModel):
@@ -81,7 +87,8 @@ class AssetCreateRequest(BaseModel):
     manual_price: Decimal | None = Field(default=None, ge=Decimal("0"))
     custom_class_weight: Decimal | None = Field(default=None, ge=Decimal("0"))
     use_cerrado: bool = True
-    cerrado_answers: dict[str, bool] = Field(default_factory=dict)
+    cerrado_answers: dict[str, AnswerInput] = Field(default_factory=dict)
+    checklist_profile: ChecklistProfile | None = None
     notes: str | None = None
     purpose: AssetPurpose = AssetPurpose.ARCA
     fixed_income_term: FixedIncomeTermPayload | None = None
@@ -98,7 +105,8 @@ class AssetUpdateRequest(BaseModel):
     manual_price: Decimal | None = Field(default=None, ge=Decimal("0"))
     custom_class_weight: Decimal | None = Field(default=None, ge=Decimal("0"))
     use_cerrado: bool | None = None
-    cerrado_answers: dict[str, bool] | None = None
+    cerrado_answers: dict[str, AnswerInput] | None = None
+    checklist_profile: ChecklistProfile | None = None
     is_active: bool | None = None
     notes: str | None = None
     purpose: AssetPurpose | None = None
@@ -128,11 +136,24 @@ class ArcaSuggestionDTO(BaseModel):
 
 
 class CerradoUpdateRequest(BaseModel):
-    """Payload to toggle Diagrama do Cerrado or update answers/manual weight on an asset."""
+    """Toggle the checklist, set its profile, answers (YES/NO/NA) with evidence, manual weight.
+
+    `cerrado_answers` is the full set of manual answers: questions left out become pending.
+    """
 
     use_cerrado: bool = True
-    cerrado_answers: dict[str, bool] = Field(default_factory=dict)
+    cerrado_answers: dict[str, AnswerInput] = Field(default_factory=dict)
+    evidence: dict[str, str] = Field(default_factory=dict)
+    checklist_profile: ChecklistProfile | None = None
     custom_class_weight: Decimal | None = Field(default=None, ge=Decimal("0"))
+
+
+class ChecklistAnswerDTO(BaseModel):
+    value: AnswerValue | None
+    source: AnswerSource
+    evidence: str | None = None
+    answered_at: datetime | None = None
+    checklist_version: int = 2
 
 
 class AssetResponseDTO(BaseModel):
@@ -149,7 +170,10 @@ class AssetResponseDTO(BaseModel):
     manual_price: Decimal | None = None
     custom_class_weight: Decimal | None = None
     use_cerrado: bool
+    # YES/NO answers as booleans (NA omitted); `checklist_answers` carries the full record.
     cerrado_answers: dict[str, bool]
+    checklist_profile: ChecklistProfile
+    checklist_answers: dict[str, ChecklistAnswerDTO] = Field(default_factory=dict)
     is_active: bool
     notes: str | None = None
     purpose: AssetPurpose = AssetPurpose.ARCA
@@ -258,17 +282,25 @@ class EvaluatedAnswerDTO(BaseModel):
     text: str
     category: str
     hint: str
+    value: AnswerValue | None
     answer: bool | None
     source: str
     automatable: bool
+    evidence: str | None = None
+    answered_at: datetime | None = None
 
 
 class CerradoEvaluationDTO(BaseModel):
-    asset_type: AssetType
+    profile: ChecklistProfile
+    checklist_version: int
     use_cerrado: bool
     score: int
     max_score: int
+    normalized_score: float | None
+    coverage_pct: float
     answered: int
+    applicable: int
+    not_applicable: int
     pending: int
     recommendation: str
     answers: list[EvaluatedAnswerDTO]

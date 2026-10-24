@@ -13,8 +13,9 @@ from alembic.config import Config
 from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
+from fincontrol_core.market.models import Fundamentals
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
-from fincontrol_worker.jobs import refresh_fundamentals_job
+from fincontrol_worker.jobs import record_checklist_evaluations_job, refresh_fundamentals_job
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -104,3 +105,39 @@ def test_refresh_job_covers_active_companies_and_extra_tickers(uow_factory: UoWF
             "WEGE3",
             "ITSA4",
         }
+
+
+def test_checklist_evaluations_are_recorded_only_when_they_change(
+    uow_factory: UoWFactory,
+) -> None:
+    with uow_factory() as uow:
+        stock = uow.assets.add(
+            AssetEntity(ticker="WEGE3", name="WEG", asset_type=AssetType.STOCK_BR)
+        )
+        uow.assets.add(
+            AssetEntity(
+                ticker="CDB-X",
+                name="CDB",
+                asset_type=AssetType.CASH,
+                cerrado_answers={"guarantee": True},
+            )
+        )
+        uow.fundamentals.upsert(_StatementGateway().get_annual_statements("WEGE3"))
+        uow.commit()
+
+    class _Gateway:
+        roe = 0.2
+
+        def get_fundamentals(self, symbol: str, *, asset_type: AssetType | None = None) -> Any:
+            return Fundamentals(symbol=symbol, return_on_equity=self.roe)
+
+    gateway = _Gateway()
+    assert record_checklist_evaluations_job(uow_factory, gateway) == 2  # type: ignore[arg-type]
+    assert record_checklist_evaluations_job(uow_factory, gateway) == 0  # type: ignore[arg-type]
+    gateway.roe = 0.01
+    assert record_checklist_evaluations_job(uow_factory, gateway) == 1  # type: ignore[arg-type]
+
+    with uow_factory() as uow:
+        history = uow.checklists.evaluation_history(stock.id or 0)
+    # Two fiscal years are too few for history rules: only the TTM ROE answers.
+    assert [r.score for r in history] == [1, -1]

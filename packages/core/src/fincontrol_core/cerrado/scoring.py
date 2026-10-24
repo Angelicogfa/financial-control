@@ -1,20 +1,43 @@
-"""Optional Diagrama do Cerrado evaluation and intra-class weight resolution."""
+"""Checklist evaluation (Diagrama do Cerrado v2) and intra-class weight resolution.
+
+Score = YES - NO over applicable questions (NA is excluded). `normalized_score` scales it to
+[-1, 1] so assets with different questionnaires compare; `coverage_pct` is the share of
+applicable questions answered (manually or automatically).
+"""
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
-from fincontrol_core.cerrado.questions import questions_for
-from fincontrol_core.domain.enums import AssetType, IntraClassStrategy
+from fincontrol_core.cerrado.questions import (
+    CHECKLIST_VERSION,
+    STATEMENT_PROFILES,
+    EvidenceContext,
+    questions_for,
+    resolve_profile,
+)
+from fincontrol_core.domain.entities import (
+    AssetEntity,
+    ChecklistAnswer,
+    ChecklistEvaluationRecord,
+)
+from fincontrol_core.domain.enums import (
+    AnswerSource,
+    AnswerValue,
+    AssetType,
+    ChecklistProfile,
+    IntraClassStrategy,
+)
+from fincontrol_core.fundamentals.history import (
+    FundamentalSnapshot,
+    HistoricalMetrics,
+    historical_metrics,
+)
 from fincontrol_core.market.models import Fundamentals
-
-
-class AnswerSource(StrEnum):
-    MANUAL = "MANUAL"
-    AUTO = "AUTO"
-    PENDING = "PENDING"
+from fincontrol_core.ports.repositories import AbstractChecklistRepository
 
 
 class Recommendation(StrEnum):
@@ -30,71 +53,124 @@ class EvaluatedAnswer:
     text: str
     category: str
     hint: str
-    answer: bool | None
+    value: AnswerValue | None
     source: AnswerSource
     automatable: bool
+    evidence: str | None = None
+    answered_at: datetime | None = None
+
+    @property
+    def answer(self) -> bool | None:
+        """YES/NO as a bool; None when pending or not applicable."""
+        if self.value == AnswerValue.YES:
+            return True
+        if self.value == AnswerValue.NO:
+            return False
+        return None
 
 
 @dataclass(frozen=True)
 class CerradoEvaluation:
-    asset_type: AssetType
+    profile: ChecklistProfile
     use_cerrado: bool
     answers: list[EvaluatedAnswer]
-    score: int
-    max_score: int
-    answered: int
+    yes: int
+    no: int
+    not_applicable: int
     recommendation: Recommendation
+    checklist_version: int = CHECKLIST_VERSION
+
+    @property
+    def answered(self) -> int:
+        return self.yes + self.no
+
+    @property
+    def applicable(self) -> int:
+        return len(self.answers) - self.not_applicable
+
+    @property
+    def score(self) -> int:
+        return self.yes - self.no
+
+    @property
+    def max_score(self) -> int:
+        return self.applicable
 
     @property
     def pending(self) -> int:
-        return len(self.answers) - self.answered
+        return self.applicable - self.answered
+
+    @property
+    def normalized_score(self) -> float | None:
+        return self.score / self.applicable if self.applicable else None
+
+    @property
+    def coverage_pct(self) -> float:
+        return self.answered / self.applicable * 100.0 if self.applicable else 0.0
 
 
 def evaluate(
-    asset_type: AssetType,
-    manual_answers: Mapping[str, bool] | None = None,
+    profile_or_type: ChecklistProfile | AssetType,
+    manual_answers: Mapping[str, object] | None = None,
     fundamentals: Fundamentals | None = None,
     *,
     use_cerrado: bool = True,
+    history: HistoricalMetrics | None = None,
 ) -> CerradoEvaluation:
-    """Evaluate an asset's Diagrama do Cerrado questionnaire (or DESATIVADO if disabled)."""
-    manual_answers = manual_answers or {}
+    """Evaluate a checklist: manual answers first, then auto rules with evidence."""
+    profile = resolve_profile(profile_or_type)
+    manual = {qid: ChecklistAnswer.coerce(qid, raw) for qid, raw in (manual_answers or {}).items()}
+    context = EvidenceContext(fundamentals=fundamentals, history=history)
     evaluated: list[EvaluatedAnswer] = []
-    score = 0
-    answered = 0
+    counts = {AnswerValue.YES: 0, AnswerValue.NO: 0, AnswerValue.NA: 0}
 
-    for q in questions_for(asset_type):
-        answer: bool | None = None
+    for q in questions_for(profile):
+        value: AnswerValue | None = None
         source = AnswerSource.PENDING
-        if q.id in manual_answers and manual_answers[q.id] is not None:
-            answer, source = bool(manual_answers[q.id]), AnswerSource.MANUAL
-        elif q.auto is not None and fundamentals is not None:
-            auto_answer = q.auto(fundamentals)
-            if auto_answer is not None:
-                answer, source = auto_answer, AnswerSource.AUTO
-        if answer is not None:
-            answered += 1
-            score += 1 if answer else -1
+        evidence: str | None = None
+        answered_at: datetime | None = None
+        stored = manual.get(q.id)
+        if stored is not None and stored.value is not None:
+            value, source = stored.value, stored.source
+            evidence, answered_at = stored.evidence, stored.answered_at
+        elif q.auto is not None:
+            auto = q.auto(context)
+            if auto is not None:
+                value = AnswerValue.YES if auto.value else AnswerValue.NO
+                source, evidence = AnswerSource.AUTO, auto.evidence
+        if value is not None:
+            counts[value] += 1
         evaluated.append(
-            EvaluatedAnswer(q.id, q.text, q.category, q.hint, answer, source, q.automatable)
+            EvaluatedAnswer(
+                q.id,
+                q.text,
+                q.category,
+                q.hint,
+                value,
+                source,
+                q.automatable,
+                evidence,
+                answered_at,
+            )
         )
 
+    yes, no = counts[AnswerValue.YES], counts[AnswerValue.NO]
     if not use_cerrado:
         recommendation = Recommendation.DESATIVADO
-    elif answered == 0:
+    elif yes + no == 0:
         recommendation = Recommendation.INCOMPLETO
-    elif score > 0:
+    elif yes > no:
         recommendation = Recommendation.APTO
     else:
         recommendation = Recommendation.REVISAR
 
     return CerradoEvaluation(
-        asset_type=asset_type,
+        profile=profile,
         use_cerrado=use_cerrado,
         answers=evaluated,
-        score=score,
-        max_score=len(evaluated),
-        answered=answered,
+        yes=yes,
+        no=no,
+        not_applicable=counts[AnswerValue.NA],
         recommendation=recommendation,
     )
 
@@ -155,3 +231,43 @@ def resolve_intra_class_weights[K: Hashable](
             effective_scores[k] = scores_map.get(k, 0)
 
     return target_weights_from_scores(effective_scores)
+
+
+def evaluation_record(
+    asset_id: int, evaluation: CerradoEvaluation, evaluated_at: datetime
+) -> ChecklistEvaluationRecord:
+    """Persistable summary of an evaluation (item 11.4)."""
+    return ChecklistEvaluationRecord(
+        asset_id=asset_id,
+        evaluated_at=evaluated_at,
+        profile=evaluation.profile,
+        score=evaluation.score,
+        normalized_score=evaluation.normalized_score,
+        coverage_pct=round(evaluation.coverage_pct, 2),
+        answered=evaluation.answered,
+        applicable=evaluation.applicable,
+        recommendation=evaluation.recommendation.value,
+        checklist_version=evaluation.checklist_version,
+    )
+
+
+def history_for_assets(
+    assets: Iterable[AssetEntity], snapshots: Mapping[str, list[FundamentalSnapshot]]
+) -> dict[str, HistoricalMetrics]:
+    """Multi-year metrics of the assets whose checklist profile reads statements."""
+    return {
+        asset.ticker: historical_metrics(snapshots[asset.ticker])
+        for asset in assets
+        if asset.profile in STATEMENT_PROFILES and snapshots.get(asset.ticker)
+    }
+
+
+def record_if_changed(
+    checklists: AbstractChecklistRepository, record: ChecklistEvaluationRecord
+) -> bool:
+    """Append an evaluation to the history only when its outcome changed."""
+    latest = checklists.latest_evaluation(record.asset_id)
+    if latest is not None and latest.same_result(record):
+        return False
+    checklists.record_evaluation(record)
+    return True

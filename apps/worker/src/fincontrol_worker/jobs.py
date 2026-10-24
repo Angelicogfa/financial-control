@@ -5,10 +5,16 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fincontrol_core.arca.allocation import ArcaTargets
 from fincontrol_core.calendar import business_days_between, is_business_day
+from fincontrol_core.cerrado import (
+    evaluate,
+    evaluation_record,
+    history_for_assets,
+    record_if_changed,
+)
 from fincontrol_core.domain.entities import AssetEntity, PortfolioSnapshotEntity
 from fincontrol_core.domain.enums import (
     ArcaClass,
@@ -205,6 +211,36 @@ def refresh_fundamentals_job(
             uow.commit()
     logger.info("Fundamentals refreshed", extra={"job": "refresh_fundamentals"})
     return stored
+
+
+def record_checklist_evaluations_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+) -> int:
+    """Re-evaluate every active checklist with fresh data; store the changed outcomes."""
+    now = datetime.now(UTC)
+    recorded = 0
+    with uow_factory() as uow:
+        assets = [a for a in uow.assets.list_all(active_only=True) if a.id is not None]
+        snapshots = uow.fundamentals.list_for_many([a.ticker for a in assets])
+        histories = history_for_assets(assets, snapshots)
+        for asset in assets:
+            fundamentals = (
+                None
+                if asset.market in (Market.MANUAL, Market.FIXED_INCOME_CURVE)
+                else gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
+            )
+            evaluation = evaluate(
+                asset.profile,
+                asset.cerrado_answers,
+                fundamentals,
+                use_cerrado=asset.use_cerrado,
+                history=histories.get(asset.ticker),
+            )
+            if record_if_changed(uow.checklists, evaluation_record(asset.id or 0, evaluation, now)):
+                recorded += 1
+        uow.commit()
+    return recorded
 
 
 def _rate_curves(

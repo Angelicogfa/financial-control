@@ -11,6 +11,8 @@ from datetime import date
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
+    ChecklistAnswer,
+    ChecklistEvaluationRecord,
     EarningEntity,
     JobRunEntity,
     MarketSeriesPoint,
@@ -267,4 +269,32 @@ class AbstractFundamentalsRepository(ABC):
     def list_for_many(
         self, tickers: list[str], *, period: FundamentalPeriod = FundamentalPeriod.ANNUAL
     ) -> dict[str, list[FundamentalSnapshot]]:
+        raise NotImplementedError
+
+
+class AbstractChecklistRepository(ABC):
+    """Repository port for the append-only checklist answers and evaluation history.
+
+    Current answers travel with `AssetEntity.cerrado_answers`; saving an asset appends the
+    answers that changed. This port reads the full history and stores evaluations.
+    """
+
+    @abstractmethod
+    def answer_history(self, asset_id: int) -> list[ChecklistAnswer]:
+        """Every recorded answer of an asset, newest first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def record_evaluation(self, record: ChecklistEvaluationRecord) -> ChecklistEvaluationRecord:
+        raise NotImplementedError
+
+    @abstractmethod
+    def latest_evaluation(self, asset_id: int) -> ChecklistEvaluationRecord | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluation_history(
+        self, asset_id: int, *, limit: int = 104
+    ) -> list[ChecklistEvaluationRecord]:
+        """Evaluations of an asset, oldest first (at most `limit`, the most recent ones)."""
         raise NotImplementedError

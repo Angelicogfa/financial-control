@@ -25,6 +25,7 @@ from fincontrol_api.schemas import (
     AssetResponseDTO,
     BenchmarkComparisonDTO,
     CerradoEvaluationDTO,
+    ChecklistAnswerDTO,
     ClassAllocationDTO,
     ContributionPlanResponseDTO,
     EarningResponseDTO,
@@ -76,7 +77,20 @@ def to_asset_dto(entity: AssetEntity) -> AssetResponseDTO:
         manual_price=entity.manual_price,
         custom_class_weight=entity.custom_class_weight,
         use_cerrado=entity.use_cerrado,
-        cerrado_answers=dict(entity.cerrado_answers),
+        cerrado_answers={
+            qid: a.as_bool for qid, a in entity.cerrado_answers.items() if a.as_bool is not None
+        },
+        checklist_profile=entity.profile,
+        checklist_answers={
+            qid: ChecklistAnswerDTO(
+                value=a.value,
+                source=a.source,
+                evidence=a.evidence,
+                answered_at=a.answered_at,
+                checklist_version=a.checklist_version,
+            )
+            for qid, a in entity.cerrado_answers.items()
+        },
         is_active=entity.is_active,
         notes=entity.notes,
         purpose=entity.purpose,
@@ -136,11 +150,16 @@ def to_earning_dto(entity: EarningEntity, ticker: str | None = None) -> EarningR
 
 def to_cerrado_dto(eval_obj: CerradoEvaluation) -> CerradoEvaluationDTO:
     return CerradoEvaluationDTO(
-        asset_type=eval_obj.asset_type,
+        profile=eval_obj.profile,
+        checklist_version=eval_obj.checklist_version,
         use_cerrado=eval_obj.use_cerrado,
         score=eval_obj.score,
         max_score=eval_obj.max_score,
+        normalized_score=eval_obj.normalized_score,
+        coverage_pct=round(eval_obj.coverage_pct, 2),
         answered=eval_obj.answered,
+        applicable=eval_obj.applicable,
+        not_applicable=eval_obj.not_applicable,
         pending=eval_obj.pending,
         recommendation=eval_obj.recommendation.value,
         answers=[
@@ -149,9 +168,12 @@ def to_cerrado_dto(eval_obj: CerradoEvaluation) -> CerradoEvaluationDTO:
                 text=a.text,
                 category=a.category,
                 hint=a.hint,
+                value=a.value,
                 answer=a.answer,
                 source=a.source.value,
                 automatable=a.automatable,
+                evidence=a.evidence,
+                answered_at=a.answered_at,
             )
             for a in eval_obj.answers
         ],

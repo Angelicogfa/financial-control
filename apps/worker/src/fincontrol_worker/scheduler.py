@@ -18,6 +18,7 @@ from fincontrol_worker.jobs import (
     UoWFactory,
     backfill_snapshots_job,
     ensure_series_coverage_job,
+    record_checklist_evaluations_job,
     record_daily_snapshot_job,
     refresh_fundamentals_job,
     sync_bcb_and_benchmarks_job,
@@ -113,6 +114,16 @@ def create_scheduler(
         hour=cfg.fundamentals_cron_hour,
         minute=0,
         id="refresh_fundamentals",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("record_checklist_evaluations", record_checklist_evaluations_job),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=cfg.fundamentals_cron_hour,
+        minute=30,
+        id="record_checklist_evaluations",
         replace_existing=True,
         **defaults,
     )

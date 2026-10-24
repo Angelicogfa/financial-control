@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, replace
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fincontrol_core.analytics import (
@@ -15,13 +15,20 @@ from fincontrol_core.analytics import (
     dated_simple_returns,
     dated_time_weighted_returns,
 )
-from fincontrol_core.cerrado.scoring import CerradoEvaluation, evaluate
+from fincontrol_core.cerrado.scoring import (
+    CerradoEvaluation,
+    evaluate,
+    evaluation_record,
+    history_for_assets,
+    record_if_changed,
+)
 from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import (
     AssetLifecycle,
     AssetType,
     IntraClassStrategy,
 )
+from fincontrol_core.fundamentals.history import HistoricalMetrics
 from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.policy import InvestmentPolicy, current_policy
@@ -73,6 +80,34 @@ class PortfolioApplicationService:
         """Current investment policy (defaults when none was saved)."""
         return current_policy(uow.policies)
 
+    def checklist_histories(
+        self, uow: AbstractUnitOfWork, assets: list[AssetEntity]
+    ) -> dict[str, HistoricalMetrics]:
+        """Multi-year statement metrics feeding the historical checklist questions."""
+        snapshots = uow.fundamentals.list_for_many([a.ticker for a in assets])
+        return history_for_assets(assets, snapshots)
+
+    def evaluate_checklist(self, uow: AbstractUnitOfWork, asset: AssetEntity) -> CerradoEvaluation:
+        """Checklist of one asset with its current fundamentals and statement history."""
+        fund = self.gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
+        return evaluate(
+            asset.profile,
+            asset.cerrado_answers,
+            fund,
+            use_cerrado=asset.use_cerrado,
+            history=self.checklist_histories(uow, [asset]).get(asset.ticker),
+        )
+
+    def record_checklist(
+        self, uow: AbstractUnitOfWork, asset: AssetEntity, evaluation: CerradoEvaluation
+    ) -> bool:
+        """Store the evaluation when its outcome changed since the last record."""
+        if asset.id is None:
+            return False
+        return record_if_changed(
+            uow.checklists, evaluation_record(asset.id, evaluation, datetime.now(UTC))
+        )
+
     def asset_lifecycles(
         self, uow: AbstractUnitOfWork, assets: list[AssetEntity]
     ) -> dict[int, tuple[AssetLifecycle, bool]]:
@@ -85,13 +120,15 @@ class PortfolioApplicationService:
             max_workers=self.fetch_workers,
             timeout_seconds=self.fetch_timeout_seconds,
         ).fundamentals
+        histories = self.checklist_histories(uow, assets)
         result: dict[int, tuple[AssetLifecycle, bool]] = {}
         for asset in assets:
             evaluation = evaluate(
-                asset.asset_type,
+                asset.profile,
                 asset.cerrado_answers,
                 fundamentals.get(asset.ticker),
                 use_cerrado=asset.use_cerrado,
+                history=histories.get(asset.ticker),
             )
             result[asset.id or 0] = asset_lifecycle(asset, evaluation, policy)
         return result
@@ -153,6 +190,7 @@ class PortfolioApplicationService:
             targets=policy.arca.targets,
             quotes=quotes,
             fundamentals_by_ticker=fundamentals,
+            history_by_ticker=self.checklist_histories(uow, assets),
             intra_strategies=policy.arca.strategies,
             bands=policy.arca.bands,
             eligibility=policy.eligibility,
@@ -187,12 +225,7 @@ class PortfolioApplicationService:
         )
 
         fund = self.gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
-        cerrado_eval: CerradoEvaluation = evaluate(
-            asset.asset_type,
-            asset.cerrado_answers,
-            fund,
-            use_cerrado=asset.use_cerrado,
-        )
+        cerrado_eval = self.evaluate_checklist(uow, asset)
 
         current_price = (
             pos.current_unit_price

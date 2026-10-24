@@ -7,7 +7,7 @@ from dataclasses import replace
 
 from fincontrol_core.catalog.etf_exposure import suggest_arca_class
 from fincontrol_core.domain.codes import CODE_ASSET_TYPES, generated_asset_code
-from fincontrol_core.domain.entities import AssetEntity, FixedIncomeTermEntity
+from fincontrol_core.domain.entities import AssetEntity, ChecklistAnswer, FixedIncomeTermEntity
 from fincontrol_core.domain.enums import AssetLifecycle, AssetType
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
@@ -125,6 +125,7 @@ class AssetHandler:
                 custom_class_weight=req.custom_class_weight,
                 use_cerrado=req.use_cerrado,
                 cerrado_answers=dict(req.cerrado_answers),
+                checklist_profile=req.checklist_profile,
                 notes=req.notes,
                 purpose=req.purpose,
                 fixed_income_term=fi_term,
@@ -176,6 +177,11 @@ class AssetHandler:
                     if req.cerrado_answers is not None
                     else current.cerrado_answers
                 ),
+                checklist_profile=(
+                    req.checklist_profile
+                    if req.checklist_profile is not None
+                    else current.checklist_profile
+                ),
                 is_active=req.is_active if req.is_active is not None else current.is_active,
                 notes=req.notes if req.notes is not None else current.notes,
                 purpose=req.purpose if req.purpose is not None else current.purpose,
@@ -190,15 +196,25 @@ class AssetHandler:
             current = uow.assets.get_by_id(asset_id)
             if current is None:
                 raise NotFoundError(f"Asset id={asset_id} not found")
+            answers = {}
+            for qid, raw in req.cerrado_answers.items():
+                answer = ChecklistAnswer.coerce(qid, raw)
+                if answer.value is not None:
+                    answers[qid] = replace(answer, evidence=req.evidence.get(qid) or None)
             updated_entity = replace(
                 current,
                 use_cerrado=req.use_cerrado,
-                cerrado_answers=dict(req.cerrado_answers),
+                cerrado_answers=answers,
+                checklist_profile=req.checklist_profile or current.checklist_profile,
                 custom_class_weight=req.custom_class_weight,
             )
             saved = uow.assets.update(updated_entity)
+            reloaded = uow.assets.get_by_id(asset_id) or saved
+            self.portfolio_service.record_checklist(
+                uow, reloaded, self.portfolio_service.evaluate_checklist(uow, reloaded)
+            )
             uow.commit()
-            return to_asset_dto(saved)
+            return to_asset_dto(reloaded)
 
     def delete(self, asset_id: int, *, hard: bool = False) -> None:
         with self.uow_factory() as uow:

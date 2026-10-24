@@ -7,6 +7,7 @@ never depend on SQLAlchemy models.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -14,9 +15,12 @@ from typing import Any
 
 from fincontrol_core.domain.enums import (
     AccountKind,
+    AnswerSource,
+    AnswerValue,
     ArcaClass,
     AssetPurpose,
     AssetType,
+    ChecklistProfile,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -26,6 +30,7 @@ from fincontrol_core.domain.enums import (
     SeriesUnit,
     TransactionKind,
     default_arca_class,
+    default_checklist_profile,
     default_currency,
     market_for,
 )
@@ -143,6 +148,44 @@ class EarningEntity:
 
 
 @dataclass(frozen=True)
+class ChecklistAnswer:
+    """One recorded checklist answer; the history is append-only (item 11.4).
+
+    `value=None` records that a previous answer was cleared (the question is pending again).
+    """
+
+    question_id: str
+    value: AnswerValue | None
+    source: AnswerSource = AnswerSource.MANUAL
+    evidence: str | None = None
+    answered_at: datetime | None = None
+    checklist_version: int = 2
+    id: int | None = None
+
+    @classmethod
+    def coerce(cls, question_id: str, raw: object) -> ChecklistAnswer:
+        """Accept a ChecklistAnswer, an AnswerValue/str, a legacy bool or None."""
+        if isinstance(raw, ChecklistAnswer):
+            return raw
+        if raw is None:
+            return cls(question_id, None)
+        if isinstance(raw, bool):
+            return cls(question_id, AnswerValue.YES if raw else AnswerValue.NO)
+        try:
+            return cls(question_id, AnswerValue(str(raw).upper()))
+        except ValueError as exc:
+            raise ValidationError(f"Invalid answer for {question_id}: {raw!r}") from exc
+
+    @property
+    def as_bool(self) -> bool | None:
+        if self.value == AnswerValue.YES:
+            return True
+        if self.value == AnswerValue.NO:
+            return False
+        return None
+
+
+@dataclass(frozen=True)
 class AssetEntity:
     """Pure domain representation of an investment asset and its optional children."""
 
@@ -154,10 +197,13 @@ class AssetEntity:
     manual_price: Decimal | None = None
     custom_class_weight: Decimal | None = None
     use_cerrado: bool = True
-    cerrado_answers: dict[str, bool] = field(default_factory=dict)
+    # Current answer per question (latest of the append-only history). Plain bools and
+    # AnswerValue strings are accepted and normalized to ChecklistAnswer.
+    cerrado_answers: Mapping[str, Any] = field(default_factory=dict)
     is_active: bool = True
     notes: str | None = None
     purpose: AssetPurpose = AssetPurpose.ARCA
+    checklist_profile: ChecklistProfile | None = None
     fixed_income_term: FixedIncomeTermEntity | None = None
     transactions: tuple[TransactionEntity, ...] = ()
     earnings: tuple[EarningEntity, ...] = ()
@@ -181,10 +227,21 @@ class AssetEntity:
             raise ValidationError("manual_price cannot be negative")
         if self.custom_class_weight is not None and self.custom_class_weight < Decimal("0"):
             raise ValidationError("custom_class_weight cannot be negative")
+        answers = {
+            qid: ChecklistAnswer.coerce(qid, raw) for qid, raw in self.cerrado_answers.items()
+        }
+        object.__setattr__(
+            self, "cerrado_answers", {q: a for q, a in answers.items() if a.value is not None}
+        )
 
     @property
     def market(self) -> Market:
         return market_for(self.asset_type)
+
+    @property
+    def profile(self) -> ChecklistProfile:
+        """Chosen checklist profile, or the default one for the asset type."""
+        return self.checklist_profile or default_checklist_profile(self.asset_type)
 
 
 @dataclass(frozen=True)
@@ -243,3 +300,30 @@ class AccountEntity:
         if not normalized:
             raise ValidationError("account name cannot be empty")
         object.__setattr__(self, "name", normalized)
+
+
+@dataclass(frozen=True)
+class ChecklistEvaluationRecord:
+    """Stored result of a checklist evaluation, kept to chart the score over time."""
+
+    asset_id: int
+    evaluated_at: datetime
+    profile: ChecklistProfile
+    score: int
+    normalized_score: float | None
+    coverage_pct: float
+    answered: int
+    applicable: int
+    recommendation: str
+    checklist_version: int = 2
+    id: int | None = None
+
+    def same_result(self, other: ChecklistEvaluationRecord) -> bool:
+        """Whether two evaluations reached the same outcome (used to skip duplicates)."""
+        return (
+            self.profile == other.profile
+            and self.score == other.score
+            and self.answered == other.answered
+            and self.applicable == other.applicable
+            and self.recommendation == other.recommendation
+        )

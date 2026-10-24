@@ -158,6 +158,7 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "sync_bcb_and_benchmarks",
         "record_daily_snapshot",
         "refresh_fundamentals",
+        "record_checklist_evaluations",
     }
     assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"
