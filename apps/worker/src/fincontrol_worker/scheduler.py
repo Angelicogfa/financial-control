@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from apscheduler.schedulers.blocking import BlockingScheduler
-from fincontrol_core.market.bcb import BcbSgsProvider
-from fincontrol_core.market.brapi import BrapiProvider
-from fincontrol_core.market.cache import build_cache_backend
+from fincontrol_config import get_settings
+from fincontrol_core.market.factory import build_market_gateway
 from fincontrol_core.market.gateway import CachedMarketGateway
-from fincontrol_core.market.yfinance_provider import YFinanceProvider
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_worker.jobs import (
@@ -24,30 +21,20 @@ logger = logging.getLogger("fincontrol_worker")
 
 
 def build_worker_gateway() -> CachedMarketGateway:
-    """Construct CachedMarketGateway from environment variables."""
-    redis_url = os.getenv("REDIS_URL")
-    brapi_token = os.getenv("BRAPI_TOKEN")
-    cdi_default = float(os.getenv("DEFAULT_CDI_ANNUAL_RATE", "0.1075"))
-    ipca_default = float(os.getenv("DEFAULT_IPCA_ANNUAL_RATE", "0.045"))
-    return CachedMarketGateway(
-        brapi=BrapiProvider(token=brapi_token),
-        yfinance=YFinanceProvider(),
-        bcb=BcbSgsProvider(default_cdi_annual=cdi_default, default_ipca_annual=ipca_default),
-        cache=build_cache_backend(redis_url),
-    )
+    """Construct the market gateway from the shared settings."""
+    return build_market_gateway(get_settings())
 
 
 def create_scheduler(gateway: CachedMarketGateway | None = None) -> BlockingScheduler:
     """Create and configure the APScheduler BlockingScheduler with all recurring jobs."""
     gw = gateway or build_worker_gateway()
-    scheduler = BlockingScheduler(timezone="America/Sao_Paulo")
-
-    quote_interval_min = int(os.getenv("WORKER_QUOTE_INTERVAL_MINUTES", "15"))
+    settings = get_settings()
+    scheduler = BlockingScheduler(timezone=settings.tz)
 
     scheduler.add_job(
         warm_portfolio_quotes_job,
         trigger="interval",
-        minutes=quote_interval_min,
+        minutes=settings.quote_refresh_minutes,
         kwargs={"uow_factory": SqlAlchemyUnitOfWork, "gateway": gw},
         id="warm_portfolio_quotes",
         replace_existing=True,
@@ -55,8 +42,8 @@ def create_scheduler(gateway: CachedMarketGateway | None = None) -> BlockingSche
     scheduler.add_job(
         sync_bcb_and_benchmarks_job,
         trigger="cron",
-        hour=19,
-        minute=0,
+        hour=settings.bcb_sync_cron_hour,
+        minute=settings.bcb_sync_cron_minute,
         kwargs={"uow_factory": SqlAlchemyUnitOfWork, "gateway": gw},
         id="sync_bcb_and_benchmarks",
         replace_existing=True,
@@ -65,8 +52,8 @@ def create_scheduler(gateway: CachedMarketGateway | None = None) -> BlockingSche
         record_daily_snapshot_job,
         trigger="cron",
         day_of_week="mon-fri",
-        hour=19,
-        minute=30,
+        hour=settings.snapshot_cron_hour,
+        minute=settings.snapshot_cron_minute,
         kwargs={"uow_factory": SqlAlchemyUnitOfWork, "gateway": gw},
         id="record_daily_snapshot",
         replace_existing=True,

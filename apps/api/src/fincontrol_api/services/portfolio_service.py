@@ -52,9 +52,14 @@ class PortfolioApplicationService:
         self,
         gateway: CachedMarketGateway,
         assumptions: ProjectionAssumptions | None = None,
+        *,
+        fetch_workers: int = 8,
+        fetch_timeout_seconds: float = 20.0,
     ) -> None:
         self.gateway = gateway
         self.assumptions = assumptions or ProjectionAssumptions()
+        self.fetch_workers = fetch_workers
+        self.fetch_timeout_seconds = fetch_timeout_seconds
 
     def load_arca_targets(
         self, uow: AbstractUnitOfWork

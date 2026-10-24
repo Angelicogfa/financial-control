@@ -4,12 +4,14 @@ version = "0.1.0"
 description = "APScheduler background worker for quotes, BCB series, and daily portfolio snapshots"
 requires-python = ">=3.12"
 dependencies = [
+    "fincontrol-config",
     "fincontrol-core",
     "fincontrol-persistence",
     "apscheduler>=3.10",
 ]
 
 [tool.uv.sources]
+fincontrol-config = { workspace = true }
 fincontrol-core = { workspace = true }
 fincontrol-persistence = { workspace = true }
 

@@ -31,7 +31,7 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
     app = FastAPI(
-        title=settings.app_name,
+        title="Financial Control API",
         version="0.1.0",
         description=(
             "Investment portfolio control with ARCA methodology "

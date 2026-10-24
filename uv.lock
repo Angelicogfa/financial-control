@@ -13,6 +13,7 @@ resolution-markers = [
 [manifest]
 members = [
     "fincontrol-api",
+    "fincontrol-config",
     "fincontrol-core",
     "fincontrol-persistence",
     "fincontrol-worker",
@@ -506,6 +507,7 @@ version = "0.1.0"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "fastapi" },
+    { name = "fincontrol-config" },
     { name = "fincontrol-core" },
     { name = "fincontrol-persistence" },
     { name = "pydantic" },
@@ -516,12 +518,24 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "fincontrol-config", editable = "packages/config" },
     { name = "fincontrol-core", editable = "packages/core" },
     { name = "fincontrol-persistence", editable = "packages/persistence" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
+
+[[package]]
+name = "fincontrol-config"
+version = "0.1.0"
+source = { editable = "packages/config" }
+dependencies = [
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic-settings", specifier = ">=2.6" }]
 
 [[package]]
 name = "fincontrol-core"
@@ -569,6 +583,7 @@ version = "0.1.0"
 source = { editable = "apps/worker" }
 dependencies = [
     { name = "apscheduler" },
+    { name = "fincontrol-config" },
     { name = "fincontrol-core" },
     { name = "fincontrol-persistence" },
 ]
@@ -576,6 +591,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "apscheduler", specifier = ">=3.10" },
+    { name = "fincontrol-config", editable = "packages/config" },
     { name = "fincontrol-core", editable = "packages/core" },
     { name = "fincontrol-persistence", editable = "packages/persistence" },
 ]

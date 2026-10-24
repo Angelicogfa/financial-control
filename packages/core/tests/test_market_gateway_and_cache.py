@@ -239,3 +239,31 @@ def test_build_cache_backend_selects_implementation() -> None:
     assert isinstance(build_cache_backend(None), InMemoryCache)
     assert isinstance(build_cache_backend("   "), InMemoryCache)
     assert isinstance(build_cache_backend("redis://localhost:6379/0"), RedisCache)
+
+
+def test_build_market_gateway_applies_settings() -> None:
+    from types import SimpleNamespace
+
+    from fincontrol_core.market.factory import build_market_gateway
+
+    gateway = build_market_gateway(
+        SimpleNamespace(
+            redis_url=None,
+            brapi_token="token",
+            bcb_sgs_base_url="https://example.test/sgs/",
+            risk_free_rate=0.12,
+            default_annual_ipca=0.05,
+            default_usd_brl=5.4,
+            quote_cache_ttl=60,
+            fundamentals_cache_ttl=120,
+            history_cache_ttl=180,
+        )
+    )
+
+    assert gateway.quote_ttl == 60
+    assert gateway.history_ttl == 180
+    assert gateway.default_usd_brl == 5.4
+    assert gateway.bcb.base_url == "https://example.test/sgs"
+    assert gateway.bcb.default_cdi_annual == 0.12
+    assert gateway.brapi.token == "token"
+    assert isinstance(gateway.cache, InMemoryCache)

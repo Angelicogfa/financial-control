@@ -6,15 +6,12 @@ from collections.abc import Callable
 from functools import lru_cache
 
 from fastapi import Depends
-from fincontrol_core.market.bcb import BcbSgsProvider
-from fincontrol_core.market.brapi import BrapiProvider
-from fincontrol_core.market.cache import build_cache_backend
+from fincontrol_core.market.factory import build_market_gateway
 from fincontrol_core.market.gateway import CachedMarketGateway
-from fincontrol_core.market.yfinance_provider import YFinanceProvider
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
-from fincontrol_api.config import AppSettings, get_settings
+from fincontrol_api.config import AppSettings, get_settings, projection_assumptions
 from fincontrol_api.handlers.asset_handlers import AssetHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.portfolio_handlers import (
@@ -34,24 +31,7 @@ def get_uow_factory() -> UoWFactory:
 
 @lru_cache(maxsize=1)
 def _singleton_gateway() -> CachedMarketGateway:
-    settings = get_settings()
-    cache = build_cache_backend(settings.redis_url)
-    brapi = BrapiProvider(token=settings.brapi_token)
-    yfinance = YFinanceProvider()
-    bcb = BcbSgsProvider(
-        default_cdi_annual=settings.default_cdi_annual_rate,
-        default_ipca_annual=settings.default_ipca_annual_rate,
-    )
-    return CachedMarketGateway(
-        brapi=brapi,
-        yfinance=yfinance,
-        bcb=bcb,
-        cache=cache,
-        quote_ttl_seconds=settings.quote_cache_ttl_seconds,
-        fundamentals_ttl_seconds=settings.fundamentals_cache_ttl_seconds,
-        history_ttl_seconds=settings.history_cache_ttl_seconds,
-        default_usd_brl=settings.default_usd_brl_rate,
-    )
+    return build_market_gateway(get_settings())
 
 
 def get_market_gateway(
@@ -67,7 +47,10 @@ def get_portfolio_service(
 ) -> PortfolioApplicationService:
     """Provide the PortfolioApplicationService instance."""
     return PortfolioApplicationService(
-        gateway=gateway, assumptions=settings.projection_assumptions
+        gateway=gateway,
+        assumptions=projection_assumptions(settings),
+        fetch_workers=settings.market_fetch_workers,
+        fetch_timeout_seconds=settings.market_fetch_timeout_seconds,
     )
 
 

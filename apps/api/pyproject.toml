@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "FastAPI HTTP backend for Financial Control"
 requires-python = ">=3.12"
 dependencies = [
+    "fincontrol-config",
     "fincontrol-core",
     "fincontrol-persistence",
     "fastapi>=0.115",
@@ -13,6 +14,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+fincontrol-config = { workspace = true }
 fincontrol-core = { workspace = true }
 fincontrol-persistence = { workspace = true }
 
