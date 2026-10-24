@@ -22,7 +22,7 @@
 | **Fase 6** | Validação End-to-End no Docker Compose, CI/CD GitHub Actions e Publicação no GitHub Privado | `[~]` Em andamento | 95% |
 | **Fase 7** | Fundação de Correção: Git, rede de testes de regressão, convenções de unidades (ADR 0006) | `[x]` Concluída | 100% |
 | **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[x]` Concluída | 100% |
-| **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[ ]` Pendente | 0% |
+| **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[x]` Concluída | 100% |
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[ ]` Pendente | 0% |
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[ ]` Pendente | 0% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[ ]` Pendente | 0% |
@@ -295,19 +295,23 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 9 — Configuração, Segurança, Infraestrutura e CI (`[ ]` Pendente)
+## Fase 9 — Configuração, Segurança, Infraestrutura e CI (`[x]` Concluída)
 
-- `[ ]` **9.1** (I-08) Pacote `packages/config` (`fincontrol_config`) com `pydantic-settings` compartilhado por API e worker; nomes idênticos ao `.env.example`; teste que falha se existir variável no `.env.example` sem campo correspondente (e vice-versa).
-- `[ ]` **9.2** (O-01) Dockerfiles multi-stage (builder com `uv sync --frozen`, runtime slim), usuário não-root, imagem da API só com `core`+`persistence`+`config`+`api`, imagem do worker só com o que usa; `HEALTHCHECK` em API e web.
-- `[ ]` **9.3** (O-02) Web: copiar `package-lock.json` e usar `npm ci`.
-- `[ ]` **9.4** (O-03) Postgres e Redis sem portas publicadas por padrão (acesso de desenvolvimento via `docker-compose.dev.yml`, vinculado a `127.0.0.1`); Redis com `requirepass`; `.env.example` com placeholders `change-me`.
-- `[ ]` **9.5** (O-03, TD-01) Autenticação single-user: credencial definida no `.env` (hash Argon2), login emite JWT em cookie `httpOnly`/`SameSite=Strict`; todas as rotas exceto `/health` protegidas. Estrutura preparada para `users` futuramente.
-- `[ ]` **9.6** Observabilidade: logs estruturados JSON com `request_id`; `/health` (liveness) e `/ready` (DB, Redis, migrations em `head`).
-- `[ ]` **9.7** Worker: agenda e fuso lidos de settings; lock distribuído no Redis por job; retries com backoff; tabela `job_runs` (`script_00006_job_runs.py`) com início, fim, status e contagens — base do indicador de frescor da UI.
-- `[ ]` **9.8** (D-05, I-07) Busca de cotações/fundamentos em lote e concorrente (`httpx.AsyncClient` ou pool de threads limitado), com timeout global por request; API lê preferencialmente do cache aquecido pelo worker.
-- `[ ]` **9.9** (O-04) CI: versão de `uv` fixada, `uv sync --frozen`, `npm ci`, ESLint + `tsc --noEmit`, cobertura, e job de *smoke* que sobe a stack com `docker compose up -d --wait` e valida `/ready` e a página web.
+- `[x]` **9.1** (I-08) Pacote `packages/config` (`fincontrol_config`) com `pydantic-settings` compartilhado por API e worker; nomes idênticos ao `.env.example`; teste que falha se existir variável no `.env.example` sem campo correspondente (e vice-versa). Também corrigiu `BCB_SGS_BASE_URL` (o valor antigo gerava URL inválida) e trouxe `fincontrol_core.market.factory` para montar o gateway igual na API e no worker.
+- `[x]` **9.2** (O-01) Dockerfiles multi-stage (builder com `uv sync --frozen`, runtime slim), usuário não-root, imagem da API só com `core`+`persistence`+`config`+`api`, imagem do worker só com o que usa; `HEALTHCHECK` em API e web. `uv` 0.12.7 fixado no builder; uid 10001 no runtime; a imagem do worker não contém `fincontrol_api` e vice-versa.
+- `[x]` **9.3** (O-02) Web: copiar `package-lock.json` e usar `npm ci`.
+- `[x]` **9.4** (O-03) Postgres e Redis sem portas publicadas por padrão (acesso de desenvolvimento via `docker-compose.dev.yml`, vinculado a `127.0.0.1`); Redis com `requirepass`; `.env.example` com placeholders `change-me`. Nomes de volume (`PGDATA_VOLUME`, `REDISDATA_VOLUME`) e arquivo de env dos apps (`APP_ENV_FILE`) são configuráveis para rodar uma segunda stack isolada; `container_name` fixo removido.
+- `[x]` **9.5** (O-03, TD-01) Autenticação single-user: credencial definida no `.env` (hash Argon2), login emite JWT em cookie `httpOnly`/`SameSite=Strict`; todas as rotas exceto `/health` protegidas. Estrutura preparada para `users` futuramente. `/ready` também fica aberto. CLI `python -m fincontrol_api.auth hash-password|new-secret` imprime linhas prontas (com aspas simples, por causa do `$` do Argon2). Placeholders `change-me` contam como não configurado (503 `AUTH_NOT_CONFIGURED`). Web ganhou tela de login e volta para ela em qualquer 401.
+- `[x]` **9.6** Observabilidade: logs estruturados JSON com `request_id`; `/health` (liveness) e `/ready` (DB, Redis, migrations em `head`). `/ready` responde 503 sem banco ou fora do `head` e `degraded` quando só o cache cai; respostas 500 trazem o `request_id`.
+- `[x]` **9.7** Worker: agenda e fuso lidos de settings; lock distribuído no Redis por job; retries com backoff; tabela `job_runs` (`script_00006_job_runs.py`) com início, fim, status e contagens — base do indicador de frescor da UI. Endpoint `GET /api/v1/market/job-runs`. Novo job `ensure_series_coverage` (no intervalo das cotações) completa o histórico do BCB assim que entra uma posição mais antiga — falha revelada pelo smoke.
+- `[x]` **9.8** (D-05, I-07) Busca de cotações/fundamentos em lote e concorrente (`httpx.AsyncClient` ou pool de threads limitado), com timeout global por request; API lê preferencialmente do cache aquecido pelo worker. Implementado com pool de threads limitado (`MARKET_FETCH_WORKERS`) e prazo global (`MARKET_FETCH_TIMEOUT_SECONDS`).
+- `[x]` **9.9** (O-04) CI: versão de `uv` fixada, `uv sync --frozen`, `npm ci`, ESLint + `tsc --noEmit`, cobertura, e job de *smoke* que sobe a stack com `docker compose up -d --wait` e valida `/ready` e a página web. **Ajuste:** sem minutos do GitHub Actions, o portão de qualidade é local — `scripts/check.sh` (`--fast` sem Docker, `--smoke` com teste ponta a ponta isolado em `scripts/smoke.sh`) e hook de pre-push via `scripts/install-hooks.sh`. O `ci.yml` só chama o mesmo script, para quando houver minutos.
 
-**Aceite:** stack sobe do zero com `cp .env.example .env && docker compose up -d --wait`; nenhuma porta de banco exposta; rotas exigem login; CI verde.
+**Aceite:** stack sobe do zero com `cp .env.example .env && docker compose up -d --wait`; nenhuma porta de banco exposta; rotas exigem login; portão de qualidade local (`scripts/check.sh --smoke`) verde.
+
+**Validação (2026-10-24):** `scripts/check.sh --smoke` → ruff e formatação limpos; `packages/core` 88,3% de cobertura só com testes em memória; 230 testes de backend (cobertura total 94%); web com ESLint sem avisos, `tsc`, 10 testes e build; imagens buildadas; stack isolada `fincontrol-smoke` subiu do zero com `/ready` = ready (migrations em `script_00006`, cache Redis), 401 sem sessão, login, cadastro de CDB e compra, cabeçalhos de segurança, containers sem root, Redis exigindo senha e apenas a porta do web publicada. A stack em uso e os volumes `fincontrol_pgdata`/`fincontrol_redisdata` não foram tocados.
+
+**Ação pendente na base real (antes de subir esta versão):** o `.env` em uso precisa das novas variáveis — `REDIS_PASSWORD` (e `REDIS_URL` com `:senha@`), `AUTH_PASSWORD_HASH`, `AUTH_JWT_SECRET` e as demais listadas em `.env.example`. Manter `POSTGRES_PASSWORD` igual ao usado na criação do volume.
 
 ---
 
