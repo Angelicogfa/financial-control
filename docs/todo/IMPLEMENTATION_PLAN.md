@@ -20,7 +20,7 @@
 | **Fase 4** | Backend API (`apps/api` Controllers $\rightarrow$ Handlers $\rightarrow$ Services $\rightarrow$ UoW) e Worker (`apps/worker`) + Testes de Integração | `[x]` Concluída | 100% |
 | **Fase 5** | Frontend Web (`apps/web` React + TypeScript): Menu Hambúrguer, Cards Evolução/Projeção e Tabelas Paginadas | `[x]` Concluída | 100% |
 | **Fase 6** | Validação End-to-End no Docker Compose, CI/CD GitHub Actions e Publicação no GitHub Privado | `[~]` Em andamento | 95% |
-| **Fase 7** | Fundação de Correção: Git, rede de testes de regressão, convenções de unidades (ADR 0006) | `[ ]` Pendente | 0% |
+| **Fase 7** | Fundação de Correção: Git, rede de testes de regressão, convenções de unidades (ADR 0006) | `[x]` Concluída | 100% |
 | **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[ ]` Pendente | 0% |
 | **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[ ]` Pendente | 0% |
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[ ]` Pendente | 0% |
@@ -240,17 +240,19 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 7 — Fundação de Correção (`[ ]` Pendente)
+## Fase 7 — Fundação de Correção (`[x]` Concluída)
 
 **Objetivo:** criar a rede de segurança para refatorar sem regressão.
 
-- `[ ]` **7.1** (O-04) `git init`, `.gitattributes` (LF), commit baseline do estado atual e branch `main`. O push para o GitHub (item 6.4) só ocorre com confirmação explícita do usuário.
-- `[ ]` **7.2** (O-05) Testes de caracterização que reproduzem C-01..C-04, I-01, I-02, I-04, I-09, I-10, A-04 (marcados `xfail(strict=True)` até a correção, para que a correção os "desmarque").
-- `[ ]` **7.3** (I-02) **ADR 0006 — Convenções de unidades:** taxas sempre como fração decimal (`0.065` = 6,5%); percentual de indexador como multiplicador (`1.10` = 110% do CDI); séries do BCB armazenadas com unidade explícita; dinheiro em `Decimal`/`Numeric` em persistência e fronteiras de API; `float` apenas em estatística.
-- `[ ]` **7.4** Fixtures de domínio reutilizáveis (`packages/core/tests/fixtures`) com carteira de referência cobrindo: ação BR, FII, ETF internacional em USD, CDB CDI, Tesouro IPCA+, LCI, cripto; valores esperados calculados em planilha anexada aos testes (`tests/golden/*.csv`).
-- `[ ]` **7.5** Cobertura no CI com `pytest-cov` e piso inicial (`packages/core` ≥ 85%), elevado ao final da Fase 14.
+- `[x]` **7.1** (O-04) `git init`, `.gitattributes` (LF), commit baseline do estado atual e branch `main`; trabalho da fase na branch `fix/phase-7-foundation`. O push para o GitHub (item 6.4) só ocorre com confirmação explícita do usuário.
+- `[x]` **7.2** (O-05) Testes de caracterização que reproduzem C-01..C-04, I-01..I-05, I-09, I-10, A-04 (marcados `xfail(strict=True, raises=...)` até a correção, para que a correção os "desmarque"): `packages/core/tests/test_audit_characterization.py`, `apps/api/tests/test_audit_characterization_api.py`, `apps/worker/tests/test_audit_characterization_worker.py` (23 casos).
+- `[x]` **7.3** (I-02) **ADR 0006 — Convenções de unidades:** taxas sempre como fração decimal (`0.065` = 6,5%); percentual de indexador como multiplicador (`1.10` = 110% do CDI); séries do BCB armazenadas com unidade explícita; dinheiro em `Decimal`/`Numeric` em persistência e fronteiras de API; `float` apenas em estatística.
+- `[x]` **7.4** Carteira de referência (ação BR, FII, ETF internacional em USD, cripto, CDB CDI, LCI, Tesouro IPCA+) em `packages/core/tests/golden/reference_portfolio.json`, exposta pelas fixtures de `packages/core/tests/conftest.py`. Os valores esperados (`reference_portfolio_expected.csv`, 53 linhas) são gerados por `build_reference_golden.py`, cálculo independente só com a biblioteca padrão (substitui a planilha); 18 linhas afetadas por C-01, C-02 e I-01 estão em `xfail` estrito.
+- `[x]` **7.5** Cobertura no CI com `pytest-cov` e piso inicial (`packages/core` ≥ 85%, hoje 87% só com testes em memória após `test_market_gateway_and_cache.py`), elevado ao final da Fase 14.
 
 **Aceite:** baseline commitado; suíte roda com os `xfail` listados; ADR 0006 aceito.
+
+**Validação (2026-10-24):** `uv run pytest` → 84 passed, 41 xfailed; `ruff check` limpo; `docker compose build` dos serviços `migrate`, `api`, `worker` e `web` concluído.
 
 ---
 
