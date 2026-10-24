@@ -9,6 +9,7 @@ from fastapi import Depends
 from fincontrol_core.market.factory import build_market_gateway
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
+from fincontrol_persistence.health import check_database
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_api.config import AppSettings, get_settings, projection_assumptions
@@ -19,6 +20,7 @@ from fincontrol_api.handlers.portfolio_handlers import (
     PortfolioHandler,
     TransactionHandler,
 )
+from fincontrol_api.handlers.system_handlers import DatabaseProbe, SystemHandler
 from fincontrol_api.services.portfolio_service import PortfolioApplicationService
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
@@ -75,6 +77,19 @@ def get_earning_handler(
 ) -> EarningHandler:
     """Provide the EarningHandler instance."""
     return EarningHandler(uow_factory=uow_factory)
+
+
+def get_database_probe() -> DatabaseProbe:
+    """Provide the database readiness probe."""
+    return check_database
+
+
+def get_system_handler(
+    gateway: CachedMarketGateway = Depends(get_market_gateway),
+    database_probe: DatabaseProbe = Depends(get_database_probe),
+) -> SystemHandler:
+    """Provide the SystemHandler instance."""
+    return SystemHandler(gateway=gateway, database_probe=database_probe)
 
 
 def get_market_data_handler(

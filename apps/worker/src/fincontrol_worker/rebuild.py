@@ -19,6 +19,8 @@ from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 
+from fincontrol_config import get_settings
+from fincontrol_config.logging import configure_logging
 from fincontrol_core.domain.enums import Market
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.portfolio.snapshots import PriceLookup, first_trade_date, history_range_for
@@ -122,7 +124,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--skip-snapshots", action="store_true", help="keep existing snapshots")
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO)
+    settings = get_settings()
+    configure_logging(settings.log_level, settings.log_format)
     report = rebuild(
         SqlAlchemyUnitOfWork,
         build_worker_gateway(),

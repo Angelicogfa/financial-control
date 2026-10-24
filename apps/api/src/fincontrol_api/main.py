@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+import time
+import uuid
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fincontrol_config.logging import configure_logging, request_id_var
 from fincontrol_core.errors import ConflictError, DomainError, NotFoundError, ValidationError
 
 from fincontrol_api.config import get_settings
@@ -21,6 +24,9 @@ from fincontrol_api.controllers import (
 )
 
 logger = logging.getLogger("fincontrol_api")
+access_logger = logging.getLogger("fincontrol_api.access")
+
+REQUEST_ID_HEADER = "X-Request-ID"
 
 
 def _error_response(status_code: int, exc: DomainError) -> JSONResponse:
@@ -30,6 +36,7 @@ def _error_response(status_code: int, exc: DomainError) -> JSONResponse:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
+    configure_logging(settings.log_level, settings.log_format)
     app = FastAPI(
         title="Financial Control API",
         version="0.1.0",
@@ -47,6 +54,32 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
+        request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex
+        request.state.request_id = request_id
+        token = request_id_var.set(request_id)
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_var.reset(token)
+        response.headers[REQUEST_ID_HEADER] = request_id
+        access_logger.info(
+            "%s %s %s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+            },
+        )
+        return response
+
     @app.exception_handler(NotFoundError)
     async def not_found_handler(_request: Request, exc: NotFoundError) -> JSONResponse:
         return _error_response(status.HTTP_404_NOT_FOUND, exc)
@@ -61,10 +94,15 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", None)
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Internal server error", "code": "INTERNAL_ERROR"},
+            content={
+                "detail": "Internal server error",
+                "code": "INTERNAL_ERROR",
+                "request_id": request_id,
+            },
         )
 
     api_prefix = "/api/v1"

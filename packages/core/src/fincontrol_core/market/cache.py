@@ -11,6 +11,12 @@ from typing import Any
 class AbstractCacheBackend(ABC):
     """Port for key-value JSON caching with TTL."""
 
+    backend_name = "memory"
+
+    def ping(self) -> bool:
+        """Whether the backing store is reachable."""
+        return True
+
     @abstractmethod
     def get_json(self, key: str) -> dict[str, Any] | list[Any] | None:
         """Retrieve a cached JSON-serializable payload or None if expired/missing."""
@@ -48,6 +54,14 @@ class InMemoryCache(AbstractCacheBackend):
 
 class RedisCache(AbstractCacheBackend):
     """Redis-backed cache with transparent fallback to InMemoryCache on connection errors."""
+
+    backend_name = "redis"
+
+    def ping(self) -> bool:
+        try:
+            return bool(self._client.ping())
+        except Exception:
+            return False
 
     def __init__(self, redis_url: str, fallback: InMemoryCache | None = None) -> None:
         import redis

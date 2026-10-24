@@ -399,6 +399,18 @@ class PortfolioAnalyticsResponseDTO(BaseModel):
     curves: dict[str, list[dict[str, Any]]]
 
 
+class ReadinessCheckDTO(BaseModel):
+    ok: bool
+    detail: str
+
+
+class ReadinessDTO(BaseModel):
+    """Readiness of the API: `ready`, `degraded` (cache down) or `not_ready`."""
+
+    status: str
+    checks: dict[str, ReadinessCheckDTO]
+
+
 class SeriesStatusDTO(BaseModel):
     """Freshness diagnostics of a persisted market or macro series."""
 

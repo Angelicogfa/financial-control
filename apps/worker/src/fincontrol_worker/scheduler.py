@@ -6,6 +6,7 @@ import logging
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from fincontrol_config import get_settings
+from fincontrol_config.logging import configure_logging
 from fincontrol_core.market.factory import build_market_gateway
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
@@ -63,7 +64,8 @@ def create_scheduler(gateway: CachedMarketGateway | None = None) -> BlockingSche
 
 def main() -> None:
     """Start the background worker process."""
-    logging.basicConfig(level=logging.INFO)
+    settings = get_settings()
+    configure_logging(settings.log_level, settings.log_format)
     gateway = build_worker_gateway()
     logger.info("Running initial market series sync and daily snapshot...")
     try:

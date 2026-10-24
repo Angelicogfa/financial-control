@@ -12,6 +12,7 @@ from fincontrol_api.dependencies import (
     get_earning_handler,
     get_market_data_handler,
     get_portfolio_handler,
+    get_system_handler,
     get_transaction_handler,
 )
 from fincontrol_api.handlers import (
@@ -21,6 +22,7 @@ from fincontrol_api.handlers import (
     TransactionHandler,
 )
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
+from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -37,6 +39,7 @@ from fincontrol_api.schemas import (
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
+    ReadinessDTO,
     SeriesStatusDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
@@ -76,8 +79,20 @@ def pagination_query(
 # ---------------------------------------------------------------------------
 @health_router.get("/health")
 def get_health() -> dict[str, str]:
-    """Liveness and readiness check."""
+    """Liveness check: the process is up (no dependency is touched)."""
     return {"status": "ok", "service": "fincontrol-api"}
+
+
+@health_router.get("/ready", response_model=ReadinessDTO)
+def get_ready(
+    response: Response,
+    handler: SystemHandler = Depends(get_system_handler),
+) -> ReadinessDTO:
+    """Readiness check: database reachable and migrated (503 otherwise), cache status."""
+    result = handler.readiness()
+    if result.status == "not_ready":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return result
 
 
 # ---------------------------------------------------------------------------
