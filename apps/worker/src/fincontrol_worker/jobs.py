@@ -50,11 +50,12 @@ COVERAGE_TOLERANCE = timedelta(days=7)
 class _Targets:
     targets: ArcaTargets
     strategies: dict[ArcaClass, IntraClassStrategy]
+    bands: dict[ArcaClass, float]
 
 
 def _load_targets(uow: AbstractUnitOfWork) -> _Targets:
     arca = current_policy(uow.policies).arca
-    return _Targets(arca.targets, arca.strategies)
+    return _Targets(arca.targets, arca.strategies, arca.bands)
 
 
 def _missing_windows(
@@ -202,6 +203,7 @@ def _snapshot(
         targets=targets.targets,
         quotes=quotes,
         intra_strategies=targets.strategies,
+        bands=targets.bands,
         usd_brl_rate=usd_brl,
         curves=curves,
         as_of_date=day,

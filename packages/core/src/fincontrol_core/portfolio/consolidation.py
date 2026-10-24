@@ -17,10 +17,12 @@ from datetime import date, timedelta
 from typing import Any
 
 from fincontrol_core.arca.allocation import (
+    BAND_BELOW,
     ArcaTargets,
     ClassAllocation,
     compute_allocation,
     distribute_by_targets,
+    distribute_with_bands,
 )
 from fincontrol_core.cerrado.scoring import (
     CerradoEvaluation,
@@ -351,6 +353,7 @@ def consolidate_portfolio(
     quotes: Mapping[str, Quote] | None = None,
     fundamentals_by_ticker: Mapping[str, Fundamentals] | None = None,
     intra_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
+    bands: Mapping[ArcaClass, float] | None = None,
     usd_brl_rate: float = 5.0,
     curves: RateCurves | None = None,
     assumptions: ProjectionAssumptions | None = None,
@@ -460,6 +463,7 @@ def consolidate_portfolio(
     allocations = compute_allocation(
         values_by_class,
         targets,
+        bands=bands,
         invested_by_class=invested_by_class,
         consolidated_pnl_by_class=cons_pnl_by_class,
     )
@@ -646,7 +650,9 @@ def plan_contribution(
         raise ValidationError("Contribution amount cannot be negative")
 
     current_by_class = {a.arca_class: a.current_value for a in report.allocations}
-    class_alloc_brl = distribute_by_targets(current_by_class, targets.as_fractions(), amount_brl)
+    below_band = {a.arca_class for a in report.allocations if a.band_status == BAND_BELOW}
+    class_alloc_brl = distribute_with_bands(current_by_class, targets, below_band, amount_brl)
+    bands = {a.arca_class: a.band_pct for a in report.allocations}
 
     drafts: dict[ArcaClass, list[_DraftOrder]] = {}
     projected = dict(current_by_class)
@@ -709,6 +715,6 @@ def plan_contribution(
         by_class_allocated_brl={k: round(v, 2) for k, v in class_alloc_brl.items()},
         orders=orders,
         projected_allocations=compute_allocation(
-            {c: round(v, 2) for c, v in projected.items()}, targets
+            {c: round(v, 2) for c, v in projected.items()}, targets, bands=bands
         ),
     )

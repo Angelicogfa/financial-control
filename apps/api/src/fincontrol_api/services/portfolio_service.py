@@ -112,6 +112,7 @@ class PortfolioApplicationService:
             quotes=quotes,
             fundamentals_by_ticker=fundamentals,
             intra_strategies=policy.arca.strategies,
+            bands=policy.arca.bands,
             usd_brl_rate=usd_brl,
             curves=curves,
             assumptions=policy.valuation.projections,

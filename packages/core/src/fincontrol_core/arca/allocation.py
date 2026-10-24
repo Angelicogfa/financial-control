@@ -10,6 +10,10 @@ from fincontrol_core.errors import ValidationError
 
 _TOLERANCE = 0.01
 
+BAND_WITHIN = "WITHIN"
+BAND_BELOW = "BELOW"
+BAND_ABOVE = "ABOVE"
+
 
 class InvalidTargetsError(ValidationError):
     """Raised when ARCA target weights do not sum to 100% or contain negative values."""
@@ -57,16 +61,31 @@ class ClassAllocation:
     deviation_pct: float
     gap_value: float
     consolidated_pnl: float = 0.0
+    band_pct: float = 0.0
+    band_status: str = BAND_WITHIN
+
+
+def band_status(current_pct: float, target_pct: float, band_pct: float, total: float) -> str:
+    """WITHIN when |current - target| <= band (percentage points), else BELOW / ABOVE."""
+    if total <= 0:
+        return BAND_WITHIN
+    deviation = current_pct - target_pct
+    if deviation < -band_pct - _TOLERANCE:
+        return BAND_BELOW
+    if deviation > band_pct + _TOLERANCE:
+        return BAND_ABOVE
+    return BAND_WITHIN
 
 
 def compute_allocation(
     values_by_class: Mapping[ArcaClass, float],
     targets: ArcaTargets,
     *,
+    bands: Mapping[ArcaClass, float] | None = None,
     invested_by_class: Mapping[ArcaClass, float] | None = None,
     consolidated_pnl_by_class: Mapping[ArcaClass, float] | None = None,
 ) -> list[ClassAllocation]:
-    """Compute current percentage, target percentage, deviation, and R$ gap per ARCA class."""
+    """Current %, target %, deviation, R$ gap and tolerance-band status per ARCA class."""
     total = sum(max(values_by_class.get(c, 0.0), 0.0) for c in ArcaClass)
     result: list[ClassAllocation] = []
     for c in ArcaClass:
@@ -75,6 +94,7 @@ def compute_allocation(
         cons_pnl = (consolidated_pnl_by_class or {}).get(c, 0.0)
         current_pct = (value / total * 100.0) if total > 0 else 0.0
         target_pct = targets.weights[c]
+        band = (bands or {}).get(c, 0.0)
         result.append(
             ClassAllocation(
                 arca_class=c,
@@ -86,8 +106,48 @@ def compute_allocation(
                 deviation_pct=round(current_pct - target_pct, 4),
                 gap_value=round(total * target_pct / 100.0 - value, 2),
                 consolidated_pnl=round(cons_pnl, 2),
+                band_pct=round(band, 4),
+                band_status=band_status(current_pct, target_pct, band, total),
             )
         )
+    return result
+
+
+def distribute_with_bands(
+    current: Mapping[ArcaClass, float],
+    targets: ArcaTargets,
+    below_band: set[ArcaClass],
+    amount: float,
+) -> dict[ArcaClass, float]:
+    """Level-1 contribution that first refills classes below their band (finding A-01).
+
+    Classes below the band receive money up to their target before anything else; whatever
+    remains is split by `distribute_by_targets` across all classes.
+    """
+    if amount < 0:
+        raise ValidationError("Contribution amount cannot be negative")
+    result = dict.fromkeys(ArcaClass, 0.0)
+    if not below_band:
+        return distribute_by_targets(current, targets.as_fractions(), amount)
+
+    total_after = sum(max(current.get(c, 0.0), 0.0) for c in ArcaClass) + amount
+    deficits = {
+        c: max(targets.fraction(c) * total_after - max(current.get(c, 0.0), 0.0), 0.0)
+        for c in below_band
+    }
+    needed = sum(deficits.values())
+    if needed >= amount and needed > 0:
+        for c, deficit in deficits.items():
+            result[c] = amount * deficit / needed
+        return result
+
+    for c, deficit in deficits.items():
+        result[c] = deficit
+    refilled = {c: current.get(c, 0.0) + result[c] for c in ArcaClass}
+    for c, extra in distribute_by_targets(
+        refilled, targets.as_fractions(), amount - needed
+    ).items():
+        result[c] += extra
     return result
 
 

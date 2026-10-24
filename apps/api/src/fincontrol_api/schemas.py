@@ -297,6 +297,8 @@ class ClassAllocationDTO(BaseModel):
     deviation_pct: float
     gap_value: float
     consolidated_pnl: float
+    band_pct: float = 0.0
+    band_status: str = "WITHIN"
 
 
 class PortfolioReportResponseDTO(BaseModel):
