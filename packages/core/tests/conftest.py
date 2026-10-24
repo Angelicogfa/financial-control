@@ -126,6 +126,11 @@ def reference_assets(reference_portfolio_data: dict[str, Any]) -> list[AssetEnti
 
 
 @pytest.fixture(scope="session")
+def reference_curves(reference_portfolio_data: dict[str, Any]) -> RateCurves:
+    return _rate_curves(reference_portfolio_data)
+
+
+@pytest.fixture(scope="session")
 def reference_report(
     reference_portfolio_data: dict[str, Any],
     reference_assets: list[AssetEntity],
