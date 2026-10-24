@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.domain.pagination import PaginationParams
 
 from fincontrol_api.auth import SESSION_COOKIE
@@ -30,6 +31,7 @@ from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
+    ArcaSuggestionDTO,
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
     AssetAnalysisResponseDTO,
@@ -135,6 +137,16 @@ def create_asset(
     handler: AssetHandler = Depends(get_asset_handler),
 ) -> AssetResponseDTO:
     return handler.create(payload)
+
+
+@assets_router.get("/classification", response_model=ArcaSuggestionDTO)
+def suggest_asset_classification(
+    ticker: str = Query(..., min_length=1, max_length=32),
+    asset_type: AssetType = Query(...),
+    handler: AssetHandler = Depends(get_asset_handler),
+) -> ArcaSuggestionDTO:
+    """ARCA class suggested by what the instrument is exposed to (ETF catalog) or its type."""
+    return handler.suggest_classification(ticker, asset_type)
 
 
 @assets_router.get("/{asset_id}", response_model=AssetResponseDTO)

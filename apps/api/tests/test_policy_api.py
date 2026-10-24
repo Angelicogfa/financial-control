@@ -82,3 +82,22 @@ def test_asset_purpose_round_trip(api: SimpleNamespace) -> None:
 
     updated = api.client.put(f"/api/v1/assets/{created['id']}", json={"purpose": "ARCA"}).json()
     assert updated["purpose"] == "ARCA"
+
+
+def test_classification_suggestion_and_default_on_create(api: SimpleNamespace) -> None:
+    suggestion = api.client.get(
+        "/api/v1/assets/classification", params={"ticker": "ivvb11", "asset_type": "ETF_BR"}
+    ).json()
+    assert suggestion["arca_class"] == "ATIVOS_INTERNACIONAIS"
+    assert suggestion["source"] == "CATALOG"
+
+    created = api.client.post(
+        "/api/v1/assets", json={"ticker": "IMAB11", "name": "IMA-B", "asset_type": "ETF_BR"}
+    ).json()
+    assert created["arca_class"] == "CAIXA"
+
+    overridden = api.client.post(
+        "/api/v1/assets",
+        json={"ticker": "IVVB11", "name": "S&P", "asset_type": "ETF_BR", "arca_class": "ACOES"},
+    ).json()
+    assert overridden["arca_class"] == "ACOES"

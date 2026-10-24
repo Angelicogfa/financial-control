@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 
+from fincontrol_core.catalog.etf_exposure import suggest_arca_class
 from fincontrol_core.domain.entities import AssetEntity, FixedIncomeTermEntity
+from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.errors import ConflictError, NotFoundError
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
@@ -16,6 +18,7 @@ from fincontrol_api.handlers.serializers import (
     to_page_meta_dto,
 )
 from fincontrol_api.schemas import (
+    ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
     AssetCreateRequest,
     AssetResponseDTO,
@@ -59,6 +62,17 @@ class AssetHandler:
                 meta=to_page_meta_dto(result.meta),
             )
 
+    @staticmethod
+    def suggest_classification(ticker: str, asset_type: AssetType) -> ArcaSuggestionDTO:
+        suggestion = suggest_arca_class(ticker, asset_type)
+        return ArcaSuggestionDTO(
+            ticker=ticker.strip().upper(),
+            asset_type=asset_type,
+            arca_class=suggestion.arca_class,
+            source=suggestion.source,
+            reason=suggestion.reason,
+        )
+
     def get_by_id(self, asset_id: int) -> AssetResponseDTO:
         with self.uow_factory() as uow:
             entity = uow.assets.get_by_id(asset_id)
@@ -93,7 +107,8 @@ class AssetHandler:
                 ticker=req.ticker,
                 name=req.name,
                 asset_type=req.asset_type,
-                arca_class=req.arca_class,
+                arca_class=req.arca_class
+                or suggest_arca_class(req.ticker, req.asset_type).arca_class,
                 currency=req.currency,
                 manual_price=req.manual_price,
                 custom_class_weight=req.custom_class_weight,

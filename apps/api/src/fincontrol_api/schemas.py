@@ -98,6 +98,16 @@ class AssetUpdateRequest(BaseModel):
     fixed_income_term: FixedIncomeTermPayload | None = None
 
 
+class ArcaSuggestionDTO(BaseModel):
+    """Suggested ARCA class by economic exposure (catalog) or by asset type."""
+
+    ticker: str
+    asset_type: AssetType
+    arca_class: ArcaClass
+    source: str
+    reason: str
+
+
 class CerradoUpdateRequest(BaseModel):
     """Payload to toggle Diagrama do Cerrado or update answers/manual weight on an asset."""
 
