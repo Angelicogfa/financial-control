@@ -28,8 +28,16 @@ jobs:
       - name: Run Ruff linter
         run: uv run ruff check .
 
-      - name: Run unit & integration tests
-        run: uv run pytest -v
+      - name: Run core domain tests with coverage floor
+        run: >-
+          uv run pytest packages/core/tests
+          --cov=fincontrol_core --cov-report=term-missing --cov-fail-under=85
+
+      - name: Run unit & integration tests with coverage report
+        run: >-
+          uv run pytest -v
+          --cov=fincontrol_core --cov=fincontrol_persistence
+          --cov=fincontrol_api --cov=fincontrol_worker --cov-report=term
 
   frontend:
     name: Frontend Tests & Build
