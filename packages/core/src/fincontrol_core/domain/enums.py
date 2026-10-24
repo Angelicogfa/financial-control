@@ -106,6 +106,15 @@ class SeriesUnit(StrEnum):
     INDEX_POINTS = "INDEX_POINTS"
 
 
+class AccountKind(StrEnum):
+    """Where positions are held (custody)."""
+
+    BROKER = "BROKER"
+    BANK = "BANK"
+    EXCHANGE = "EXCHANGE"
+    OTHER = "OTHER"
+
+
 class AssetPurpose(StrEnum):
     """Why an asset is held; only ARCA assets take part in allocation and contributions."""
 

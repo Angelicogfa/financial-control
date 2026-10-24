@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, timedelta
 from typing import Any
 
@@ -35,6 +35,17 @@ from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_r
 from fincontrol_core.portfolio.fixed_income import RateCurves
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 from fincontrol_core.valuation import summarize_valuation
+
+
+def _restrict_to_account(assets: list[AssetEntity], account_id: int) -> list[AssetEntity]:
+    restricted = []
+    for asset in assets:
+        transactions = tuple(t for t in asset.transactions if t.account_id == account_id)
+        earnings = tuple(e for e in asset.earnings if e.account_id == account_id)
+        if transactions or earnings:
+            restricted.append(replace(asset, transactions=transactions, earnings=earnings))
+    return restricted
+
 
 ANALYTICS_OK = "OK"
 ANALYTICS_INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
@@ -81,10 +92,16 @@ class PortfolioApplicationService:
         *,
         as_of_date: date | None = None,
         date_from: date | None = None,
+        account_id: int | None = None,
     ) -> ConsolidatedPortfolioReport:
-        """Fetch active assets, quotes, fundamentals, FX, and BCB curves to consolidate."""
+        """Fetch active assets, quotes, fundamentals, FX, and BCB curves to consolidate.
+
+        With `account_id`, only the trades and earnings of that account are consolidated.
+        """
         ref_date = as_of_date or date.today()
         assets = uow.assets.list_all(active_only=True)
+        if account_id is not None:
+            assets = _restrict_to_account(assets, account_id)
         policy = self.load_policy(uow)
 
         market = fetch_market_data(

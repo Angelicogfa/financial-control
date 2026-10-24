@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Any
 
 from fincontrol_core.domain.entities import (
+    AccountEntity,
     AssetEntity,
     EarningEntity,
     JobRunEntity,
@@ -23,6 +24,7 @@ from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, Paginat
 from fincontrol_core.errors import NotFoundError, ValidationError
 from fincontrol_core.policy.models import InvestmentPolicy
 from fincontrol_core.ports.repositories import (
+    AbstractAccountRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
     AbstractJobRunRepository,
@@ -36,6 +38,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from fincontrol_persistence.mappers import (
     policy_payload,
+    to_account_entity,
     to_asset_entity,
     to_earning_entity,
     to_fixed_income_term_model,
@@ -46,6 +49,7 @@ from fincontrol_persistence.mappers import (
     to_transaction_entity,
 )
 from fincontrol_persistence.models import (
+    AccountModel,
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
@@ -245,7 +249,27 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
         return True
 
 
-class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
+def _default_account_id(session: Session) -> int:
+    stmt = (
+        select(AccountModel.id)
+        .where(AccountModel.is_active.is_(True))
+        .order_by(AccountModel.id.asc())
+        .limit(1)
+    )
+    account_id = session.scalar(stmt)
+    if account_id is None:
+        raise ValidationError("Create an account before recording trades", code="NO_ACCOUNT")
+    return int(account_id)
+
+
+class _AccountDefaultMixin:
+    session: Session
+
+    def _account_id(self, account_id: int | None) -> int:
+        return account_id if account_id is not None else _default_account_id(self.session)
+
+
+class SqlAlchemyTransactionRepository(_AccountDefaultMixin, AbstractTransactionRepository):
     """SQLAlchemy implementation of AbstractTransactionRepository."""
 
     SORT_COLUMNS = {
@@ -269,6 +293,7 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
             fees=transaction.fees,
             fx_rate=transaction.fx_rate,
             notes=transaction.notes,
+            account_id=self._account_id(transaction.account_id),
         )
         self.session.add(model)
         self.session.flush()
@@ -289,6 +314,7 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
         model.fees = transaction.fees
         model.fx_rate = transaction.fx_rate
         model.notes = transaction.notes
+        model.account_id = self._account_id(transaction.account_id)
         self.session.flush()
         return to_transaction_entity(model)
 
@@ -316,10 +342,13 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
         kind: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        account_id: int | None = None,
     ) -> PaginatedResult[TransactionEntity]:
         stmt = select(TransactionModel).join(AssetModel)
         if asset_id is not None:
             stmt = stmt.where(TransactionModel.asset_id == asset_id)
+        if account_id is not None:
+            stmt = stmt.where(TransactionModel.account_id == account_id)
         if kind:
             stmt = stmt.where(TransactionModel.kind == kind.upper())
         if date_from is not None:
@@ -347,7 +376,7 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
         return PaginatedResult(items=[to_transaction_entity(m) for m in rows], meta=meta)
 
 
-class SqlAlchemyEarningRepository(AbstractEarningRepository):
+class SqlAlchemyEarningRepository(_AccountDefaultMixin, AbstractEarningRepository):
     """SQLAlchemy implementation of AbstractEarningRepository."""
 
     SORT_COLUMNS = {
@@ -372,6 +401,7 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
             net_amount=earning.net_amount or (earning.gross_amount - earning.withholding_tax),
             fx_rate=earning.fx_rate,
             notes=earning.notes,
+            account_id=self._account_id(earning.account_id),
         )
         self.session.add(model)
         self.session.flush()
@@ -393,6 +423,7 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
         model.net_amount = earning.net_amount or (earning.gross_amount - earning.withholding_tax)
         model.fx_rate = earning.fx_rate
         model.notes = earning.notes
+        model.account_id = self._account_id(earning.account_id)
         self.session.flush()
         return to_earning_entity(model)
 
@@ -420,10 +451,13 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
         kind: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        account_id: int | None = None,
     ) -> PaginatedResult[EarningEntity]:
         stmt = select(EarningModel).join(AssetModel)
         if asset_id is not None:
             stmt = stmt.where(EarningModel.asset_id == asset_id)
+        if account_id is not None:
+            stmt = stmt.where(EarningModel.account_id == account_id)
         if kind:
             stmt = stmt.where(EarningModel.kind == kind.upper())
         if date_from is not None:
@@ -644,6 +678,59 @@ class SqlAlchemyJobRunRepository(AbstractJobRunRepository):
             .order_by(JobRunModel.job_name.asc())
         )
         return [to_job_run_entity(m) for m in self.session.scalars(stmt).all()]
+
+
+class SqlAlchemyAccountRepository(AbstractAccountRepository):
+    """SQLAlchemy implementation of AbstractAccountRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, account: AccountEntity) -> AccountEntity:
+        model = AccountModel(
+            name=account.name,
+            institution=account.institution,
+            kind=account.kind.value,
+            is_active=account.is_active,
+        )
+        self.session.add(model)
+        self.session.flush()
+        return to_account_entity(model)
+
+    def update(self, account: AccountEntity) -> AccountEntity:
+        model = self.session.get(AccountModel, account.id) if account.id else None
+        if model is None:
+            raise NotFoundError(f"Account id={account.id} not found")
+        model.name = account.name
+        model.institution = account.institution
+        model.kind = account.kind.value
+        model.is_active = account.is_active
+        self.session.flush()
+        return to_account_entity(model)
+
+    def get_by_id(self, account_id: int) -> AccountEntity | None:
+        model = self.session.get(AccountModel, account_id)
+        return to_account_entity(model) if model else None
+
+    def get_by_name(self, name: str) -> AccountEntity | None:
+        model = self.session.scalar(select(AccountModel).where(AccountModel.name == name.strip()))
+        return to_account_entity(model) if model else None
+
+    def list_all(self, *, active_only: bool = False) -> list[AccountEntity]:
+        stmt = select(AccountModel).order_by(AccountModel.id.asc())
+        if active_only:
+            stmt = stmt.where(AccountModel.is_active.is_(True))
+        return [to_account_entity(m) for m in self.session.scalars(stmt).all()]
+
+    def get_default(self) -> AccountEntity | None:
+        stmt = (
+            select(AccountModel)
+            .where(AccountModel.is_active.is_(True))
+            .order_by(AccountModel.id.asc())
+            .limit(1)
+        )
+        model = self.session.scalar(stmt)
+        return to_account_entity(model) if model else None
 
 
 # Backward-compatible aliases within persistence package

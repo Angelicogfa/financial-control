@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from datetime import date
 
 from fincontrol_core.domain.entities import (
+    AccountEntity,
     AssetEntity,
     EarningEntity,
     JobRunEntity,
@@ -93,6 +94,7 @@ class AbstractTransactionRepository(ABC):
         kind: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        account_id: int | None = None,
     ) -> PaginatedResult[TransactionEntity]:
         raise NotImplementedError
 
@@ -129,6 +131,7 @@ class AbstractEarningRepository(ABC):
         kind: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        account_id: int | None = None,
     ) -> PaginatedResult[EarningEntity]:
         raise NotImplementedError
 
@@ -216,4 +219,29 @@ class AbstractJobRunRepository(ABC):
     @abstractmethod
     def latest_per_job(self) -> list[JobRunEntity]:
         """Most recent execution of each job name."""
+        raise NotImplementedError
+
+
+class AbstractAccountRepository(ABC):
+    """Repository port for custody accounts."""
+
+    @abstractmethod
+    def add(self, account: AccountEntity) -> AccountEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, account: AccountEntity) -> AccountEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_by_id(self, account_id: int) -> AccountEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self, *, active_only: bool = False) -> list[AccountEntity]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_default(self) -> AccountEntity | None:
+        """Oldest active account, used when a trade does not name one."""
         raise NotImplementedError

@@ -1,6 +1,7 @@
 """Application and domain ports (Repository interfaces and Unit of Work contract)."""
 
 from fincontrol_core.ports.repositories import (
+    AbstractAccountRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
     AbstractMarketSeriesRepository,
@@ -11,6 +12,7 @@ from fincontrol_core.ports.repositories import (
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 __all__ = [
+    "AbstractAccountRepository",
     "AbstractPolicyRepository",
     "AbstractAssetRepository",
     "AbstractEarningRepository",

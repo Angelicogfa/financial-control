@@ -10,6 +10,7 @@ from fincontrol_core.domain.pagination import PaginationParams
 
 from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.dependencies import (
+    get_account_handler,
     get_asset_handler,
     get_auth_handler,
     get_earning_handler,
@@ -26,11 +27,14 @@ from fincontrol_api.handlers import (
     PortfolioHandler,
     TransactionHandler,
 )
+from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
+    AccountDTO,
+    AccountRequest,
     ArcaSuggestionDTO,
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -67,6 +71,7 @@ portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
 settings_router = APIRouter(prefix="/settings", tags=["Settings"])
 market_router = APIRouter(prefix="/market", tags=["Market Data"])
 policy_router = APIRouter(prefix="/policy", tags=["Investment Policy"])
+accounts_router = APIRouter(prefix="/accounts", tags=["Accounts"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
@@ -203,6 +208,7 @@ def list_transactions(
     kind: str | None = Query(default=None),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
+    account_id: int | None = Query(default=None),
     handler: TransactionHandler = Depends(get_transaction_handler),
 ) -> PaginatedResponse[TransactionResponseDTO]:
     return handler.list_paginated(
@@ -211,6 +217,7 @@ def list_transactions(
         kind=kind,
         date_from=date_from,
         date_to=date_to,
+        account_id=account_id,
     )
 
 
@@ -252,6 +259,7 @@ def list_earnings(
     kind: str | None = Query(default=None),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
+    account_id: int | None = Query(default=None),
     handler: EarningHandler = Depends(get_earning_handler),
 ) -> PaginatedResponse[EarningResponseDTO]:
     return handler.list_paginated(
@@ -260,6 +268,7 @@ def list_earnings(
         kind=kind,
         date_from=date_from,
         date_to=date_to,
+        account_id=account_id,
     )
 
 
@@ -296,18 +305,24 @@ def delete_earning(
 def get_portfolio(
     as_of_date: date | None = Query(default=None),
     date_from: date | None = Query(default=None),
+    account_id: int | None = Query(default=None),
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> PortfolioReportResponseDTO:
-    return handler.get_portfolio_report(as_of_date=as_of_date, date_from=date_from)
+    return handler.get_portfolio_report(
+        as_of_date=as_of_date, date_from=date_from, account_id=account_id
+    )
 
 
 @portfolio_router.get("/consolidated", response_model=PortfolioReportResponseDTO)
 def get_consolidated_portfolio(
     as_of_date: date | None = Query(default=None),
     date_from: date | None = Query(default=None),
+    account_id: int | None = Query(default=None),
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> PortfolioReportResponseDTO:
-    return handler.get_portfolio_report(as_of_date=as_of_date, date_from=date_from)
+    return handler.get_portfolio_report(
+        as_of_date=as_of_date, date_from=date_from, account_id=account_id
+    )
 
 
 @portfolio_router.post("/contribution", response_model=ContributionPlanResponseDTO)
@@ -348,6 +363,31 @@ def update_arca_targets(
 # ---------------------------------------------------------------------------
 # Investment Policy Controller (Estratégia)
 # ---------------------------------------------------------------------------
+@accounts_router.get("", response_model=list[AccountDTO])
+def list_accounts(
+    active_only: bool = Query(default=False),
+    handler: AccountHandler = Depends(get_account_handler),
+) -> list[AccountDTO]:
+    return handler.list_all(active_only=active_only)
+
+
+@accounts_router.post("", response_model=AccountDTO, status_code=status.HTTP_201_CREATED)
+def create_account(
+    payload: AccountRequest,
+    handler: AccountHandler = Depends(get_account_handler),
+) -> AccountDTO:
+    return handler.create(payload)
+
+
+@accounts_router.put("/{account_id}", response_model=AccountDTO)
+def update_account(
+    account_id: int,
+    payload: AccountRequest,
+    handler: AccountHandler = Depends(get_account_handler),
+) -> AccountDTO:
+    return handler.update(account_id, payload)
+
+
 @policy_router.get("", response_model=PolicyDTO)
 def get_policy(handler: PolicyHandler = Depends(get_policy_handler)) -> PolicyDTO:
     return handler.get_current()

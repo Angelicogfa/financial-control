@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from fincontrol_core.domain import (
+    AccountEntity,
     ArcaClass,
     AssetEntity,
     AssetType,
@@ -26,6 +27,9 @@ def uow_factory():
     engine = build_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     session_factory = build_session_factory(engine)
+    with SqlAlchemyUnitOfWork(session_factory) as uow:
+        uow.accounts.add(AccountEntity(name="Principal"))
+        uow.commit()
     return lambda: SqlAlchemyUnitOfWork(session_factory)
 
 

@@ -6,10 +6,11 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from fincontrol_core.catalog.etf_exposure import suggest_arca_class
+from fincontrol_core.domain.codes import CODE_ASSET_TYPES, generated_asset_code
 from fincontrol_core.domain.entities import AssetEntity, FixedIncomeTermEntity
 from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.domain.pagination import PaginationParams
-from fincontrol_core.errors import ConflictError, NotFoundError
+from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 from fincontrol_api.handlers.serializers import (
@@ -82,11 +83,14 @@ class AssetHandler:
 
     def create(self, req: AssetCreateRequest) -> AssetResponseDTO:
         with self.uow_factory() as uow:
-            existing = uow.assets.get_by_ticker(req.ticker)
-            if existing is not None:
+            if req.ticker is not None and uow.assets.get_by_ticker(req.ticker) is not None:
                 raise ConflictError(
                     f"Asset with ticker '{req.ticker.upper()}' already exists",
                     code="DUPLICATE_TICKER",
+                )
+            if req.ticker is None and req.asset_type not in CODE_ASSET_TYPES:
+                raise ValidationError(
+                    "ticker is required for exchange-traded assets", code="TICKER_REQUIRED"
                 )
 
             fi_term = None
@@ -103,12 +107,17 @@ class AssetHandler:
                     issuer=t.issuer,
                 )
 
+            ticker = req.ticker or generated_asset_code(
+                req.asset_type,
+                req.name,
+                fi_term,
+                is_taken=lambda code: uow.assets.get_by_ticker(code) is not None,
+            )
             entity = AssetEntity(
-                ticker=req.ticker,
+                ticker=ticker,
                 name=req.name,
                 asset_type=req.asset_type,
-                arca_class=req.arca_class
-                or suggest_arca_class(req.ticker, req.asset_type).arca_class,
+                arca_class=req.arca_class or suggest_arca_class(ticker, req.asset_type).arca_class,
                 currency=req.currency,
                 manual_price=req.manual_price,
                 custom_class_weight=req.custom_class_weight,

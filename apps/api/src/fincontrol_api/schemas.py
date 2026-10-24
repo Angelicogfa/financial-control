@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from fincontrol_core.domain.enums import (
+    AccountKind,
     ArcaClass,
     AssetPurpose,
     AssetType,
@@ -66,7 +67,12 @@ class FixedIncomeTermPayload(BaseModel):
 class AssetCreateRequest(BaseModel):
     """Payload to register a new investment asset."""
 
-    ticker: str = Field(..., min_length=1, max_length=32)
+    ticker: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=32,
+        description="Required for exchange-traded assets; generated for fixed income and cash",
+    )
     name: str = Field(..., min_length=1, max_length=160)
     asset_type: AssetType
     arca_class: ArcaClass | None = None
@@ -96,6 +102,18 @@ class AssetUpdateRequest(BaseModel):
     notes: str | None = None
     purpose: AssetPurpose | None = None
     fixed_income_term: FixedIncomeTermPayload | None = None
+
+
+class AccountRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    institution: str | None = Field(default=None, max_length=120)
+    kind: AccountKind = AccountKind.BROKER
+    is_active: bool = True
+
+
+class AccountDTO(AccountRequest):
+    id: int
+    created_at: datetime | None = None
 
 
 class ArcaSuggestionDTO(BaseModel):
@@ -150,6 +168,7 @@ class TransactionCreateRequest(BaseModel):
     fees: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
     notes: str | None = None
+    account_id: int | None = None
 
 
 class TransactionUpdateRequest(BaseModel):
@@ -162,6 +181,7 @@ class TransactionUpdateRequest(BaseModel):
     fees: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
     notes: str | None = None
+    account_id: int | None = None
 
 
 class TransactionResponseDTO(BaseModel):
@@ -178,6 +198,7 @@ class TransactionResponseDTO(BaseModel):
     fx_rate: float
     total_brl: float
     notes: str | None = None
+    account_id: int | None = None
     created_at: datetime | None = None
 
 
@@ -193,6 +214,7 @@ class EarningCreateRequest(BaseModel):
     ex_date: date | None = None
     notes: str | None = None
     fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
+    account_id: int | None = None
 
 
 class EarningUpdateRequest(BaseModel):
@@ -206,6 +228,7 @@ class EarningUpdateRequest(BaseModel):
     ex_date: date | None = None
     notes: str | None = None
     fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
+    account_id: int | None = None
 
 
 class EarningResponseDTO(BaseModel):
@@ -223,6 +246,7 @@ class EarningResponseDTO(BaseModel):
     fx_rate: float = 1.0
     net_amount_brl: float = 0.0
     notes: str | None = None
+    account_id: int | None = None
     created_at: datetime | None = None
 
 

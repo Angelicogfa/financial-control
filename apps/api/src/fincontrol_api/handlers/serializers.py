@@ -106,6 +106,7 @@ def to_transaction_dto(
         fx_rate=fx,
         total_brl=total_brl,
         notes=entity.notes,
+        account_id=entity.account_id,
         created_at=entity.created_at,
     )
 
@@ -128,6 +129,7 @@ def to_earning_dto(entity: EarningEntity, ticker: str | None = None) -> EarningR
         fx_rate=fx,
         net_amount_brl=round(net * fx, 2),
         notes=entity.notes,
+        account_id=entity.account_id,
         created_at=entity.created_at,
     )
 

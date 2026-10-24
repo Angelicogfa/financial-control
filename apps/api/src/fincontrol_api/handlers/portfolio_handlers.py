@@ -24,6 +24,7 @@ from fincontrol_core.portfolio.ledger import (
 )
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
+from fincontrol_api.handlers.account_handlers import resolve_account_id
 from fincontrol_api.handlers.serializers import (
     to_contribution_plan_dto,
     to_earning_dto,
@@ -70,6 +71,7 @@ class TransactionHandler:
         kind: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        account_id: int | None = None,
     ) -> PaginatedResponse[TransactionResponseDTO]:
         with self.uow_factory() as uow:
             assets_map = {a.id: a.ticker for a in uow.assets.list_all(active_only=False)}
@@ -79,6 +81,7 @@ class TransactionHandler:
                 kind=kind,
                 date_from=date_from,
                 date_to=date_to,
+                account_id=account_id,
             )
             return PaginatedResponse(
                 items=[
@@ -106,6 +109,7 @@ class TransactionHandler:
                 fees=req.fees,
                 fx_rate=req.fx_rate,
                 notes=req.notes,
+                account_id=resolve_account_id(uow, req.account_id),
             )
             entries = [*asset.transactions, candidate]
             validate_ledger(asset, entries, curves=self._curves(uow, asset, entries))
@@ -128,6 +132,7 @@ class TransactionHandler:
                 fees=req.fees,
                 fx_rate=req.fx_rate,
                 notes=req.notes,
+                account_id=resolve_account_id(uow, req.account_id) or current.account_id,
             )
             entries = [edited if t.id == tx_id else t for t in asset.transactions]
             validate_ledger_change(asset, entries, curves=self._curves(uow, asset, entries))
@@ -161,6 +166,7 @@ class EarningHandler:
         kind: EarningKind | str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        account_id: int | None = None,
     ) -> PaginatedResponse[EarningResponseDTO]:
         with self.uow_factory() as uow:
             assets_map = {a.id: a.ticker for a in uow.assets.list_all(active_only=False)}
@@ -171,6 +177,7 @@ class EarningHandler:
                 kind=kind_str,
                 date_from=date_from,
                 date_to=date_to,
+                account_id=account_id,
             )
             return PaginatedResponse(
                 items=[to_earning_dto(e, ticker=assets_map.get(e.asset_id)) for e in result.items],
@@ -191,6 +198,7 @@ class EarningHandler:
                 ex_date=req.ex_date,
                 notes=req.notes,
                 fx_rate=req.fx_rate,
+                account_id=resolve_account_id(uow, req.account_id),
             )
             saved = uow.earnings.add(entity)
             uow.commit()
@@ -214,6 +222,7 @@ class EarningHandler:
                 ex_date=req.ex_date,
                 notes=req.notes,
                 fx_rate=req.fx_rate,
+                account_id=resolve_account_id(uow, req.account_id) or current.account_id,
                 created_at=current.created_at,
             )
             saved = uow.earnings.update(edited)
@@ -256,10 +265,14 @@ class PortfolioHandler:
         *,
         as_of_date: date | None = None,
         date_from: date | None = None,
+        account_id: int | None = None,
     ) -> PortfolioReportResponseDTO:
         with self.uow_factory() as uow:
             report = self.portfolio_service.build_portfolio_report(
-                uow, as_of_date=as_of_date, date_from=date_from
+                uow,
+                as_of_date=as_of_date,
+                date_from=date_from,
+                account_id=resolve_account_id(uow, account_id),
             )
             return to_portfolio_report_dto(report)
 

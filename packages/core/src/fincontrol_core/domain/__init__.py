@@ -1,6 +1,7 @@
 """Core domain enumerations, entities, and pagination primitives."""
 
 from fincontrol_core.domain.entities import (
+    AccountEntity,
     AssetEntity,
     EarningEntity,
     FixedIncomeTermEntity,
@@ -15,6 +16,7 @@ from fincontrol_core.domain.enums import (
     DEFAULT_CURRENCY_BY_TYPE,
     INTEGER_QUANTITY_TYPES,
     MARKET_BY_TYPE,
+    AccountKind,
     ArcaClass,
     AssetPurpose,
     AssetType,
@@ -34,6 +36,8 @@ from fincontrol_core.domain.enums import (
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
 
 __all__ = [
+    "AccountEntity",
+    "AccountKind",
     "ARCA_LABELS",
     "DEFAULT_ARCA_BY_TYPE",
     "DEFAULT_CURRENCY_BY_TYPE",

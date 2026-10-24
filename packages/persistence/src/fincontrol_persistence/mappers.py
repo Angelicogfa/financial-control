@@ -6,6 +6,7 @@ from dataclasses import asdict
 from decimal import Decimal
 
 from fincontrol_core.domain.entities import (
+    AccountEntity,
     AssetEntity,
     EarningEntity,
     FixedIncomeTermEntity,
@@ -15,6 +16,7 @@ from fincontrol_core.domain.entities import (
     TransactionEntity,
 )
 from fincontrol_core.domain.enums import (
+    AccountKind,
     ArcaClass,
     AssetPurpose,
     AssetType,
@@ -37,6 +39,7 @@ from fincontrol_core.policy.models import (
 from fincontrol_core.portfolio.consolidation import ProjectionAssumptions
 
 from fincontrol_persistence.models import (
+    AccountModel,
     AssetModel,
     EarningModel,
     FixedIncomeTermModel,
@@ -87,6 +90,7 @@ def to_transaction_entity(model: TransactionModel) -> TransactionEntity:
         fees=Decimal(model.fees),
         fx_rate=Decimal(model.fx_rate),
         notes=model.notes,
+        account_id=model.account_id,
         created_at=model.created_at,
     )
 
@@ -103,6 +107,7 @@ def to_earning_entity(model: EarningModel) -> EarningEntity:
         net_amount=Decimal(model.net_amount),
         fx_rate=Decimal(model.fx_rate),
         notes=model.notes,
+        account_id=model.account_id,
         created_at=model.created_at,
     )
 
@@ -222,4 +227,15 @@ def to_job_run_entity(model: JobRunModel) -> JobRunEntity:
         finished_at=model.finished_at,
         details=dict(model.details or {}),
         error=model.error,
+    )
+
+
+def to_account_entity(model: AccountModel) -> AccountEntity:
+    return AccountEntity(
+        id=model.id,
+        name=model.name,
+        institution=model.institution,
+        kind=AccountKind(model.kind),
+        is_active=bool(model.is_active),
+        created_at=model.created_at,
     )

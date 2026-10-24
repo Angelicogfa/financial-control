@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 
 from fincontrol_core.ports.repositories import (
+    AbstractAccountRepository,
     AbstractAssetRepository,
     AbstractEarningRepository,
     AbstractJobRunRepository,
@@ -23,6 +24,7 @@ class AbstractUnitOfWork(ABC):
     transactions: AbstractTransactionRepository
     earnings: AbstractEarningRepository
     policies: AbstractPolicyRepository
+    accounts: AbstractAccountRepository
     market_series: AbstractMarketSeriesRepository
     snapshots: AbstractPortfolioSnapshotRepository
     job_runs: AbstractJobRunRepository

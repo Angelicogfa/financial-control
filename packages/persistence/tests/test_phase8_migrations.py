@@ -132,13 +132,9 @@ def test_script_00004_adds_earning_fx_rate_with_default(db: tuple[Config, Engine
 
     command.upgrade(cfg, "script_00004")
 
-    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
-    from sqlalchemy.orm import sessionmaker
-
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
-        (legacy,) = uow.earnings.list_for_asset(1)
-        assert float(legacy.fx_rate) == 1.0
+    with engine.connect() as conn:
+        (fx_rate,) = conn.execute(text("SELECT fx_rate FROM earnings")).one()
+    assert float(fx_rate) == 1.0
 
 
 def test_script_00005_keeps_snapshot_values_as_numeric(db: tuple[Config, Engine]) -> None:
@@ -257,3 +253,34 @@ def test_script_00007_turns_arca_targets_into_policy_version(db: tuple[Config, E
     with engine.connect() as conn:
         rows = dict(conn.execute(text("SELECT arca_class, target_pct FROM arca_targets")).all())
     assert float(rows["ACOES"]) == 35.0
+
+
+def test_script_00009_assigns_existing_ledger_to_principal(db: tuple[Config, Engine]) -> None:
+    cfg, engine = db
+    command.upgrade(cfg, "script_00008")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO assets (id, ticker, name, asset_type, arca_class, currency, "
+                "cerrado_answers, created_at, updated_at) VALUES (1, 'WEGE3', 'WEG', "
+                "'STOCK_BR', 'ACOES', 'BRL', '{}', '2025-01-01', '2025-01-01')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO transactions (asset_id, kind, trade_date, quantity, unit_price, "
+                "fees, fx_rate, created_at) VALUES (1, 'BUY', '2025-01-02', 10, 40, 0, 1, "
+                "'2025-01-02')"
+            )
+        )
+
+    command.upgrade(cfg, "script_00009")
+
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT account_id FROM transactions")).scalar() == 1
+        assert conn.execute(text("SELECT name FROM accounts")).scalar() == "Principal"
+
+    command.downgrade(cfg, "script_00008")
+    with engine.connect() as conn:
+        columns = [row[1] for row in conn.execute(text("PRAGMA table_info(transactions)"))]
+    assert "account_id" not in columns

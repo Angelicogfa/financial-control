@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from fincontrol_core.domain.enums import (
+    AccountKind,
     ArcaClass,
     AssetPurpose,
     AssetType,
@@ -92,6 +93,7 @@ class TransactionEntity:
     fees: Decimal = Decimal("0")
     fx_rate: Decimal = Decimal("1")
     notes: str | None = None
+    account_id: int | None = None
     id: int | None = None
     created_at: datetime | None = None
 
@@ -119,6 +121,7 @@ class EarningEntity:
     ex_date: date | None = None
     notes: str | None = None
     fx_rate: Decimal = Decimal("1")
+    account_id: int | None = None
     id: int | None = None
     created_at: datetime | None = None
 
@@ -222,3 +225,21 @@ class JobRunEntity:
     details: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     id: int | None = None
+
+
+@dataclass(frozen=True)
+class AccountEntity:
+    """A custody account (broker, bank, exchange) where trades and earnings happen."""
+
+    name: str
+    institution: str | None = None
+    kind: AccountKind = AccountKind.BROKER
+    is_active: bool = True
+    id: int | None = None
+    created_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        normalized = self.name.strip()
+        if not normalized:
+            raise ValidationError("account name cannot be empty")
+        object.__setattr__(self, "name", normalized)

@@ -14,6 +14,7 @@ from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.config import AppSettings, get_settings
+from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.asset_handlers import AssetHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
@@ -116,6 +117,13 @@ def get_market_data_handler(
 ) -> MarketDataHandler:
     """Provide the MarketDataHandler instance."""
     return MarketDataHandler(uow_factory=uow_factory)
+
+
+def get_account_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+) -> AccountHandler:
+    """Provide the AccountHandler instance."""
+    return AccountHandler(uow_factory=uow_factory)
 
 
 def get_policy_handler(

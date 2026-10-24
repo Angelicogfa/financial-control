@@ -15,6 +15,7 @@ from fincontrol_core.errors import ConflictError, DomainError, NotFoundError, Va
 from fincontrol_api.auth import AuthenticationError, AuthNotConfiguredError
 from fincontrol_api.config import get_settings
 from fincontrol_api.controllers import (
+    accounts_router,
     assets_router,
     auth_router,
     earnings_router,
@@ -131,6 +132,7 @@ def create_app() -> FastAPI:
         settings_router,
         market_router,
         policy_router,
+        accounts_router,
     ):
         app.include_router(router, prefix=api_prefix, dependencies=protected)
 
