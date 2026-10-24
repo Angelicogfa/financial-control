@@ -291,4 +291,3 @@ class PortfolioHandler:
                 correlation_matrix=raw["correlation_matrix"],
                 curves=raw["curves"],
             )
-

@@ -49,9 +49,11 @@ def upgrade() -> None:
         sa.Column("valuation", sa.JSON(), nullable=False),
     )
 
-    rows = op.get_bind().execute(
-        sa.text("SELECT arca_class, target_pct, intra_class_strategy FROM arca_targets")
-    ).all()
+    rows = (
+        op.get_bind()
+        .execute(sa.text("SELECT arca_class, target_pct, intra_class_strategy FROM arca_targets"))
+        .all()
+    )
     arca = {
         cls: {"target_pct": 25.0, "band_pct": DEFAULT_BAND_PCT, "intra_class_strategy": "CERRADO"}
         for cls in ARCA_CLASSES
@@ -87,9 +89,11 @@ def downgrade() -> None:
             "target_pct >= 0 AND target_pct <= 100", name="ck_arca_targets_pct_bounds"
         ),
     )
-    latest = op.get_bind().execute(
-        sa.text("SELECT arca FROM investment_policies ORDER BY version DESC LIMIT 1")
-    ).scalar()
+    latest = (
+        op.get_bind()
+        .execute(sa.text("SELECT arca FROM investment_policies ORDER BY version DESC LIMIT 1"))
+        .scalar()
+    )
     arca = json.loads(latest) if isinstance(latest, str) else (latest or {})
     now = datetime.now(UTC)
     op.bulk_insert(
