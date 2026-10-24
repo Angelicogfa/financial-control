@@ -16,6 +16,7 @@ from fincontrol_core.domain.entities import (
 )
 from fincontrol_core.domain.enums import (
     ArcaClass,
+    AssetPurpose,
     AssetType,
     EarningKind,
     FixedIncomeIndexer,
@@ -137,6 +138,7 @@ def to_asset_entity(
         cerrado_answers=dict(model.cerrado_answers or {}),
         is_active=bool(model.is_active),
         notes=model.notes,
+        purpose=AssetPurpose(model.purpose),
         fixed_income_term=fi_term,
         transactions=txs,
         earnings=earnings,

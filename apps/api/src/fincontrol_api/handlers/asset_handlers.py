@@ -100,6 +100,7 @@ class AssetHandler:
                 use_cerrado=req.use_cerrado,
                 cerrado_answers=dict(req.cerrado_answers),
                 notes=req.notes,
+                purpose=req.purpose,
                 fixed_income_term=fi_term,
             )
             created = uow.assets.add(entity)
@@ -151,6 +152,7 @@ class AssetHandler:
                 ),
                 is_active=req.is_active if req.is_active is not None else current.is_active,
                 notes=req.notes if req.notes is not None else current.notes,
+                purpose=req.purpose if req.purpose is not None else current.purpose,
                 fixed_income_term=fi_term,
             )
             saved = uow.assets.update(updated_entity)

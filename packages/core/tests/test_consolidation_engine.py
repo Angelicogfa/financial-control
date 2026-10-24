@@ -161,3 +161,41 @@ def test_budget_of_class_without_assets_goes_to_other_classes() -> None:
 
     assert plan.executed_total_brl == pytest.approx(1000.0)
     assert plan.unallocated_cash_brl == 0.0
+
+
+def test_emergency_reserve_is_valued_but_kept_out_of_arca() -> None:
+    from fincontrol_core.domain.enums import AssetPurpose
+
+    stock = _stock(1, "WEGE3", _tx(1, TransactionKind.BUY, date(2025, 1, 2), "10", "40"))
+    reserve = AssetEntity(
+        id=2,
+        ticker="RESERVA",
+        name="Reserva de emergência",
+        asset_type=AssetType.CASH,
+        manual_price=Decimal("1"),
+        purpose=AssetPurpose.EMERGENCY_RESERVE,
+        transactions=(_tx(2, TransactionKind.BUY, date(2025, 1, 2), "20000", "1"),),
+    )
+
+    report = consolidate_portfolio(
+        [stock, reserve],
+        ArcaTargets.default(),
+        quotes={"WEGE3": Quote("WEGE3", 50.0)},
+        as_of_date=AS_OF,
+    )
+
+    assert report.total_current_value_brl == 20500.0
+    assert report.value_by_purpose_brl == {
+        "ARCA": 500.0,
+        "EMERGENCY_RESERVE": 20000.0,
+        "OTHER": 0.0,
+    }
+    caixa = next(a for a in report.allocations if a.arca_class == ArcaClass.CAIXA)
+    acoes = next(a for a in report.allocations if a.arca_class == ArcaClass.ACOES)
+    assert caixa.current_value == 0.0
+    assert acoes.current_pct == 100.0
+    reserve_pos = next(p for p in report.positions if p.ticker == "RESERVA")
+    assert reserve_pos.class_target_weight_pct == 0.0
+
+    plan = plan_contribution(report, ArcaTargets.default(), 1000.0)
+    assert "RESERVA" not in {o.ticker for o in plan.orders}

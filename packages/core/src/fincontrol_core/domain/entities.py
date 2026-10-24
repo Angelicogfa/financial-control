@@ -14,6 +14,7 @@ from typing import Any
 
 from fincontrol_core.domain.enums import (
     ArcaClass,
+    AssetPurpose,
     AssetType,
     EarningKind,
     FixedIncomeIndexer,
@@ -153,6 +154,7 @@ class AssetEntity:
     cerrado_answers: dict[str, bool] = field(default_factory=dict)
     is_active: bool = True
     notes: str | None = None
+    purpose: AssetPurpose = AssetPurpose.ARCA
     fixed_income_term: FixedIncomeTermEntity | None = None
     transactions: tuple[TransactionEntity, ...] = ()
     earnings: tuple[EarningEntity, ...] = ()

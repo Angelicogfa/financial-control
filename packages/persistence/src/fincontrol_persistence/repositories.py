@@ -114,6 +114,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             is_active=asset.is_active,
             notes=asset.notes,
         )
+        model.purpose = asset.purpose.value
         if asset.fixed_income_term is not None:
             model.fixed_income_term = to_fixed_income_term_model(asset.fixed_income_term)
         self.session.add(model)
@@ -143,6 +144,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
         model.cerrado_answers = dict(asset.cerrado_answers)
         model.is_active = asset.is_active
         model.notes = asset.notes
+        model.purpose = asset.purpose.value
 
         if asset.fixed_income_term is not None:
             term = asset.fixed_income_term

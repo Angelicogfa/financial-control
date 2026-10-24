@@ -79,6 +79,7 @@ def to_asset_dto(entity: AssetEntity) -> AssetResponseDTO:
         cerrado_answers=dict(entity.cerrado_answers),
         is_active=entity.is_active,
         notes=entity.notes,
+        purpose=entity.purpose,
         fixed_income_term=term_dto,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
@@ -197,6 +198,7 @@ def to_valued_position_dto(pos: ValuedAssetPosition) -> ValuedPositionDTO:
         custom_class_weight=pos.custom_class_weight,
         ledger_status=pos.ledger_status,
         ledger_message=pos.ledger_message,
+        purpose=pos.purpose,
     )
 
 
@@ -223,6 +225,7 @@ def to_portfolio_report_dto(report: ConsolidatedPortfolioReport) -> PortfolioRep
         earnings_by_month=dict(report.earnings_by_month),
         total_fx_pnl_brl=report.total_fx_pnl_brl,
         projection_assumptions=dict(report.projection_assumptions),
+        value_by_purpose_brl=dict(report.value_by_purpose_brl),
     )
 
 

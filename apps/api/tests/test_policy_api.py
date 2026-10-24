@@ -66,3 +66,19 @@ def test_arca_targets_facade_keeps_bands_and_rules(api: SimpleNamespace) -> None
     assert policy["eligibility"]["min_score"] == 3
     facade = api.client.get("/api/v1/settings/arca-targets").json()
     assert [t["target_pct"] for t in facade] == [25.0] * 4
+
+
+def test_asset_purpose_round_trip(api: SimpleNamespace) -> None:
+    created = api.client.post(
+        "/api/v1/assets",
+        json={
+            "ticker": "RESERVA",
+            "name": "Conta remunerada",
+            "asset_type": "CASH",
+            "purpose": "EMERGENCY_RESERVE",
+        },
+    ).json()
+    assert created["purpose"] == "EMERGENCY_RESERVE"
+
+    updated = api.client.put(f"/api/v1/assets/{created['id']}", json={"purpose": "ARCA"}).json()
+    assert updated["purpose"] == "ARCA"

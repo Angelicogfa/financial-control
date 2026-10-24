@@ -34,6 +34,7 @@ from fincontrol_core.domain.entities import AssetEntity, EarningEntity
 from fincontrol_core.domain.enums import (
     INTEGER_QUANTITY_TYPES,
     ArcaClass,
+    AssetPurpose,
     AssetType,
     IntraClassStrategy,
     TransactionKind,
@@ -110,6 +111,7 @@ class ValuedAssetPosition:
     custom_class_weight: float | None = None
     ledger_status: str = LEDGER_VALID
     ledger_message: str | None = None
+    purpose: AssetPurpose = AssetPurpose.ARCA
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,7 @@ class ConsolidatedPortfolioReport:
     earnings_by_month: dict[str, float] = field(default_factory=dict)
     total_fx_pnl_brl: float = 0.0
     projection_assumptions: dict[str, float] = field(default_factory=dict)
+    value_by_purpose_brl: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -438,8 +441,16 @@ def consolidate_portfolio(
     invested_by_class: dict[ArcaClass, float] = dict.fromkeys(ArcaClass, 0.0)
     cons_pnl_by_class: dict[ArcaClass, float] = dict.fromkeys(ArcaClass, 0.0)
 
+    for row in rows:
+        if row["v"].asset.purpose != AssetPurpose.ARCA:
+            positions.append(_to_position(row, 0.0, 0.0))
+
     for arca_class in ArcaClass:
-        class_rows = [r for r in rows if r["v"].asset.arca_class == arca_class]
+        class_rows = [
+            r
+            for r in rows
+            if r["v"].asset.arca_class == arca_class and r["v"].asset.purpose == AssetPurpose.ARCA
+        ]
         if not class_rows:
             continue
         valid_rows = [r for r in class_rows if r["v"].is_valid]
@@ -501,6 +512,10 @@ def consolidate_portfolio(
         positions=positions,
         earnings_by_month=dict(sorted(combined_earnings_by_month.items())),
         total_fx_pnl_brl=round(sum(p.fx_pnl_brl for p in valid), 2),
+        value_by_purpose_brl={
+            purpose.value: round(sum(p.current_value_brl for p in valid if p.purpose == purpose), 2)
+            for purpose in AssetPurpose
+        },
         projection_assumptions=premises.as_dict(),
     )
 
@@ -550,6 +565,7 @@ def _to_position(
         custom_class_weight=_custom_weight(a),
         ledger_status=LEDGER_VALID if v.is_valid else LEDGER_INVALID,
         ledger_message=v.ledger_message,
+        purpose=a.purpose,
     )
 
 
@@ -662,7 +678,9 @@ def plan_contribution(
         class_positions = [
             p
             for p in report.positions
-            if p.arca_class == arca_class and p.ledger_status == LEDGER_VALID
+            if p.arca_class == arca_class
+            and p.ledger_status == LEDGER_VALID
+            and p.purpose == AssetPurpose.ARCA
         ]
         if class_budget <= 0 or not class_positions:
             leftover += max(class_budget, 0.0)

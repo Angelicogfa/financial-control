@@ -8,6 +8,7 @@ from typing import Any
 
 from fincontrol_core.domain.enums import (
     ArcaClass,
+    AssetPurpose,
     AssetType,
     EarningKind,
     FixedIncomeIndexer,
@@ -75,6 +76,7 @@ class AssetCreateRequest(BaseModel):
     use_cerrado: bool = True
     cerrado_answers: dict[str, bool] = Field(default_factory=dict)
     notes: str | None = None
+    purpose: AssetPurpose = AssetPurpose.ARCA
     fixed_income_term: FixedIncomeTermPayload | None = None
 
 
@@ -92,6 +94,7 @@ class AssetUpdateRequest(BaseModel):
     cerrado_answers: dict[str, bool] | None = None
     is_active: bool | None = None
     notes: str | None = None
+    purpose: AssetPurpose | None = None
     fixed_income_term: FixedIncomeTermPayload | None = None
 
 
@@ -120,6 +123,7 @@ class AssetResponseDTO(BaseModel):
     cerrado_answers: dict[str, bool]
     is_active: bool
     notes: str | None = None
+    purpose: AssetPurpose = AssetPurpose.ARCA
     fixed_income_term: FixedIncomeTermPayload | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -285,6 +289,7 @@ class ValuedPositionDTO(BaseModel):
     custom_class_weight: float | None = None
     ledger_status: str = "VALID"
     ledger_message: str | None = None
+    purpose: AssetPurpose = AssetPurpose.ARCA
 
 
 class ClassAllocationDTO(BaseModel):
@@ -323,6 +328,7 @@ class PortfolioReportResponseDTO(BaseModel):
     earnings_by_month: dict[str, float]
     total_fx_pnl_brl: float = 0.0
     projection_assumptions: dict[str, float] = Field(default_factory=dict)
+    value_by_purpose_brl: dict[str, float] = Field(default_factory=dict)
 
 
 class ContributionSimulationRequest(BaseModel):

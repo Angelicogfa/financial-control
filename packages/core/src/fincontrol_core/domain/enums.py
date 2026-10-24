@@ -106,6 +106,14 @@ class SeriesUnit(StrEnum):
     INDEX_POINTS = "INDEX_POINTS"
 
 
+class AssetPurpose(StrEnum):
+    """Why an asset is held; only ARCA assets take part in allocation and contributions."""
+
+    ARCA = "ARCA"
+    EMERGENCY_RESERVE = "EMERGENCY_RESERVE"
+    OTHER = "OTHER"
+
+
 class JobRunStatus(StrEnum):
     """Lifecycle of a background job execution."""
 
