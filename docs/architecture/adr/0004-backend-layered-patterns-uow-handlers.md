@@ -1,0 +1,52 @@
+# ADR 0004 — Isolamento de Componentes Backend (Controllers, Handlers, Services, Unit of Work e Repositories)
+
+- **Status:** Aceito
+- **Data:** 2026-10-24
+
+## Contexto
+Para evitar acoplamento entre a camada HTTP (`FastAPI`), as regras de negócio (`packages/core`) e o banco de dados (`SQLAlchemy`), precisamos garantir que cada camada tenha responsabilidade única, fronteiras bem definidas por interfaces (Protocols/ABCs) e que os controllers jamais manipulem modelos de banco ou sessões diretamente.
+
+## Decisão
+Adotar os seguintes padrões de projeto em todo o backend (`packages/core`, `packages/persistence`, `apps/api`, `apps/worker`):
+
+1. **Entidades de Domínio e Mappers (`Domain Entities` $\leftrightarrow$ `ORM Models`)**:
+   - Os repositórios recebem e devolvem **Entidades de Domínio imutáveis** (`AssetEntity`, `FixedIncomeTermEntity`, `TransactionEntity`, `EarningEntity`, `ArcaTargetEntity`, `MarketSeriesPoint`, `PortfolioSnapshotEntity`) definidas em `packages/core/domain/entities.py`.
+   - Modelos SQLAlchemy (`AssetModel`, etc.) ficam encapsulados dentro de `packages/persistence` e nunca vazam para os Controllers ou para o `packages/core`.
+2. **Repository Pattern (`AbstractRepository` $\rightarrow$ `SqlAlchemyRepository`)**:
+   - Interfaces abstratas definidas em `packages/core/ports/repositories.py`.
+   - Implementações concretas em `packages/persistence/repositories.py`.
+   - Repositórios executam queries, filtros, ordenação e paginação (`PaginatedResult[DomainEntity]`), mas **nunca** chamam `session.commit()`.
+3. **Unit of Work Pattern (`AbstractUnitOfWork` $\rightarrow$ `SqlAlchemyUnitOfWork`)**:
+   - Interface definida em `packages/core/ports/unit_of_work.py` e implementação concreta em `packages/persistence/unit_of_work.py`.
+   - Gerencia o ciclo de vida da sessão e a atomicidade da transação (`with uow: ... uow.commit()`), expondo os repositórios (`uow.assets`, `uow.transactions`, `uow.earnings`, `uow.arca_targets`, `uow.market_series`, `uow.snapshots`).
+4. **Services (`Application / Domain Services`)**:
+   - Coordenam regras de negócio complexas que envolvem múltiplos agregados, cálculos financeiros do `core` e provedores externos (`MarketDataGateway`).
+5. **Handlers (`Command / Query Handlers`)**:
+   - Cada caso de uso da aplicação (ex.: `RegisterAssetHandler`, `RecordTransactionHandler`, `GetPortfolioConsolidatedQueryHandler`) recebe um Command/Query tipado, abre o `UnitOfWork`, aciona os `Services` e persiste de forma atômica.
+6. **Controllers (`FastAPI Routers`)**:
+   - Atuam apenas como adaptadores HTTP: validam o payload de entrada (Pydantic), invocam o `Handler`/`Service` injetado via `Depends()` e retornam o DTO de resposta. **É proibido injetar `Session` ou `Repository` em um Controller.**
+
+## Diagrama de Sequência entre as Camadas
+
+```mermaid
+sequenceDiagram
+    participant C as Controller (FastAPI Router)
+    participant H as Command/Query Handler
+    participant S as Application Service
+    participant U as UnitOfWork (SqlAlchemyUnitOfWork)
+    participant R as Repository (SqlAlchemy)
+    participant DB as PostgreSQL
+
+    C->>H: handle(Command / Query)
+    H->>U: __enter__() (abre Session / transação)
+    H->>S: execute_business_rule(uow, command)
+    S->>R: uow.assets.get_by_id(...) / list_paginated(...)
+    R->>DB: SELECT ...
+    DB-->>R: ORM Row
+    R-->>S: Domain Entity (imutável)
+    S->>R: uow.transactions.add(TransactionEntity)
+    R->>DB: INSERT / FLUSH
+    H->>U: commit()
+    U->>DB: COMMIT
+    H-->>C: Result DTO
+```
