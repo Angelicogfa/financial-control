@@ -89,7 +89,6 @@ def uow_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> UoWFactory:
 # ---------------------------------------------------------------------------
 # I-03 — BCB history must cover the oldest fixed income position
 # ---------------------------------------------------------------------------
-@_xfail("I-03", "BCB sync always requests only the last 365 days")
 def test_i03_bcb_sync_starts_at_oldest_fixed_income_issue(uow_factory: UoWFactory) -> None:
     issue = date(2022, 1, 3)
     with uow_factory() as uow:
@@ -134,7 +133,6 @@ def test_i03_bcb_sync_starts_at_oldest_fixed_income_issue(uow_factory: UoWFactor
 # ---------------------------------------------------------------------------
 # I-09 — Snapshot net flow must cover every trade since the previous snapshot
 # ---------------------------------------------------------------------------
-@_xfail("I-09", "net_flow only counts trades dated exactly on the snapshot day")
 def test_i09_net_flow_includes_trades_since_previous_snapshot(uow_factory: UoWFactory) -> None:
     with uow_factory() as uow:
         uow.snapshots.upsert(

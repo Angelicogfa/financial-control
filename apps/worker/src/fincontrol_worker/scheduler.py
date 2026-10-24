@@ -14,6 +14,7 @@ from fincontrol_core.market.yfinance_provider import YFinanceProvider
 from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_worker.jobs import (
+    backfill_snapshots_job,
     record_daily_snapshot_job,
     sync_bcb_and_benchmarks_job,
     warm_portfolio_quotes_job,
@@ -63,6 +64,7 @@ def create_scheduler(gateway: CachedMarketGateway | None = None) -> BlockingSche
     scheduler.add_job(
         record_daily_snapshot_job,
         trigger="cron",
+        day_of_week="mon-fri",
         hour=19,
         minute=30,
         kwargs={"uow_factory": SqlAlchemyUnitOfWork, "gateway": gw},
@@ -79,6 +81,7 @@ def main() -> None:
     logger.info("Running initial market series sync and daily snapshot...")
     try:
         sync_bcb_and_benchmarks_job(SqlAlchemyUnitOfWork, gateway)
+        backfill_snapshots_job(SqlAlchemyUnitOfWork, gateway)
         record_daily_snapshot_job(SqlAlchemyUnitOfWork, gateway)
     except Exception as exc:
         logger.warning("Initial sync warning: %s", exc)

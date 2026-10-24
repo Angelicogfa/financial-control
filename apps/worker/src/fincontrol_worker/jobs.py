@@ -2,25 +2,75 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from fincontrol_core.arca.allocation import ArcaTargets
-from fincontrol_core.domain.entities import PortfolioSnapshotEntity
+from fincontrol_core.calendar import business_days_between, is_business_day
+from fincontrol_core.domain.entities import AssetEntity, PortfolioSnapshotEntity
 from fincontrol_core.domain.enums import (
     ArcaClass,
     IntraClassStrategy,
     Market,
     SeriesUnit,
-    TransactionKind,
 )
 from fincontrol_core.market.gateway import CachedMarketGateway
+from fincontrol_core.market.models import Quote, QuoteFreshness
 from fincontrol_core.market.units import BCB_SERIES_UNITS
 from fincontrol_core.portfolio.consolidation import consolidate_portfolio
 from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_rate_curves
+from fincontrol_core.portfolio.fixed_income import RateCurves
+from fincontrol_core.portfolio.snapshots import (
+    PriceLookup,
+    first_trade_date,
+    history_range_for,
+    history_start,
+    invalid_ledger_tickers,
+    net_flow_between,
+    snapshot_from_report,
+)
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
+
+logger = logging.getLogger("fincontrol_worker")
+
+BCB_SYMBOLS = ("CDI", "SELIC", "IPCA")
+BENCHMARK_TICKERS = {"IBOV": "^BVSP", "IFIX": "IFIX.SA", "SP500": "^GSPC"}
+USD_BRL_SYMBOL = "USDBRL=X"
+
+
+@dataclass(frozen=True)
+class _Targets:
+    targets: ArcaTargets
+    strategies: dict[ArcaClass, IntraClassStrategy]
+
+
+def _load_targets(uow: AbstractUnitOfWork) -> _Targets:
+    rows = uow.arca_targets.get_all()
+    if rows and len(rows) == len(ArcaClass):
+        return _Targets(
+            ArcaTargets({r.arca_class: float(r.target_pct) for r in rows}),
+            {r.arca_class: r.intra_class_strategy for r in rows},
+        )
+    return _Targets(ArcaTargets.default(), dict.fromkeys(ArcaClass, IntraClassStrategy.CERRADO))
+
+
+def _missing_windows(
+    stored: tuple[date, date] | None, start: date, end: date, *, full: bool
+) -> list[tuple[date, date]]:
+    """Date windows not yet persisted for a series (incremental sync, finding I-03)."""
+    if full or stored is None:
+        return [(start, end)]
+    first, last = stored
+    windows: list[tuple[date, date]] = []
+    if start < first:
+        windows.append((start, first - timedelta(days=1)))
+    if last < end:
+        windows.append((last + timedelta(days=1), end))
+    return windows
 
 
 def sync_bcb_and_benchmarks_job(
@@ -28,41 +78,47 @@ def sync_bcb_and_benchmarks_job(
     gateway: CachedMarketGateway,
     *,
     as_of_date: date | None = None,
+    full: bool = False,
 ) -> dict[str, int]:
-    """Fetch and persist BCB series (CDI, SELIC, IPCA) and benchmarks (IBOV, IFIX, SP500)."""
+    """Persist BCB series (CDI, SELIC, IPCA) and benchmarks (IBOV, IFIX, SP500).
+
+    The history starts at the oldest fixed income position or trade (capped at ten years)
+    and only missing windows are fetched unless `full` is set.
+    """
     end = as_of_date or date.today()
-    start = end - timedelta(days=365)
     counts: dict[str, int] = {}
 
     with uow_factory() as uow:
-        for bcb_sym in ("CDI", "SELIC", "IPCA"):
-            pts = gateway.fetch_bcb_series(bcb_sym, start_date=start, end_date=end)
-            if pts:
-                counts[bcb_sym] = uow.market_series.upsert_points(
-                    bcb_sym,
-                    [(p.reference_date, p.value) for p in pts],
-                    unit=BCB_SERIES_UNITS[bcb_sym],
-                )
-            else:
-                counts[bcb_sym] = 0
+        assets = uow.assets.list_all(active_only=False)
+        start = history_start(end, earliest_fixed_income_start(assets), first_trade_date(assets))
 
-        benchmark_tickers = {
-            "IBOV": "^BVSP",
-            "IFIX": "IFIX.SA",
-            "SP500": "^GSPC",
-        }
-        for sym_label, yahoo_sym in benchmark_tickers.items():
-            hist = gateway.get_history(
-                yahoo_sym, range_period="1y", market=Market.INDEX, bypass_cache=True
-            )
-            if hist:
-                counts[sym_label] = uow.market_series.upsert_points(
-                    sym_label,
-                    [(p.date, p.close) for p in hist],
-                    unit=SeriesUnit.INDEX_POINTS,
+        for symbol in BCB_SYMBOLS:
+            counts[symbol] = 0
+            sync_start = date(start.year, start.month, 1) if symbol == "IPCA" else start
+            for window_start, window_end in _missing_windows(
+                uow.market_series.date_range(symbol), sync_start, end, full=full
+            ):
+                points = gateway.fetch_bcb_series(
+                    symbol, start_date=window_start, end_date=window_end
                 )
-            else:
-                counts[sym_label] = 0
+                counts[symbol] += uow.market_series.upsert_points(
+                    symbol,
+                    [(p.reference_date, p.value) for p in points],
+                    unit=BCB_SERIES_UNITS[symbol],
+                )
+
+        for label, yahoo_symbol in BENCHMARK_TICKERS.items():
+            history = gateway.get_history(
+                yahoo_symbol,
+                range_period=history_range_for(start, end),
+                market=Market.INDEX,
+                bypass_cache=True,
+            )
+            counts[label] = uow.market_series.upsert_points(
+                label,
+                [(p.date, p.close) for p in history if start <= p.date <= end],
+                unit=SeriesUnit.INDEX_POINTS,
+            )
 
         uow.commit()
     return counts
@@ -87,89 +143,163 @@ def warm_portfolio_quotes_job(
     return warmed
 
 
+def _rate_curves(
+    uow: AbstractUnitOfWork, gateway: CachedMarketGateway, assets: list[AssetEntity], end: date
+) -> RateCurves:
+    annual_cdi, annual_ipca = gateway.get_macro_rates()
+    return load_rate_curves(
+        uow.market_series,
+        date_from=earliest_fixed_income_start(assets),
+        date_to=end,
+        annual_cdi_rate=annual_cdi,
+        annual_ipca_rate=annual_ipca,
+    )
+
+
+def _snapshot(
+    uow: AbstractUnitOfWork,
+    assets: list[AssetEntity],
+    targets: _Targets,
+    *,
+    day: date,
+    previous: date | None,
+    quotes: dict[str, Quote],
+    usd_brl: float,
+    curves: RateCurves,
+) -> PortfolioSnapshotEntity:
+    report = consolidate_portfolio(
+        assets=assets,
+        targets=targets.targets,
+        quotes=quotes,
+        intra_strategies=targets.strategies,
+        usd_brl_rate=usd_brl,
+        curves=curves,
+        as_of_date=day,
+    )
+    invalid = invalid_ledger_tickers(report)
+    if invalid:
+        logger.warning("Snapshot %s excludes invalid ledgers: %s", day, ", ".join(invalid))
+    flow = net_flow_between(
+        [a for a in assets if a.ticker not in invalid], after=previous, up_to=day
+    )
+    return uow.snapshots.upsert(snapshot_from_report(report, net_flow=flow))
+
+
 def record_daily_snapshot_job(
     uow_factory: UoWFactory,
     gateway: CachedMarketGateway,
     *,
     snapshot_date: date | None = None,
-) -> PortfolioSnapshotEntity:
-    """Consolidate portfolio and upsert a daily PortfolioSnapshotEntity via UnitOfWork."""
+) -> PortfolioSnapshotEntity | None:
+    """Consolidate the portfolio with live quotes and upsert the snapshot of a business day.
+
+    The net flow covers every trade since the previous snapshot, so days the worker was
+    down are not lost (finding I-09). Returns None on weekends and holidays.
+    """
     ref_date = snapshot_date or date.today()
+    if not is_business_day(ref_date):
+        return None
     usd_brl = gateway.get_usd_brl_rate()
-    annual_cdi, annual_ipca = gateway.get_macro_rates()
 
     with uow_factory() as uow:
         assets = uow.assets.list_all(active_only=True)
-        target_rows = uow.arca_targets.get_all()
-        if target_rows and len(target_rows) == len(ArcaClass):
-            targets = ArcaTargets({r.arca_class: float(r.target_pct) for r in target_rows})
-            intra_strategies = {r.arca_class: r.intra_class_strategy for r in target_rows}
-        else:
-            targets = ArcaTargets.default()
-            intra_strategies = {c: IntraClassStrategy.CERRADO for c in ArcaClass}
-
-        quotes = {}
-        fundamentals = {}
-        net_flow_brl = 0.0
-
+        quotes: dict[str, Quote] = {}
         for asset in assets:
-            for tx in asset.transactions:
-                if tx.trade_date == ref_date:
-                    fx = float(tx.fx_rate) if tx.fx_rate > 0 else 1.0
-                    gross_tx = float(tx.quantity * tx.unit_price + tx.fees) * fx
-                    net_flow_brl += (
-                        gross_tx if tx.kind == TransactionKind.BUY else -gross_tx
-                    )
-
             if asset.market in (Market.MANUAL, Market.FIXED_INCOME_CURVE):
                 continue
-            q = gateway.get_quote(asset.ticker, asset_type=asset.asset_type)
-            if q is not None:
-                quotes[asset.ticker] = q
-            fund = gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
-            if fund is not None:
-                fundamentals[asset.ticker] = fund
+            quote = gateway.get_quote(asset.ticker, asset_type=asset.asset_type)
+            if quote is not None:
+                quotes[asset.ticker] = quote
 
-        curves = load_rate_curves(
-            uow.market_series,
-            date_from=earliest_fixed_income_start(assets),
-            date_to=ref_date,
-            annual_cdi_rate=annual_cdi,
-            annual_ipca_rate=annual_ipca,
-        )
-
-        report = consolidate_portfolio(
-            assets=assets,
-            targets=targets,
+        previous = uow.snapshots.latest_before(ref_date)
+        saved = _snapshot(
+            uow,
+            assets,
+            _load_targets(uow),
+            day=ref_date,
+            previous=previous.snapshot_date if previous else None,
             quotes=quotes,
-            fundamentals_by_ticker=fundamentals,
-            intra_strategies=intra_strategies,
-            usd_brl_rate=usd_brl,
-            curves=curves,
-            as_of_date=ref_date,
+            usd_brl=usd_brl,
+            curves=_rate_curves(uow, gateway, assets, ref_date),
         )
-
-        by_class = {
-            alloc.arca_class.value: {
-                "invested_value": alloc.invested_value,
-                "current_value": alloc.current_value,
-                "current_pct": alloc.current_pct,
-                "target_pct": alloc.target_pct,
-            }
-            for alloc in report.allocations
-        }
-
-        snapshot = PortfolioSnapshotEntity(
-            snapshot_date=ref_date,
-            invested_value=report.total_invested_brl,
-            market_value=report.total_current_value_brl,
-            unrealized_pnl=report.total_unrealized_pnl_brl,
-            realized_pnl_cum=report.total_realized_pnl_brl,
-            earnings_cum=report.total_received_earnings_brl,
-            consolidated_pnl=report.total_consolidated_pnl_brl,
-            net_flow=round(net_flow_brl, 2),
-            by_class=by_class,
-        )
-        saved = uow.snapshots.upsert(snapshot)
         uow.commit()
         return saved
+
+
+def _price_history(
+    gateway: CachedMarketGateway, assets: Iterable[AssetEntity], start: date, end: date
+) -> dict[str, PriceLookup]:
+    period = history_range_for(start, end)
+    lookups: dict[str, PriceLookup] = {}
+    for asset in assets:
+        if asset.market in (Market.MANUAL, Market.FIXED_INCOME_CURVE):
+            continue
+        history = gateway.get_history(
+            asset.ticker, range_period=period, asset_type=asset.asset_type
+        )
+        lookups[asset.ticker] = PriceLookup([(p.date, p.close) for p in history])
+    return lookups
+
+
+def backfill_snapshots_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    end_date: date | None = None,
+    overwrite: bool = False,
+) -> int:
+    """Rebuild missing daily snapshots from the first trade using historical prices (8.9).
+
+    Each business day is valued with the last close on or before it, the historical
+    USD/BRL rate and the persisted index curves. Returns the number of snapshots written.
+    """
+    end = end_date or (date.today() - timedelta(days=1))
+    with uow_factory() as uow:
+        assets = uow.assets.list_all(active_only=True)
+        start = first_trade_date(assets)
+        if start is None or start > end:
+            return 0
+        existing = {s.snapshot_date for s in uow.snapshots.list_range(date_from=start)}
+        days = [start] if is_business_day(start) else []
+        days += business_days_between(start, end)
+        pending = [d for d in days if overwrite or d not in existing]
+        if not pending:
+            return 0
+
+        prices = _price_history(gateway, assets, start, end)
+        fx = PriceLookup(
+            [
+                (p.date, p.close)
+                for p in gateway.get_history(
+                    USD_BRL_SYMBOL, range_period=history_range_for(start, end), market=Market.INDEX
+                )
+            ]
+        )
+        targets = _load_targets(uow)
+        curves = _rate_curves(uow, gateway, assets, end)
+        default_fx = gateway.default_usd_brl
+
+        written = 0
+        previous: date | None = None
+        for day in days:
+            if day in pending:
+                quotes = {
+                    ticker: Quote(symbol=ticker, price=price, freshness=QuoteFreshness.CACHED)
+                    for ticker, lookup in prices.items()
+                    if (price := lookup.on(day)) is not None
+                }
+                _snapshot(
+                    uow,
+                    assets,
+                    targets,
+                    day=day,
+                    previous=previous,
+                    quotes=quotes,
+                    usd_brl=fx.on(day) or default_fx,
+                    curves=curves,
+                )
+                written += 1
+            previous = day
+        uow.commit()
+    logger.info("Backfilled %d snapshots between %s and %s", written, start, end)
+    return written

@@ -193,3 +193,12 @@ class AbstractPortfolioSnapshotRepository(ABC):
         date_to: date | None = None,
     ) -> list[PortfolioSnapshotEntity]:
         raise NotImplementedError
+
+    @abstractmethod
+    def latest_before(self, snapshot_date: date) -> PortfolioSnapshotEntity | None:
+        """Most recent snapshot strictly before `snapshot_date`."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_range(self, *, date_from: date | None = None, date_to: date | None = None) -> int:
+        raise NotImplementedError

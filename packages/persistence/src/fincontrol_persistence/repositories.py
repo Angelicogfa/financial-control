@@ -30,7 +30,7 @@ from fincontrol_core.ports.repositories import (
     AbstractPortfolioSnapshotRepository,
     AbstractTransactionRepository,
 )
-from sqlalchemy import Select, asc, desc, func, or_, select
+from sqlalchemy import Select, asc, delete, desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from fincontrol_persistence.mappers import (
@@ -591,6 +591,26 @@ class SqlAlchemyPortfolioSnapshotRepository(AbstractPortfolioSnapshotRepository)
             stmt = stmt.where(PortfolioSnapshotModel.snapshot_date <= date_to)
         stmt = stmt.order_by(PortfolioSnapshotModel.snapshot_date.asc())
         return [to_portfolio_snapshot_entity(m) for m in self.session.scalars(stmt).all()]
+
+    def latest_before(self, snapshot_date: date) -> PortfolioSnapshotEntity | None:
+        stmt = (
+            select(PortfolioSnapshotModel)
+            .where(PortfolioSnapshotModel.snapshot_date < snapshot_date)
+            .order_by(PortfolioSnapshotModel.snapshot_date.desc())
+            .limit(1)
+        )
+        model = self.session.scalar(stmt)
+        return to_portfolio_snapshot_entity(model) if model else None
+
+    def delete_range(self, *, date_from: date | None = None, date_to: date | None = None) -> int:
+        stmt = delete(PortfolioSnapshotModel)
+        if date_from is not None:
+            stmt = stmt.where(PortfolioSnapshotModel.snapshot_date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(PortfolioSnapshotModel.snapshot_date <= date_to)
+        result = self.session.execute(stmt)
+        self.session.flush()
+        return int(result.rowcount or 0)
 
 
 # Backward-compatible aliases within persistence package
