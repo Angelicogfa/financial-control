@@ -18,6 +18,7 @@ from fincontrol_core.domain.enums import (
     TransactionKind,
 )
 from fincontrol_core.domain.pagination import PaginationParams
+from fincontrol_core.errors import NotFoundError
 from fincontrol_core.portfolio.positions import build_position
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
@@ -83,7 +84,7 @@ class TransactionHandler:
         with self.uow_factory() as uow:
             asset = uow.assets.get_by_id(req.asset_id)
             if asset is None:
-                raise LookupError(f"Asset id={req.asset_id} not found")
+                raise NotFoundError(f"Asset id={req.asset_id} not found")
 
             candidate = TransactionEntity(
                 asset_id=req.asset_id,
@@ -107,7 +108,7 @@ class TransactionHandler:
         with self.uow_factory() as uow:
             deleted = uow.transactions.delete(tx_id)
             if not deleted:
-                raise LookupError(f"Transaction id={tx_id} not found")
+                raise NotFoundError(f"Transaction id={tx_id} not found")
             uow.commit()
 
 
@@ -147,7 +148,7 @@ class EarningHandler:
         with self.uow_factory() as uow:
             asset = uow.assets.get_by_id(req.asset_id)
             if asset is None:
-                raise LookupError(f"Asset id={req.asset_id} not found")
+                raise NotFoundError(f"Asset id={req.asset_id} not found")
 
             entity = EarningEntity(
                 asset_id=req.asset_id,
@@ -167,7 +168,7 @@ class EarningHandler:
         with self.uow_factory() as uow:
             deleted = uow.earnings.delete(earning_id)
             if not deleted:
-                raise LookupError(f"Earning id={earning_id} not found")
+                raise NotFoundError(f"Earning id={earning_id} not found")
             uow.commit()
 
 

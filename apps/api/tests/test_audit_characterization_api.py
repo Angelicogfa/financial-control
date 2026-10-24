@@ -211,7 +211,6 @@ def test_i04_invalid_ledger_does_not_break_portfolio(api: SimpleNamespace) -> No
 # ---------------------------------------------------------------------------
 # I-05 — Unexpected errors must surface as 500, not as 404/400
 # ---------------------------------------------------------------------------
-@_xfail("I-05", "KeyError is a LookupError and is translated into HTTP 404")
 def test_i05_internal_key_error_is_a_server_error(api: SimpleNamespace) -> None:
     def broken_report(**_kwargs: Any) -> Any:
         raise KeyError("missing_internal_field")

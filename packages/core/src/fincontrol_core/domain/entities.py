@@ -26,6 +26,7 @@ from fincontrol_core.domain.enums import (
     default_currency,
     market_for,
 )
+from fincontrol_core.errors import ValidationError
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,7 @@ class FixedIncomeTermEntity:
 
     def __post_init__(self) -> None:
         if self.contracted_rate < Decimal("0"):
-            raise ValueError("contracted_rate cannot be negative")
+            raise ValidationError("contracted_rate cannot be negative")
 
 
 @dataclass(frozen=True)
@@ -65,13 +66,13 @@ class TransactionEntity:
 
     def __post_init__(self) -> None:
         if self.quantity <= Decimal("0"):
-            raise ValueError("quantity must be positive")
+            raise ValidationError("quantity must be positive")
         if self.unit_price < Decimal("0"):
-            raise ValueError("unit_price cannot be negative")
+            raise ValidationError("unit_price cannot be negative")
         if self.fees < Decimal("0"):
-            raise ValueError("fees cannot be negative")
+            raise ValidationError("fees cannot be negative")
         if self.fx_rate <= Decimal("0"):
-            raise ValueError("fx_rate must be positive")
+            raise ValidationError("fx_rate must be positive")
 
 
 @dataclass(frozen=True)
@@ -91,16 +92,16 @@ class EarningEntity:
 
     def __post_init__(self) -> None:
         if self.gross_amount <= Decimal("0"):
-            raise ValueError("gross_amount must be positive")
+            raise ValidationError("gross_amount must be positive")
         if self.withholding_tax < Decimal("0"):
-            raise ValueError("withholding_tax cannot be negative")
+            raise ValidationError("withholding_tax cannot be negative")
         resolved_net = (
             self.net_amount
             if self.net_amount is not None
             else self.gross_amount - self.withholding_tax
         )
         if resolved_net < Decimal("0"):
-            raise ValueError("net_amount cannot be negative")
+            raise ValidationError("net_amount cannot be negative")
         object.__setattr__(self, "net_amount", resolved_net)
 
 
@@ -129,7 +130,7 @@ class AssetEntity:
     def __post_init__(self) -> None:
         normalized_ticker = self.ticker.strip().upper()
         if not normalized_ticker:
-            raise ValueError("ticker cannot be empty")
+            raise ValidationError("ticker cannot be empty")
         object.__setattr__(self, "ticker", normalized_ticker)
         object.__setattr__(self, "name", self.name.strip())
         if self.arca_class is None:
@@ -139,9 +140,9 @@ class AssetEntity:
         else:
             object.__setattr__(self, "currency", self.currency.strip().upper())
         if self.manual_price is not None and self.manual_price < Decimal("0"):
-            raise ValueError("manual_price cannot be negative")
+            raise ValidationError("manual_price cannot be negative")
         if self.custom_class_weight is not None and self.custom_class_weight < Decimal("0"):
-            raise ValueError("custom_class_weight cannot be negative")
+            raise ValidationError("custom_class_weight cannot be negative")
 
     @property
     def market(self) -> Market:
@@ -159,7 +160,7 @@ class ArcaTargetEntity:
 
     def __post_init__(self) -> None:
         if self.target_pct < Decimal("0") or self.target_pct > Decimal("100"):
-            raise ValueError("target_pct must be between 0 and 100")
+            raise ValidationError("target_pct must be between 0 and 100")
 
 
 @dataclass(frozen=True)

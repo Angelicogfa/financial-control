@@ -9,12 +9,15 @@ from decimal import Decimal
 
 from fincontrol_core.domain.entities import TransactionEntity
 from fincontrol_core.domain.enums import TransactionKind
+from fincontrol_core.errors import ValidationError
 
 ZERO = Decimal("0")
 
 
-class InsufficientQuantityError(ValueError):
+class InsufficientQuantityError(ValidationError):
     """Raised when a sell transaction exceeds the currently held quantity."""
+
+    code = "INSUFFICIENT_QUANTITY"
 
 
 @dataclass(frozen=True)

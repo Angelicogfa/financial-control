@@ -6,12 +6,15 @@ from collections.abc import Hashable, Mapping
 from dataclasses import dataclass
 
 from fincontrol_core.domain.enums import ARCA_LABELS, ArcaClass
+from fincontrol_core.errors import ValidationError
 
 _TOLERANCE = 0.01
 
 
-class InvalidTargetsError(ValueError):
+class InvalidTargetsError(ValidationError):
     """Raised when ARCA target weights do not sum to 100% or contain negative values."""
+
+    code = "INVALID_ARCA_TARGETS"
 
 
 @dataclass(frozen=True)
@@ -97,7 +100,7 @@ def distribute_by_targets[K: Hashable](
 ) -> dict[K, float]:
     """Distribute a new cash contribution prioritizing items furthest below target (no selling)."""
     if amount < 0:
-        raise ValueError("Contribution amount cannot be negative")
+        raise ValidationError("Contribution amount cannot be negative")
     keys = list(target_weights)
     result: dict[K, float] = {k: 0.0 for k in keys}
     if amount == 0 or not keys:

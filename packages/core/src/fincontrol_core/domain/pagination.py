@@ -6,6 +6,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from fincontrol_core.errors import ValidationError
+
 ALLOWED_SORT_ORDERS = frozenset({"asc", "desc"})
 
 
@@ -21,11 +23,11 @@ class PaginationParams:
 
     def __post_init__(self) -> None:
         if self.page < 1:
-            raise ValueError("page must be >= 1")
+            raise ValidationError("page must be >= 1")
         if self.page_size < 1 or self.page_size > 200:
-            raise ValueError("page_size must be between 1 and 200")
+            raise ValidationError("page_size must be between 1 and 200")
         if self.sort_order.lower() not in ALLOWED_SORT_ORDERS:
-            raise ValueError("sort_order must be 'asc' or 'desc'")
+            raise ValidationError("sort_order must be 'asc' or 'desc'")
 
     @property
     def offset(self) -> int:

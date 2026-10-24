@@ -27,6 +27,7 @@ from fincontrol_core.domain.enums import (
     AssetType,
     IntraClassStrategy,
 )
+from fincontrol_core.errors import ValidationError
 from fincontrol_core.market.models import Fundamentals, Quote, QuoteFreshness
 from fincontrol_core.portfolio.fixed_income import (
     FixedIncomeValuation,
@@ -524,7 +525,7 @@ def plan_contribution(
 ) -> ContributionPlan:
     """Build a 2-level contribution plan (Level 1: ARCA classes; Level 2: intra-class assets)."""
     if amount_brl < 0:
-        raise ValueError("Contribution amount cannot be negative")
+        raise ValidationError("Contribution amount cannot be negative")
 
     current_by_class = {a.arca_class: a.current_value for a in report.allocations}
     class_alloc_brl = distribute_by_targets(

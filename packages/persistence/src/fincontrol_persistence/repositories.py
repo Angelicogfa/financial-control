@@ -10,6 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from fincontrol_core.arca.allocation import InvalidTargetsError
 from fincontrol_core.domain.entities import (
     ArcaTargetEntity,
     AssetEntity,
@@ -20,6 +21,7 @@ from fincontrol_core.domain.entities import (
 )
 from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
+from fincontrol_core.errors import NotFoundError, ValidationError
 from fincontrol_core.ports.repositories import (
     AbstractArcaTargetRepository,
     AbstractAssetRepository,
@@ -108,7 +110,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
 
     def update(self, asset: AssetEntity) -> AssetEntity:
         if asset.id is None:
-            raise ValueError("Cannot update AssetEntity without id")
+            raise ValidationError("Cannot update AssetEntity without id")
         stmt = (
             select(AssetModel)
             .options(selectinload(AssetModel.fixed_income_term))
@@ -116,7 +118,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
         )
         model = self.session.scalar(stmt)
         if model is None:
-            raise LookupError(f"Asset id={asset.id} not found")
+            raise NotFoundError(f"Asset id={asset.id} not found")
 
         model.ticker = asset.ticker
         model.name = asset.name
@@ -430,7 +432,7 @@ class SqlAlchemyArcaTargetRepository(AbstractArcaTargetRepository):
     ) -> list[ArcaTargetEntity]:
         total = sum(targets.values(), Decimal("0"))
         if abs(total - Decimal("100")) > Decimal("0.01"):
-            raise ValueError(f"ARCA target percentages must sum to 100 (got {total})")
+            raise InvalidTargetsError(f"ARCA target percentages must sum to 100 (got {total})")
         stmt = select(ArcaTargetModel)
         existing = {row.arca_class: row for row in self.session.scalars(stmt).all()}
         result: list[ArcaTargetModel] = []

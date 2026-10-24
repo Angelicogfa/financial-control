@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fincontrol_core.arca.allocation import InvalidTargetsError
-from fincontrol_core.portfolio.positions import InsufficientQuantityError
+from fincontrol_core.errors import ConflictError, DomainError, NotFoundError, ValidationError
 
 from fincontrol_api.config import get_settings
 from fincontrol_api.controllers import (
@@ -17,6 +18,12 @@ from fincontrol_api.controllers import (
     settings_router,
     transactions_router,
 )
+
+logger = logging.getLogger("fincontrol_api")
+
+
+def _error_response(status_code: int, exc: DomainError) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"detail": exc.message, "code": exc.code})
 
 
 def create_app() -> FastAPI:
@@ -39,36 +46,24 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.exception_handler(LookupError)
-    async def lookup_error_handler(_request: Request, exc: LookupError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
+    @app.exception_handler(NotFoundError)
+    async def not_found_handler(_request: Request, exc: NotFoundError) -> JSONResponse:
+        return _error_response(status.HTTP_404_NOT_FOUND, exc)
 
-    @app.exception_handler(InsufficientQuantityError)
-    async def short_sell_error_handler(
-        _request: Request, exc: InsufficientQuantityError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc), "code": "INSUFFICIENT_QUANTITY"},
-        )
+    @app.exception_handler(ValidationError)
+    async def validation_error_handler(_request: Request, exc: ValidationError) -> JSONResponse:
+        return _error_response(status.HTTP_400_BAD_REQUEST, exc)
 
-    @app.exception_handler(InvalidTargetsError)
-    async def invalid_targets_error_handler(
-        _request: Request, exc: InvalidTargetsError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc), "code": "INVALID_ARCA_TARGETS"},
-        )
+    @app.exception_handler(ConflictError)
+    async def conflict_error_handler(_request: Request, exc: ConflictError) -> JSONResponse:
+        return _error_response(status.HTTP_409_CONFLICT, exc)
 
-    @app.exception_handler(ValueError)
-    async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
+    @app.exception_handler(Exception)
+    async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "Internal server error", "code": "INTERNAL_ERROR"},
         )
 
     api_prefix = "/api/v1"

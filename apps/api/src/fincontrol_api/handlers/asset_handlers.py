@@ -7,6 +7,7 @@ from dataclasses import replace
 
 from fincontrol_core.domain.entities import AssetEntity, FixedIncomeTermEntity
 from fincontrol_core.domain.pagination import PaginationParams
+from fincontrol_core.errors import ConflictError, NotFoundError
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 from fincontrol_api.handlers.serializers import (
@@ -62,14 +63,17 @@ class AssetHandler:
         with self.uow_factory() as uow:
             entity = uow.assets.get_by_id(asset_id)
             if entity is None:
-                raise LookupError(f"Asset id={asset_id} not found")
+                raise NotFoundError(f"Asset id={asset_id} not found")
             return to_asset_dto(entity)
 
     def create(self, req: AssetCreateRequest) -> AssetResponseDTO:
         with self.uow_factory() as uow:
             existing = uow.assets.get_by_ticker(req.ticker)
             if existing is not None:
-                raise ValueError(f"Asset with ticker '{req.ticker.upper()}' already exists")
+                raise ConflictError(
+                    f"Asset with ticker '{req.ticker.upper()}' already exists",
+                    code="DUPLICATE_TICKER",
+                )
 
             fi_term = None
             if req.fixed_income_term is not None:
@@ -106,7 +110,7 @@ class AssetHandler:
         with self.uow_factory() as uow:
             current = uow.assets.get_by_id(asset_id)
             if current is None:
-                raise LookupError(f"Asset id={asset_id} not found")
+                raise NotFoundError(f"Asset id={asset_id} not found")
 
             fi_term = current.fixed_income_term
             if req.fixed_income_term is not None:
@@ -157,7 +161,7 @@ class AssetHandler:
         with self.uow_factory() as uow:
             current = uow.assets.get_by_id(asset_id)
             if current is None:
-                raise LookupError(f"Asset id={asset_id} not found")
+                raise NotFoundError(f"Asset id={asset_id} not found")
             updated_entity = replace(
                 current,
                 use_cerrado=req.use_cerrado,
@@ -172,14 +176,14 @@ class AssetHandler:
         with self.uow_factory() as uow:
             found = uow.assets.delete(asset_id, hard=hard)
             if not found:
-                raise LookupError(f"Asset id={asset_id} not found")
+                raise NotFoundError(f"Asset id={asset_id} not found")
             uow.commit()
 
     def get_analysis(self, asset_id: int) -> AssetAnalysisResponseDTO:
         with self.uow_factory() as uow:
             asset = uow.assets.get_by_id(asset_id)
             if asset is None:
-                raise LookupError(f"Asset id={asset_id} not found")
+                raise NotFoundError(f"Asset id={asset_id} not found")
             raw = self.portfolio_service.analyze_single_asset(uow, asset)
             payload = to_asset_analysis_dto(asset, raw)
             return AssetAnalysisResponseDTO(**payload)
