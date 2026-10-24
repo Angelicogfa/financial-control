@@ -183,7 +183,6 @@ def test_i04_deleting_buy_that_backs_a_sell_is_rejected(api: SimpleNamespace) ->
     assert resp.status_code in (400, 409, 422)
 
 
-@_xfail("I-04", "one invalid ledger turns the whole portfolio endpoint into HTTP 400")
 def test_i04_invalid_ledger_does_not_break_portfolio(api: SimpleNamespace) -> None:
     _create_stock(api.client, "WEGE3")
     with api.uow_factory() as uow:

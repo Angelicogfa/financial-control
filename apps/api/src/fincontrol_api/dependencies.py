@@ -62,9 +62,12 @@ def get_market_gateway(
 
 def get_portfolio_service(
     gateway: CachedMarketGateway = Depends(get_market_gateway),
+    settings: AppSettings = Depends(get_settings),
 ) -> PortfolioApplicationService:
     """Provide the PortfolioApplicationService instance."""
-    return PortfolioApplicationService(gateway=gateway)
+    return PortfolioApplicationService(
+        gateway=gateway, assumptions=settings.projection_assumptions
+    )
 
 
 def get_asset_handler(

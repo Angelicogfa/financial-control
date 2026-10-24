@@ -40,14 +40,7 @@ IOF_TABLE = (
 )  # fmt: skip
 
 # Rows the current implementation is known to get wrong, keyed by (ticker, metric).
-KNOWN_FINDINGS: dict[tuple[str, str], str] = {
-    **{("VOO", m): "C-02" for m in ("invested_value_brl", "unrealized_pnl_brl")},
-    **{("VOO", "consolidated_pnl_brl"): "C-02"},
-    **{("BTC", m): "C-02" for m in ("invested_value_brl", "unrealized_pnl_brl")},
-    **{("BTC", "consolidated_pnl_brl"): "C-02"},
-    ("PORTFOLIO", "total_invested_brl"): "C-02",
-    ("PORTFOLIO", "total_consolidated_pnl_brl"): "C-02",
-}
+KNOWN_FINDINGS: dict[tuple[str, str], str] = {}
 
 
 def _d(raw: str) -> date:

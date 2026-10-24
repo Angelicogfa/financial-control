@@ -159,6 +159,7 @@ class EarningHandler:
                 net_amount=req.net_amount,
                 ex_date=req.ex_date,
                 notes=req.notes,
+                fx_rate=req.fx_rate,
             )
             saved = uow.earnings.add(entity)
             uow.commit()

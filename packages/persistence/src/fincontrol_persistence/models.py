@@ -186,6 +186,7 @@ class EarningModel(Base):
         CheckConstraint("gross_amount > 0", name="ck_earnings_gross_positive"),
         CheckConstraint("withholding_tax >= 0", name="ck_earnings_tax_non_negative"),
         CheckConstraint("net_amount >= 0", name="ck_earnings_net_non_negative"),
+        CheckConstraint("fx_rate > 0", name="ck_earnings_fx_rate_positive"),
         Index("ix_earnings_asset_payment_date", "asset_id", "payment_date"),
     )
 
@@ -201,6 +202,7 @@ class EarningModel(Base):
         Numeric(18, 6), nullable=False, default=Decimal("0")
     )
     net_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    fx_rate: Mapped[Decimal] = mapped_column(Numeric(14, 6), nullable=False, default=Decimal("1"))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now

@@ -113,6 +113,7 @@ def to_earning_dto(entity: EarningEntity, ticker: str | None = None) -> EarningR
     gross = float(entity.gross_amount)
     tax = float(entity.withholding_tax)
     net = float(entity.net_amount) if entity.net_amount is not None else (gross - tax)
+    fx = float(entity.fx_rate)
     return EarningResponseDTO(
         id=entity.id or 0,
         asset_id=entity.asset_id,
@@ -123,6 +124,8 @@ def to_earning_dto(entity: EarningEntity, ticker: str | None = None) -> EarningR
         gross_amount=gross,
         withholding_tax=tax,
         net_amount=net,
+        fx_rate=fx,
+        net_amount_brl=round(net * fx, 2),
         notes=entity.notes,
         created_at=entity.created_at,
     )
@@ -190,6 +193,10 @@ def to_valued_position_dto(pos: ValuedAssetPosition) -> ValuedPositionDTO:
         class_target_weight_pct=pos.class_target_weight_pct,
         class_current_weight_pct=pos.class_current_weight_pct,
         fixed_income_details=fi_dto,
+        fx_pnl_brl=pos.fx_pnl_brl,
+        custom_class_weight=pos.custom_class_weight,
+        ledger_status=pos.ledger_status,
+        ledger_message=pos.ledger_message,
     )
 
 
@@ -214,6 +221,8 @@ def to_portfolio_report_dto(report: ConsolidatedPortfolioReport) -> PortfolioRep
         allocations=[ClassAllocationDTO(**asdict(a)) for a in report.allocations],
         positions=[to_valued_position_dto(p) for p in report.positions],
         earnings_by_month=dict(report.earnings_by_month),
+        total_fx_pnl_brl=report.total_fx_pnl_brl,
+        projection_assumptions=dict(report.projection_assumptions),
     )
 
 

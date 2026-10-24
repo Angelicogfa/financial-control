@@ -1,10 +1,18 @@
-"""Portfolio valuation, yield estimation, P/L consolidation, and 2-level contribution planner."""
+"""Portfolio valuation, yield estimation, P/L consolidation, and 2-level contribution planner.
+
+Currency conventions (finding C-02): cost and realized P/L are converted with the FX of each
+trade, earnings with the FX of each payment, and open positions with the current FX. The
+difference between the current-FX cost and the historical-FX cost is reported as `fx_pnl_brl`.
+
+An asset whose ledger cannot be valued (oversell) is reported with `ledger_status=INVALID`
+and excluded from totals and allocations instead of failing the whole report (finding I-04).
+"""
 
 from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
@@ -26,6 +34,7 @@ from fincontrol_core.domain.enums import (
     ArcaClass,
     AssetType,
     IntraClassStrategy,
+    TransactionKind,
 )
 from fincontrol_core.errors import ValidationError
 from fincontrol_core.market.models import Fundamentals, Quote, QuoteFreshness
@@ -34,7 +43,30 @@ from fincontrol_core.portfolio.fixed_income import (
     RateCurves,
     value_fixed_income_position,
 )
-from fincontrol_core.portfolio.positions import PositionState, build_position
+from fincontrol_core.portfolio.positions import InsufficientQuantityError, build_position
+
+LEDGER_VALID = "VALID"
+LEDGER_INVALID = "INVALID"
+
+FIXED_INCOME_TYPES = frozenset({AssetType.FIXED_INCOME, AssetType.TREASURY})
+
+
+@dataclass(frozen=True)
+class ProjectionAssumptions:
+    """Forward-looking assumptions for 12-month projections (finding I-11).
+
+    Rates are annual fractions (ADR 0006). They are surfaced in every report so the user
+    always sees which premises produced a projection.
+    """
+
+    equity_capital_growth_rate: float = 0.08
+    fund_capital_growth_rate: float = 0.10
+    real_estate_default_yield_rate: float = 0.085
+    cash_cdi_multiplier: float = 1.0
+    cash_income_tax_rate: float = 0.175
+
+    def as_dict(self) -> dict[str, float]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -72,6 +104,10 @@ class ValuedAssetPosition:
     class_target_weight_pct: float = 0.0
     class_current_weight_pct: float = 0.0
     fixed_income_details: FixedIncomeValuation | None = None
+    fx_pnl_brl: float = 0.0
+    custom_class_weight: float | None = None
+    ledger_status: str = LEDGER_VALID
+    ledger_message: str | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +133,8 @@ class ConsolidatedPortfolioReport:
     allocations: list[ClassAllocation]
     positions: list[ValuedAssetPosition]
     earnings_by_month: dict[str, float] = field(default_factory=dict)
+    total_fx_pnl_brl: float = 0.0
+    projection_assumptions: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -130,11 +168,34 @@ class ContributionPlan:
     projected_allocations: list[ClassAllocation]
 
 
+@dataclass
+class _Valuation:
+    """Intermediate per-asset numbers before intra-class weights are known."""
+
+    asset: AssetEntity
+    qty: float = 0.0
+    avg_price: float = 0.0
+    unit_price: float = 0.0
+    fx: float = 1.0
+    freshness: QuoteFreshness = QuoteFreshness.FALLBACK
+    invested_brl: float = 0.0
+    gross_brl: float = 0.0
+    tax_brl: float = 0.0
+    current_brl: float = 0.0
+    realized_brl: float = 0.0
+    fx_pnl_brl: float = 0.0
+    fi_val: FixedIncomeValuation | None = None
+    ledger_message: str | None = None
+
+    @property
+    def is_valid(self) -> bool:
+        return self.ledger_message is None
+
+
 def _sum_earnings(
     earnings: Iterable[EarningEntity],
     *,
     as_of_date: date,
-    fx_rate: float,
     date_from: date | None = None,
 ) -> tuple[float, float, dict[str, float]]:
     total_net = 0.0
@@ -147,7 +208,7 @@ def _sum_earnings(
             continue
         if date_from is not None and e.payment_date < date_from:
             continue
-        net_val = float(e.net_amount or (e.gross_amount - e.withholding_tax)) * fx_rate
+        net_val = float(e.net_amount or (e.gross_amount - e.withholding_tax)) * float(e.fx_rate)
         total_net += net_val
         if e.payment_date >= trailing_12m_cutoff:
             earnings_12m += net_val
@@ -155,6 +216,10 @@ def _sum_earnings(
         by_month[month_key] = round(by_month.get(month_key, 0.0) + net_val, 2)
 
     return round(total_net, 2), round(earnings_12m, 2), by_month
+
+
+def _pct(value: float, base: float) -> float:
+    return round(value / base * 100.0, 4) if base > 0 else 0.0
 
 
 def _estimate_yield_and_projection_by_type(
@@ -168,72 +233,115 @@ def _estimate_yield_and_projection_by_type(
     fundamentals: Fundamentals | None,
     fi_valuation: FixedIncomeValuation | None,
     annual_cdi_rate: float,
+    assumptions: ProjectionAssumptions,
 ) -> tuple[float, float, str, float]:
     """Compute estimated yield to date and 12m projection tailored to the specific AssetType."""
     atype = asset.asset_type
 
-    if atype in (AssetType.FIXED_INCOME, AssetType.TREASURY) and fi_valuation is not None:
+    if atype in FIXED_INCOME_TYPES and fi_valuation is not None:
         basis = (
             f"Fixed Income Curve ({asset.fixed_income_term.indexer.value})"
             if asset.fixed_income_term
             else "Fixed Income"
         )
         est_brl = fi_valuation.net_yield + received_earnings_brl
-        est_pct = (est_brl / invested_brl * 100.0) if invested_brl > 0 else 0.0
         return (
             round(est_brl, 2),
-            round(est_pct, 4),
+            _pct(est_brl, invested_brl),
             basis,
             round(fi_valuation.projected_12m_net_yield, 2),
         )
 
+    est_brl = unrealized_brl + received_earnings_brl
+    est_pct = _pct(est_brl, invested_brl)
+
     if atype == AssetType.CASH:
-        est_brl = unrealized_brl + received_earnings_brl
-        est_pct = (est_brl / invested_brl * 100.0) if invested_brl > 0 else 0.0
-        proj_12m = current_net_brl * annual_cdi_rate * 0.825
-        return (
-            round(est_brl, 2),
-            round(est_pct, 4),
-            "Cash / Daily Liquidity (CDI)",
-            round(proj_12m, 2),
+        proj_12m = (
+            current_net_brl
+            * annual_cdi_rate
+            * assumptions.cash_cdi_multiplier
+            * (1.0 - assumptions.cash_income_tax_rate)
         )
+        return round(est_brl, 2), est_pct, "Cash / Daily Liquidity (CDI)", round(proj_12m, 2)
 
     dy = fundamentals.dividend_yield if fundamentals and fundamentals.dividend_yield else 0.0
     expected_div_12m = max(earnings_12m_brl, current_net_brl * dy)
 
     if atype in (AssetType.FII, AssetType.REIT):
-        est_brl = unrealized_brl + received_earnings_brl
-        est_pct = (est_brl / invested_brl * 100.0) if invested_brl > 0 else 0.0
-        proj_12m = expected_div_12m if expected_div_12m > 0 else current_net_brl * 0.085
+        proj_12m = (
+            expected_div_12m
+            if expected_div_12m > 0
+            else current_net_brl * assumptions.real_estate_default_yield_rate
+        )
         return (
             round(est_brl, 2),
-            round(est_pct, 4),
+            est_pct,
             "Quota Appreciation + Tax-Exempt Real Estate Distributions",
             round(proj_12m, 2),
         )
 
     if atype in (AssetType.STOCK_BR, AssetType.STOCK_INTL, AssetType.BDR):
-        est_brl = unrealized_brl + received_earnings_brl
-        est_pct = (est_brl / invested_brl * 100.0) if invested_brl > 0 else 0.0
-        cap_growth = current_net_brl * 0.08
-        proj_12m = expected_div_12m + cap_growth
+        proj_12m = expected_div_12m + current_net_brl * assumptions.equity_capital_growth_rate
         return (
             round(est_brl, 2),
-            round(est_pct, 4),
+            est_pct,
             "Price Appreciation + Dividends/JCP + Yield on Cost",
             round(proj_12m, 2),
         )
 
     # ETF_BR, ETF_INTL, CRYPTO
-    est_brl = unrealized_brl + received_earnings_brl
-    est_pct = (est_brl / invested_brl * 100.0) if invested_brl > 0 else 0.0
-    proj_12m = current_net_brl * 0.10
+    proj_12m = current_net_brl * assumptions.fund_capital_growth_rate
     return (
         round(est_brl, 2),
-        round(est_pct, 4),
+        est_pct,
         "Market Price Appreciation (BRL Adjusted)",
         round(proj_12m, 2),
     )
+
+
+def _value_fixed_income(v: _Valuation, ref_date: date, curves: RateCurves) -> None:
+    asset = v.asset
+    assert asset.fixed_income_term is not None
+    v.fi_val = value_fixed_income_position(
+        asset.transactions, asset.fixed_income_term, ref_date, curves=curves
+    )
+    open_qty = sum(
+        float(t.quantity) if t.kind == TransactionKind.BUY else -float(t.quantity)
+        for t in asset.transactions
+        if t.trade_date <= ref_date
+    )
+    v.qty = max(open_qty, 0.0) if v.fi_val.invested_principal > 0 else 0.0
+    v.invested_brl = v.fi_val.invested_principal
+    v.avg_price = v.invested_brl / v.qty if v.qty > 0 else v.invested_brl
+    v.gross_brl = v.fi_val.gross_value
+    v.tax_brl = round(v.fi_val.iof_tax + v.fi_val.income_tax, 2)
+    v.current_brl = v.fi_val.net_value
+    v.realized_brl = v.fi_val.realized_pnl
+    v.unit_price = v.current_brl / v.qty if v.qty > 0 else v.current_brl
+    v.freshness = QuoteFreshness.CURVE
+
+
+def _value_market_asset(
+    v: _Valuation, ref_date: date, quote: Quote | None, usd_brl_rate: float
+) -> None:
+    asset = v.asset
+    pos = build_position(asset.transactions, up_to_date=ref_date)
+    v.fx = usd_brl_rate if (asset.currency or "BRL").upper() == "USD" else 1.0
+    v.qty = float(pos.quantity)
+    v.avg_price = float(pos.average_price)
+    v.invested_brl = round(float(pos.total_cost_brl), 2)
+    v.realized_brl = round(float(pos.realized_pnl_brl), 2)
+
+    if quote is not None:
+        v.unit_price, v.freshness = float(quote.price), quote.freshness
+    elif asset.manual_price is not None:
+        v.unit_price, v.freshness = float(asset.manual_price), QuoteFreshness.MANUAL
+    else:
+        v.unit_price, v.freshness = v.avg_price, QuoteFreshness.FALLBACK
+
+    v.gross_brl = round(v.qty * v.unit_price * v.fx, 2)
+    v.current_brl = v.gross_brl
+    v.fx_pnl_brl = round(float(pos.total_cost) * v.fx - float(pos.total_cost_brl), 2)
 
 
 def consolidate_portfolio(
@@ -245,223 +353,108 @@ def consolidate_portfolio(
     intra_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
     usd_brl_rate: float = 5.0,
     curves: RateCurves | None = None,
+    assumptions: ProjectionAssumptions | None = None,
     as_of_date: date | None = None,
     date_from: date | None = None,
 ) -> ConsolidatedPortfolioReport:
     """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations."""
     ref_date = as_of_date or date.today()
     rate_curves = curves or RateCurves()
+    premises = assumptions or ProjectionAssumptions()
     quotes_map = quotes or {}
     fund_map = fundamentals_by_ticker or {}
     strategy_map = intra_strategies or {}
 
-    raw_positions: list[dict[str, Any]] = []
-    combined_earnings_by_month: dict[str, float] = {}
-
+    valuations: list[_Valuation] = []
     for asset in assets:
         if not asset.is_active:
             continue
+        v = _Valuation(asset=asset)
+        try:
+            if asset.asset_type in FIXED_INCOME_TYPES and asset.fixed_income_term is not None:
+                _value_fixed_income(v, ref_date, rate_curves)
+            else:
+                _value_market_asset(v, ref_date, quotes_map.get(asset.ticker), usd_brl_rate)
+        except InsufficientQuantityError as err:
+            v = _Valuation(asset=asset, ledger_message=str(err))
+        valuations.append(v)
 
-        pos_state: PositionState = build_position(asset.transactions, up_to_date=ref_date)
-        fx = usd_brl_rate if (asset.currency or "BRL").upper() == "USD" else 1.0
+    combined_earnings_by_month: dict[str, float] = {}
+    rows: list[dict[str, Any]] = []
+    for v in valuations:
+        asset = v.asset
         fund = fund_map.get(asset.ticker)
         cerrado_eval = evaluate(
-            asset.asset_type,
-            asset.cerrado_answers,
-            fund,
-            use_cerrado=asset.use_cerrado,
+            asset.asset_type, asset.cerrado_answers, fund, use_cerrado=asset.use_cerrado
         )
-
-        received_earnings_brl, earnings_12m_brl, asset_monthly = _sum_earnings(
-            asset.earnings,
-            as_of_date=ref_date,
-            fx_rate=fx,
-            date_from=date_from,
+        received_brl, earnings_12m_brl, monthly = (
+            _sum_earnings(asset.earnings, as_of_date=ref_date, date_from=date_from)
+            if v.is_valid
+            else (0.0, 0.0, {})
         )
-        for m_key, m_val in asset_monthly.items():
+        for m_key, m_val in monthly.items():
             combined_earnings_by_month[m_key] = round(
                 combined_earnings_by_month.get(m_key, 0.0) + m_val, 2
             )
 
-        qty = float(pos_state.quantity)
-        avg_price = float(pos_state.average_price)
-        invested_brl = round(float(pos_state.total_cost) * fx, 2)
-        realized_brl = round(float(pos_state.realized_pnl) * fx, 2)
-
-        fi_val: FixedIncomeValuation | None = None
-        if (
-            asset.asset_type in (AssetType.FIXED_INCOME, AssetType.TREASURY)
-            and asset.fixed_income_term is not None
-        ):
-            fi_val = value_fixed_income_position(
-                asset.transactions,
-                asset.fixed_income_term,
-                ref_date,
-                curves=rate_curves,
-            )
-            realized_brl = fi_val.realized_pnl
-            invested_brl = fi_val.invested_principal
-            gross_brl = fi_val.gross_value
-            tax_brl = round(fi_val.iof_tax + fi_val.income_tax, 2)
-            current_brl = fi_val.net_value
-            unit_price = (current_brl / qty) if qty > 0 else avg_price
-            freshness = QuoteFreshness.CURVE
-        else:
-            quote = quotes_map.get(asset.ticker)
-            if quote is not None:
-                unit_price = float(quote.price)
-                freshness = quote.freshness
-            elif asset.manual_price is not None:
-                unit_price = float(asset.manual_price)
-                freshness = QuoteFreshness.MANUAL
-            else:
-                unit_price = avg_price
-                freshness = QuoteFreshness.FALLBACK
-
-            gross_brl = round(qty * unit_price * fx, 2)
-            tax_brl = 0.0
-            current_brl = gross_brl
-
-        unrealized_brl = round(current_brl - invested_brl, 2)
-        unrealized_pct = (
-            round(unrealized_brl / invested_brl * 100.0, 4) if invested_brl > 0 else 0.0
-        )
-        yoc_pct = (
-            round(earnings_12m_brl / invested_brl * 100.0, 4) if invested_brl > 0 else 0.0
-        )
-
-        est_yield_brl, est_yield_pct, est_basis, proj_12m_brl = (
+        unrealized_brl = round(v.current_brl - v.invested_brl, 2)
+        est_brl, est_pct, est_basis, proj_12m = (
             _estimate_yield_and_projection_by_type(
                 asset,
-                invested_brl=invested_brl,
-                current_net_brl=current_brl,
+                invested_brl=v.invested_brl,
+                current_net_brl=v.current_brl,
                 unrealized_brl=unrealized_brl,
-                received_earnings_brl=received_earnings_brl,
+                received_earnings_brl=received_brl,
                 earnings_12m_brl=earnings_12m_brl,
                 fundamentals=fund,
-                fi_valuation=fi_val,
+                fi_valuation=v.fi_val,
                 annual_cdi_rate=rate_curves.annual_cdi_rate,
+                assumptions=premises,
             )
+            if v.is_valid
+            else (0.0, 0.0, "Invalid ledger", 0.0)
         )
-
-        consolidated_pnl_brl = round(unrealized_brl + realized_brl + received_earnings_brl, 2)
-        denom = invested_brl if invested_brl > 0 else 0.0
-        consolidated_return_pct = (
-            round(consolidated_pnl_brl / denom * 100.0, 4) if denom > 0 else 0.0
-        )
-
-        raw_positions.append(
+        consolidated = round(unrealized_brl + v.realized_brl + received_brl, 2)
+        rows.append(
             {
-                "asset": asset,
-                "qty": qty,
-                "avg_price": avg_price,
-                "unit_price": unit_price,
-                "fx": fx,
-                "freshness": freshness,
-                "invested_brl": invested_brl,
-                "gross_brl": gross_brl,
-                "tax_brl": tax_brl,
-                "current_brl": current_brl,
-                "unrealized_brl": unrealized_brl,
-                "unrealized_pct": unrealized_pct,
-                "realized_brl": realized_brl,
-                "received_earnings_brl": received_earnings_brl,
-                "earnings_12m_brl": earnings_12m_brl,
-                "yoc_pct": yoc_pct,
-                "est_yield_brl": est_yield_brl,
-                "est_yield_pct": est_yield_pct,
+                "v": v,
+                "cerrado": cerrado_eval,
+                "received": received_brl,
+                "earnings_12m": earnings_12m_brl,
+                "unrealized": unrealized_brl,
+                "est_brl": est_brl,
+                "est_pct": est_pct,
                 "est_basis": est_basis,
-                "proj_12m_brl": proj_12m_brl,
-                "consolidated_pnl_brl": consolidated_pnl_brl,
-                "consolidated_return_pct": consolidated_return_pct,
-                "cerrado_eval": cerrado_eval,
-                "fi_val": fi_val,
+                "proj_12m": proj_12m,
+                "consolidated": consolidated,
             }
         )
 
-    # Resolve intra-class target weights and current weights per ARCA class
-    valued_positions: list[ValuedAssetPosition] = []
-    values_by_class: dict[ArcaClass, float] = {c: 0.0 for c in ArcaClass}
-    invested_by_class: dict[ArcaClass, float] = {c: 0.0 for c in ArcaClass}
-    cons_pnl_by_class: dict[ArcaClass, float] = {c: 0.0 for c in ArcaClass}
+    positions: list[ValuedAssetPosition] = []
+    values_by_class: dict[ArcaClass, float] = dict.fromkeys(ArcaClass, 0.0)
+    invested_by_class: dict[ArcaClass, float] = dict.fromkeys(ArcaClass, 0.0)
+    cons_pnl_by_class: dict[ArcaClass, float] = dict.fromkeys(ArcaClass, 0.0)
 
     for arca_class in ArcaClass:
-        class_items = [
-            item for item in raw_positions if item["asset"].arca_class == arca_class
-        ]
-        if not class_items:
+        class_rows = [r for r in rows if r["v"].asset.arca_class == arca_class]
+        if not class_rows:
             continue
-        class_total_val = sum(item["current_brl"] for item in class_items)
-        values_by_class[arca_class] = round(class_total_val, 2)
-        invested_by_class[arca_class] = round(
-            sum(item["invested_brl"] for item in class_items), 2
-        )
-        cons_pnl_by_class[arca_class] = round(
-            sum(item["consolidated_pnl_brl"] for item in class_items), 2
-        )
+        valid_rows = [r for r in class_rows if r["v"].is_valid]
+        class_total = sum(r["v"].current_brl for r in valid_rows)
+        values_by_class[arca_class] = round(class_total, 2)
+        invested_by_class[arca_class] = round(sum(r["v"].invested_brl for r in valid_rows), 2)
+        cons_pnl_by_class[arca_class] = round(sum(r["consolidated"] for r in valid_rows), 2)
 
-        strategy = strategy_map.get(arca_class, IntraClassStrategy.CERRADO)
-        keys = [item["asset"].ticker for item in class_items]
-        scores = {item["asset"].ticker: item["cerrado_eval"].score for item in class_items}
-        enabled = {item["asset"].ticker: item["asset"].use_cerrado for item in class_items}
-        manuals = {
-            item["asset"].ticker: (
-                float(item["asset"].custom_class_weight)
-                if item["asset"].custom_class_weight is not None
-                else None
-            )
-            for item in class_items
-        }
         target_weights = resolve_intra_class_weights(
-            strategy,
-            keys,
-            cerrado_scores=scores,
-            cerrado_enabled=enabled,
-            manual_weights=manuals,
+            strategy_map.get(arca_class, IntraClassStrategy.CERRADO),
+            [r["v"].asset.ticker for r in valid_rows],
+            cerrado_scores={r["v"].asset.ticker: r["cerrado"].score for r in valid_rows},
+            cerrado_enabled={r["v"].asset.ticker: r["v"].asset.use_cerrado for r in valid_rows},
+            manual_weights={r["v"].asset.ticker: _custom_weight(r["v"].asset) for r in valid_rows},
         )
-
-        for item in class_items:
-            a: AssetEntity = item["asset"]
-            cur_w_pct = (
-                round(item["current_brl"] / class_total_val * 100.0, 4)
-                if class_total_val > 0
-                else 0.0
-            )
-            tgt_w_pct = round(target_weights.get(a.ticker, 0.0) * 100.0, 4)
-            valued_positions.append(
-                ValuedAssetPosition(
-                    asset_id=a.id or 0,
-                    ticker=a.ticker,
-                    name=a.name,
-                    asset_type=a.asset_type,
-                    arca_class=a.arca_class or ArcaClass.ACOES,
-                    currency=a.currency or "BRL",
-                    quantity=round(item["qty"], 8),
-                    average_price=round(item["avg_price"], 4),
-                    current_unit_price=round(item["unit_price"], 4),
-                    fx_rate=round(item["fx"], 4),
-                    price_freshness=item["freshness"],
-                    invested_value_brl=item["invested_brl"],
-                    gross_current_value_brl=item["gross_brl"],
-                    estimated_tax_brl=item["tax_brl"],
-                    current_value_brl=item["current_brl"],
-                    unrealized_pnl_brl=item["unrealized_brl"],
-                    unrealized_pnl_pct=item["unrealized_pct"],
-                    realized_pnl_brl=item["realized_brl"],
-                    received_earnings_brl=item["received_earnings_brl"],
-                    earnings_12m_brl=item["earnings_12m_brl"],
-                    yield_on_cost_pct=item["yoc_pct"],
-                    estimated_yield_to_date_brl=item["est_yield_brl"],
-                    estimated_yield_to_date_pct=item["est_yield_pct"],
-                    estimated_yield_basis=item["est_basis"],
-                    projected_12m_yield_brl=item["proj_12m_brl"],
-                    consolidated_pnl_brl=item["consolidated_pnl_brl"],
-                    consolidated_return_pct=item["consolidated_return_pct"],
-                    cerrado_evaluation=item["cerrado_eval"],
-                    class_target_weight_pct=tgt_w_pct,
-                    class_current_weight_pct=cur_w_pct,
-                    fixed_income_details=item["fi_val"],
-                )
+        for r in class_rows:
+            positions.append(
+                _to_position(r, class_total, target_weights.get(r["v"].asset.ticker, 0.0))
             )
 
     allocations = compute_allocation(
@@ -471,48 +464,174 @@ def consolidate_portfolio(
         consolidated_pnl_by_class=cons_pnl_by_class,
     )
 
-    total_invested = round(sum(p.invested_value_brl for p in valued_positions), 2)
-    total_gross = round(sum(p.gross_current_value_brl for p in valued_positions), 2)
-    total_tax = round(sum(p.estimated_tax_brl for p in valued_positions), 2)
-    total_current = round(sum(p.current_value_brl for p in valued_positions), 2)
+    valid = [p for p in positions if p.ledger_status == LEDGER_VALID]
+    total_invested = round(sum(p.invested_value_brl for p in valid), 2)
+    total_current = round(sum(p.current_value_brl for p in valid), 2)
     total_unrealized = round(total_current - total_invested, 2)
-    total_unrealized_pct = (
-        round(total_unrealized / total_invested * 100.0, 4) if total_invested > 0 else 0.0
-    )
-    total_realized = round(sum(p.realized_pnl_brl for p in valued_positions), 2)
-    total_earnings = round(sum(p.received_earnings_brl for p in valued_positions), 2)
-    total_earnings_12m = round(sum(p.earnings_12m_brl for p in valued_positions), 2)
-    portfolio_yoc = (
-        round(total_earnings_12m / total_invested * 100.0, 4) if total_invested > 0 else 0.0
-    )
-    total_est_yield = round(sum(p.estimated_yield_to_date_brl for p in valued_positions), 2)
-    total_proj_12m = round(sum(p.projected_12m_yield_brl for p in valued_positions), 2)
+    total_realized = round(sum(p.realized_pnl_brl for p in valid), 2)
+    total_earnings = round(sum(p.received_earnings_brl for p in valid), 2)
+    total_earnings_12m = round(sum(p.earnings_12m_brl for p in valid), 2)
+    total_proj_12m = round(sum(p.projected_12m_yield_brl for p in valid), 2)
     total_consolidated = round(total_unrealized + total_realized + total_earnings, 2)
-    total_consolidated_pct = (
-        round(total_consolidated / total_invested * 100.0, 4) if total_invested > 0 else 0.0
-    )
 
     return ConsolidatedPortfolioReport(
         as_of_date=ref_date,
         total_invested_brl=total_invested,
-        total_gross_value_brl=total_gross,
-        total_estimated_tax_brl=total_tax,
+        total_gross_value_brl=round(sum(p.gross_current_value_brl for p in valid), 2),
+        total_estimated_tax_brl=round(sum(p.estimated_tax_brl for p in valid), 2),
         total_current_value_brl=total_current,
         total_unrealized_pnl_brl=total_unrealized,
-        total_unrealized_pnl_pct=total_unrealized_pct,
+        total_unrealized_pnl_pct=_pct(total_unrealized, total_invested),
         total_realized_pnl_brl=total_realized,
         total_received_earnings_brl=total_earnings,
         total_earnings_12m_brl=total_earnings_12m,
-        portfolio_yield_on_cost_pct=portfolio_yoc,
-        total_estimated_yield_to_date_brl=total_est_yield,
+        portfolio_yield_on_cost_pct=_pct(total_earnings_12m, total_invested),
+        total_estimated_yield_to_date_brl=round(
+            sum(p.estimated_yield_to_date_brl for p in valid), 2
+        ),
         total_projected_12m_yield_brl=total_proj_12m,
         total_projected_12m_value_brl=round(total_current + total_proj_12m, 2),
         total_consolidated_pnl_brl=total_consolidated,
-        total_consolidated_return_pct=total_consolidated_pct,
+        total_consolidated_return_pct=_pct(total_consolidated, total_invested),
         allocations=allocations,
-        positions=valued_positions,
+        positions=positions,
         earnings_by_month=dict(sorted(combined_earnings_by_month.items())),
+        total_fx_pnl_brl=round(sum(p.fx_pnl_brl for p in valid), 2),
+        projection_assumptions=premises.as_dict(),
     )
+
+
+def _custom_weight(asset: AssetEntity) -> float | None:
+    return float(asset.custom_class_weight) if asset.custom_class_weight is not None else None
+
+
+def _to_position(
+    row: dict[str, Any], class_total: float, target_weight: float
+) -> ValuedAssetPosition:
+    v: _Valuation = row["v"]
+    a = v.asset
+    return ValuedAssetPosition(
+        asset_id=a.id or 0,
+        ticker=a.ticker,
+        name=a.name,
+        asset_type=a.asset_type,
+        arca_class=a.arca_class or ArcaClass.ACOES,
+        currency=a.currency or "BRL",
+        quantity=round(v.qty, 8),
+        average_price=round(v.avg_price, 4),
+        current_unit_price=round(v.unit_price, 4),
+        fx_rate=round(v.fx, 4),
+        price_freshness=v.freshness,
+        invested_value_brl=v.invested_brl,
+        gross_current_value_brl=v.gross_brl,
+        estimated_tax_brl=v.tax_brl,
+        current_value_brl=v.current_brl,
+        unrealized_pnl_brl=row["unrealized"],
+        unrealized_pnl_pct=_pct(row["unrealized"], v.invested_brl),
+        realized_pnl_brl=v.realized_brl,
+        received_earnings_brl=row["received"],
+        earnings_12m_brl=row["earnings_12m"],
+        yield_on_cost_pct=_pct(row["earnings_12m"], v.invested_brl),
+        estimated_yield_to_date_brl=row["est_brl"],
+        estimated_yield_to_date_pct=row["est_pct"],
+        estimated_yield_basis=row["est_basis"],
+        projected_12m_yield_brl=row["proj_12m"],
+        consolidated_pnl_brl=row["consolidated"],
+        consolidated_return_pct=_pct(row["consolidated"], v.invested_brl),
+        cerrado_evaluation=row["cerrado"],
+        class_target_weight_pct=round(target_weight * 100.0, 4),
+        class_current_weight_pct=(_pct(v.current_brl, class_total) if v.is_valid else 0.0),
+        fixed_income_details=v.fi_val,
+        fx_pnl_brl=v.fx_pnl_brl,
+        custom_class_weight=_custom_weight(a),
+        ledger_status=LEDGER_VALID if v.is_valid else LEDGER_INVALID,
+        ledger_message=v.ledger_message,
+    )
+
+
+@dataclass
+class _DraftOrder:
+    pos: ValuedAssetPosition
+    weight: float
+    budget: float
+    unit_brl: float
+    qty: float = 0.0
+    executed: float = 0.0
+
+    @property
+    def is_integer(self) -> bool:
+        return self.pos.asset_type in INTEGER_QUANTITY_TYPES
+
+    @property
+    def can_buy(self) -> bool:
+        return self.unit_brl > 0 and self.weight > 0
+
+
+def _class_weights(
+    class_positions: list[ValuedAssetPosition], strategy_override: IntraClassStrategy | None
+) -> dict[str, float]:
+    if strategy_override is not None:
+        return resolve_intra_class_weights(
+            strategy_override,
+            [p.ticker for p in class_positions],
+            cerrado_scores={p.ticker: p.cerrado_evaluation.score for p in class_positions},
+            cerrado_enabled={p.ticker: p.cerrado_evaluation.use_cerrado for p in class_positions},
+            manual_weights={p.ticker: p.custom_class_weight for p in class_positions},
+        )
+    weights = {p.ticker: max(p.class_target_weight_pct / 100.0, 0.0) for p in class_positions}
+    if sum(weights.values()) <= 0:
+        return {p.ticker: 1.0 / len(class_positions) for p in class_positions}
+    return weights
+
+
+def _fill(order: _DraftOrder, amount: float) -> float:
+    """Spend up to `amount` on `order`; return what was actually spent."""
+    if not order.can_buy or amount <= 0:
+        return 0.0
+    if order.is_integer:
+        units = math.floor(amount / order.unit_brl + 1e-9)
+        spent = units * order.unit_brl
+        order.qty += units
+    else:
+        spent = amount
+        order.qty += amount / order.unit_brl
+    order.executed += spent
+    return spent
+
+
+def _redistribute_leftover(
+    drafts: dict[ArcaClass, list[_DraftOrder]],
+    projected: dict[ArcaClass, float],
+    targets: ArcaTargets,
+    leftover: float,
+) -> float:
+    """Spend rounding leftovers on the classes furthest below target (finding A-04)."""
+    while leftover > 0.005:
+        total_after = sum(projected.values()) + leftover
+        ranked = sorted(
+            (c for c in ArcaClass if targets.fraction(c) > 0 and drafts.get(c)),
+            key=lambda c: projected[c] - targets.fraction(c) * total_after,
+        )
+        progressed = False
+        for arca_class in ranked:
+            candidates = sorted(
+                (o for o in drafts[arca_class] if o.can_buy),
+                key=lambda o: (o.is_integer, -o.weight, o.unit_brl),
+            )
+            for order in candidates:
+                if order.is_integer and order.unit_brl > leftover:
+                    continue
+                spent = _fill(order, order.unit_brl if order.is_integer else leftover)
+                if spent > 0:
+                    leftover -= spent
+                    projected[arca_class] += spent
+                    progressed = True
+                    break
+            if progressed:
+                break
+        if not progressed:
+            break
+    return leftover
 
 
 def plan_contribution(
@@ -527,127 +646,69 @@ def plan_contribution(
         raise ValidationError("Contribution amount cannot be negative")
 
     current_by_class = {a.arca_class: a.current_value for a in report.allocations}
-    class_alloc_brl = distribute_by_targets(
-        current_by_class,
-        targets.as_fractions(),
-        amount_brl,
-    )
+    class_alloc_brl = distribute_by_targets(current_by_class, targets.as_fractions(), amount_brl)
 
-    orders: list[AssetContributionOrder] = []
-    projected_by_class = dict(current_by_class)
-    executed_total = 0.0
-
+    drafts: dict[ArcaClass, list[_DraftOrder]] = {}
+    projected = dict(current_by_class)
+    leftover = 0.0
     for arca_class in ArcaClass:
         class_budget = class_alloc_brl.get(arca_class, 0.0)
-        if class_budget <= 0:
+        class_positions = [
+            p
+            for p in report.positions
+            if p.arca_class == arca_class and p.ledger_status == LEDGER_VALID
+        ]
+        if class_budget <= 0 or not class_positions:
+            leftover += max(class_budget, 0.0)
             continue
 
-        class_positions = [p for p in report.positions if p.arca_class == arca_class]
-        if not class_positions:
-            continue
-
-        if strategy_override is not None:
-            weights_map = resolve_intra_class_weights(
-                strategy_override,
-                [p.ticker for p in class_positions],
-                cerrado_scores={p.ticker: p.cerrado_evaluation.score for p in class_positions},
-                cerrado_enabled={
-                    p.ticker: p.cerrado_evaluation.use_cerrado for p in class_positions
-                },
-                manual_weights={
-                    p.ticker: p.class_target_weight_pct for p in class_positions
-                },
-            )
-        else:
-            weights_map = {
-                p.ticker: max(p.class_target_weight_pct / 100.0, 0.0) for p in class_positions
-            }
-            if sum(weights_map.values()) <= 0:
-                weights_map = {p.ticker: 1.0 / len(class_positions) for p in class_positions}
-
-        current_asset_values = {p.ticker: p.current_value_brl for p in class_positions}
-        asset_budgets = distribute_by_targets(current_asset_values, weights_map, class_budget)
-
-        class_leftover = 0.0
-        temp_orders: list[dict[str, Any]] = []
-
-        for pos in class_positions:
-            raw_budget = asset_budgets.get(pos.ticker, 0.0)
-            unit_brl = max(pos.current_unit_price * pos.fx_rate, 0.0)
-            if unit_brl <= 0 or raw_budget <= 0:
-                qty = 0.0
-                exec_brl = 0.0
-            elif pos.asset_type in INTEGER_QUANTITY_TYPES:
-                qty = float(math.floor(raw_budget / unit_brl))
-                exec_brl = qty * unit_brl
-                class_leftover += raw_budget - exec_brl
-            else:
-                qty = round(raw_budget / unit_brl, 6)
-                exec_brl = round(raw_budget, 2)
-
-            temp_orders.append(
-                {
-                    "pos": pos,
-                    "weight_pct": round(weights_map.get(pos.ticker, 0.0) * 100.0, 2),
-                    "raw_budget": round(raw_budget, 2),
-                    "unit_brl": round(unit_brl, 2),
-                    "qty": qty,
-                    "exec_brl": exec_brl,
-                }
-            )
-
-        # Redistribute integer rounding leftover to highest-weight integer assets that fit
-        integer_candidates = sorted(
-            [
-                o
-                for o in temp_orders
-                if o["pos"].asset_type in INTEGER_QUANTITY_TYPES
-                and o["unit_brl"] > 0
-                and o["weight_pct"] > 0
-            ],
-            key=lambda o: (-o["weight_pct"], o["unit_brl"]),
+        weights = _class_weights(class_positions, strategy_override)
+        budgets = distribute_by_targets(
+            {p.ticker: p.current_value_brl for p in class_positions}, weights, class_budget
         )
-        made_progress = True
-        while made_progress and class_leftover > 0:
-            made_progress = False
-            for cand in integer_candidates:
-                if class_leftover >= cand["unit_brl"]:
-                    cand["qty"] += 1.0
-                    cand["exec_brl"] += cand["unit_brl"]
-                    class_leftover -= cand["unit_brl"]
-                    made_progress = True
-
-        for o in temp_orders:
-            pos = o["pos"]
-            exec_brl = round(o["exec_brl"], 2)
-            executed_total += exec_brl
-            projected_by_class[arca_class] = round(
-                projected_by_class.get(arca_class, 0.0) + exec_brl, 2
+        drafts[arca_class] = [
+            _DraftOrder(
+                pos=p,
+                weight=weights.get(p.ticker, 0.0),
+                budget=budgets.get(p.ticker, 0.0),
+                unit_brl=max(p.current_unit_price * p.fx_rate, 0.0),
             )
-            orders.append(
-                AssetContributionOrder(
-                    asset_id=pos.asset_id,
-                    ticker=pos.ticker,
-                    name=pos.name,
-                    asset_type=pos.asset_type,
-                    arca_class=pos.arca_class,
-                    cerrado_score=pos.cerrado_evaluation.score,
-                    cerrado_recommendation=pos.cerrado_evaluation.recommendation,
-                    intra_class_target_weight_pct=o["weight_pct"],
-                    allocated_amount_brl=o["raw_budget"],
-                    unit_price_brl=o["unit_brl"],
-                    recommended_quantity=o["qty"],
-                    executed_amount_brl=exec_brl,
-                    projected_value_brl=round(pos.current_value_brl + exec_brl, 2),
-                )
-            )
+            for p in class_positions
+        ]
+        for order in drafts[arca_class]:
+            spent = _fill(order, order.budget)
+            leftover += order.budget - spent
+            projected[arca_class] = projected.get(arca_class, 0.0) + spent
 
-    projected_allocations = compute_allocation(projected_by_class, targets)
+    leftover = _redistribute_leftover(drafts, projected, targets, leftover)
+
+    orders = [
+        AssetContributionOrder(
+            asset_id=o.pos.asset_id,
+            ticker=o.pos.ticker,
+            name=o.pos.name,
+            asset_type=o.pos.asset_type,
+            arca_class=o.pos.arca_class,
+            cerrado_score=o.pos.cerrado_evaluation.score,
+            cerrado_recommendation=o.pos.cerrado_evaluation.recommendation,
+            intra_class_target_weight_pct=round(o.weight * 100.0, 2),
+            allocated_amount_brl=round(o.budget, 2),
+            unit_price_brl=round(o.unit_brl, 2),
+            recommended_quantity=o.qty if o.is_integer else round(o.qty, 6),
+            executed_amount_brl=round(o.executed, 2),
+            projected_value_brl=round(o.pos.current_value_brl + o.executed, 2),
+        )
+        for arca_class in ArcaClass
+        for o in drafts.get(arca_class, [])
+    ]
+    executed_total = round(sum(o.executed_amount_brl for o in orders), 2)
     return ContributionPlan(
         contribution_amount_brl=round(amount_brl, 2),
-        executed_total_brl=round(executed_total, 2),
+        executed_total_brl=executed_total,
         unallocated_cash_brl=round(max(amount_brl - executed_total, 0.0), 2),
         by_class_allocated_brl={k: round(v, 2) for k, v in class_alloc_brl.items()},
         orders=orders,
-        projected_allocations=projected_allocations,
+        projected_allocations=compute_allocation(
+            {c: round(v, 2) for c, v in projected.items()}, targets
+        ),
     )

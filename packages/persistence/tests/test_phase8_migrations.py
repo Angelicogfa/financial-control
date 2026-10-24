@@ -109,3 +109,33 @@ def test_script_00003_normalizes_percent_scaled_contracted_rates(
         5: pytest.approx(0.065),
         6: pytest.approx(0.12),
     }
+
+
+def test_script_00004_adds_earning_fx_rate_with_default(db: tuple[Config, Engine]) -> None:
+    cfg, engine = db
+    command.upgrade(cfg, "script_00003")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO assets (id, ticker, name, asset_type, arca_class, currency, "
+                "cerrado_answers, created_at, updated_at) VALUES (1, 'AAPL', 'Apple', "
+                "'STOCK_INTL', 'ATIVOS_INTERNACIONAIS', 'USD', '{}', '2025-01-01', '2025-01-01')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO earnings (asset_id, kind, payment_date, gross_amount, "
+                "withholding_tax, net_amount, created_at) VALUES "
+                "(1, 'DIVIDEND', '2025-03-01', 10, 3, 7, '2025-03-01')"
+            )
+        )
+
+    command.upgrade(cfg, "script_00004")
+
+    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from sqlalchemy.orm import sessionmaker
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        (legacy,) = uow.earnings.list_for_asset(1)
+        assert float(legacy.fx_rate) == 1.0

@@ -89,6 +89,7 @@ def to_earning_entity(model: EarningModel) -> EarningEntity:
         gross_amount=Decimal(model.gross_amount),
         withholding_tax=Decimal(model.withholding_tax),
         net_amount=Decimal(model.net_amount),
+        fx_rate=Decimal(model.fx_rate),
         notes=model.notes,
         created_at=model.created_at,
     )

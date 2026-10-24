@@ -408,7 +408,8 @@ def test_consolidate_portfolio_and_contribution_planner() -> None:
     )
 
     assert len(report.positions) == 4
-    assert report.total_invested_brl == 17200.00
+    # IVV cost is converted at its purchase FX (2 x 500 x 5.00), not today's 5.20 (C-02).
+    assert report.total_invested_brl == 17000.00
     assert report.total_current_value_brl > report.total_invested_brl
     assert report.total_received_earnings_brl == 440.00
     assert report.total_consolidated_pnl_brl > 0.0

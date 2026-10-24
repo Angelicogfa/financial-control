@@ -339,6 +339,7 @@ class SqlAlchemyEarningRepository(AbstractEarningRepository):
             gross_amount=earning.gross_amount,
             withholding_tax=earning.withholding_tax,
             net_amount=earning.net_amount or (earning.gross_amount - earning.withholding_tax),
+            fx_rate=earning.fx_rate,
             notes=earning.notes,
         )
         self.session.add(model)

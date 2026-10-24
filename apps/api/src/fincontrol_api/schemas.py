@@ -165,6 +165,7 @@ class EarningCreateRequest(BaseModel):
     net_amount: Decimal | None = Field(default=None, ge=Decimal("0"))
     ex_date: date | None = None
     notes: str | None = None
+    fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
 
 
 class EarningResponseDTO(BaseModel):
@@ -179,6 +180,8 @@ class EarningResponseDTO(BaseModel):
     gross_amount: float
     withholding_tax: float
     net_amount: float
+    fx_rate: float = 1.0
+    net_amount_brl: float = 0.0
     notes: str | None = None
     created_at: datetime | None = None
 
@@ -252,6 +255,10 @@ class ValuedPositionDTO(BaseModel):
     class_target_weight_pct: float
     class_current_weight_pct: float
     fixed_income_details: FixedIncomeValuationDTO | None = None
+    fx_pnl_brl: float = 0.0
+    custom_class_weight: float | None = None
+    ledger_status: str = "VALID"
+    ledger_message: str | None = None
 
 
 class ClassAllocationDTO(BaseModel):
@@ -286,6 +293,8 @@ class PortfolioReportResponseDTO(BaseModel):
     allocations: list[ClassAllocationDTO]
     positions: list[ValuedPositionDTO]
     earnings_by_month: dict[str, float]
+    total_fx_pnl_brl: float = 0.0
+    projection_assumptions: dict[str, float] = Field(default_factory=dict)
 
 
 class ContributionSimulationRequest(BaseModel):

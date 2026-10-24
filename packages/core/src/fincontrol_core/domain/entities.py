@@ -117,10 +117,13 @@ class EarningEntity:
     net_amount: Decimal | None = None
     ex_date: date | None = None
     notes: str | None = None
+    fx_rate: Decimal = Decimal("1")
     id: int | None = None
     created_at: datetime | None = None
 
     def __post_init__(self) -> None:
+        if self.fx_rate <= Decimal("0"):
+            raise ValidationError("fx_rate must be positive")
         if self.gross_amount <= Decimal("0"):
             raise ValidationError("gross_amount must be positive")
         if self.withholding_tax < Decimal("0"):

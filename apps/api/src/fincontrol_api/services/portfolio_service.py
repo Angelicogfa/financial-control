@@ -28,6 +28,7 @@ from fincontrol_core.market.models import Fundamentals, Quote
 from fincontrol_core.portfolio.consolidation import (
     ConsolidatedPortfolioReport,
     ContributionPlan,
+    ProjectionAssumptions,
     ValuedAssetPosition,
     consolidate_portfolio,
     plan_contribution,
@@ -40,8 +41,13 @@ from fincontrol_core.valuation import summarize_valuation
 class PortfolioApplicationService:
     """Stateless application service operating on an AbstractUnitOfWork and MarketGateway."""
 
-    def __init__(self, gateway: CachedMarketGateway) -> None:
+    def __init__(
+        self,
+        gateway: CachedMarketGateway,
+        assumptions: ProjectionAssumptions | None = None,
+    ) -> None:
         self.gateway = gateway
+        self.assumptions = assumptions or ProjectionAssumptions()
 
     def load_arca_targets(
         self, uow: AbstractUnitOfWork
@@ -98,6 +104,7 @@ class PortfolioApplicationService:
             intra_strategies=intra_strategies,
             usd_brl_rate=usd_brl,
             curves=curves,
+            assumptions=self.assumptions,
             as_of_date=ref_date,
             date_from=date_from,
         )

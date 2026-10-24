@@ -148,7 +148,6 @@ def _consolidate_usd(asset: AssetEntity, usd_brl: float):
     )
 
 
-@_xfail("C-02", "invested value converted with today's FX instead of the purchase FX")
 def test_c02_invested_value_uses_purchase_fx_and_shows_fx_gain() -> None:
     asset = _usd_asset((_buy(1, date(2025, 1, 10), "10", "100", fx="5.0"),))
     pos = _consolidate_usd(asset, usd_brl=6.0).positions[0]
@@ -158,7 +157,6 @@ def test_c02_invested_value_uses_purchase_fx_and_shows_fx_gain() -> None:
     assert pos.unrealized_pnl_brl == pytest.approx(1000.0)
 
 
-@_xfail("C-02", "realized P/L converted with today's FX instead of trade-date FX")
 def test_c02_realized_pnl_uses_trade_date_fx() -> None:
     asset = _usd_asset(
         (
@@ -297,7 +295,6 @@ def _stock(asset_id: int, ticker: str, weight: str | None = None) -> AssetEntity
     )
 
 
-@_xfail("A-04", "MANUAL_WEIGHT override uses computed target weights, not custom weights")
 def test_a04_manual_override_uses_custom_class_weight() -> None:
     assets = [_stock(1, "AAAA3", "80"), _stock(2, "BBBB3", "20")]
     quotes = {a.ticker: Quote(symbol=a.ticker, price=10.0) for a in assets}
@@ -325,7 +322,6 @@ def test_a04_manual_override_uses_custom_class_weight() -> None:
     assert weights == {"AAAA3": pytest.approx(80.0), "BBBB3": pytest.approx(20.0)}
 
 
-@_xfail("A-04", "integer rounding leftover is not redistributed to other classes")
 def test_a04_rounding_leftover_flows_to_other_classes() -> None:
     stock = _stock(1, "PRIC3")
     cash = AssetEntity(
