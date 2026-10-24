@@ -20,6 +20,9 @@ COMPOSE_ONLY_VARIABLES = frozenset(
         "REDIS_PASSWORD",
         "API_PORT",
         "WEB_PORT",
+        "PGDATA_VOLUME",
+        "REDISDATA_VOLUME",
+        "APP_ENV_FILE",
     }
 )
 

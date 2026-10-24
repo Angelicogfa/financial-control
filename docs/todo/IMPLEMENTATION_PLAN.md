@@ -285,7 +285,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **8.14** (I-05) Hierarquia de exceções de domínio (`DomainError`, `NotFoundError`, `ValidationError`, `ConflictError`) em `packages/core/errors.py`; handlers mapeiam só essas; demais exceções viram 500 com `request_id` e log.
 - `[x]` **8.15** (A-04) Override `MANUAL_WEIGHT` usa `custom_class_weight`; sobra de arredondamento redistribuída entre classes por ordem de déficit.
 - `[x]` **8.16** (D-02, D-04) Colunas monetárias de `portfolio_snapshots` para `Numeric(20, 2)` (`script_00005_snapshot_numeric.py`); `id` como desempate em toda ordenação paginada. O domínio mantém `float` nos snapshots (série estatística derivada, exceção registrada na ADR 0006); o repositório arredonda para centavos.
-- `[x]` **8.17** Reprocessamento: comando `uv run python -m fincontrol_worker.rebuild` que ressincroniza séries e reconstrói snapshots após as correções. Também reprecifica lançamentos e proventos em USD gravados com `fx_rate = 1` usando o USD/BRL histórico. **Ação pendente na base real:** rodar `docker compose run --rm worker uv run --no-sync python -m fincontrol_worker.rebuild` após aplicar as migrations.
+- `[x]` **8.17** Reprocessamento: comando `uv run python -m fincontrol_worker.rebuild` que ressincroniza séries e reconstrói snapshots após as correções. Também reprecifica lançamentos e proventos em USD gravados com `fx_rate = 1` usando o USD/BRL histórico. **Ação pendente na base real:** rodar `docker compose run --rm worker python -m fincontrol_worker.rebuild` após aplicar as migrations.
 
 **Aceite:** todos os `xfail` da 7.2 passam; carteira de referência (7.4) bate com a planilha golden em ±R$ 0,01; integração + `docker compose build` verdes.
 
