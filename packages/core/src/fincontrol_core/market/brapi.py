@@ -12,8 +12,12 @@ from fincontrol_core.market.models import (
     PricePoint,
     Quote,
     QuoteFreshness,
-    as_fraction,
+    financial_volume,
 )
+
+# Units of the quoteSummary fields consumed from brapi (ADR 0006): returnOnEquity,
+# profitMargins, revenueGrowth, earningsGrowth and dividendYield are fractions;
+# debtToEquity is a percentage; averageDailyVolume10Day is a share count.
 
 
 def _float_or_none(val: Any) -> float | None:
@@ -170,18 +174,14 @@ class BrapiProvider:
             stats.get("trailingEps")
         )
         bvps = _float_or_none(stats.get("bookValue"))
-        dy = as_fraction(
-            _float_or_none(summary.get("dividendYield"))
-            or _float_or_none(stats.get("dividendYield"))
+        dy = _float_or_none(summary.get("dividendYield")) or _float_or_none(
+            stats.get("dividendYield")
         )
         dps = _float_or_none(summary.get("trailingAnnualDividendRate"))
-        roe = as_fraction(_float_or_none(fin.get("returnOnEquity")))
-        margin = as_fraction(_float_or_none(fin.get("profitMargins")))
-        debt_to_eq_raw = _float_or_none(fin.get("debtToEquity"))
-        debt_to_eq = (
-            debt_to_eq_raw / 100.0
-            if debt_to_eq_raw is not None and debt_to_eq_raw > 5.0
-            else debt_to_eq_raw
+        debt_to_eq_pct = _float_or_none(fin.get("debtToEquity"))
+        price = _float_or_none(item.get("regularMarketPrice"))
+        volume_shares = _float_or_none(item.get("averageDailyVolume10Day")) or _float_or_none(
+            item.get("regularMarketVolume")
         )
 
         total_debt = _float_or_none(fin.get("totalDebt"))
@@ -201,13 +201,12 @@ class BrapiProvider:
             book_value_per_share=bvps,
             dividend_yield=dy,
             dividends_per_share_ttm=dps,
-            return_on_equity=roe,
-            profit_margin=margin,
-            debt_to_equity=debt_to_eq,
+            return_on_equity=_float_or_none(fin.get("returnOnEquity")),
+            profit_margin=_float_or_none(fin.get("profitMargins")),
+            debt_to_equity=debt_to_eq_pct / 100.0 if debt_to_eq_pct is not None else None,
             net_debt_to_ebitda=net_debt_ebitda,
-            revenue_growth=as_fraction(_float_or_none(fin.get("revenueGrowth"))),
-            earnings_growth=as_fraction(_float_or_none(fin.get("earningsGrowth"))),
+            revenue_growth=_float_or_none(fin.get("revenueGrowth")),
+            earnings_growth=_float_or_none(fin.get("earningsGrowth")),
             market_cap=_float_or_none(item.get("marketCap")),
-            avg_daily_volume=_float_or_none(item.get("averageDailyVolume10Day"))
-            or _float_or_none(item.get("regularMarketVolume")),
+            avg_daily_volume=financial_volume(volume_shares, price),
         )

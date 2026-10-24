@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 import pandas as pd
+import pytest
 from fincontrol_core.analytics import (
      analyze_return_series,
     annualized_volatility,
@@ -122,7 +123,8 @@ class _FakeYFTicker:
             "priceToBook": 4.2,
             "trailingEps": 24.16,
             "bookValue": 138.0,
-            "dividendYield": 0.014,
+            "dividendYield": 1.4,
+            "averageVolume": 1000.0,
             "returnOnEquity": 0.18,
             "profitMargins": 0.12,
         }
@@ -161,6 +163,9 @@ def test_yfinance_symbol_resolution_and_provider() -> None:
     fund = yf_prov.get_fundamentals("IVV", market=Market.US)
     assert fund is not None
     assert fund.price_to_earnings == 24.0
+    # yfinance reports dividendYield in percent and averageVolume in shares (ADR 0006).
+    assert fund.dividend_yield == pytest.approx(0.014)
+    assert fund.avg_daily_volume == pytest.approx(580_000.0)
 
 
 # ---------------------------------------------------------------------------

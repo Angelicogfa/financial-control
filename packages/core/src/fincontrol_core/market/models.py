@@ -84,7 +84,11 @@ class PricePoint:
 
 @dataclass(frozen=True)
 class Fundamentals:
-    """Normalized fundamental indicators. Percentages are expressed as fractions (0.12 = 12%)."""
+    """Normalized fundamental indicators (ADR 0006).
+
+    Percentages are fractions (0.12 = 12%), multiples are plain ratios and
+    `avg_daily_volume` is the average *financial* volume in the trading currency.
+    """
 
     symbol: str
     sector: str | None = None
@@ -114,8 +118,8 @@ class Fundamentals:
         return cls(**{k: v for k, v in data.items() if k in valid_fields})
 
 
-def as_fraction(value: float | None) -> float | None:
-    """Normalize percentage values that some providers return on a 0-100 scale."""
-    if value is None:
+def financial_volume(volume_shares: float | None, price: float | None) -> float | None:
+    """Average financial volume (shares traded x price) used by liquidity rules (I-10)."""
+    if volume_shares is None or price is None or price <= 0:
         return None
-    return value / 100.0 if abs(value) > 1.5 else value
+    return volume_shares * price

@@ -11,8 +11,13 @@ from fincontrol_core.market.models import (
     PricePoint,
     Quote,
     QuoteFreshness,
-    as_fraction,
+    financial_volume,
 )
+
+# Units of the yfinance `Ticker.info` fields consumed here (ADR 0006): returnOnEquity,
+# profitMargins, revenueGrowth, earningsGrowth and trailingAnnualDividendYield are
+# fractions; dividendYield and debtToEquity are percentages (yfinance >= 0.2.54);
+# averageVolume is a share count.
 
 
 def resolve_yahoo_symbol(symbol: str, market: Market | None = None) -> str:
@@ -154,8 +159,16 @@ class YFinanceProvider:
             if total_debt is not None and ebitda is not None and ebitda > 0:
                 net_debt_ebitda = (total_debt - total_cash) / ebitda
 
-            dte_raw = _safe_float(info.get("debtToEquity"))
-            dte = dte_raw / 100.0 if dte_raw is not None and dte_raw > 5.0 else dte_raw
+            dte_pct = _safe_float(info.get("debtToEquity"))
+            dy = _safe_float(info.get("trailingAnnualDividendYield"))
+            if dy is None:
+                dy_pct = _safe_float(info.get("dividendYield"))
+                dy = dy_pct / 100.0 if dy_pct is not None else None
+            price = (
+                _safe_float(info.get("regularMarketPrice"))
+                or _safe_float(info.get("currentPrice"))
+                or _safe_float(info.get("previousClose"))
+            )
 
             return Fundamentals(
                 symbol=symbol.strip().upper(),
@@ -166,16 +179,16 @@ class YFinanceProvider:
                 price_to_book=_safe_float(info.get("priceToBook")),
                 earnings_per_share=_safe_float(info.get("trailingEps")),
                 book_value_per_share=_safe_float(info.get("bookValue")),
-                dividend_yield=as_fraction(_safe_float(info.get("dividendYield"))),
+                dividend_yield=dy,
                 dividends_per_share_ttm=_safe_float(info.get("trailingAnnualDividendRate")),
-                return_on_equity=as_fraction(_safe_float(info.get("returnOnEquity"))),
-                profit_margin=as_fraction(_safe_float(info.get("profitMargins"))),
-                debt_to_equity=dte,
+                return_on_equity=_safe_float(info.get("returnOnEquity")),
+                profit_margin=_safe_float(info.get("profitMargins")),
+                debt_to_equity=dte_pct / 100.0 if dte_pct is not None else None,
                 net_debt_to_ebitda=net_debt_ebitda,
-                revenue_growth=as_fraction(_safe_float(info.get("revenueGrowth"))),
-                earnings_growth=as_fraction(_safe_float(info.get("earningsGrowth"))),
+                revenue_growth=_safe_float(info.get("revenueGrowth")),
+                earnings_growth=_safe_float(info.get("earningsGrowth")),
                 market_cap=_safe_float(info.get("marketCap")),
-                avg_daily_volume=_safe_float(info.get("averageVolume")),
+                avg_daily_volume=financial_volume(_safe_float(info.get("averageVolume")), price),
             )
         except Exception:
             return None

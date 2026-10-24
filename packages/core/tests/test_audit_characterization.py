@@ -233,19 +233,16 @@ def _brapi_fundamentals(item: dict) -> object:
     return fundamentals
 
 
-@_xfail("I-02", "as_fraction divides any value > 1.5 by 100 (ROE 160% becomes 1.6%)")
 def test_i02_roe_fraction_above_one_is_kept() -> None:
     fundamentals = _brapi_fundamentals({"financialData": {"returnOnEquity": {"raw": 1.6}}})
     assert fundamentals.return_on_equity == pytest.approx(1.6)
 
 
-@_xfail("I-02", "debtToEquity is a percentage but only values > 5 are divided by 100")
 def test_i02_debt_to_equity_percentage_is_always_converted() -> None:
     fundamentals = _brapi_fundamentals({"financialData": {"debtToEquity": {"raw": 4.0}}})
     assert fundamentals.debt_to_equity == pytest.approx(0.04)
 
 
-@_xfail("I-10", "average volume is a share count, liquidity rules expect money")
 def test_i10_average_daily_volume_is_financial() -> None:
     fundamentals = _brapi_fundamentals(
         {"regularMarketPrice": 100.0, "averageDailyVolume10Day": 30_000}

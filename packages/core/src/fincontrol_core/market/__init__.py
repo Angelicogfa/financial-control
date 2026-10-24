@@ -14,7 +14,7 @@ from fincontrol_core.market.models import (
     PricePoint,
     Quote,
     QuoteFreshness,
-    as_fraction,
+    financial_volume,
 )
 from fincontrol_core.market.yfinance_provider import YFinanceProvider, resolve_yahoo_symbol
 
@@ -28,9 +28,9 @@ __all__ = [
     "PricePoint",
     "Quote",
     "QuoteFreshness",
+    "financial_volume",
     "RedisCache",
     "YFinanceProvider",
-    "as_fraction",
     "build_cache_backend",
     "resolve_yahoo_symbol",
 ]
