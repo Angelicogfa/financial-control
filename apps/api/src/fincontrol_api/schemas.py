@@ -468,6 +468,14 @@ class ProjectionAssumptionsDTO(BaseModel):
 class ValuationPolicyDTO(BaseModel):
     bazin_required_yield: float = 0.06
     graham_multiplier: float = 22.5
+    max_price_to_earnings: float = 15.0
+    max_ev_to_ebitda: float = 10.0
+    max_price_to_book_bank: float = 2.0
+    bank_cost_of_equity: float = 0.14
+    max_price_to_book_fii: float = 1.05
+    reference_real_yield: float = 0.06
+    min_fii_spread: float = 0.02
+    min_margin_of_safety: float = 0.15
     projections: ProjectionAssumptionsDTO = Field(default_factory=ProjectionAssumptionsDTO)
 
 

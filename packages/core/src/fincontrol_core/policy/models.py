@@ -8,7 +8,7 @@ immutable and versioned: changing a rule creates a new version.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -89,17 +89,45 @@ class EligibilityPolicy:
 
 @dataclass(frozen=True)
 class ValuationPolicy:
-    """Valuation premises (Bazin, Graham) and 12-month projection assumptions."""
+    """Valuation premises by instrument type (item 11.5) and 12-month projection assumptions.
+
+    Rates and margins are fractions (ADR 0006); multiples are plain ratios.
+    `reference_real_yield` is the inflation-linked bond (NTN-B) real yield FIIs compete with.
+    """
 
     bazin_required_yield: float = 0.06
     graham_multiplier: float = 22.5
+    max_price_to_earnings: float = 15.0
+    max_ev_to_ebitda: float = 10.0
+    max_price_to_book_bank: float = 2.0
+    bank_cost_of_equity: float = 0.14
+    max_price_to_book_fii: float = 1.05
+    reference_real_yield: float = 0.06
+    min_fii_spread: float = 0.02
+    min_margin_of_safety: float = 0.15
     projections: ProjectionAssumptions = field(default_factory=ProjectionAssumptions)
 
     def __post_init__(self) -> None:
         if not 0.0 < self.bazin_required_yield < 1.0:
             raise ValidationError("bazin_required_yield must be an annual fraction (0.06 = 6%)")
-        if self.graham_multiplier <= 0:
-            raise ValidationError("graham_multiplier must be positive")
+        for name in (
+            "graham_multiplier",
+            "max_price_to_earnings",
+            "max_ev_to_ebitda",
+            "max_price_to_book_bank",
+            "max_price_to_book_fii",
+        ):
+            if getattr(self, name) <= 0:
+                raise ValidationError(f"{name} must be positive")
+        if not 0.0 < self.bank_cost_of_equity < 1.0:
+            raise ValidationError("bank_cost_of_equity must be an annual fraction")
+        for name in ("reference_real_yield", "min_fii_spread", "min_margin_of_safety"):
+            if not -1.0 < getattr(self, name) < 1.0:
+                raise ValidationError(f"{name} must be a fraction (0.06 = 6%)")
+
+    def as_dict(self) -> dict[str, float]:
+        """Scalar premises (projections excluded)."""
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.name != "projections"}
 
 
 @dataclass(frozen=True)

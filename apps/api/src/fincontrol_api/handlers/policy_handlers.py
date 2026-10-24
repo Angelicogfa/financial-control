@@ -53,8 +53,7 @@ def to_policy_dto(policy: InvestmentPolicy) -> PolicyDTO:
             min_coverage_pct=policy.eligibility.min_coverage_pct,
         ),
         valuation=ValuationPolicyDTO(
-            bazin_required_yield=policy.valuation.bazin_required_yield,
-            graham_multiplier=policy.valuation.graham_multiplier,
+            **policy.valuation.as_dict(),
             projections=ProjectionAssumptionsDTO(**policy.valuation.projections.as_dict()),
         ),
     )
@@ -96,8 +95,7 @@ class PolicyHandler:
                 min_coverage_pct=req.eligibility.min_coverage_pct,
             ),
             valuation=ValuationPolicy(
-                bazin_required_yield=req.valuation.bazin_required_yield,
-                graham_multiplier=req.valuation.graham_multiplier,
+                **req.valuation.model_dump(exclude={"projections"}),
                 projections=ProjectionAssumptions(**req.valuation.projections.model_dump()),
             ),
         )
