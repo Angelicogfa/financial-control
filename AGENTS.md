@@ -9,6 +9,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
 1. **Code in English (`código em ingles`)**
    - All source code identifiers (variables, functions, classes, modules, database tables, columns, API routes, JSON keys, enum values, git commit messages, and code comments/docstrings) MUST be written in **English**.
    - User-facing UI labels (in `apps/web`) and project documentation (`docs/`) may be in Portuguese (pt-BR), matching the domain vocabulary (e.g., *ARCA*, *Diagrama do Cerrado*, *FIIs*, *Tesouro Direto*, *Proventos*).
+   - **Agent replies in Portuguese (`respostas em português`):** every message the agent writes to the user (answers, summaries, questions, explanations, progress updates) MUST be in **Portuguese (pt-BR)**. This applies to conversation only; code, commits and identifiers stay in English as above.
 
 2. **Mandatory Unit Tests (`testes de unidade obrigatorios`)**
    - Every domain rule, calculation, service, handler, Unit of Work, repository method, and UI utility/component MUST have accompanying unit tests.
