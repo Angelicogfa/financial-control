@@ -12,6 +12,7 @@ from fincontrol_core.research.screener import ScreenerCriteria
 from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.dependencies import (
     get_account_handler,
+    get_alert_handler,
     get_asset_handler,
     get_auth_handler,
     get_contribution_handler,
@@ -33,6 +34,7 @@ from fincontrol_api.handlers import (
     TransactionHandler,
 )
 from fincontrol_api.handlers.account_handlers import AccountHandler
+from fincontrol_api.handlers.alert_handlers import AlertHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.contribution_handlers import ContributionHandler
 from fincontrol_api.handlers.event_handlers import CorporateEventHandler
@@ -44,6 +46,8 @@ from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
     AccountDTO,
     AccountRequest,
+    AlertDismissRequest,
+    AlertsResponseDTO,
     ArcaSuggestionDTO,
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -95,6 +99,7 @@ research_router = APIRouter(prefix="/research", tags=["Research"])
 contributions_router = APIRouter(prefix="/contributions", tags=["Contributions"])
 events_router = APIRouter(prefix="/corporate-events", tags=["Corporate Events"])
 imports_router = APIRouter(prefix="/imports", tags=["Imports"])
+alerts_router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
 
 def pagination_query(
@@ -645,3 +650,29 @@ async def commit_b3_import(
         account_id=account_id,
         create_tickers=[t for t in create_tickers.split(",") if t.strip()],
     )
+
+
+# ---------------------------------------------------------------------------
+# Alerts (item 12.2)
+# ---------------------------------------------------------------------------
+@alerts_router.get("", response_model=AlertsResponseDTO)
+def list_alerts(handler: AlertHandler = Depends(get_alert_handler)) -> AlertsResponseDTO:
+    return handler.list_alerts()
+
+
+@alerts_router.post("/dismissals", status_code=status.HTTP_204_NO_CONTENT)
+def dismiss_alert(
+    payload: AlertDismissRequest,
+    handler: AlertHandler = Depends(get_alert_handler),
+) -> Response:
+    handler.dismiss(payload)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@alerts_router.delete("/dismissals", status_code=status.HTTP_204_NO_CONTENT)
+def restore_alert(
+    key: str = Query(..., min_length=1, max_length=160),
+    handler: AlertHandler = Depends(get_alert_handler),
+) -> Response:
+    handler.restore(key)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

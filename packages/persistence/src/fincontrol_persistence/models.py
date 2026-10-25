@@ -428,3 +428,15 @@ class CorporateEventModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
+
+
+class AlertDismissalModel(Base):
+    """Hidden alert keys; `until` NULL hides it while the condition persists."""
+
+    __tablename__ = "alert_dismissals"
+
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    dismissed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
+    until: Mapped[date | None] = mapped_column(Date, nullable=True)

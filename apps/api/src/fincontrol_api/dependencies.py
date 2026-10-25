@@ -15,6 +15,7 @@ from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.config import AppSettings, get_settings
 from fincontrol_api.handlers.account_handlers import AccountHandler
+from fincontrol_api.handlers.alert_handlers import AlertHandler
 from fincontrol_api.handlers.asset_handlers import AssetHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.contribution_handlers import ContributionHandler
@@ -69,6 +70,14 @@ def get_asset_handler(
 ) -> AssetHandler:
     """Provide the AssetHandler instance."""
     return AssetHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
+
+
+def get_alert_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+    portfolio_service: PortfolioApplicationService = Depends(get_portfolio_service),
+) -> AlertHandler:
+    """Provide the AlertHandler instance."""
+    return AlertHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
 
 
 def get_import_handler(

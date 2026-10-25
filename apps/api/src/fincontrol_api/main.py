@@ -16,6 +16,7 @@ from fincontrol_api.auth import AuthenticationError, AuthNotConfiguredError
 from fincontrol_api.config import get_settings
 from fincontrol_api.controllers import (
     accounts_router,
+    alerts_router,
     assets_router,
     auth_router,
     contributions_router,
@@ -141,6 +142,7 @@ def create_app() -> FastAPI:
         contributions_router,
         events_router,
         imports_router,
+        alerts_router,
     ):
         app.include_router(router, prefix=api_prefix, dependencies=protected)
 

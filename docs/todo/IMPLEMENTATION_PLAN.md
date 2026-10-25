@@ -25,7 +25,7 @@
 | **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[x]` Concluída | 100% |
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[x]` Concluída | 100% |
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[x]` Implementado | 100% |
-| **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[ ]` Pendente | 0% |
+| **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[x]` Implementado | 100% |
 | **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[ ]` Pendente | 0% |
 | **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[ ]` Pendente | 0% |
 
@@ -348,14 +348,14 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 12 — Operação: Aporte, Alertas, Importação e Eventos (`[ ]` Pendente)
+## Fase 12 — Operação: Aporte, Alertas, Importação e Eventos (`[x]` Implementado)
 
-- `[ ]` **12.1** (I-07) Aporte persistido como `contribution_plans` (`DRAFT`, `CONFIRMED`, `DISCARDED`) — `script_00013_contribution_plans.py`; nível 2 só com ativos elegíveis; confirmação gera os lançamentos com preço/quantidade executados editáveis pelo usuário.
-- `[ ]` **12.2** Motor de alertas (`packages/core/alerts.py`): classe fora da banda, ativo em `REVIEW`, preço abaixo do teto, cotação em fallback, série BCB desatualizada, livro inválido, snapshot ausente; endpoint `GET /api/v1/alerts` e dispensa por usuário.
-- `[ ]` **12.3** (D-03) Importação B3 (Área do Investidor: planilhas de Negociação e Movimentação) com pré-visualização, deduplicação por hash e mapeamento de ativos desconhecidos para cadastro/watchlist.
-- `[ ]` **12.4** (D-03, TD-03) Entidade `corporate_events` (desdobramento, grupamento, bonificação com custo atribuído) — `script_00014_corporate_events.py`; motor de posições aplica fatores por data; importação de eventos da Movimentação B3.
+- `[x]` **12.1** (I-07) Aporte persistido em `contribution_plans` (`DRAFT`, `CONFIRMED`, `DISCARDED`) — `script_00013_contribution_plans.py`; a sugestão é gravada como foi exibida; `POST /api/v1/contributions/{id}/confirm` cria um `BUY` por execução (a própria sugestão ou o executado de fato, com preço, quantidade, taxas e câmbio editáveis), validando o livro como qualquer lançamento; só rascunhos mudam de estado (409 nos demais); nível 2 continua só com ativos `ELIGIBLE`/`HELD`.
+- `[x]` **12.2** Motor de alertas (`fincontrol_core/alerts.py`): livro inválido, classe fora da banda, ativo em `REVIEW`, preço abaixo do justo (elegível ou em carteira), cotação em fallback, série desatualizada, retrato diário ausente e rotina com falha; chave estável por condição e rota da tela de ação; `GET /api/v1/alerts`, dispensa por N dias ou até a condição mudar (`alert_dismissals`, `script_00015_alert_dismissals.py`).
+- `[x]` **12.3** (D-03) Importação B3 (Área do Investidor, `.xlsx` ou `.csv`): Negociação (compras/vendas, fracionário normalizado) e Movimentação (dividendo, JCP com bruto/IR a partir do líquido, rendimento, desdobro, grupamento, bonificação); pré-visualização com status por linha (`NEW`, `DUPLICATE`, `UNKNOWN_ASSET`, `IGNORED`, `INVALID`); deduplicação por hash de conteúdo + ocorrência (`import_hash` único em lançamentos, proventos e eventos); cadastro de tickers desconhecidos pelo catálogo ou pela convenção de código; gravação atômica após validar cada livro.
+- `[x]` **12.4** (D-03, TD-03) `corporate_events` (`script_00014_corporate_events.py`): desdobramento, grupamento e bonificação com custo atribuído aplicados por data no motor de posições, na validação do livro e no ciclo de vida; backfill de retratos expressa a quantidade nos termos da data final (cotações históricas ajustadas); fator dos eventos importados calculado pela posição do dia anterior; CRUD `/api/v1/corporate-events` revalidando o livro.
 
-**Aceite:** importar extrato B3 de exemplo, confirmar um aporte e ver posições, alocação e alertas atualizados sem lançamentos manuais.
+**Aceite:** `apps/api/tests/test_operations_flow.py` — importa as planilhas de exemplo (`apps/api/tests/fixtures/b3_*.csv`), vê alertas (banda, série), dispensa e restaura, confirma um aporte e verifica posições, alocação e o alerta da classe resolvido, sem lançamentos manuais. **Validação:** `scripts/check.sh --smoke` verde e migrações `script_00013`–`script_00015` validadas em Postgres descartável.
 
 ---
 

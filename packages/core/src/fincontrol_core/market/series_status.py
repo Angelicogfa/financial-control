@@ -11,6 +11,7 @@ from fincontrol_core.domain.entities import MarketSeriesPoint
 from fincontrol_core.domain.enums import SeriesUnit
 
 INDEX_STALE_AFTER_DAYS = 5
+TRACKED_SERIES = ("CDI", "SELIC", "IPCA", "IBOV", "IFIX", "SP500")
 MONTHLY_STALE_AFTER_MONTHS = 2
 
 

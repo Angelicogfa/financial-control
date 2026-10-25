@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from fincontrol_persistence.db import get_default_session_factory
 from fincontrol_persistence.repositories import (
     SqlAlchemyAccountRepository,
+    SqlAlchemyAlertDismissalRepository,
     SqlAlchemyAssetRepository,
     SqlAlchemyCatalogRepository,
     SqlAlchemyChecklistRepository,
@@ -49,6 +50,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.contribution_plans = SqlAlchemyContributionPlanRepository(self.session)
         self.corporate_events = SqlAlchemyCorporateEventRepository(self.session)
         self.ledger_imports = SqlAlchemyLedgerImportRepository(self.session)
+        self.alert_dismissals = SqlAlchemyAlertDismissalRepository(self.session)
         return self
 
     def __exit__(

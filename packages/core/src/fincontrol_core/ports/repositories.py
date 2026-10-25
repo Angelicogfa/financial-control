@@ -28,6 +28,7 @@ from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalS
 from fincontrol_core.policy.models import InvestmentPolicy
 
 if TYPE_CHECKING:
+    from fincontrol_core.alerts import AlertDismissal
     from fincontrol_core.domain.enums import ContributionPlanStatus
     from fincontrol_core.portfolio.contribution_plans import SavedContributionPlan
 
@@ -373,4 +374,20 @@ class AbstractLedgerImportRepository(ABC):
 
     @abstractmethod
     def existing_hashes(self, hashes: list[str]) -> set[str]:
+        raise NotImplementedError
+
+
+class AbstractAlertDismissalRepository(ABC):
+    """Alerts the user chose to hide (for a while or until the condition clears)."""
+
+    @abstractmethod
+    def list_all(self) -> list[AlertDismissal]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def upsert(self, dismissal: AlertDismissal) -> AlertDismissal:
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete(self, key: str) -> bool:
         raise NotImplementedError

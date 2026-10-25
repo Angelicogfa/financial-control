@@ -11,6 +11,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
+from fincontrol_core.alerts import AlertDismissal
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
@@ -32,6 +33,7 @@ from fincontrol_core.policy.models import InvestmentPolicy
 from fincontrol_core.portfolio.contribution_plans import SavedContributionPlan, plan_to_payload
 from fincontrol_core.ports.repositories import (
     AbstractAccountRepository,
+    AbstractAlertDismissalRepository,
     AbstractAssetRepository,
     AbstractCatalogRepository,
     AbstractChecklistRepository,
@@ -70,6 +72,7 @@ from fincontrol_persistence.mappers import (
 )
 from fincontrol_persistence.models import (
     AccountModel,
+    AlertDismissalModel,
     AssetModel,
     ChecklistAnswerModel,
     ChecklistEvaluationModel,
@@ -1058,6 +1061,38 @@ class SqlAlchemyLedgerImportRepository(AbstractLedgerImportRepository):
             ):
                 found.update(self.session.scalars(select(column).where(column.in_(chunk))))
         return found
+
+
+class SqlAlchemyAlertDismissalRepository(AbstractAlertDismissalRepository):
+    """SQLAlchemy implementation of AbstractAlertDismissalRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def list_all(self) -> list[AlertDismissal]:
+        stmt = select(AlertDismissalModel).order_by(AlertDismissalModel.dismissed_at.desc())
+        return [
+            AlertDismissal(key=m.key, dismissed_at=m.dismissed_at, until=m.until)
+            for m in self.session.scalars(stmt).all()
+        ]
+
+    def upsert(self, dismissal: AlertDismissal) -> AlertDismissal:
+        model = self.session.get(AlertDismissalModel, dismissal.key)
+        if model is None:
+            model = AlertDismissalModel(key=dismissal.key)
+            self.session.add(model)
+        model.dismissed_at = dismissal.dismissed_at
+        model.until = dismissal.until
+        self.session.flush()
+        return dismissal
+
+    def delete(self, key: str) -> bool:
+        model = self.session.get(AlertDismissalModel, key)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.flush()
+        return True
 
 
 # Backward-compatible aliases within persistence package

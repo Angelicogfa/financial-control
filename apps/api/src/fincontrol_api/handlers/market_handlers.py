@@ -5,14 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date
 
-from fincontrol_core.market.series_status import evaluate_series_status
+from fincontrol_core.market.series_status import TRACKED_SERIES, evaluate_series_status
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
 
 from fincontrol_api.schemas import JobRunDTO, SeriesStatusDTO
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
-
-TRACKED_SERIES = ("CDI", "SELIC", "IPCA", "IBOV", "IFIX", "SP500")
 
 
 class MarketDataHandler:

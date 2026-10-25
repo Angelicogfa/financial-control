@@ -7,6 +7,7 @@ from types import TracebackType
 
 from fincontrol_core.ports.repositories import (
     AbstractAccountRepository,
+    AbstractAlertDismissalRepository,
     AbstractAssetRepository,
     AbstractCatalogRepository,
     AbstractChecklistRepository,
@@ -40,6 +41,7 @@ class AbstractUnitOfWork(ABC):
     contribution_plans: AbstractContributionPlanRepository
     corporate_events: AbstractCorporateEventRepository
     ledger_imports: AbstractLedgerImportRepository
+    alert_dismissals: AbstractAlertDismissalRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self
