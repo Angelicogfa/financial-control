@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PLACEHOLDER_PREFIX = "change-me"
 
-# Read by docker-compose.yml only (container credentials, published ports).
+# Read by the compose files only (container credentials, published ports).
 COMPOSE_ONLY_VARIABLES = frozenset(
     {
         "POSTGRES_USER",

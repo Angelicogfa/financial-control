@@ -43,9 +43,10 @@ if [[ "$MODE" == "--fast" ]]; then
   exit 0
 fi
 
-step "Docker: compose config and image build"
-docker compose -p fincontrol-check --env-file .env.example config -q
-docker compose -p fincontrol-check --env-file .env.example build
+step "Docker: compose config (production and development) and image build"
+docker compose -p fincontrol-check --env-file .env.example -f docker-compose.prod.yml config -q
+docker compose -p fincontrol-check --env-file .env.example -f docker-compose.yml config -q
+docker compose -p fincontrol-check --env-file .env.example -f docker-compose.prod.yml build
 
 if [[ "$MODE" == "--smoke" || "$MODE" == "--e2e" ]]; then
   step "Docker: isolated end-to-end smoke test"

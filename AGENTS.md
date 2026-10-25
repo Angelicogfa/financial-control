@@ -27,8 +27,10 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
    - `.env.example` MUST be kept up-to-date with safe placeholder values whenever a new variable is introduced.
 
 5. **Docker Compose Runtime (`ambiente deve rodar em docker-compose`)**
-   - The entire stack (`postgres`, `redis`, `migrate`, `api`, `worker`, `web`) MUST build and run via `docker compose up --build`.
-   - Local host execution (`uv run`, `npm run dev`) is supported for fast feedback, but `docker-compose.yml` is the canonical runtime contract.
+   - The entire stack (`postgres`, `redis`, `migrate`, `api`, `worker`, `web`) MUST build and run via Docker Compose:
+     - **Production:** `docker-compose.prod.yml` (`docker compose -f docker-compose.prod.yml up -d --build`) is the canonical runtime contract: only `web` publishes a port.
+     - **Development:** `docker-compose.yml` (`docker compose up -d --build`) extends the production services and publishes Postgres, Redis and the API on `127.0.0.1` only.
+   - Local host execution (`uv run`, `npm run dev`) is supported for fast feedback.
 
 6. **Isolated Named Volumes for Data Persistence (`volume mapeado de forma isolado a fim de evitar perder dados`)**
    - Stateful services (`postgres` and `redis`) MUST use dedicated, explicitly named Docker volumes (`fincontrol_pgdata`, `fincontrol_redisdata`) mapped outside container ephemeral filesystems so that container rebuilds or `docker compose down` (without `-v`) never lose user data.
@@ -102,7 +104,8 @@ financial-control/
 │   ├── features/             # Feature specifications
 │   ├── todo/                 # Phased implementation plan & status tracker
 │   └── tech-debt/            # Technical debt register
-├── docker-compose.yml
+├── docker-compose.yml          # development (extends prod, loopback ports)
+├── docker-compose.prod.yml     # production (only web published)
 ├── pyproject.toml            # Root uv workspace configuration
 └── .env.example              # Template for .env (never commit .env)
 ```

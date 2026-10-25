@@ -32,7 +32,7 @@ sed -e "s|^PGDATA_VOLUME=.*|PGDATA_VOLUME=fincontrol_smoke_pgdata|" \
     -e "s|^AUTH_JWT_SECRET=.*|AUTH_JWT_SECRET=${SECRET}|" \
     .env.example > "$ENV_FILE"
 
-COMPOSE=(docker compose -p "$PROJECT" --env-file "$(native_path "$ENV_FILE")")
+COMPOSE=(docker compose -p "$PROJECT" -f docker-compose.prod.yml --env-file "$(native_path "$ENV_FILE")")
 
 # Safety net: never run `down -v` against the real data volumes.
 if grep -qE "^PGDATA_VOLUME=fincontrol_pgdata$|^REDISDATA_VOLUME=fincontrol_redisdata$" "$ENV_FILE"; then

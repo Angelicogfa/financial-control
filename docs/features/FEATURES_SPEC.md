@@ -22,7 +22,7 @@ Organizadas pelos contextos do menu (ADR 0005 e ADR 0007).
 CDB, LCI, LCA, CRI, CRA, debêntures, Tesouro Selic/IPCA+/Prefixado e contas remuneradas por indexador (`CDI`, `SELIC`, `IPCA`, `PRE`), com taxa contratada, aplicação, vencimento, isenção, IR regressivo, IOF, resgates proporcionais (FIFO), feriados nacionais e projeção em 252 dias úteis.
 
 ## Operação da stack
-- `docker compose up -d --build` sobe Postgres, Redis, migrations, API, worker e web; dados em volumes nomeados (`fincontrol_pgdata`, `fincontrol_redisdata`).
+- Produção: `docker compose -f docker-compose.prod.yml up -d --build` sobe Postgres, Redis, migrations, API, worker e web, publicando só o web. Desenvolvimento: `docker compose up -d --build` sobe a mesma stack e publica também Postgres, Redis e API em `127.0.0.1`. Os dois usam os mesmos volumes nomeados (`fincontrol_pgdata`, `fincontrol_redisdata`).
 - Login único (Argon2 + JWT httpOnly); `/health` e `/ready`; logs JSON com `X-Request-ID`.
 - `uv run python -m fincontrol_worker.seed_demo` preenche um banco **vazio** com dois anos de demonstração.
 - Portão local: `scripts/check.sh` (`--fast`, `--smoke`, `--e2e`).
