@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response, status
-from fincontrol_core.domain.enums import ArcaClass, AssetType
+from fincontrol_core.domain.enums import ArcaClass, AssetType, ContributionPlanStatus
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.research.screener import ScreenerCriteria
 
@@ -14,6 +14,7 @@ from fincontrol_api.dependencies import (
     get_account_handler,
     get_asset_handler,
     get_auth_handler,
+    get_contribution_handler,
     get_earning_handler,
     get_market_data_handler,
     get_policy_handler,
@@ -31,6 +32,7 @@ from fincontrol_api.handlers import (
 )
 from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
+from fincontrol_api.handlers.contribution_handlers import ContributionHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.research_handlers import ResearchHandler
@@ -46,6 +48,7 @@ from fincontrol_api.schemas import (
     AssetResponseDTO,
     AssetUpdateRequest,
     CerradoUpdateRequest,
+    ContributionConfirmRequest,
     ContributionPlanResponseDTO,
     ContributionSimulationRequest,
     CurrentUserDTO,
@@ -60,6 +63,7 @@ from fincontrol_api.schemas import (
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
     ReadinessDTO,
+    SavedContributionPlanDTO,
     ScreenerResponseDTO,
     SeriesStatusDTO,
     TransactionCreateRequest,
@@ -80,6 +84,7 @@ policy_router = APIRouter(prefix="/policy", tags=["Investment Policy"])
 accounts_router = APIRouter(prefix="/accounts", tags=["Accounts"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 research_router = APIRouter(prefix="/research", tags=["Research"])
+contributions_router = APIRouter(prefix="/contributions", tags=["Contributions"])
 
 
 def pagination_query(
@@ -529,3 +534,50 @@ def remove_from_watchlist(
 ) -> Response:
     handler.remove(asset_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Contribution plans: draft -> confirm (trades) or discard (item 12.1)
+# ---------------------------------------------------------------------------
+@contributions_router.post(
+    "", response_model=SavedContributionPlanDTO, status_code=status.HTTP_201_CREATED
+)
+def create_contribution_plan(
+    payload: ContributionSimulationRequest,
+    handler: ContributionHandler = Depends(get_contribution_handler),
+) -> SavedContributionPlanDTO:
+    return handler.create_draft(payload)
+
+
+@contributions_router.get("", response_model=list[SavedContributionPlanDTO])
+def list_contribution_plans(
+    plan_status: ContributionPlanStatus | None = Query(default=None, alias="status"),
+    limit: int = Query(default=20, ge=1, le=100),
+    handler: ContributionHandler = Depends(get_contribution_handler),
+) -> list[SavedContributionPlanDTO]:
+    return handler.list_recent(status=plan_status, limit=limit)
+
+
+@contributions_router.get("/{plan_id}", response_model=SavedContributionPlanDTO)
+def get_contribution_plan(
+    plan_id: int,
+    handler: ContributionHandler = Depends(get_contribution_handler),
+) -> SavedContributionPlanDTO:
+    return handler.get(plan_id)
+
+
+@contributions_router.post("/{plan_id}/confirm", response_model=SavedContributionPlanDTO)
+def confirm_contribution_plan(
+    plan_id: int,
+    payload: ContributionConfirmRequest,
+    handler: ContributionHandler = Depends(get_contribution_handler),
+) -> SavedContributionPlanDTO:
+    return handler.confirm(plan_id, payload)
+
+
+@contributions_router.post("/{plan_id}/discard", response_model=SavedContributionPlanDTO)
+def discard_contribution_plan(
+    plan_id: int,
+    handler: ContributionHandler = Depends(get_contribution_handler),
+) -> SavedContributionPlanDTO:
+    return handler.discard(plan_id)

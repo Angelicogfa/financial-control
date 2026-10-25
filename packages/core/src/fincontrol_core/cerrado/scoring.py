@@ -11,6 +11,7 @@ from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from fincontrol_core.cerrado.questions import (
     CHECKLIST_VERSION,
@@ -37,7 +38,9 @@ from fincontrol_core.fundamentals.history import (
     historical_metrics,
 )
 from fincontrol_core.market.models import Fundamentals
-from fincontrol_core.ports.repositories import AbstractChecklistRepository
+
+if TYPE_CHECKING:
+    from fincontrol_core.ports.repositories import AbstractChecklistRepository
 
 
 class Recommendation(StrEnum):

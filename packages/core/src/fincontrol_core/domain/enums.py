@@ -150,6 +150,12 @@ class IntraClassStrategy(StrEnum):
     EQUAL_WEIGHT = "EQUAL_WEIGHT"
 
 
+class ContributionPlanStatus(StrEnum):
+    DRAFT = "DRAFT"
+    CONFIRMED = "CONFIRMED"
+    DISCARDED = "DISCARDED"
+
+
 class ChecklistProfile(StrEnum):
     """Fundamentalist checklist profile; each one asks the questions that fit the instrument."""
 

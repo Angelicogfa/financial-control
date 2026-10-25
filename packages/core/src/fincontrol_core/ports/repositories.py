@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import date
+from typing import TYPE_CHECKING
 
 from fincontrol_core.domain.entities import (
     AccountEntity,
@@ -24,6 +25,10 @@ from fincontrol_core.domain.enums import SeriesUnit
 from fincontrol_core.domain.pagination import PaginatedResult, PaginationParams
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.policy.models import InvestmentPolicy
+
+if TYPE_CHECKING:
+    from fincontrol_core.domain.enums import ContributionPlanStatus
+    from fincontrol_core.portfolio.contribution_plans import SavedContributionPlan
 
 
 class AbstractAssetRepository(ABC):
@@ -315,4 +320,27 @@ class AbstractCatalogRepository(ABC):
     @abstractmethod
     def list_all(self) -> list[CatalogInstrument]:
         """Whole catalog, highest financial volume first."""
+        raise NotImplementedError
+
+
+class AbstractContributionPlanRepository(ABC):
+    """Repository port for persisted contribution plans."""
+
+    @abstractmethod
+    def add(self, saved: SavedContributionPlan) -> SavedContributionPlan:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, saved: SavedContributionPlan) -> SavedContributionPlan:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, plan_id: int) -> SavedContributionPlan | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_recent(
+        self, *, status: ContributionPlanStatus | None = None, limit: int = 20
+    ) -> list[SavedContributionPlan]:
+        """Newest first."""
         raise NotImplementedError

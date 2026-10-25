@@ -23,16 +23,18 @@ from fincontrol_core.domain.entities import (
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import AnswerSource, SeriesUnit
+from fincontrol_core.domain.enums import AnswerSource, ContributionPlanStatus, SeriesUnit
 from fincontrol_core.domain.pagination import PageMeta, PaginatedResult, PaginationParams
 from fincontrol_core.errors import NotFoundError, ValidationError
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.policy.models import InvestmentPolicy
+from fincontrol_core.portfolio.contribution_plans import SavedContributionPlan, plan_to_payload
 from fincontrol_core.ports.repositories import (
     AbstractAccountRepository,
     AbstractAssetRepository,
     AbstractCatalogRepository,
     AbstractChecklistRepository,
+    AbstractContributionPlanRepository,
     AbstractEarningRepository,
     AbstractFundamentalsRepository,
     AbstractJobRunRepository,
@@ -59,6 +61,7 @@ from fincontrol_persistence.mappers import (
     to_job_run_entity,
     to_market_series_point,
     to_portfolio_snapshot_entity,
+    to_saved_contribution_plan,
     to_transaction_entity,
 )
 from fincontrol_persistence.models import (
@@ -66,6 +69,7 @@ from fincontrol_persistence.models import (
     AssetModel,
     ChecklistAnswerModel,
     ChecklistEvaluationModel,
+    ContributionPlanModel,
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
@@ -935,6 +939,52 @@ class SqlAlchemyCatalogRepository(AbstractCatalogRepository):
             InstrumentCatalogModel.ticker.asc(),
         )
         return [to_catalog_instrument(m) for m in self.session.scalars(stmt).all()]
+
+
+class SqlAlchemyContributionPlanRepository(AbstractContributionPlanRepository):
+    """SQLAlchemy implementation of AbstractContributionPlanRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    @staticmethod
+    def _apply(model: ContributionPlanModel, saved: SavedContributionPlan) -> None:
+        model.status = saved.status.value
+        model.amount_brl = Decimal(str(saved.plan.contribution_amount_brl))
+        model.strategy_override = saved.strategy_override.value if saved.strategy_override else None
+        model.policy_version = saved.policy_version
+        model.account_id = saved.account_id
+        model.payload = plan_to_payload(saved.plan)
+        model.transaction_ids = list(saved.transaction_ids)
+        model.confirmed_at = saved.confirmed_at
+        model.discarded_at = saved.discarded_at
+
+    def add(self, saved: SavedContributionPlan) -> SavedContributionPlan:
+        model = ContributionPlanModel(created_at=saved.created_at or datetime.now(UTC))
+        self._apply(model, saved)
+        self.session.add(model)
+        self.session.flush()
+        return to_saved_contribution_plan(model)
+
+    def update(self, saved: SavedContributionPlan) -> SavedContributionPlan:
+        model = self.session.get(ContributionPlanModel, saved.id) if saved.id else None
+        if model is None:
+            raise NotFoundError(f"Contribution plan id={saved.id} not found")
+        self._apply(model, saved)
+        self.session.flush()
+        return to_saved_contribution_plan(model)
+
+    def get(self, plan_id: int) -> SavedContributionPlan | None:
+        model = self.session.get(ContributionPlanModel, plan_id)
+        return to_saved_contribution_plan(model) if model else None
+
+    def list_recent(
+        self, *, status: ContributionPlanStatus | None = None, limit: int = 20
+    ) -> list[SavedContributionPlan]:
+        stmt = select(ContributionPlanModel).order_by(ContributionPlanModel.id.desc()).limit(limit)
+        if status is not None:
+            stmt = stmt.where(ContributionPlanModel.status == status.value)
+        return [to_saved_contribution_plan(m) for m in self.session.scalars(stmt).all()]
 
 
 # Backward-compatible aliases within persistence package

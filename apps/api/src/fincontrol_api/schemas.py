@@ -15,6 +15,7 @@ from fincontrol_core.domain.enums import (
     AssetPurpose,
     AssetType,
     ChecklistProfile,
+    ContributionPlanStatus,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -432,6 +433,37 @@ class ContributionPlanResponseDTO(BaseModel):
     by_class_allocated_brl: dict[ArcaClass, float]
     orders: list[AssetContributionOrderDTO]
     projected_allocations: list[ClassAllocationDTO]
+
+
+class ExecutionDTO(BaseModel):
+    """What was bought for one asset of the plan; price in the asset currency."""
+
+    asset_id: int
+    quantity: Decimal = Field(..., gt=Decimal("0"))
+    unit_price: Decimal = Field(..., ge=Decimal("0"))
+    fees: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    fx_rate: Decimal = Field(default=Decimal("1"), gt=Decimal("0"))
+
+
+class ContributionConfirmRequest(BaseModel):
+    """Confirm a draft: without `executions`, the suggested quantities and prices are used."""
+
+    trade_date: date
+    account_id: int | None = None
+    executions: list[ExecutionDTO] | None = None
+
+
+class SavedContributionPlanDTO(BaseModel):
+    id: int
+    status: ContributionPlanStatus
+    created_at: datetime | None = None
+    confirmed_at: datetime | None = None
+    discarded_at: datetime | None = None
+    strategy_override: IntraClassStrategy | None = None
+    policy_version: int | None = None
+    account_id: int | None = None
+    transaction_ids: list[int] = Field(default_factory=list)
+    plan: ContributionPlanResponseDTO
 
 
 class ArcaTargetItemDTO(BaseModel):

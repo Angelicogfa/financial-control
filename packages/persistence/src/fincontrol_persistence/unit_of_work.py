@@ -13,6 +13,7 @@ from fincontrol_persistence.repositories import (
     SqlAlchemyAssetRepository,
     SqlAlchemyCatalogRepository,
     SqlAlchemyChecklistRepository,
+    SqlAlchemyContributionPlanRepository,
     SqlAlchemyEarningRepository,
     SqlAlchemyFundamentalsRepository,
     SqlAlchemyJobRunRepository,
@@ -43,6 +44,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.fundamentals = SqlAlchemyFundamentalsRepository(self.session)
         self.checklists = SqlAlchemyChecklistRepository(self.session)
         self.catalog = SqlAlchemyCatalogRepository(self.session)
+        self.contribution_plans = SqlAlchemyContributionPlanRepository(self.session)
         return self
 
     def __exit__(

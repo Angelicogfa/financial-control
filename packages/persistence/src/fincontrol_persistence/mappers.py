@@ -26,6 +26,7 @@ from fincontrol_core.domain.enums import (
     AssetPurpose,
     AssetType,
     ChecklistProfile,
+    ContributionPlanStatus,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -44,12 +45,14 @@ from fincontrol_core.policy.models import (
     InvestmentPolicy,
     ValuationPolicy,
 )
+from fincontrol_core.portfolio.contribution_plans import SavedContributionPlan, plan_from_payload
 
 from fincontrol_persistence.models import (
     AccountModel,
     AssetModel,
     ChecklistAnswerModel,
     ChecklistEvaluationModel,
+    ContributionPlanModel,
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
@@ -314,4 +317,21 @@ def to_catalog_instrument(model: InstrumentCatalogModel) -> CatalogInstrument:
         market_cap=model.market_cap,
         logo_url=model.logo_url,
         updated_at=model.updated_at,
+    )
+
+
+def to_saved_contribution_plan(model: ContributionPlanModel) -> SavedContributionPlan:
+    return SavedContributionPlan(
+        id=model.id,
+        plan=plan_from_payload(model.payload),
+        status=ContributionPlanStatus(model.status),
+        strategy_override=(
+            IntraClassStrategy(model.strategy_override) if model.strategy_override else None
+        ),
+        policy_version=model.policy_version,
+        account_id=model.account_id,
+        transaction_ids=tuple(model.transaction_ids or ()),
+        created_at=model.created_at,
+        confirmed_at=model.confirmed_at,
+        discarded_at=model.discarded_at,
     )

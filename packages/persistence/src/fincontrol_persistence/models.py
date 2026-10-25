@@ -375,3 +375,25 @@ class InstrumentCatalogModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
+
+
+class ContributionPlanModel(Base):
+    """Contribution plan as suggested (payload) and what happened to it (status)."""
+
+    __tablename__ = "contribution_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    amount_brl: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    strategy_override: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    policy_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    account_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("accounts.id"), nullable=True
+    )
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    transaction_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    discarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
