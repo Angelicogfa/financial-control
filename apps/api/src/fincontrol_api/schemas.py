@@ -16,6 +16,7 @@ from fincontrol_core.domain.enums import (
     AssetType,
     ChecklistProfile,
     ContributionPlanStatus,
+    CorporateEventKind,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -433,6 +434,23 @@ class ContributionPlanResponseDTO(BaseModel):
     by_class_allocated_brl: dict[ArcaClass, float]
     orders: list[AssetContributionOrderDTO]
     projected_allocations: list[ClassAllocationDTO]
+
+
+class CorporateEventRequest(BaseModel):
+    """Split (factor 2 for 1:2), reverse split (0.1 for 10:1) or bonus (1.1 for 10%)."""
+
+    asset_id: int
+    kind: CorporateEventKind
+    ex_date: date
+    factor: Decimal = Field(..., gt=Decimal("0"))
+    unit_cost: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    notes: str | None = None
+
+
+class CorporateEventDTO(CorporateEventRequest):
+    id: int
+    ticker: str | None = None
+    imported: bool = False
 
 
 class ExecutionDTO(BaseModel):

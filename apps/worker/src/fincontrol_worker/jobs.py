@@ -278,6 +278,7 @@ def _snapshot(
     quotes: dict[str, Quote],
     usd_brl: float,
     curves: RateCurves,
+    split_adjust_through: date | None = None,
 ) -> PortfolioSnapshotEntity:
     report = consolidate_portfolio(
         assets=assets,
@@ -289,6 +290,7 @@ def _snapshot(
         usd_brl_rate=usd_brl,
         curves=curves,
         as_of_date=day,
+        split_adjust_through=split_adjust_through,
     )
     invalid = invalid_ledger_tickers(report)
     if invalid:
@@ -405,6 +407,8 @@ def backfill_snapshots_job(
                     quotes=quotes,
                     usd_brl=fx.on(day) or default_fx,
                     curves=curves,
+                    # Historical closes are split-adjusted: count shares as of `end`.
+                    split_adjust_through=end,
                 )
                 written += 1
             previous = day

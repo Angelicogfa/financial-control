@@ -21,6 +21,7 @@ from fincontrol_core.domain.enums import (
     AssetPurpose,
     AssetType,
     ChecklistProfile,
+    CorporateEventKind,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -99,6 +100,7 @@ class TransactionEntity:
     fx_rate: Decimal = Decimal("1")
     notes: str | None = None
     account_id: int | None = None
+    import_hash: str | None = None
     id: int | None = None
     created_at: datetime | None = None
 
@@ -111,6 +113,36 @@ class TransactionEntity:
             raise ValidationError("fees cannot be negative")
         if self.fx_rate <= Decimal("0"):
             raise ValidationError("fx_rate must be positive")
+
+
+@dataclass(frozen=True)
+class CorporateEventEntity:
+    """Split, reverse split or bonus issue changing the share count from `ex_date` on.
+
+    `factor` multiplies the held quantity (2 for a 1:2 split, 0.1 for a 10:1 reverse split,
+    1.1 for a 10% bonus). Bonus shares enter the cost at `unit_cost` (custo atribuído).
+    """
+
+    asset_id: int
+    kind: CorporateEventKind
+    ex_date: date
+    factor: Decimal
+    unit_cost: Decimal = Decimal("0")
+    notes: str | None = None
+    import_hash: str | None = None
+    id: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.factor <= Decimal("0"):
+            raise ValidationError("factor must be positive")
+        if self.kind == CorporateEventKind.REVERSE_SPLIT and self.factor >= Decimal("1"):
+            raise ValidationError("A reverse split reduces shares: factor must be below 1")
+        if self.kind != CorporateEventKind.REVERSE_SPLIT and self.factor <= Decimal("1"):
+            raise ValidationError("Splits and bonus issues add shares: factor must exceed 1")
+        if self.unit_cost < Decimal("0"):
+            raise ValidationError("unit_cost cannot be negative")
+        if self.kind != CorporateEventKind.BONUS and self.unit_cost != Decimal("0"):
+            raise ValidationError("Only bonus issues carry an attributed unit cost")
 
 
 @dataclass(frozen=True)
@@ -127,6 +159,7 @@ class EarningEntity:
     notes: str | None = None
     fx_rate: Decimal = Decimal("1")
     account_id: int | None = None
+    import_hash: str | None = None
     id: int | None = None
     created_at: datetime | None = None
 
@@ -207,6 +240,7 @@ class AssetEntity:
     fixed_income_term: FixedIncomeTermEntity | None = None
     transactions: tuple[TransactionEntity, ...] = ()
     earnings: tuple[EarningEntity, ...] = ()
+    corporate_events: tuple[CorporateEventEntity, ...] = ()
     id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

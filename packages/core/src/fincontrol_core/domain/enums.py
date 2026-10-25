@@ -150,6 +150,14 @@ class IntraClassStrategy(StrEnum):
     EQUAL_WEIGHT = "EQUAL_WEIGHT"
 
 
+class CorporateEventKind(StrEnum):
+    """Share-count events. Factor = shares after / shares before (ex-date)."""
+
+    SPLIT = "SPLIT"
+    REVERSE_SPLIT = "REVERSE_SPLIT"
+    BONUS = "BONUS"
+
+
 class ContributionPlanStatus(StrEnum):
     DRAFT = "DRAFT"
     CONFIRMED = "CONFIRMED"

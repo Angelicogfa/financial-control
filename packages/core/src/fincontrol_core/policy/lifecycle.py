@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from fincontrol_core.cerrado.scoring import CerradoEvaluation
-from fincontrol_core.domain.entities import AssetEntity, TransactionEntity
+from fincontrol_core.domain.entities import AssetEntity, CorporateEventEntity, TransactionEntity
 from fincontrol_core.domain.enums import AssetLifecycle, AssetPurpose, TransactionKind
 from fincontrol_core.policy.models import EligibilityPolicy
 
@@ -36,17 +36,29 @@ def is_eligible(
     return evaluation.score >= policy.min_score and coverage_pct >= policy.min_coverage_pct
 
 
-def has_position(transactions: Iterable[TransactionEntity], *, fixed_income: bool) -> bool:
+def has_position(
+    transactions: Iterable[TransactionEntity],
+    *,
+    fixed_income: bool,
+    events: Iterable[CorporateEventEntity] = (),
+) -> bool:
     """Open position from the ledger: units for market assets, money for fixed income."""
     entries = list(transactions)
     if fixed_income:
         bought = sum(float(t.quantity * t.unit_price) for t in entries if t.kind == "BUY")
         sold = sum(float(t.quantity * t.unit_price) for t in entries if t.kind == "SELL")
         return bought > 0 and sold < bought
-    held = sum(
-        float(t.quantity) if t.kind == TransactionKind.BUY else -float(t.quantity) for t in entries
-    )
-    return held > 1e-9
+    # Imported here: the portfolio package imports this module (consolidation).
+    from fincontrol_core.portfolio.positions import InsufficientQuantityError, build_position
+
+    try:
+        return build_position(entries, events=events).quantity > 0
+    except InsufficientQuantityError:
+        held = sum(
+            float(t.quantity) if t.kind == TransactionKind.BUY else -float(t.quantity)
+            for t in entries
+        )
+        return held > 1e-9
 
 
 def lifecycle_status(*, is_active: bool, holds_position: bool, eligible: bool) -> AssetLifecycle:
@@ -65,7 +77,9 @@ def asset_lifecycle(
     status = lifecycle_status(
         is_active=asset.is_active,
         holds_position=has_position(
-            asset.transactions, fixed_income=asset.fixed_income_term is not None
+            asset.transactions,
+            fixed_income=asset.fixed_income_term is not None,
+            events=asset.corporate_events,
         ),
         eligible=eligible,
     )

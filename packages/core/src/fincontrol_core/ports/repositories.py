@@ -15,6 +15,7 @@ from fincontrol_core.domain.entities import (
     CatalogInstrument,
     ChecklistAnswer,
     ChecklistEvaluationRecord,
+    CorporateEventEntity,
     EarningEntity,
     JobRunEntity,
     MarketSeriesPoint,
@@ -343,4 +344,33 @@ class AbstractContributionPlanRepository(ABC):
         self, *, status: ContributionPlanStatus | None = None, limit: int = 20
     ) -> list[SavedContributionPlan]:
         """Newest first."""
+        raise NotImplementedError
+
+
+class AbstractCorporateEventRepository(ABC):
+    """Repository port for splits, reverse splits and bonus issues."""
+
+    @abstractmethod
+    def add(self, event: CorporateEventEntity) -> CorporateEventEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, event_id: int) -> CorporateEventEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete(self, event_id: int) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self, *, asset_id: int | None = None) -> list[CorporateEventEntity]:
+        """Events ordered by ex-date."""
+        raise NotImplementedError
+
+
+class AbstractLedgerImportRepository(ABC):
+    """Deduplication of imported ledger lines (trades, earnings, events) by content hash."""
+
+    @abstractmethod
+    def existing_hashes(self, hashes: list[str]) -> set[str]:
         raise NotImplementedError

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from decimal import Decimal
 
-from fincontrol_core.domain.entities import AssetEntity, TransactionEntity
+from fincontrol_core.domain.entities import AssetEntity, CorporateEventEntity, TransactionEntity
 from fincontrol_core.errors import ConflictError, ValidationError
 from fincontrol_core.portfolio.fixed_income import RateCurves, value_fixed_income_position
 from fincontrol_core.portfolio.positions import InsufficientQuantityError, build_position
@@ -32,8 +32,12 @@ def validate_ledger(
     transactions: Iterable[TransactionEntity],
     *,
     curves: RateCurves | None = None,
+    events: Iterable[CorporateEventEntity] | None = None,
 ) -> None:
-    """Raise `InsufficientQuantityError` if the ledger sells more than it holds at any date."""
+    """Raise `InsufficientQuantityError` if the ledger sells more than it holds at any date.
+
+    Corporate events default to the asset's own; pass `events` to validate a changed list.
+    """
     entries = list(transactions)
     if not entries:
         return
@@ -41,7 +45,7 @@ def validate_ledger(
         last_date = max(t.trade_date for t in entries)
         value_fixed_income_position(entries, asset.fixed_income_term, last_date, curves=curves)
     else:
-        build_position(entries)
+        build_position(entries, events=asset.corporate_events if events is None else tuple(events))
 
 
 def validate_ledger_change(
@@ -49,10 +53,11 @@ def validate_ledger_change(
     transactions: Iterable[TransactionEntity],
     *,
     curves: RateCurves | None = None,
+    events: Iterable[CorporateEventEntity] | None = None,
 ) -> None:
     """Validate a ledger after removing/editing an entry, reporting breakage as a conflict."""
     try:
-        validate_ledger(asset, transactions, curves=curves)
+        validate_ledger(asset, transactions, curves=curves, events=events)
     except InsufficientQuantityError as err:
         raise LedgerConflictError(
             f"This change would leave {asset.ticker} with an invalid ledger: {err}"

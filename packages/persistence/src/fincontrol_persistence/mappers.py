@@ -11,6 +11,7 @@ from fincontrol_core.domain.entities import (
     CatalogInstrument,
     ChecklistAnswer,
     ChecklistEvaluationRecord,
+    CorporateEventEntity,
     EarningEntity,
     FixedIncomeTermEntity,
     JobRunEntity,
@@ -27,6 +28,7 @@ from fincontrol_core.domain.enums import (
     AssetType,
     ChecklistProfile,
     ContributionPlanStatus,
+    CorporateEventKind,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -53,6 +55,7 @@ from fincontrol_persistence.models import (
     ChecklistAnswerModel,
     ChecklistEvaluationModel,
     ContributionPlanModel,
+    CorporateEventModel,
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
@@ -105,6 +108,7 @@ def to_transaction_entity(model: TransactionModel) -> TransactionEntity:
         fx_rate=Decimal(model.fx_rate),
         notes=model.notes,
         account_id=model.account_id,
+        import_hash=model.import_hash,
         created_at=model.created_at,
     )
 
@@ -122,6 +126,7 @@ def to_earning_entity(model: EarningModel) -> EarningEntity:
         fx_rate=Decimal(model.fx_rate),
         notes=model.notes,
         account_id=model.account_id,
+        import_hash=model.import_hash,
         created_at=model.created_at,
     )
 
@@ -174,9 +179,11 @@ def to_asset_entity(
     )
     txs: tuple[TransactionEntity, ...] = ()
     earnings: tuple[EarningEntity, ...] = ()
+    events: tuple[CorporateEventEntity, ...] = ()
     if include_children:
         txs = tuple(to_transaction_entity(t) for t in model.transactions)
         earnings = tuple(to_earning_entity(e) for e in model.earnings)
+        events = tuple(to_corporate_event(e) for e in model.corporate_events)
 
     return AssetEntity(
         id=model.id,
@@ -200,6 +207,7 @@ def to_asset_entity(
         fixed_income_term=fi_term,
         transactions=txs,
         earnings=earnings,
+        corporate_events=events,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
@@ -334,4 +342,17 @@ def to_saved_contribution_plan(model: ContributionPlanModel) -> SavedContributio
         created_at=model.created_at,
         confirmed_at=model.confirmed_at,
         discarded_at=model.discarded_at,
+    )
+
+
+def to_corporate_event(model: CorporateEventModel) -> CorporateEventEntity:
+    return CorporateEventEntity(
+        id=model.id,
+        asset_id=model.asset_id,
+        kind=CorporateEventKind(model.kind),
+        ex_date=model.ex_date,
+        factor=Decimal(model.factor),
+        unit_cost=Decimal(model.unit_cost or 0),
+        notes=model.notes,
+        import_hash=model.import_hash,
     )

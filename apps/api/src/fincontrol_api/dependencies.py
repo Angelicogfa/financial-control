@@ -18,6 +18,7 @@ from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.asset_handlers import AssetHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.contribution_handlers import ContributionHandler
+from fincontrol_api.handlers.event_handlers import CorporateEventHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.portfolio_handlers import (
@@ -67,6 +68,13 @@ def get_asset_handler(
 ) -> AssetHandler:
     """Provide the AssetHandler instance."""
     return AssetHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
+
+
+def get_event_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+) -> CorporateEventHandler:
+    """Provide the CorporateEventHandler instance."""
+    return CorporateEventHandler(uow_factory=uow_factory)
 
 
 def get_contribution_handler(

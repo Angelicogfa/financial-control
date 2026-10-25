@@ -17,6 +17,7 @@ from fincontrol_core.domain.entities import (
     CatalogInstrument,
     ChecklistAnswer,
     ChecklistEvaluationRecord,
+    CorporateEventEntity,
     EarningEntity,
     JobRunEntity,
     MarketSeriesPoint,
@@ -35,9 +36,11 @@ from fincontrol_core.ports.repositories import (
     AbstractCatalogRepository,
     AbstractChecklistRepository,
     AbstractContributionPlanRepository,
+    AbstractCorporateEventRepository,
     AbstractEarningRepository,
     AbstractFundamentalsRepository,
     AbstractJobRunRepository,
+    AbstractLedgerImportRepository,
     AbstractMarketSeriesRepository,
     AbstractPolicyRepository,
     AbstractPortfolioSnapshotRepository,
@@ -54,6 +57,7 @@ from fincontrol_persistence.mappers import (
     to_catalog_instrument,
     to_checklist_answer,
     to_checklist_evaluation,
+    to_corporate_event,
     to_earning_entity,
     to_fixed_income_term_model,
     to_fundamental_snapshot,
@@ -70,6 +74,7 @@ from fincontrol_persistence.models import (
     ChecklistAnswerModel,
     ChecklistEvaluationModel,
     ContributionPlanModel,
+    CorporateEventModel,
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
@@ -187,6 +192,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             .options(
                 selectinload(AssetModel.fixed_income_term),
                 selectinload(AssetModel.checklist_answers),
+                selectinload(AssetModel.corporate_events),
             )
             .where(AssetModel.id == asset.id)
         )
@@ -235,6 +241,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
                 selectinload(AssetModel.transactions),
                 selectinload(AssetModel.earnings),
                 selectinload(AssetModel.checklist_answers),
+                selectinload(AssetModel.corporate_events),
             )
             .where(AssetModel.id == asset_id)
         )
@@ -249,6 +256,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
                 selectinload(AssetModel.transactions),
                 selectinload(AssetModel.earnings),
                 selectinload(AssetModel.checklist_answers),
+                selectinload(AssetModel.corporate_events),
             )
             .where(AssetModel.ticker == ticker.strip().upper())
         )
@@ -261,6 +269,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             selectinload(AssetModel.transactions),
             selectinload(AssetModel.earnings),
             selectinload(AssetModel.checklist_answers),
+            selectinload(AssetModel.corporate_events),
         )
         if active_only:
             stmt = stmt.where(AssetModel.is_active.is_(True))
@@ -282,6 +291,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
             selectinload(AssetModel.transactions),
             selectinload(AssetModel.earnings),
             selectinload(AssetModel.checklist_answers),
+            selectinload(AssetModel.corporate_events),
         )
         if active_only:
             stmt = stmt.where(AssetModel.is_active.is_(True))
@@ -360,6 +370,7 @@ class SqlAlchemyTransactionRepository(_AccountDefaultMixin, AbstractTransactionR
             fx_rate=transaction.fx_rate,
             notes=transaction.notes,
             account_id=self._account_id(transaction.account_id),
+            import_hash=transaction.import_hash,
         )
         self.session.add(model)
         self.session.flush()
@@ -468,6 +479,7 @@ class SqlAlchemyEarningRepository(_AccountDefaultMixin, AbstractEarningRepositor
             fx_rate=earning.fx_rate,
             notes=earning.notes,
             account_id=self._account_id(earning.account_id),
+            import_hash=earning.import_hash,
         )
         self.session.add(model)
         self.session.flush()
@@ -985,6 +997,67 @@ class SqlAlchemyContributionPlanRepository(AbstractContributionPlanRepository):
         if status is not None:
             stmt = stmt.where(ContributionPlanModel.status == status.value)
         return [to_saved_contribution_plan(m) for m in self.session.scalars(stmt).all()]
+
+
+class SqlAlchemyCorporateEventRepository(AbstractCorporateEventRepository):
+    """SQLAlchemy implementation of AbstractCorporateEventRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, event: CorporateEventEntity) -> CorporateEventEntity:
+        model = CorporateEventModel(
+            asset_id=event.asset_id,
+            kind=event.kind.value,
+            ex_date=event.ex_date,
+            factor=event.factor,
+            unit_cost=event.unit_cost,
+            notes=event.notes,
+            import_hash=event.import_hash,
+        )
+        self.session.add(model)
+        self.session.flush()
+        return to_corporate_event(model)
+
+    def get(self, event_id: int) -> CorporateEventEntity | None:
+        model = self.session.get(CorporateEventModel, event_id)
+        return to_corporate_event(model) if model else None
+
+    def delete(self, event_id: int) -> bool:
+        model = self.session.get(CorporateEventModel, event_id)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.flush()
+        return True
+
+    def list_all(self, *, asset_id: int | None = None) -> list[CorporateEventEntity]:
+        stmt = select(CorporateEventModel).order_by(
+            CorporateEventModel.ex_date.asc(), CorporateEventModel.id.asc()
+        )
+        if asset_id is not None:
+            stmt = stmt.where(CorporateEventModel.asset_id == asset_id)
+        return [to_corporate_event(m) for m in self.session.scalars(stmt).all()]
+
+
+class SqlAlchemyLedgerImportRepository(AbstractLedgerImportRepository):
+    """Looks up import hashes across trades, earnings and corporate events."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def existing_hashes(self, hashes: list[str]) -> set[str]:
+        wanted = sorted(set(hashes))
+        found: set[str] = set()
+        for start in range(0, len(wanted), 500):
+            chunk = wanted[start : start + 500]
+            for column in (
+                TransactionModel.import_hash,
+                EarningModel.import_hash,
+                CorporateEventModel.import_hash,
+            ):
+                found.update(self.session.scalars(select(column).where(column.in_(chunk))))
+        return found
 
 
 # Backward-compatible aliases within persistence package

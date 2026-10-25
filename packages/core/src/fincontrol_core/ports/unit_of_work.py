@@ -11,9 +11,11 @@ from fincontrol_core.ports.repositories import (
     AbstractCatalogRepository,
     AbstractChecklistRepository,
     AbstractContributionPlanRepository,
+    AbstractCorporateEventRepository,
     AbstractEarningRepository,
     AbstractFundamentalsRepository,
     AbstractJobRunRepository,
+    AbstractLedgerImportRepository,
     AbstractMarketSeriesRepository,
     AbstractPolicyRepository,
     AbstractPortfolioSnapshotRepository,
@@ -36,6 +38,8 @@ class AbstractUnitOfWork(ABC):
     checklists: AbstractChecklistRepository
     catalog: AbstractCatalogRepository
     contribution_plans: AbstractContributionPlanRepository
+    corporate_events: AbstractCorporateEventRepository
+    ledger_imports: AbstractLedgerImportRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

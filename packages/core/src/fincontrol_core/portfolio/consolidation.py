@@ -321,10 +321,19 @@ def _value_fixed_income(v: _Valuation, ref_date: date, curves: RateCurves) -> No
 
 
 def _value_market_asset(
-    v: _Valuation, ref_date: date, quote: Quote | None, usd_brl_rate: float
+    v: _Valuation,
+    ref_date: date,
+    quote: Quote | None,
+    usd_brl_rate: float,
+    adjust_through: date | None = None,
 ) -> None:
     asset = v.asset
-    pos = build_position(asset.transactions, up_to_date=ref_date)
+    pos = build_position(
+        asset.transactions,
+        up_to_date=ref_date,
+        events=asset.corporate_events,
+        adjust_through=adjust_through,
+    )
     v.fx = usd_brl_rate if (asset.currency or "BRL").upper() == "USD" else 1.0
     v.qty = float(pos.quantity)
     v.avg_price = float(pos.average_price)
@@ -358,8 +367,13 @@ def consolidate_portfolio(
     assumptions: ProjectionAssumptions | None = None,
     as_of_date: date | None = None,
     date_from: date | None = None,
+    split_adjust_through: date | None = None,
 ) -> ConsolidatedPortfolioReport:
-    """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations."""
+    """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations.
+
+    `split_adjust_through` is for past dates valued with split-adjusted price series: the
+    quantity is expressed in the share terms of that date (corporate events, item 12.4).
+    """
     ref_date = as_of_date or date.today()
     rate_curves = curves or RateCurves()
     premises = assumptions or ProjectionAssumptions()
@@ -378,7 +392,13 @@ def consolidate_portfolio(
             if asset.asset_type in FIXED_INCOME_TYPES and asset.fixed_income_term is not None:
                 _value_fixed_income(v, ref_date, rate_curves)
             else:
-                _value_market_asset(v, ref_date, quotes_map.get(asset.ticker), usd_brl_rate)
+                _value_market_asset(
+                    v,
+                    ref_date,
+                    quotes_map.get(asset.ticker),
+                    usd_brl_rate,
+                    adjust_through=split_adjust_through,
+                )
         except InsufficientQuantityError as err:
             v = _Valuation(asset=asset, ledger_message=str(err))
         valuations.append(v)
@@ -427,7 +447,11 @@ def consolidate_portfolio(
         holds = (
             v.invested_brl > 0 or v.qty > 0
             if v.is_valid
-            else has_position(asset.transactions, fixed_income=asset.fixed_income_term is not None)
+            else has_position(
+                asset.transactions,
+                fixed_income=asset.fixed_income_term is not None,
+                events=asset.corporate_events,
+            )
         )
         status = lifecycle_status(
             is_active=asset.is_active, holds_position=holds, eligible=eligible

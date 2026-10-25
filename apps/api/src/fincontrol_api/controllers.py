@@ -16,6 +16,7 @@ from fincontrol_api.dependencies import (
     get_auth_handler,
     get_contribution_handler,
     get_earning_handler,
+    get_event_handler,
     get_market_data_handler,
     get_policy_handler,
     get_portfolio_handler,
@@ -33,6 +34,7 @@ from fincontrol_api.handlers import (
 from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.contribution_handlers import ContributionHandler
+from fincontrol_api.handlers.event_handlers import CorporateEventHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.research_handlers import ResearchHandler
@@ -51,6 +53,8 @@ from fincontrol_api.schemas import (
     ContributionConfirmRequest,
     ContributionPlanResponseDTO,
     ContributionSimulationRequest,
+    CorporateEventDTO,
+    CorporateEventRequest,
     CurrentUserDTO,
     EarningCreateRequest,
     EarningResponseDTO,
@@ -85,6 +89,7 @@ accounts_router = APIRouter(prefix="/accounts", tags=["Accounts"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 research_router = APIRouter(prefix="/research", tags=["Research"])
 contributions_router = APIRouter(prefix="/contributions", tags=["Contributions"])
+events_router = APIRouter(prefix="/corporate-events", tags=["Corporate Events"])
 
 
 def pagination_query(
@@ -581,3 +586,31 @@ def discard_contribution_plan(
     handler: ContributionHandler = Depends(get_contribution_handler),
 ) -> SavedContributionPlanDTO:
     return handler.discard(plan_id)
+
+
+# ---------------------------------------------------------------------------
+# Corporate events (item 12.4)
+# ---------------------------------------------------------------------------
+@events_router.get("", response_model=list[CorporateEventDTO])
+def list_corporate_events(
+    asset_id: int | None = Query(default=None),
+    handler: CorporateEventHandler = Depends(get_event_handler),
+) -> list[CorporateEventDTO]:
+    return handler.list_all(asset_id=asset_id)
+
+
+@events_router.post("", response_model=CorporateEventDTO, status_code=status.HTTP_201_CREATED)
+def create_corporate_event(
+    payload: CorporateEventRequest,
+    handler: CorporateEventHandler = Depends(get_event_handler),
+) -> CorporateEventDTO:
+    return handler.create(payload)
+
+
+@events_router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_corporate_event(
+    event_id: int,
+    handler: CorporateEventHandler = Depends(get_event_handler),
+) -> Response:
+    handler.delete(event_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -14,9 +14,11 @@ from fincontrol_persistence.repositories import (
     SqlAlchemyCatalogRepository,
     SqlAlchemyChecklistRepository,
     SqlAlchemyContributionPlanRepository,
+    SqlAlchemyCorporateEventRepository,
     SqlAlchemyEarningRepository,
     SqlAlchemyFundamentalsRepository,
     SqlAlchemyJobRunRepository,
+    SqlAlchemyLedgerImportRepository,
     SqlAlchemyMarketSeriesRepository,
     SqlAlchemyPolicyRepository,
     SqlAlchemyPortfolioSnapshotRepository,
@@ -45,6 +47,8 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.checklists = SqlAlchemyChecklistRepository(self.session)
         self.catalog = SqlAlchemyCatalogRepository(self.session)
         self.contribution_plans = SqlAlchemyContributionPlanRepository(self.session)
+        self.corporate_events = SqlAlchemyCorporateEventRepository(self.session)
+        self.ledger_imports = SqlAlchemyLedgerImportRepository(self.session)
         return self
 
     def __exit__(

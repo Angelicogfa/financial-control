@@ -89,6 +89,11 @@ class AssetModel(Base):
         cascade="all, delete-orphan",
         order_by="EarningModel.payment_date.asc(), EarningModel.id.asc()",
     )
+    corporate_events: Mapped[list[CorporateEventModel]] = relationship(
+        "CorporateEventModel",
+        cascade="all, delete-orphan",
+        order_by="CorporateEventModel.ex_date.asc(), CorporateEventModel.id.asc()",
+    )
     checklist_answers: Mapped[list[ChecklistAnswerModel]] = relationship(
         "ChecklistAnswerModel",
         cascade="all, delete-orphan",
@@ -177,6 +182,7 @@ class TransactionModel(Base):
     account_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("accounts.id"), nullable=False, index=True
     )
+    import_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
@@ -213,6 +219,7 @@ class EarningModel(Base):
     account_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("accounts.id"), nullable=False, index=True
     )
+    import_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
@@ -397,3 +404,27 @@ class ContributionPlanModel(Base):
     transaction_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     discarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CorporateEventModel(Base):
+    """Split, reverse split or bonus issue of an asset (item 12.4)."""
+
+    __tablename__ = "corporate_events"
+    __table_args__ = (
+        CheckConstraint("factor > 0", name="ck_corporate_events_factor_positive"),
+        CheckConstraint("unit_cost >= 0", name="ck_corporate_events_unit_cost"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    ex_date: Mapped[date] = mapped_column(Date, nullable=False)
+    factor: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    import_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
