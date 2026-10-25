@@ -14,6 +14,7 @@ from typing import Any
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
+    CatalogInstrument,
     ChecklistAnswer,
     ChecklistEvaluationRecord,
     EarningEntity,
@@ -30,6 +31,7 @@ from fincontrol_core.policy.models import InvestmentPolicy
 from fincontrol_core.ports.repositories import (
     AbstractAccountRepository,
     AbstractAssetRepository,
+    AbstractCatalogRepository,
     AbstractChecklistRepository,
     AbstractEarningRepository,
     AbstractFundamentalsRepository,
@@ -47,6 +49,7 @@ from fincontrol_persistence.mappers import (
     policy_payload,
     to_account_entity,
     to_asset_entity,
+    to_catalog_instrument,
     to_checklist_answer,
     to_checklist_evaluation,
     to_earning_entity,
@@ -66,6 +69,7 @@ from fincontrol_persistence.models import (
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
+    InstrumentCatalogModel,
     InvestmentPolicyModel,
     JobRunModel,
     MarketSeriesModel,
@@ -893,6 +897,44 @@ class SqlAlchemyChecklistRepository(AbstractChecklistRepository):
         )
         rows = [to_checklist_evaluation(m) for m in self.session.scalars(stmt).all()]
         return rows[::-1]
+
+
+class SqlAlchemyCatalogRepository(AbstractCatalogRepository):
+    """SQLAlchemy implementation of AbstractCatalogRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def upsert(self, instruments: list[CatalogInstrument]) -> int:
+        existing = {m.ticker: m for m in self.session.scalars(select(InstrumentCatalogModel))}
+        for item in instruments:
+            model = existing.get(item.ticker)
+            if model is None:
+                model = InstrumentCatalogModel(ticker=item.ticker)
+                self.session.add(model)
+                existing[item.ticker] = model
+            model.name = item.name[:160]
+            model.asset_type = item.asset_type.value if item.asset_type else None
+            model.sector = item.sector[:80] if item.sector else None
+            model.close = item.close
+            model.change_pct = item.change_pct
+            model.volume_brl = item.volume_brl
+            model.market_cap = item.market_cap
+            model.logo_url = item.logo_url[:255] if item.logo_url else None
+            model.updated_at = item.updated_at or datetime.now(UTC)
+        self.session.flush()
+        return len(instruments)
+
+    def get(self, ticker: str) -> CatalogInstrument | None:
+        model = self.session.get(InstrumentCatalogModel, ticker.strip().upper())
+        return to_catalog_instrument(model) if model else None
+
+    def list_all(self) -> list[CatalogInstrument]:
+        stmt = select(InstrumentCatalogModel).order_by(
+            InstrumentCatalogModel.volume_brl.desc().nulls_last(),
+            InstrumentCatalogModel.ticker.asc(),
+        )
+        return [to_catalog_instrument(m) for m in self.session.scalars(stmt).all()]
 
 
 # Backward-compatible aliases within persistence package

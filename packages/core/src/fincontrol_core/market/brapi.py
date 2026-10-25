@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from fincontrol_core.domain.entities import CatalogInstrument
+from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.market.models import (
     Fundamentals,
@@ -142,6 +144,31 @@ class BrapiProvider:
             )
         points.sort(key=lambda p: p.date)
         return points
+
+    def list_instruments(
+        self, *, page_size: int = 100, max_pages: int = 50
+    ) -> list[CatalogInstrument]:
+        """Every listed B3 instrument from /quote/list (paginated); empty on failure."""
+        fetched_at = datetime.now(UTC)
+        instruments: dict[str, CatalogInstrument] = {}
+        for page in range(1, max_pages + 1):
+            try:
+                resp = self._client.get(
+                    f"{self.base_url}/quote/list",
+                    params={"page": page, "limit": page_size, "sortBy": "volume"},
+                    headers=self._headers(),
+                )
+                resp.raise_for_status()
+                payload = resp.json()
+            except Exception:
+                break
+            for item in payload.get("stocks") or []:
+                instrument = parse_brapi_list_item(item, fetched_at)
+                if instrument is not None:
+                    instruments.setdefault(instrument.ticker, instrument)
+            if not payload.get("hasNextPage") or page >= int(payload.get("totalPages") or page):
+                break
+        return list(instruments.values())
 
     def get_annual_statements(self, symbol: str) -> list[FundamentalSnapshot]:
         """Yearly statement history for a B3 symbol (empty when unavailable)."""
@@ -290,3 +317,41 @@ def parse_brapi_statements(symbol: str, item: dict[str, Any]) -> list[Fundamenta
         )
         for ref, metrics in sorted(by_year.items())
     ]
+
+
+_ETF_HINTS = ("ETF", "INDICE", "ÍNDICE", "INDEX")
+
+
+def classify_brapi_type(raw_type: str | None, name: str) -> AssetType | None:
+    """Map brapi's `type` (stock, fund, bdr) to an AssetType; funds split into ETF and FII."""
+    kind = (raw_type or "").lower()
+    if kind == "stock":
+        return AssetType.STOCK_BR
+    if kind == "bdr":
+        return AssetType.BDR
+    if kind == "fund":
+        upper = name.upper()
+        return AssetType.ETF_BR if any(h in upper for h in _ETF_HINTS) else AssetType.FII
+    return None
+
+
+def parse_brapi_list_item(item: dict[str, Any], fetched_at: datetime) -> CatalogInstrument | None:
+    ticker = str(item.get("stock") or "").strip().upper()
+    if not ticker:
+        return None
+    name = str(item.get("name") or ticker).strip()
+    close = _float_or_none(item.get("close"))
+    return CatalogInstrument(
+        ticker=ticker,
+        name=name,
+        asset_type=classify_brapi_type(item.get("type"), name),
+        sector=item.get("sector") or None,
+        close=close,
+        change_pct=(
+            change / 100.0 if (change := _float_or_none(item.get("change"))) is not None else None
+        ),
+        volume_brl=financial_volume(_float_or_none(item.get("volume")), close),
+        market_cap=_float_or_none(item.get("market_cap")),
+        logo_url=item.get("logo") or None,
+        updated_at=fetched_at,
+    )

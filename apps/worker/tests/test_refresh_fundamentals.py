@@ -141,3 +141,36 @@ def test_checklist_evaluations_are_recorded_only_when_they_change(
         history = uow.checklists.evaluation_history(stock.id or 0)
     # Two fiscal years are too few for history rules: only the TTM ROE answers.
     assert [r.score for r in history] == [1, -1]
+
+
+def test_catalog_sync_upserts_and_keeps_catalog_when_source_fails(
+    uow_factory: UoWFactory,
+) -> None:
+    from fincontrol_core.domain.entities import CatalogInstrument
+    from fincontrol_worker.jobs import sync_instrument_catalog_job
+
+    class _CatalogGateway:
+        def __init__(self, items: list[CatalogInstrument]) -> None:
+            self.items = items
+
+        def list_instruments(self) -> list[CatalogInstrument]:
+            return self.items
+
+    first = [
+        CatalogInstrument("ITUB4", "Itau", AssetType.STOCK_BR, close=30.0, volume_brl=1e9),
+        CatalogInstrument("HGLG11", "CSHG", AssetType.FII, volume_brl=None),
+    ]
+    assert sync_instrument_catalog_job(uow_factory, _CatalogGateway(first)) == 2  # type: ignore[arg-type]
+    updated = [
+        CatalogInstrument("ITUB4", "Itau PN", AssetType.STOCK_BR, close=31.0, volume_brl=2e6)
+    ]
+    assert sync_instrument_catalog_job(uow_factory, _CatalogGateway(updated)) == 1  # type: ignore[arg-type]
+    assert sync_instrument_catalog_job(uow_factory, _CatalogGateway([])) == 0  # type: ignore[arg-type]
+
+    with uow_factory() as uow:
+        catalog = uow.catalog.list_all()
+        itub = uow.catalog.get("itub4")
+    assert [c.ticker for c in catalog] == ["ITUB4", "HGLG11"]
+    assert itub is not None and (itub.name, itub.close) == ("Itau PN", 31.0)
+    with uow_factory() as uow:
+        assert uow.catalog.get("NONE3") is None

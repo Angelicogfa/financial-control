@@ -213,6 +213,18 @@ def refresh_fundamentals_job(
     return stored
 
 
+def sync_instrument_catalog_job(uow_factory: UoWFactory, gateway: CachedMarketGateway) -> int:
+    """Refresh the B3 instrument catalog; keeps the previous one when the source fails."""
+    instruments = gateway.list_instruments()
+    if not instruments:
+        logger.warning("Instrument catalog source returned nothing; keeping the stored catalog")
+        return 0
+    with uow_factory() as uow:
+        stored = uow.catalog.upsert(instruments)
+        uow.commit()
+    return stored
+
+
 def record_checklist_evaluations_job(
     uow_factory: UoWFactory,
     gateway: CachedMarketGateway,

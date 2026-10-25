@@ -257,7 +257,12 @@ def test_full_api_end_to_end_workflow(tmp_path: Path, monkeypatch) -> None:
     # 9. Single Asset Analysis & Portfolio Analytics
     r_analysis = client.get(f"/api/v1/assets/{stock_id}/analysis")
     assert r_analysis.status_code == 200
-    assert r_analysis.json()["valuation"]["graham_fair_value"] is not None
+    analysis = r_analysis.json()
+    graham = next(m for m in analysis["valuation"]["methods"] if m["method"] == "GRAHAM")
+    assert graham["value"] is not None
+    assert analysis["valuation"]["profile"] == "STOCK"
+    assert analysis["checklist"]["profile"] == "STOCK"
+    assert analysis["benchmark"] == "IBOV"
 
     r_analytics = client.get("/api/v1/portfolio/analytics")
     assert r_analytics.status_code == 200

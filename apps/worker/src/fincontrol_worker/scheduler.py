@@ -22,6 +22,7 @@ from fincontrol_worker.jobs import (
     record_daily_snapshot_job,
     refresh_fundamentals_job,
     sync_bcb_and_benchmarks_job,
+    sync_instrument_catalog_job,
     warm_portfolio_quotes_job,
 )
 from fincontrol_worker.runner import JobLock, RetryPolicy, build_job_lock, run_job
@@ -104,6 +105,16 @@ def create_scheduler(
         hour=cfg.snapshot_cron_hour,
         minute=cfg.snapshot_cron_minute,
         id="record_daily_snapshot",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("sync_instrument_catalog", sync_instrument_catalog_job),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=cfg.catalog_sync_cron_hour,
+        minute=0,
+        id="sync_instrument_catalog",
         replace_existing=True,
         **defaults,
     )

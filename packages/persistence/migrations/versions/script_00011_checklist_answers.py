@@ -126,10 +126,12 @@ def downgrade() -> None:
     latest: dict[int, dict[str, object]] = {}
     for asset_id, question_id, value in rows:
         latest.setdefault(asset_id, {})[question_id] = value
+    # Postgres needs an explicit cast from text; SQLite stores JSON as text already.
+    value = "CAST(:answers AS JSON)" if bind.dialect.name == "postgresql" else ":answers"
     for asset_id, answers in latest.items():
         legacy = {q: v == "YES" for q, v in answers.items() if v in ("YES", "NO")}
         bind.execute(
-            sa.text("UPDATE assets SET cerrado_answers = :answers WHERE id = :id"),
+            sa.text(f"UPDATE assets SET cerrado_answers = {value} WHERE id = :id"),
             {"answers": json.dumps(legacy), "id": asset_id},
         )
 

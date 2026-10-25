@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -15,6 +15,8 @@ from fincontrol_core.analytics import (
     dated_simple_returns,
     dated_time_weighted_returns,
 )
+from fincontrol_core.arca.allocation import BAND_BELOW
+from fincontrol_core.cerrado.questions import STATEMENT_PROFILES
 from fincontrol_core.cerrado.scoring import (
     CerradoEvaluation,
     evaluate,
@@ -22,15 +24,18 @@ from fincontrol_core.cerrado.scoring import (
     history_for_assets,
     record_if_changed,
 )
-from fincontrol_core.domain.entities import AssetEntity
+from fincontrol_core.domain.entities import AssetEntity, CatalogInstrument
 from fincontrol_core.domain.enums import (
+    ArcaClass,
     AssetLifecycle,
     AssetType,
     IntraClassStrategy,
 )
-from fincontrol_core.fundamentals.history import HistoricalMetrics
+from fincontrol_core.fundamentals.history import HistoricalMetrics, historical_metrics
+from fincontrol_core.fundamentals.valuation import AssetValuation, value_asset
 from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
+from fincontrol_core.market.models import Fundamentals
 from fincontrol_core.policy import InvestmentPolicy, current_policy
 from fincontrol_core.policy.lifecycle import asset_lifecycle
 from fincontrol_core.portfolio.consolidation import (
@@ -43,7 +48,6 @@ from fincontrol_core.portfolio.consolidation import (
 from fincontrol_core.portfolio.curves import earliest_fixed_income_start, load_rate_curves
 from fincontrol_core.portfolio.fixed_income import RateCurves
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
-from fincontrol_core.valuation import summarize_valuation
 
 
 def _restrict_to_account(assets: list[AssetEntity], account_id: int) -> list[AssetEntity]:
@@ -79,6 +83,21 @@ class PortfolioApplicationService:
     def load_policy(self, uow: AbstractUnitOfWork) -> InvestmentPolicy:
         """Current investment policy (defaults when none was saved)."""
         return current_policy(uow.policies)
+
+    def evaluate_with(
+        self,
+        asset: AssetEntity,
+        fundamentals: Fundamentals | None,
+        history: HistoricalMetrics | None,
+    ) -> CerradoEvaluation:
+        """Checklist of an asset with data already loaded by the caller."""
+        return evaluate(
+            asset.profile,
+            asset.cerrado_answers,
+            fundamentals,
+            use_cerrado=asset.use_cerrado,
+            history=history,
+        )
 
     def checklist_histories(
         self, uow: AbstractUnitOfWork, assets: list[AssetEntity]
@@ -225,19 +244,27 @@ class PortfolioApplicationService:
         )
 
         fund = self.gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
-        cerrado_eval = self.evaluate_checklist(uow, asset)
+        snapshots = uow.fundamentals.list_for(asset.ticker)
+        metrics = historical_metrics(snapshots) if snapshots else None
+        checklist = evaluate(
+            asset.profile,
+            asset.cerrado_answers,
+            fund,
+            use_cerrado=asset.use_cerrado,
+            history=metrics if asset.profile in STATEMENT_PROFILES else None,
+        )
 
         current_price = (
             pos.current_unit_price
             if pos
             else (float(asset.manual_price) if asset.manual_price is not None else None)
         )
-        valuation_policy = self.load_policy(uow).valuation
-        valuation_summary = summarize_valuation(
+        valuation = value_asset(
+            asset.profile,
             current_price,
             fund,
-            bazin_required_yield=valuation_policy.bazin_required_yield,
-            graham_multiplier=valuation_policy.graham_multiplier,
+            self.load_policy(uow).valuation,
+            latest_statement=snapshots[-1] if snapshots else None,
         )
 
         history = self.gateway.get_history(
@@ -280,11 +307,52 @@ class PortfolioApplicationService:
         return {
             "position": pos,
             "fundamentals": fund.to_dict() if fund else None,
-            "valuation": asdict(valuation_summary),
-            "cerrado": cerrado_eval,
+            "fundamental_history": snapshots,
+            "historical_metrics": metrics,
+            "valuation": valuation,
+            "checklist": checklist,
+            "checklist_history": uow.checklists.evaluation_history(asset.id or 0),
+            "answer_history": uow.checklists.answer_history(asset.id or 0),
             "risk_return": risk_summary,
+            "benchmark": benchmark_symbol,
             "price_history": [p.to_dict() for p in history],
         }
+
+    def catalog_fundamentals(self, instruments: list[CatalogInstrument]) -> dict[str, Fundamentals]:
+        """Current indicators of catalog instruments (cached by the gateway)."""
+        probes = [
+            AssetEntity(ticker=i.ticker, name=i.name, asset_type=i.asset_type)
+            for i in instruments
+            if i.asset_type is not None
+        ]
+        return fetch_market_data(
+            self.gateway,
+            probes,
+            include_quotes=False,
+            max_workers=self.fetch_workers,
+            timeout_seconds=self.fetch_timeout_seconds,
+        ).fundamentals
+
+    def classes_below_band(self, uow: AbstractUnitOfWork) -> frozenset[ArcaClass]:
+        """ARCA classes whose weight is below the tolerance band (contribution priority)."""
+        report = self.build_portfolio_report(uow)
+        return frozenset(a.arca_class for a in report.allocations if a.band_status == BAND_BELOW)
+
+    def value(
+        self,
+        uow: AbstractUnitOfWork,
+        asset: AssetEntity,
+        price: float | None,
+        fundamentals: Fundamentals | None,
+    ) -> AssetValuation:
+        snapshots = uow.fundamentals.list_for(asset.ticker)
+        return value_asset(
+            asset.profile,
+            price,
+            fundamentals,
+            self.load_policy(uow).valuation,
+            latest_statement=snapshots[-1] if snapshots else None,
+        )
 
     def build_portfolio_analytics(
         self,

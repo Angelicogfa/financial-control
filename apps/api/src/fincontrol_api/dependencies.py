@@ -24,6 +24,7 @@ from fincontrol_api.handlers.portfolio_handlers import (
     PortfolioHandler,
     TransactionHandler,
 )
+from fincontrol_api.handlers.research_handlers import ResearchHandler
 from fincontrol_api.handlers.system_handlers import DatabaseProbe, SystemHandler
 from fincontrol_api.services.portfolio_service import PortfolioApplicationService
 
@@ -65,6 +66,14 @@ def get_asset_handler(
 ) -> AssetHandler:
     """Provide the AssetHandler instance."""
     return AssetHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
+
+
+def get_research_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+    portfolio_service: PortfolioApplicationService = Depends(get_portfolio_service),
+) -> ResearchHandler:
+    """Provide the ResearchHandler instance."""
+    return ResearchHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
 
 
 def get_transaction_handler(

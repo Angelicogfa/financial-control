@@ -35,7 +35,14 @@ def test_checklist_update_records_answers_and_evaluation(api: SimpleNamespace) -
 
     analysis = client.get(f"/api/v1/assets/{asset_id}/analysis")
     assert analysis.status_code == 200, analysis.text
-    evaluation = analysis.json()["cerrado"]
+    evaluation = analysis.json()["checklist"]
+    assert [r["applicable"] for r in analysis.json()["checklist_history"]] == [10]
+    assert {a["question_id"] for a in analysis.json()["answer_history"]} == {
+        "basel",
+        "npl",
+        "governance",
+    }
+    assert analysis.json()["valuation"]["profile"] == "BANK"
     assert evaluation["profile"] == "BANK"
     assert evaluation["not_applicable"] == 1
     assert evaluation["applicable"] == 10

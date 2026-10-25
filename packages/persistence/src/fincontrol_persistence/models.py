@@ -356,3 +356,22 @@ class ChecklistEvaluationModel(Base):
     answered: Mapped[int] = mapped_column(Integer, nullable=False)
     applicable: Mapped[int] = mapped_column(Integer, nullable=False)
     recommendation: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+class InstrumentCatalogModel(Base):
+    """Listed B3 instruments refreshed daily; feeds the screener and the watchlist."""
+
+    __tablename__ = "instrument_catalog"
+
+    ticker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    asset_type: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    sector: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    close: Mapped[float | None] = mapped_column(Float, nullable=True)
+    change_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume_brl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    market_cap: Mapped[float | None] = mapped_column(Float, nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )

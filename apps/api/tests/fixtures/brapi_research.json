@@ -1,0 +1,240 @@
+{
+ "list": {
+  "stocks": [
+   {
+    "stock": "ITUB4",
+    "name": "ITAUUNIBANCO PN",
+    "close": 32.0,
+    "change": 0.8,
+    "volume": 25000000,
+    "market_cap": 310000000000,
+    "logo": "https://icons.brapi.dev/icons/ITUB4.svg",
+    "sector": "Finance",
+    "type": "stock"
+   },
+   {
+    "stock": "BBAS3",
+    "name": "BRASIL ON",
+    "close": 27.0,
+    "change": 1.1,
+    "volume": 20000000,
+    "market_cap": 154000000000,
+    "sector": "Finance",
+    "type": "stock"
+   },
+   {
+    "stock": "WEGE3",
+    "name": "WEG ON",
+    "close": 52.0,
+    "change": -0.4,
+    "volume": 6000000,
+    "market_cap": 218000000000,
+    "sector": "Producer Manufacturing",
+    "type": "stock"
+   },
+   {
+    "stock": "BOVA11",
+    "name": "ISHARES BOVA ETF",
+    "close": 125.0,
+    "change": 0.2,
+    "volume": 3000000,
+    "sector": null,
+    "type": "fund"
+   },
+   {
+    "stock": "HGLG11",
+    "name": "CSHG LOGISTICA FII",
+    "close": 155.0,
+    "change": 0.1,
+    "volume": 40000,
+    "sector": "Real Estate",
+    "type": "fund"
+   },
+   {
+    "stock": "TINY3",
+    "name": "MICRO CAP ON",
+    "close": 1.2,
+    "change": 0.0,
+    "volume": 1000,
+    "sector": "Finance",
+    "type": "stock"
+   },
+   {
+    "stock": "AAPL34",
+    "name": "APPLE DRN",
+    "close": 60.0,
+    "change": 0.3,
+    "volume": 500000,
+    "sector": "Electronic Technology",
+    "type": "bdr"
+   }
+  ],
+  "indexes": [
+   {
+    "stock": "^BVSP",
+    "name": "IBOVESPA"
+   }
+  ],
+  "currentPage": 1,
+  "totalPages": 1,
+  "hasNextPage": false
+ },
+ "quotes": {
+  "ITUB4": {
+   "symbol": "ITUB4",
+   "longName": "Itaú Unibanco Holding S.A.",
+   "regularMarketPrice": 32.0,
+   "regularMarketChangePercent": 0.8,
+   "regularMarketVolume": 25000000,
+   "marketCap": 310000000000,
+   "priceEarnings": 8.5,
+   "earningsPerShare": 3.76,
+   "defaultKeyStatistics": {
+    "priceToBook": 1.6,
+    "bookValue": 20.0
+   },
+   "financialData": {
+    "returnOnEquity": 0.21,
+    "profitMargins": 0.3
+   },
+   "summaryDetail": {
+    "dividendYield": 0.07,
+    "trailingAnnualDividendRate": 2.24
+   },
+   "summaryProfile": {
+    "sector": "Finance",
+    "industry": "Banks"
+   },
+   "incomeStatementHistory": [
+    {
+     "endDate": "2020-12-31",
+     "totalRevenue": 100000000000.0,
+     "netIncome": 18000000000.0
+    },
+    {
+     "endDate": "2021-12-31",
+     "totalRevenue": 110000000000.0,
+     "netIncome": 26000000000.0
+    },
+    {
+     "endDate": "2022-12-31",
+     "totalRevenue": 125000000000.0,
+     "netIncome": 29000000000.0
+    },
+    {
+     "endDate": "2023-12-31",
+     "totalRevenue": 135000000000.0,
+     "netIncome": 33000000000.0
+    },
+    {
+     "endDate": "2024-12-31",
+     "totalRevenue": 145000000000.0,
+     "netIncome": 41000000000.0
+    }
+   ],
+   "balanceSheetHistory": [
+    {
+     "endDate": "2020-12-31",
+     "totalStockholderEquity": 140000000000.0
+    },
+    {
+     "endDate": "2021-12-31",
+     "totalStockholderEquity": 150000000000.0
+    },
+    {
+     "endDate": "2022-12-31",
+     "totalStockholderEquity": 160000000000.0
+    },
+    {
+     "endDate": "2023-12-31",
+     "totalStockholderEquity": 175000000000.0
+    },
+    {
+     "endDate": "2024-12-31",
+     "totalStockholderEquity": 190000000000.0
+    }
+   ],
+   "cashflowHistory": [
+    {
+     "endDate": "2020-12-31",
+     "dividendsPaid": -7000000000.0
+    },
+    {
+     "endDate": "2021-12-31",
+     "dividendsPaid": -9000000000.0
+    },
+    {
+     "endDate": "2022-12-31",
+     "dividendsPaid": -11000000000.0
+    },
+    {
+     "endDate": "2023-12-31",
+     "dividendsPaid": -15000000000.0
+    },
+    {
+     "endDate": "2024-12-31",
+     "dividendsPaid": -18000000000.0
+    }
+   ]
+  },
+  "WEGE3": {
+   "symbol": "WEGE3",
+   "longName": "WEG S.A.",
+   "regularMarketPrice": 52.0,
+   "regularMarketChangePercent": -0.4,
+   "regularMarketVolume": 6000000,
+   "marketCap": 218000000000,
+   "priceEarnings": 32.0,
+   "earningsPerShare": 1.62,
+   "defaultKeyStatistics": {
+    "priceToBook": 9.5,
+    "bookValue": 5.5
+   },
+   "financialData": {
+    "returnOnEquity": 0.31,
+    "profitMargins": 0.17
+   },
+   "summaryDetail": {
+    "dividendYield": 0.015,
+    "trailingAnnualDividendRate": 0.8
+   },
+   "summaryProfile": {
+    "sector": "Producer Manufacturing",
+    "industry": "Electrical"
+   }
+  },
+  "BBAS3": {
+   "symbol": "BBAS3",
+   "longName": "Banco do Brasil S.A.",
+   "regularMarketPrice": 27.0,
+   "regularMarketVolume": 20000000,
+   "priceEarnings": 4.2,
+   "earningsPerShare": 6.4,
+   "defaultKeyStatistics": {
+    "priceToBook": 0.8,
+    "bookValue": 34.0
+   },
+   "financialData": {
+    "returnOnEquity": 0.2
+   },
+   "summaryDetail": {
+    "dividendYield": 0.09
+   },
+   "summaryProfile": {
+    "sector": "Finance"
+   }
+  },
+  "HGLG11": {
+   "symbol": "HGLG11",
+   "regularMarketPrice": 155.0,
+   "regularMarketVolume": 40000,
+   "defaultKeyStatistics": {
+    "priceToBook": 0.98,
+    "bookValue": 158.0
+   },
+   "summaryDetail": {
+    "dividendYield": 0.085
+   }
+  }
+ }
+}

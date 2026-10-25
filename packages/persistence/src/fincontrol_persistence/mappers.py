@@ -8,6 +8,7 @@ from decimal import Decimal
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
+    CatalogInstrument,
     ChecklistAnswer,
     ChecklistEvaluationRecord,
     EarningEntity,
@@ -52,6 +53,7 @@ from fincontrol_persistence.models import (
     EarningModel,
     FixedIncomeTermModel,
     FundamentalSnapshotModel,
+    InstrumentCatalogModel,
     InvestmentPolicyModel,
     JobRunModel,
     MarketSeriesModel,
@@ -297,4 +299,19 @@ def to_fundamental_snapshot(model: FundamentalSnapshotModel) -> FundamentalSnaps
         period=FundamentalPeriod(model.period),
         metrics=dict(model.metrics or {}),
         source=model.source,
+    )
+
+
+def to_catalog_instrument(model: InstrumentCatalogModel) -> CatalogInstrument:
+    return CatalogInstrument(
+        ticker=model.ticker,
+        name=model.name,
+        asset_type=AssetType(model.asset_type) if model.asset_type else None,
+        sector=model.sector,
+        close=model.close,
+        change_pct=model.change_pct,
+        volume_brl=model.volume_brl,
+        market_cap=model.market_cap,
+        logo_url=model.logo_url,
+        updated_at=model.updated_at,
     )

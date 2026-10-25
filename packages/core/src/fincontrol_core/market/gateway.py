@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 
-from fincontrol_core.domain.entities import MarketSeriesPoint
+from fincontrol_core.domain.entities import CatalogInstrument, MarketSeriesPoint
 from fincontrol_core.domain.enums import AssetType, Market, market_for
 from fincontrol_core.fundamentals.history import (
     FundamentalSnapshot,
@@ -196,6 +196,10 @@ class CachedMarketGateway:
                 cache_key, [snapshot_to_dict(s) for s in snapshots], self.fundamentals_ttl
             )
         return snapshots
+
+    def list_instruments(self) -> list[CatalogInstrument]:
+        """Listed B3 instruments (not cached: the worker stores them once a day)."""
+        return self.brapi.list_instruments()
 
     def get_usd_brl_rate(self) -> float:
         """Fetch live or cached USD/BRL exchange rate with safe fallback."""

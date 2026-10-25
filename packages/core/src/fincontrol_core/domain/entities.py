@@ -327,3 +327,25 @@ class ChecklistEvaluationRecord:
             and self.applicable == other.applicable
             and self.recommendation == other.recommendation
         )
+
+
+@dataclass(frozen=True)
+class CatalogInstrument:
+    """A listed B3 instrument from the daily catalog (item 11.6); not necessarily an asset.
+
+    `volume_brl` is the financial volume of the last session (shares x close).
+    """
+
+    ticker: str
+    name: str
+    asset_type: AssetType | None = None
+    sector: str | None = None
+    close: float | None = None
+    change_pct: float | None = None
+    volume_brl: float | None = None
+    market_cap: float | None = None
+    logo_url: str | None = None
+    updated_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "ticker", self.ticker.strip().upper())

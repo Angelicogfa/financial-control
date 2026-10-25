@@ -11,6 +11,7 @@ from datetime import date
 from fincontrol_core.domain.entities import (
     AccountEntity,
     AssetEntity,
+    CatalogInstrument,
     ChecklistAnswer,
     ChecklistEvaluationRecord,
     EarningEntity,
@@ -297,4 +298,21 @@ class AbstractChecklistRepository(ABC):
         self, asset_id: int, *, limit: int = 104
     ) -> list[ChecklistEvaluationRecord]:
         """Evaluations of an asset, oldest first (at most `limit`, the most recent ones)."""
+        raise NotImplementedError
+
+
+class AbstractCatalogRepository(ABC):
+    """Repository port for the daily B3 instrument catalog."""
+
+    @abstractmethod
+    def upsert(self, instruments: list[CatalogInstrument]) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, ticker: str) -> CatalogInstrument | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self) -> list[CatalogInstrument]:
+        """Whole catalog, highest financial volume first."""
         raise NotImplementedError

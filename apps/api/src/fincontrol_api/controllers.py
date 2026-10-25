@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response, status
-from fincontrol_core.domain.enums import AssetType
+from fincontrol_core.domain.enums import ArcaClass, AssetType
 from fincontrol_core.domain.pagination import PaginationParams
+from fincontrol_core.research.screener import ScreenerCriteria
 
 from fincontrol_api.auth import SESSION_COOKIE
 from fincontrol_api.dependencies import (
@@ -17,6 +18,7 @@ from fincontrol_api.dependencies import (
     get_market_data_handler,
     get_policy_handler,
     get_portfolio_handler,
+    get_research_handler,
     get_system_handler,
     get_transaction_handler,
     require_user,
@@ -31,6 +33,7 @@ from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
+from fincontrol_api.handlers.research_handlers import ResearchHandler
 from fincontrol_api.handlers.system_handlers import SystemHandler
 from fincontrol_api.schemas import (
     AccountDTO,
@@ -57,10 +60,13 @@ from fincontrol_api.schemas import (
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
     ReadinessDTO,
+    ScreenerResponseDTO,
     SeriesStatusDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
     TransactionUpdateRequest,
+    WatchlistAddRequest,
+    WatchlistItemDTO,
 )
 
 health_router = APIRouter(tags=["Health"])
@@ -73,6 +79,7 @@ market_router = APIRouter(prefix="/market", tags=["Market Data"])
 policy_router = APIRouter(prefix="/policy", tags=["Investment Policy"])
 accounts_router = APIRouter(prefix="/accounts", tags=["Accounts"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
+research_router = APIRouter(prefix="/research", tags=["Research"])
 
 
 def pagination_query(
@@ -459,3 +466,66 @@ def logout() -> Response:
 @auth_router.get("/me", response_model=CurrentUserDTO)
 def me(username: str = Depends(require_user)) -> CurrentUserDTO:
     return CurrentUserDTO(username=username)
+
+
+# ---------------------------------------------------------------------------
+# Research: screener over the catalog and watchlist (items 11.7, 11.8)
+# ---------------------------------------------------------------------------
+@research_router.get("/screener", response_model=ScreenerResponseDTO)
+def run_screener(
+    asset_type: list[AssetType] = Query(default=[]),
+    arca_class: list[ArcaClass] = Query(default=[]),
+    sector: list[str] = Query(default=[]),
+    q: str | None = Query(default=None, max_length=60),
+    min_volume_brl: float | None = Query(default=None, ge=0),
+    min_market_cap: float | None = Query(default=None, ge=0),
+    max_pe: float | None = Query(default=None, gt=0),
+    max_pb: float | None = Query(default=None, gt=0),
+    min_dy: float | None = Query(default=None, ge=0, description="Fraction: 0.06 = 6%"),
+    min_roe: float | None = Query(default=None, description="Fraction: 0.15 = 15%"),
+    below_band: bool = Query(default=False, description="Only ARCA classes below their band"),
+    exclude_registered: bool = Query(default=False),
+    limit: int = Query(default=30, ge=1, le=100),
+    handler: ResearchHandler = Depends(get_research_handler),
+) -> ScreenerResponseDTO:
+    criteria = ScreenerCriteria(
+        asset_types=frozenset(asset_type),
+        arca_classes=frozenset(arca_class),
+        sectors=frozenset(sector),
+        query=q,
+        min_volume_brl=min_volume_brl,
+        min_market_cap=min_market_cap,
+        max_pe=max_pe,
+        max_pb=max_pb,
+        min_dy=min_dy,
+        min_roe=min_roe,
+        exclude_registered=exclude_registered,
+        limit=limit,
+    )
+    return handler.screener(criteria, below_band=below_band)
+
+
+@research_router.get("/watchlist", response_model=list[WatchlistItemDTO])
+def list_watchlist(
+    handler: ResearchHandler = Depends(get_research_handler),
+) -> list[WatchlistItemDTO]:
+    return handler.watchlist()
+
+
+@research_router.post(
+    "/watchlist", response_model=WatchlistItemDTO, status_code=status.HTTP_201_CREATED
+)
+def add_to_watchlist(
+    payload: WatchlistAddRequest,
+    handler: ResearchHandler = Depends(get_research_handler),
+) -> WatchlistItemDTO:
+    return handler.add(payload)
+
+
+@research_router.delete("/watchlist/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_from_watchlist(
+    asset_id: int,
+    handler: ResearchHandler = Depends(get_research_handler),
+) -> Response:
+    handler.remove(asset_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

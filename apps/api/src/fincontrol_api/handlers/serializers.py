@@ -9,32 +9,43 @@ from fincontrol_core.analytics import RiskReturnSummary
 from fincontrol_core.cerrado.scoring import CerradoEvaluation
 from fincontrol_core.domain.entities import (
     AssetEntity,
+    ChecklistEvaluationRecord,
     EarningEntity,
     TransactionEntity,
 )
-from fincontrol_core.domain.enums import ArcaClass
+from fincontrol_core.domain.enums import ArcaClass, AssetType, default_arca_class
 from fincontrol_core.domain.pagination import PageMeta
+from fincontrol_core.fundamentals.history import HistoricalMetrics
+from fincontrol_core.fundamentals.valuation import AssetValuation
 from fincontrol_core.portfolio.consolidation import (
     ConsolidatedPortfolioReport,
     ContributionPlan,
     ValuedAssetPosition,
 )
+from fincontrol_core.research.screener import ScreenerResult
 
 from fincontrol_api.schemas import (
     AssetContributionOrderDTO,
     AssetResponseDTO,
+    AssetValuationDTO,
     BenchmarkComparisonDTO,
     CerradoEvaluationDTO,
     ChecklistAnswerDTO,
+    ChecklistAnswerHistoryDTO,
+    ChecklistEvaluationRecordDTO,
     ClassAllocationDTO,
     ContributionPlanResponseDTO,
     EarningResponseDTO,
     EvaluatedAnswerDTO,
     FixedIncomeTermPayload,
     FixedIncomeValuationDTO,
+    FundamentalSnapshotDTO,
+    HistoricalMetricsDTO,
+    MethodResultDTO,
     PageMetaDTO,
     PortfolioReportResponseDTO,
     RiskReturnSummaryDTO,
+    ScreenerItemDTO,
     TransactionResponseDTO,
     ValuedPositionDTO,
 )
@@ -302,15 +313,100 @@ def to_risk_summary_dto(summary: RiskReturnSummary) -> RiskReturnSummaryDTO:
     )
 
 
+def to_valuation_dto(valuation: AssetValuation) -> AssetValuationDTO:
+    return AssetValuationDTO(
+        profile=valuation.profile,
+        applicable=valuation.applicable,
+        price=valuation.price,
+        methods=[MethodResultDTO(**{**asdict(m), "kind": m.kind.value}) for m in valuation.methods],
+        fair_value=valuation.fair_value,
+        margin=valuation.margin,
+        verdict=valuation.verdict.value,
+        reason=valuation.reason,
+    )
+
+
+def to_historical_metrics_dto(metrics: HistoricalMetrics) -> HistoricalMetricsDTO:
+    return HistoricalMetricsDTO(
+        **asdict(metrics),
+        always_profitable=metrics.always_profitable,
+        dividend_regularity=metrics.dividend_regularity,
+    )
+
+
+def to_checklist_record_dto(record: ChecklistEvaluationRecord) -> ChecklistEvaluationRecordDTO:
+    return ChecklistEvaluationRecordDTO(
+        evaluated_at=record.evaluated_at,
+        profile=record.profile,
+        checklist_version=record.checklist_version,
+        score=record.score,
+        normalized_score=record.normalized_score,
+        coverage_pct=record.coverage_pct,
+        answered=record.answered,
+        applicable=record.applicable,
+        recommendation=record.recommendation,
+    )
+
+
 def to_asset_analysis_dto(asset: AssetEntity, raw: dict[str, Any]) -> dict[str, Any]:
+    metrics = raw["historical_metrics"]
     return {
         "asset": to_asset_dto(asset),
         "position": (
             to_valued_position_dto(raw["position"]) if raw["position"] is not None else None
         ),
         "fundamentals": raw["fundamentals"],
-        "valuation": raw["valuation"],
-        "cerrado": to_cerrado_dto(raw["cerrado"]),
+        "fundamental_history": [
+            FundamentalSnapshotDTO(
+                reference_date=s.reference_date,
+                period=s.period.value,
+                metrics=dict(s.metrics),
+                source=s.source,
+            )
+            for s in raw["fundamental_history"]
+        ],
+        "historical_metrics": to_historical_metrics_dto(metrics) if metrics else None,
+        "valuation": to_valuation_dto(raw["valuation"]),
+        "checklist": to_cerrado_dto(raw["checklist"]),
+        "checklist_history": [to_checklist_record_dto(r) for r in raw["checklist_history"]],
+        "answer_history": [
+            ChecklistAnswerHistoryDTO(
+                question_id=a.question_id,
+                value=a.value,
+                source=a.source,
+                evidence=a.evidence,
+                answered_at=a.answered_at,
+                checklist_version=a.checklist_version,
+            )
+            for a in raw["answer_history"]
+        ],
         "risk_return": to_risk_summary_dto(raw["risk_return"]),
+        "benchmark": raw["benchmark"],
         "price_history": raw["price_history"],
     }
+
+
+def to_screener_item_dto(result: ScreenerResult) -> ScreenerItemDTO:
+    item, fund, valuation = result.instrument, result.fundamentals, result.valuation
+    asset_type = item.asset_type or AssetType.STOCK_BR
+    return ScreenerItemDTO(
+        ticker=item.ticker,
+        name=item.name,
+        asset_type=asset_type,
+        arca_class=default_arca_class(asset_type),
+        sector=item.sector,
+        close=item.close,
+        change_pct=item.change_pct,
+        volume_brl=item.volume_brl,
+        market_cap=item.market_cap,
+        logo_url=item.logo_url,
+        price_to_earnings=fund.price_to_earnings if fund else None,
+        price_to_book=fund.price_to_book if fund else None,
+        dividend_yield=fund.dividend_yield if fund else None,
+        return_on_equity=fund.return_on_equity if fund else None,
+        valuation_verdict=valuation.verdict.value if valuation else None,
+        fair_value=valuation.fair_value if valuation else None,
+        margin=valuation.margin if valuation else None,
+        asset_id=result.asset_id,
+        lifecycle_status=result.lifecycle_status,
+    )

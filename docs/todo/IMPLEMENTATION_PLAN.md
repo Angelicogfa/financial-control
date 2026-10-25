@@ -24,7 +24,7 @@
 | **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[x]` Concluída | 100% |
 | **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[x]` Concluída | 100% |
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[x]` Concluída | 100% |
-| **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[ ]` Pendente | 0% |
+| **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[x]` Implementado | 100% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[ ]` Pendente | 0% |
 | **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[ ]` Pendente | 0% |
 | **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[ ]` Pendente | 0% |
@@ -332,28 +332,28 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 11 — Módulo Fundamentalista (`[ ]` Pendente)
+## Fase 11 — Módulo Fundamentalista (`[x]` Implementado)
 
-- `[ ]` **11.1** (F-02) Tabela `fundamental_snapshots` (ativo, data de referência, período `ANNUAL`/`TTM`, métricas normalizadas em fração) — `script_00010_fundamental_snapshots.py`; adaptadores brapi/yfinance para demonstrativos anuais; job semanal de atualização para carteira + watchlist.
-- `[ ]` **11.2** (F-02) Métricas históricas derivadas: ROE médio 5a, CAGR de receita e lucro 5a, anos com lucro, regularidade de proventos, payout médio.
-- `[ ]` **11.3** (F-03) Checklists versionados por tipo e setor (`STOCK`, `BANK`, `FII_BRICK`, `FII_PAPER`, `ETF`, `INTL_STOCK`, `CRYPTO`, `FIXED_INCOME`), com perguntas `N/A` quando não aplicáveis; Cerrado como modelo padrão; ETFs com checklist próprio (taxa, índice, liquidez, tracking).
-- `[ ]` **11.4** (F-04) Tabela `checklist_answers` (pergunta, valor, origem `MANUAL`/`AUTO`, evidência, `answered_at`, versão) — `script_00011_checklist_answers.py`, migrando `cerrado_answers`; score normalizado (`score / respondidas`) e elegibilidade exigindo cobertura mínima da política.
-- `[ ]` **11.5** (F-03) Valuation por tipo: ações não financeiras (Graham, Bazin, P/L, EV/EBITDA), bancos (Bazin, P/VP, ROE), FII (P/VP, DY vs NTN-B, Bazin), ETF/cripto sem preço justo; yield do Bazin e aplicabilidade vindos da `ValuationPolicy`.
-- `[ ]` **11.6** (F-01) Catálogo de instrumentos `instrument_catalog` sincronizado diariamente (lista de ativos B3 via brapi; cadastro manual para internacionais), com campos básicos (setor, preço, volume financeiro, valor de mercado).
-- `[ ]` **11.7** (F-01) Screener `GET /api/v1/research/screener` com filtros por classe ARCA, setor, liquidez, indicadores e status de elegibilidade; métricas profundas calculadas sob demanda para a watchlist (respeitando limites do plano gratuito da brapi, com cache).
-- `[ ]` **11.8** (F-01) Watchlist: `POST /api/v1/research/watchlist` cria ativo com status `WATCHLIST` sem posição; promoção para `ELIGIBLE` ao passar na política.
-- `[ ]` **11.9** (F-05) `GET /api/v1/assets/{id}/analysis` reformulado: posição (se houver), histórico de fundamentos, valuation, checklist com evidências, risco vs benchmark alinhado por data, histórico do score.
+- `[x]` **11.1** (F-02) Tabela `fundamental_snapshots` por ticker (data de referência, período `ANNUAL`/`TTM`, métricas em JSON) — `script_00010_fundamental_snapshots.py`; adaptadores de demonstrativos anuais brapi (`incomeStatementHistory`, `balanceSheetHistory`, `cashflowHistory`) e Yahoo (`income_stmt`, `balance_sheet`, `cashflow`) com fallback e cache no gateway; job semanal `refresh_fundamentals` para carteira + watchlist.
+- `[x]` **11.2** (F-02) `HistoricalMetrics`: ROE médio, CAGR de receita e lucro, anos com lucro, regularidade de proventos e payout médio na janela de 5 anos; regras históricas exigem ao menos 3 exercícios e caem para os indicadores TTM com evidência explícita.
+- `[x]` **11.3** (F-03) Checklist v2 por perfil (`STOCK`, `BANK`, `FII_BRICK`, `FII_PAPER`, `ETF`, `INTL_STOCK`, `CRYPTO`, `FIXED_INCOME`), perfil padrão por tipo e escolha manual no ativo; respostas `YES`/`NO`/`NA`; respostas automáticas com evidência textual.
+- `[x]` **11.4** (F-04) Tabelas `checklist_answers` (append-only: valor, origem, evidência, `answered_at`, versão) e `checklist_evaluations` (histórico do score) — `script_00011_checklist_answers.py`, migrando `assets.cerrado_answers` (com downgrade); `normalized_score` (−1 a 1) e `coverage_pct` sobre perguntas aplicáveis; avaliação registrada ao responder e semanalmente pelo job `record_checklist_evaluations` (só quando o resultado muda); rota `PUT /assets/{id}/checklist` (a rota `/cerrado` fica como alias obsoleto até a Fase 13).
+- `[x]` **11.5** (F-03) Valuation por perfil: ações (Graham, Bazin, P/L, EV/EBITDA), bancos (Bazin, P/VP justificado por ROE/custo de capital, P/VP), FII (P/VP, DY e spread sobre o juro real de referência NTN-B), internacionais (Graham, P/L, EV/EBITDA); ETF, cripto e renda fixa marcados como não aplicáveis; limites, juro real de referência e margem de segurança mínima na `ValuationPolicy`.
+- `[x]` **11.6** (F-01) `instrument_catalog` (`script_00012_instrument_catalog.py`) sincronizado em dias úteis via `GET /quote/list` da brapi (paginado; fundos separados em FII e ETF), preservando o catálogo anterior se a fonte falhar.
+- `[x]` **11.7** (F-01) `GET /api/v1/research/screener`: filtros de catálogo (tipo, classe ARCA, setor, texto, liquidez, valor de mercado, excluir cadastrados) e de indicadores (P/L, P/VP, DY, ROE) buscados só para até 120 candidatos (cache do gateway); atalho `below_band` para as classes abaixo da banda; cada resultado traz veredito de valuation e status de ciclo de vida quando cadastrado.
+- `[x]` **11.8** (F-01) Watchlist: `GET/POST/DELETE /api/v1/research/watchlist` — cria o ativo a partir do catálogo (ou com tipo informado), lista ativos sem posição com checklist e valuation, impede remover ativo com posição (409) e apaga de vez quem nunca teve lançamentos.
+- `[x]` **11.9** (F-05) `GET /api/v1/assets/{id}/analysis` reformulado: posição, fundamentos atuais, histórico anual e métricas históricas, valuation por perfil, checklist com evidências, histórico do score e das respostas, risco vs benchmark da classe.
 
-**Aceite:** pesquisar um ticker não cadastrado → analisar → adicionar à watchlist → torna-se elegível → aparece no aporte; testes com fixtures de provedores gravadas.
+**Aceite:** `apps/api/tests/test_research_flow.py` com respostas gravadas da brapi: catálogo → screener → watchlist → demonstrativos → checklist BANK → análise → elegível → recebe aporte → remoção. **Validação:** `scripts/check.sh --smoke` verde (ver notas da fase).
 
 ---
 
 ## Fase 12 — Operação: Aporte, Alertas, Importação e Eventos (`[ ]` Pendente)
 
-- `[ ]` **12.1** (I-07) Aporte persistido como `contribution_plans` (`DRAFT`, `CONFIRMED`, `DISCARDED`) — `script_00012_contribution_plans.py`; nível 2 só com ativos elegíveis; confirmação gera os lançamentos com preço/quantidade executados editáveis pelo usuário.
+- `[ ]` **12.1** (I-07) Aporte persistido como `contribution_plans` (`DRAFT`, `CONFIRMED`, `DISCARDED`) — `script_00013_contribution_plans.py`; nível 2 só com ativos elegíveis; confirmação gera os lançamentos com preço/quantidade executados editáveis pelo usuário.
 - `[ ]` **12.2** Motor de alertas (`packages/core/alerts.py`): classe fora da banda, ativo em `REVIEW`, preço abaixo do teto, cotação em fallback, série BCB desatualizada, livro inválido, snapshot ausente; endpoint `GET /api/v1/alerts` e dispensa por usuário.
 - `[ ]` **12.3** (D-03) Importação B3 (Área do Investidor: planilhas de Negociação e Movimentação) com pré-visualização, deduplicação por hash e mapeamento de ativos desconhecidos para cadastro/watchlist.
-- `[ ]` **12.4** (D-03, TD-03) Entidade `corporate_events` (desdobramento, grupamento, bonificação com custo atribuído) — `script_00013_corporate_events.py`; motor de posições aplica fatores por data; importação de eventos da Movimentação B3.
+- `[ ]` **12.4** (D-03, TD-03) Entidade `corporate_events` (desdobramento, grupamento, bonificação com custo atribuído) — `script_00014_corporate_events.py`; motor de posições aplica fatores por data; importação de eventos da Movimentação B3.
 
 **Aceite:** importar extrato B3 de exemplo, confirmar um aporte e ver posições, alocação e alertas atualizados sem lançamentos manuais.
 
