@@ -78,6 +78,7 @@ from fincontrol_api.schemas import (
     SavedContributionPlanDTO,
     ScreenerResponseDTO,
     SeriesStatusDTO,
+    SnapshotPointDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
     TransactionUpdateRequest,
@@ -259,6 +260,14 @@ def create_transaction(
     return handler.create(payload)
 
 
+@transactions_router.get("/{tx_id}", response_model=TransactionResponseDTO)
+def get_transaction(
+    tx_id: int,
+    handler: TransactionHandler = Depends(get_transaction_handler),
+) -> TransactionResponseDTO:
+    return handler.get(tx_id)
+
+
 @transactions_router.put("/{tx_id}", response_model=TransactionResponseDTO)
 def update_transaction(
     tx_id: int,
@@ -306,6 +315,14 @@ def create_earning(
     handler: EarningHandler = Depends(get_earning_handler),
 ) -> EarningResponseDTO:
     return handler.create(payload)
+
+
+@earnings_router.get("/{earning_id}", response_model=EarningResponseDTO)
+def get_earning(
+    earning_id: int,
+    handler: EarningHandler = Depends(get_earning_handler),
+) -> EarningResponseDTO:
+    return handler.get(earning_id)
 
 
 @earnings_router.put("/{earning_id}", response_model=EarningResponseDTO)
@@ -359,6 +376,15 @@ def simulate_contribution(
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> ContributionPlanResponseDTO:
     return handler.simulate_contribution(payload)
+
+
+@portfolio_router.get("/snapshots", response_model=list[SnapshotPointDTO])
+def list_portfolio_snapshots(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    handler: PortfolioHandler = Depends(get_portfolio_handler),
+) -> list[SnapshotPointDTO]:
+    return handler.list_snapshots(date_from=date_from, date_to=date_to)
 
 
 @portfolio_router.get("/analytics", response_model=PortfolioAnalyticsResponseDTO)

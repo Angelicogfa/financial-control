@@ -78,3 +78,15 @@ def test_benchmark_return_uses_aligned_window_only() -> None:
     ibov = next(b for b in summary.benchmarks if b.benchmark == "IBOV")
     # The 50% move on 01-03 precedes the portfolio window and must not count.
     assert ibov.benchmark_return == pytest.approx(1.02 * 1.03 - 1, abs=1e-4)
+
+
+def test_accumulate_daily_rate_curve_compounds_percent_per_day() -> None:
+    from datetime import date
+
+    from fincontrol_core.analytics import accumulate_daily_rate_curve
+
+    curve = accumulate_daily_rate_curve(
+        [date(2026, 1, 2), date(2026, 1, 5), date(2026, 1, 6)], [0.05, 0.04, 0.04]
+    )
+    assert [p["value"] for p in curve] == [100.0, 100.04, 100.08]
+    assert accumulate_daily_rate_curve([], []) == []

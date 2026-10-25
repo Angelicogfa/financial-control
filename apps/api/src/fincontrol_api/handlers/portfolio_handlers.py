@@ -42,6 +42,7 @@ from fincontrol_api.schemas import (
     PaginatedResponse,
     PortfolioAnalyticsResponseDTO,
     PortfolioReportResponseDTO,
+    SnapshotPointDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
     TransactionUpdateRequest,
@@ -95,6 +96,11 @@ class TransactionHandler:
     ) -> RateCurves | None:
         as_of = max((t.trade_date for t in entries), default=date.today())
         return self.portfolio_service.ledger_curves(uow, asset, as_of)
+
+    def get(self, tx_id: int) -> TransactionResponseDTO:
+        with self.uow_factory() as uow:
+            tx = _get_transaction(uow, tx_id)
+            return to_transaction_dto(tx, ticker=_get_asset(uow, tx.asset_id).ticker)
 
     def create(self, req: TransactionCreateRequest) -> TransactionResponseDTO:
         with self.uow_factory() as uow:
@@ -204,6 +210,13 @@ class EarningHandler:
             uow.commit()
             return to_earning_dto(saved, ticker=asset.ticker)
 
+    def get(self, earning_id: int) -> EarningResponseDTO:
+        with self.uow_factory() as uow:
+            earning = uow.earnings.get_by_id(earning_id)
+            if earning is None:
+                raise NotFoundError(f"Earning id={earning_id} not found")
+            return to_earning_dto(earning, ticker=_get_asset(uow, earning.asset_id).ticker)
+
     def update(self, earning_id: int, req: EarningUpdateRequest) -> EarningResponseDTO:
         with self.uow_factory() as uow:
             current = uow.earnings.get_by_id(earning_id)
@@ -286,6 +299,23 @@ class PortfolioHandler:
                 strategy_override=req.strategy_override,
             )
             return to_contribution_plan_dto(plan)
+
+    def list_snapshots(
+        self, *, date_from: date | None = None, date_to: date | None = None
+    ) -> list[SnapshotPointDTO]:
+        with self.uow_factory() as uow:
+            snapshots = uow.snapshots.list_range(date_from=date_from, date_to=date_to)
+        return [
+            SnapshotPointDTO(
+                snapshot_date=s.snapshot_date,
+                invested_value=float(s.invested_value),
+                market_value=float(s.market_value),
+                consolidated_pnl=float(s.consolidated_pnl),
+                earnings_cum=float(s.earnings_cum),
+                net_flow=float(s.net_flow),
+            )
+            for s in sorted(snapshots, key=lambda s: s.snapshot_date)
+        ]
 
     def get_analytics(
         self,

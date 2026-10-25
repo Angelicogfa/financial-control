@@ -92,7 +92,7 @@ def portfolio_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                     "Você tem posição, mas o ativo não atende mais à política. "
                     "Não recebe aportes até ser revisado.",
                     position.ticker,
-                    f"/assets/{position.asset_id}",
+                    f"/asset/{position.asset_id}",
                 )
             )
         if (
@@ -109,7 +109,7 @@ def portfolio_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                     "O valor usa o preço médio de compra; informe um preço manual ou aguarde "
                     "o provedor de cotações.",
                     position.ticker,
-                    f"/assets/{position.asset_id}",
+                    f"/asset/{position.asset_id}",
                 )
             )
     for allocation in report.allocations:
@@ -157,7 +157,7 @@ def valuation_alerts(
                     ".", ",", 1
                 ),
                 ticker,
-                f"/assets/{asset_ids.get(ticker, 0)}",
+                f"/asset/{asset_ids.get(ticker, 0)}",
             )
         )
     return alerts

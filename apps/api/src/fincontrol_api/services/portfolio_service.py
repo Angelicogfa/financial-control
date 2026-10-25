@@ -8,6 +8,7 @@ from typing import Any
 
 from fincontrol_core.analytics import (
     RiskReturnSummary,
+    accumulate_daily_rate_curve,
     align_to_base,
     analyze_return_series,
     build_base100_curve,
@@ -398,6 +399,12 @@ class PortfolioApplicationService:
                 level_dates, [p.value for p in pts]
             )
             curves[sym] = build_base100_curve(level_dates, bench_returns[sym])
+
+        cdi = uow.market_series.list_series("CDI", date_from=start, date_to=end)
+        if len(cdi) >= 2:
+            curves["CDI"] = accumulate_daily_rate_curve(
+                [p.reference_date for p in cdi], [p.value for p in cdi]
+            )
 
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()
         summary = analyze_return_series(

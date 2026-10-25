@@ -493,3 +493,20 @@ def analyze_return_series(
         benchmarks=comparisons,
         drawdown_curve=[round(d, 4) for d in dd_curve],
     )
+
+
+def accumulate_daily_rate_curve(
+    dates: Sequence[date], percent_per_day: Sequence[float]
+) -> list[dict[str, str | float]]:
+    """Base-100 curve of a daily rate series such as the CDI (values in % per day).
+
+    The rate of a day accrues from the first date on, so the first point is 100.
+    """
+    if not dates:
+        return []
+    curve: list[dict[str, str | float]] = [{"date": dates[0].isoformat(), "value": 100.0}]
+    level = 100.0
+    for d, rate in zip(dates[1:], percent_per_day[1:], strict=False):
+        level *= 1.0 + rate / 100.0
+        curve.append({"date": d.isoformat(), "value": round(level, 4)})
+    return curve

@@ -610,6 +610,17 @@ class BenchmarkComparisonDTO(BaseModel):
     correlation: float | None = None
 
 
+class SnapshotPointDTO(BaseModel):
+    """One daily portfolio snapshot (home sparklines and patrimony evolution)."""
+
+    snapshot_date: date
+    invested_value: float
+    market_value: float
+    consolidated_pnl: float
+    earnings_cum: float
+    net_flow: float
+
+
 class RiskReturnSummaryDTO(BaseModel):
     observations: int
     cumulative_return: float
