@@ -1,6 +1,6 @@
 /** Contracted-rate conversion between the form (percent) and the API scale (ADR 0006). */
 
-import type { FixedIncomeIndexer } from "../types/api";
+import type { FixedIncomeIndexer } from "../api/types";
 
 /** Default percentage shown in the form for each indexer. */
 export const DEFAULT_RATE_PERCENT: Record<FixedIncomeIndexer, string> = {

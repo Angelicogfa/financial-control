@@ -768,11 +768,16 @@ def plan_contribution(
         for o in drafts.get(arca_class, [])
     ]
     executed_total = round(sum(o.executed_amount_brl for o in orders), 2)
+    # What each class actually receives: a class without eligible assets passes its share on
+    # (leftover redistribution), so the first-level split alone would not add up.
+    received: dict[ArcaClass, float] = {}
+    for order in orders:
+        received[order.arca_class] = received.get(order.arca_class, 0.0) + order.executed_amount_brl
     return ContributionPlan(
         contribution_amount_brl=round(amount_brl, 2),
         executed_total_brl=executed_total,
         unallocated_cash_brl=round(max(amount_brl - executed_total, 0.0), 2),
-        by_class_allocated_brl={k: round(v, 2) for k, v in class_alloc_brl.items()},
+        by_class_allocated_brl={c: round(received.get(c, 0.0), 2) for c in class_alloc_brl},
         orders=orders,
         projected_allocations=compute_allocation(
             {c: round(v, 2) for c, v in projected.items()}, targets, bands=bands

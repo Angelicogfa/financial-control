@@ -139,3 +139,25 @@ def test_custom_executions_and_discard(client) -> None:  # type: ignore[no-untyp
     assert [p["status"] for p in listed] == ["DISCARDED", "CONFIRMED"]
     assert [p["id"] for p in client.get("/api/v1/contributions?status=DRAFT").json()] == []
     assert client.get("/api/v1/contributions/12345").status_code == 404
+
+
+def test_foreign_execution_without_fx_is_read_in_brl() -> None:
+    from decimal import Decimal
+
+    from fincontrol_api.handlers.contribution_handlers import _execution
+    from fincontrol_api.schemas import ExecutionDTO
+
+    brl_priced = _execution(
+        ExecutionDTO(asset_id=1, quantity="2", unit_price="1000", fees="5"), Decimal("5")
+    )
+    assert (brl_priced.unit_price, brl_priced.fees, brl_priced.fx_rate) == (
+        Decimal("200"),
+        Decimal("1"),
+        Decimal("5"),
+    )
+    explicit = _execution(
+        ExecutionDTO(asset_id=1, quantity="2", unit_price="190", fx_rate="5.2"), Decimal("5")
+    )
+    assert (explicit.unit_price, explicit.fx_rate) == (Decimal("190"), Decimal("5.2"))
+    domestic = _execution(ExecutionDTO(asset_id=1, quantity="2", unit_price="30"), None)
+    assert domestic.fx_rate == Decimal("1")

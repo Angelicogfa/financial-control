@@ -1,0 +1,504 @@
+import { Link, useParams } from "react-router-dom";
+
+import { api } from "../../api/endpoints";
+import type { AssetAnalysisResponseDTO } from "../../api/types";
+import { useApi } from "../../api/useApi";
+import { Badge, Signed } from "../../components/Badge";
+import { PageHeader } from "../../components/PageHeader";
+import { Async, Empty } from "../../components/States";
+import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
+import { brl, brlCompact, day, money, num, pct, points, quantity } from "../../utils/format";
+import {
+  ASSET_TYPE_LABELS,
+  EARNING_LABELS,
+  EVENT_LABELS,
+  LIFECYCLE_LABELS,
+  LIFECYCLE_TONES,
+  PROFILE_LABELS,
+  TRADE_LABELS,
+  VERDICT_LABELS,
+  VERDICT_TONES,
+} from "../../utils/labels";
+import { ColumnChart } from "../../viz/ColumnChart";
+import { TrendChart } from "../../viz/TrendChart";
+import { ChecklistTab } from "./ChecklistTab";
+
+const BENCHMARK_LABELS: Record<string, string> = {
+  IBOV: "Ibovespa",
+  IFIX: "IFIX",
+  SP500: "S&P 500",
+  CDI: "CDI",
+  IPCA: "IPCA",
+};
+
+type TabKey = "summary" | "fundamentals" | "valuation" | "checklist" | "earnings" | "ledger";
+const TABS: TabSpec<TabKey>[] = [
+  { key: "summary", label: "Resumo" },
+  { key: "fundamentals", label: "Fundamentos" },
+  { key: "valuation", label: "Valuation" },
+  { key: "checklist", label: "Checklist" },
+  { key: "earnings", label: "Proventos" },
+  { key: "ledger", label: "Lançamentos" },
+];
+
+function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
+  const p = analysis.position;
+  const prices = analysis.price_history as Array<{ date?: string; close?: number }>;
+  const risk = analysis.risk_return;
+  return (
+    <div className="app-page-stack">
+      <div className="app-split">
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Posição</h2>
+          {p && (p.quantity > 0 || p.invested_value_brl > 0) ? (
+            <dl className="app-definition-list">
+              <dt>Quantidade</dt>
+              <dd>{quantity(p.quantity)}</dd>
+              <dt>Preço médio</dt>
+              <dd>{money(p.average_price, p.currency)}</dd>
+              <dt>Preço atual</dt>
+              <dd>{money(p.current_unit_price, p.currency)}</dd>
+              <dt>Valor atual</dt>
+              <dd>{brl(p.current_value_brl)}</dd>
+              <dt>Investido</dt>
+              <dd>{brl(p.invested_value_brl)}</dd>
+              <dt>Resultado consolidado</dt>
+              <dd>
+                <Signed value={p.consolidated_pnl_brl}>
+                  {brl(p.consolidated_pnl_brl)} ({points(p.consolidated_return_pct, 1, true)})
+                </Signed>
+              </dd>
+              <dt>Proventos recebidos</dt>
+              <dd>{brl(p.received_earnings_brl)}</dd>
+              <dt>Peso na classe</dt>
+              <dd>
+                {points(p.class_current_weight_pct)} (alvo {points(p.class_target_weight_pct)})
+              </dd>
+            </dl>
+          ) : (
+            <p className="app-muted">Sem posição: o ativo está em observação.</p>
+          )}
+        </section>
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Risco em 12 meses</h2>
+          {risk.observations < 2 ? (
+            <p className="app-muted">Sem histórico de preços suficiente.</p>
+          ) : (
+            <dl className="app-definition-list">
+              <dt>Retorno do preço</dt>
+              <dd>{pct(risk.cumulative_return, 1, true)}</dd>
+              <dt>Volatilidade anual</dt>
+              <dd>{pct(risk.annualized_volatility, 1)}</dd>
+              <dt>Queda máxima</dt>
+              <dd>{pct(risk.max_drawdown, 1)}</dd>
+              {risk.benchmarks.map((b) => (
+                <div key={b.benchmark} style={{ display: "contents" }}>
+                  <dt>{BENCHMARK_LABELS[b.benchmark] ?? b.benchmark} no período</dt>
+                  <dd>
+                    {pct(b.benchmark_return, 1, true)}
+                    {b.beta !== null && b.beta !== undefined && <span className="app-muted"> · beta {num(b.beta, 2)}</span>}
+                  </dd>
+                </div>
+              ))}
+              {!risk.benchmarks.some((b) => b.benchmark === analysis.benchmark) && (
+                <>
+                  <dt>{BENCHMARK_LABELS[analysis.benchmark] ?? analysis.benchmark}</dt>
+                  <dd className="app-muted">Sem série no período</dd>
+                </>
+              )}
+            </dl>
+          )}
+        </section>
+      </div>
+      {prices.length >= 2 && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Preço em 12 meses</h2>
+          <TrendChart
+            title={`Preço de ${analysis.asset.ticker} nos últimos 12 meses`}
+            labels={prices.map((pt) => day(pt.date))}
+            hint="Passe o mouse para ler o fechamento."
+            format={(v) => num(v, 2)}
+            series={[
+              {
+                key: "close",
+                label: analysis.asset.ticker,
+                color: "var(--viz-serie-1)",
+                values: prices.map((pt) => (typeof pt.close === "number" ? pt.close : null)),
+              },
+            ]}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+const INDICATORS: Array<[string, string, (v: number) => string]> = [
+  ["price_to_earnings", "P/L", (v) => num(v, 2)],
+  ["price_to_book", "P/VP", (v) => num(v, 2)],
+  ["dividend_yield", "Dividend yield", (v) => pct(v)],
+  ["return_on_equity", "ROE", (v) => pct(v)],
+  ["profit_margin", "Margem líquida", (v) => pct(v)],
+  ["net_debt_to_ebitda", "Dív. líq./EBITDA", (v) => num(v, 2)],
+  ["earnings_per_share", "LPA", (v) => num(v, 2)],
+  ["book_value_per_share", "VPA", (v) => num(v, 2)],
+  ["market_cap", "Valor de mercado", (v) => brlCompact(v)],
+  ["avg_daily_volume", "Volume financeiro médio", (v) => brlCompact(v)],
+];
+
+const STATEMENT_COLUMNS: Array<[string, string]> = [
+  ["revenue", "Receita"],
+  ["net_income", "Lucro líquido"],
+  ["ebitda", "EBITDA"],
+  ["equity", "Patrimônio"],
+  ["total_debt", "Dívida"],
+  ["cash", "Caixa"],
+  ["dividends_paid", "Proventos pagos"],
+];
+
+function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
+  const f = (analysis.fundamentals ?? {}) as Record<string, unknown>;
+  const m = analysis.historical_metrics;
+  const history = analysis.fundamental_history ?? [];
+  return (
+    <div className="app-page-stack">
+      <div className="app-split">
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Indicadores atuais</h2>
+          {analysis.fundamentals ? (
+            <dl className="app-definition-list">
+              {INDICATORS.map(([key, label, format]) => (
+                <div key={key} style={{ display: "contents" }}>
+                  <dt>{label}</dt>
+                  <dd>{typeof f[key] === "number" ? format(f[key] as number) : "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="app-muted">O provedor não retornou indicadores para este ativo.</p>
+          )}
+        </section>
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Histórico</h2>
+          {m && m.years > 0 ? (
+            <dl className="app-definition-list">
+              <dt>Período</dt>
+              <dd>
+                {m.years} anos ({m.first_year}–{m.last_year})
+              </dd>
+              <dt>ROE médio</dt>
+              <dd>{pct(m.roe_average)}</dd>
+              <dt>CAGR da receita</dt>
+              <dd>{pct(m.revenue_cagr, 1, true)}</dd>
+              <dt>CAGR do lucro</dt>
+              <dd>{pct(m.earnings_cagr, 1, true)}</dd>
+              <dt>Anos com lucro</dt>
+              <dd>
+                {m.profitable_years} de {m.years}
+              </dd>
+              <dt>Anos com proventos</dt>
+              <dd>
+                {m.dividend_years} de {m.years}
+              </dd>
+              <dt>Payout médio</dt>
+              <dd>{pct(m.payout_average)}</dd>
+            </dl>
+          ) : (
+            <p className="app-muted">
+              Sem demonstrativos anuais armazenados. O worker os busca semanalmente para ações.
+            </p>
+          )}
+        </section>
+      </div>
+      {history.length > 0 && (
+        <>
+          <section className="app-card app-card-padded">
+            <h2 className="app-card-heading">Lucro líquido por ano</h2>
+            <ColumnChart
+              title={`Lucro líquido anual de ${analysis.asset.ticker}`}
+              columns={history.map((s) => ({
+                label: s.reference_date.slice(0, 4),
+                value: Number(s.metrics.net_income ?? 0),
+              }))}
+              hint="Passe o mouse para ler o ano."
+              format={brlCompact}
+            />
+          </section>
+          <div className="app-table-wrap">
+            <table className="app-table">
+              <thead>
+                <tr>
+                  <th>Ano</th>
+                  {STATEMENT_COLUMNS.map(([key, label]) => (
+                    <th key={key} className="app-numeric">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...history].reverse().map((s) => (
+                  <tr key={s.reference_date}>
+                    <td>{s.reference_date.slice(0, 4)}</td>
+                    {STATEMENT_COLUMNS.map(([key]) => (
+                      <td key={key} className="app-numeric">
+                        {s.metrics[key] === null || s.metrics[key] === undefined ? "—" : brlCompact(s.metrics[key])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Valuation({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
+  const v = analysis.valuation;
+  if (!v.applicable) {
+    return <Empty title="Valuation não se aplica" hint={v.reason} />;
+  }
+  const currency = analysis.asset.currency;
+  return (
+    <div className="app-page-stack">
+      <section className="app-card app-card-padded">
+        <div className="app-button-row">
+          <Badge tone={VERDICT_TONES[v.verdict]}>{VERDICT_LABELS[v.verdict] ?? v.verdict}</Badge>
+          <span>
+            Preço {money(v.price, currency)} · valor estimado {money(v.fair_value, currency)}
+            {v.margin !== null && v.margin !== undefined && <> · margem {pct(v.margin, 1, true)}</>}
+          </span>
+        </div>
+        <p className="app-card-hint" style={{ marginTop: "var(--space-2)" }}>
+          Perfil {PROFILE_LABELS[v.profile]}. Os preços justos se combinam pela mediana; múltiplos passam ou não nos
+          limites da estratégia.
+        </p>
+      </section>
+      <div className="app-table-wrap">
+        <table className="app-table">
+          <thead>
+            <tr>
+              <th>Método</th>
+              <th className="app-numeric">Valor</th>
+              <th className="app-numeric">Limite</th>
+              <th className="app-numeric">Margem</th>
+              <th>Resultado</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {v.methods.map((method) => {
+              const asYield = method.kind === "YIELD";
+              const format = (x: number | null | undefined) =>
+                x === null || x === undefined ? "—" : method.kind === "PRICE" ? money(x, currency) : asYield ? pct(x) : num(x, 2);
+              return (
+                <tr key={method.method}>
+                  <td>{method.label}</td>
+                  <td className="app-numeric">{format(method.value)}</td>
+                  <td className="app-numeric">{method.kind === "PRICE" ? "—" : format(method.threshold)}</td>
+                  <td className="app-numeric">{method.margin === null || method.margin === undefined ? "—" : pct(method.margin, 1, true)}</td>
+                  <td>
+                    {method.passes === null || method.passes === undefined ? (
+                      <span className="app-muted">—</span>
+                    ) : (
+                      <Badge tone={method.passes ? "success" : "danger"}>{method.passes ? "Passa" : "Não passa"}</Badge>
+                    )}
+                  </td>
+                  <td className="app-cell-wrap app-muted">{method.note}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Earnings({ assetId }: Readonly<{ assetId: number }>) {
+  const earnings = useApi(`asset-earnings-${assetId}`, () => api.ledger.earnings({ asset_id: assetId, page_size: 200 }));
+  return (
+    <Async state={earnings}>
+      {(page) => {
+        if (page.items.length === 0) return <Empty title="Nenhum provento registrado" />;
+        const byYear = new Map<string, number>();
+        page.items.forEach((e) => {
+          const year = e.payment_date.slice(0, 4);
+          byYear.set(year, (byYear.get(year) ?? 0) + (e.net_amount_brl ?? e.net_amount));
+        });
+        const years = [...byYear.entries()].sort(([a], [b]) => a.localeCompare(b));
+        return (
+          <div className="app-page-stack">
+            <section className="app-card app-card-padded">
+              <h2 className="app-card-heading">Proventos por ano</h2>
+              <ColumnChart
+                title="Proventos líquidos recebidos por ano"
+                columns={years.map(([label, value]) => ({ label, value }))}
+                hint="Passe o mouse para ler o ano."
+                format={brlCompact}
+              />
+            </section>
+            <div className="app-table-wrap">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>Pagamento</th>
+                    <th>Tipo</th>
+                    <th className="app-numeric">Bruto</th>
+                    <th className="app-numeric">Líquido (R$)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {page.items.map((e) => (
+                    <tr key={e.id}>
+                      <td>{day(e.payment_date)}</td>
+                      <td>{EARNING_LABELS[e.kind]}</td>
+                      <td className="app-numeric">{num(e.gross_amount)}</td>
+                      <td className="app-numeric">{brl(e.net_amount_brl ?? e.net_amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }}
+    </Async>
+  );
+}
+
+function Ledger({ assetId }: Readonly<{ assetId: number }>) {
+  const trades = useApi(`asset-trades-${assetId}`, () => api.ledger.trades({ asset_id: assetId, page_size: 200 }));
+  const events = useApi(`asset-events-${assetId}`, () => api.ledger.events(assetId));
+  return (
+    <div className="app-page-stack">
+      <Async state={trades}>
+        {(page) =>
+          page.items.length === 0 ? (
+            <Empty title="Nenhuma compra ou venda" />
+          ) : (
+            <div className="app-table-wrap">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Operação</th>
+                    <th className="app-numeric">Quantidade</th>
+                    <th className="app-numeric">Preço</th>
+                    <th className="app-numeric">Total (R$)</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {page.items.map((t) => (
+                    <tr key={t.id}>
+                      <td>{day(t.trade_date)}</td>
+                      <td>{TRADE_LABELS[t.kind]}</td>
+                      <td className="app-numeric">{quantity(t.quantity)}</td>
+                      <td className="app-numeric">{num(t.unit_price)}</td>
+                      <td className="app-numeric">{brl(t.total_brl)}</td>
+                      <td className="app-row-actions">
+                        <Link className="app-link" to={`/ledger/trades/${t.id}/edit`}>
+                          Editar
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </Async>
+      <Async state={events}>
+        {(list) =>
+          list.length === 0 ? null : (
+            <section>
+              <h2 className="app-card-heading">Eventos corporativos</h2>
+              <div className="app-table-wrap">
+                <table className="app-table">
+                  <thead>
+                    <tr>
+                      <th>Data ex</th>
+                      <th>Evento</th>
+                      <th className="app-numeric">Fator</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.map((e) => (
+                      <tr key={e.id}>
+                        <td>{day(e.ex_date)}</td>
+                        <td>{EVENT_LABELS[e.kind]}</td>
+                        <td className="app-numeric">{num(e.factor, 6)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )
+        }
+      </Async>
+    </div>
+  );
+}
+
+export function AssetDetailPage() {
+  const { id } = useParams();
+  const assetId = Number(id);
+  const [tab, setTab] = useTab(TABS, "summary");
+  const analysis = useApi(`asset-${assetId}`, () => api.assets.analysis(assetId));
+
+  return (
+    <div className="app-page">
+      <Async state={analysis} lines={6}>
+        {(data) => {
+          const status = data.position?.lifecycle_status;
+          return (
+            <>
+              <PageHeader
+                title={
+                  <>
+                    {data.asset.ticker} <span className="app-muted">· {data.asset.name}</span>
+                  </>
+                }
+                subtitle={
+                  <span className="app-button-row">
+                    <Badge>{ASSET_TYPE_LABELS[data.asset.asset_type]}</Badge>
+                    {status && <Badge tone={LIFECYCLE_TONES[status]}>{LIFECYCLE_LABELS[status]}</Badge>}
+                    {!data.asset.is_active && <Badge>Arquivado</Badge>}
+                    <Badge tone={VERDICT_TONES[data.valuation.verdict]}>
+                      {VERDICT_LABELS[data.valuation.verdict] ?? data.valuation.verdict}
+                    </Badge>
+                  </span>
+                }
+                actions={
+                  <>
+                    <Link className="app-secondary-button" to={`/asset/${assetId}/edit`}>
+                      Editar ativo
+                    </Link>
+                    <Link className="app-primary-button" to={`/ledger/trades/new?asset=${assetId}`}>
+                      Registrar compra
+                    </Link>
+                  </>
+                }
+              />
+              <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Seções do ativo" />
+              {tab === "summary" && <Summary analysis={data} />}
+              {tab === "fundamentals" && <Fundamentals analysis={data} />}
+              {tab === "valuation" && <Valuation analysis={data} />}
+              {tab === "checklist" && (
+                <ChecklistTab key={`${data.asset.checklist_profile}-${(data.checklist_history ?? []).length}`} analysis={data} onSaved={analysis.reload} />
+              )}
+              {tab === "earnings" && <Earnings assetId={assetId} />}
+              {tab === "ledger" && <Ledger assetId={assetId} />}
+            </>
+          );
+        }}
+      </Async>
+    </div>
+  );
+}

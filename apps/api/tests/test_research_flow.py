@@ -195,6 +195,10 @@ def test_watchlist_requires_type_outside_the_catalog_and_protects_positions(
     blocked = client.delete(f"/api/v1/research/watchlist/{held['asset_id']}")
     assert blocked.status_code == 409
     assert [w["ticker"] for w in client.get("/api/v1/research/watchlist").json()] == ["XPTO3"]
+    cash = client.post("/api/v1/assets", json={"name": "Caixa", "asset_type": "CASH"})
+    assert cash.status_code == 201
+    # Cash and fixed income are not market instruments to follow.
+    assert [w["ticker"] for w in client.get("/api/v1/research/watchlist").json()] == ["XPTO3"]
 
 
 def test_below_band_shortcut_without_positions_returns_nothing(research: SimpleNamespace) -> None:

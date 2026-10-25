@@ -513,7 +513,11 @@ class CorporateEventDTO(CorporateEventRequest):
 
 
 class ExecutionDTO(BaseModel):
-    """What was bought for one asset of the plan; price in the asset currency."""
+    """What was bought for one asset of the plan, in the asset currency with its `fx_rate`.
+
+    For a foreign asset sent with `fx_rate=1`, price and fees are read as BRL (as the plan
+    shows them) and converted at the day's USD/BRL rate.
+    """
 
     asset_id: int
     quantity: Decimal = Field(..., gt=Decimal("0"))

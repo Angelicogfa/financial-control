@@ -26,7 +26,7 @@
 | **Fase 10** | Domínio do Framework Operacional: Política de Investimento, Contas, Ciclo de Vida do Ativo e ARCA com Bandas | `[x]` Concluída | 100% |
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[x]` Implementado | 100% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[x]` Implementado | 100% |
-| **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[ ]` Pendente | 0% |
+| **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[x]` Implementado | 100% |
 | **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[ ]` Pendente | 0% |
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
@@ -359,25 +359,25 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 13 — Frontend no Modelo de Referência (`[ ]` Pendente)
+## Fase 13 — Frontend no Modelo de Referência (`[x]` Implementado)
 
 **Objetivo:** reescrever `apps/web` seguindo a ADR 0007 — shell, menu e conteúdo interno no padrão do web do `dynamic-research`, **home como tela de analytics** e telas de operação apenas com o domínio da operação (gráficos só quando específicos da operação).
 
-- `[ ]` **13.1** (O-06) Fundação: `react-router-dom`, estrutura `src/layout`, `src/pages/<contexto>`, `src/viz`, `src/api`; tema com tokens de espaço/tipografia e papéis `--app-*` (claro e escuro); ícones SVG em linha; `App.tsx` reduzido a rotas.
-- `[ ]` **13.2** (I-06, I-07) Cliente HTTP tipado que propaga erros e hook `useApi` (carregando, erro, recarregar); componentes padronizados de erro, vazio e esqueleto; remoção de `computeLocalContributionPlan` e de qualquer regra de negócio no frontend.
-- `[ ]` **13.3** Shell de referência: sidebar fixa com seções **Visão geral** (Início, Desempenho), **Operação** (Carteira, Pesquisar, Aportar, Lançamentos) e **Configuração** (Estratégia, Contas, Dados de mercado); grupos recolhíveis; rodapé com usuário e sair; topbar com título da rota e indicador de frescor dos dados; gaveta no celular; 404 para rota desconhecida; login fora do shell.
-- `[ ]` **13.4** **Início (analytics):** manchete gerada dos números; indicadores com variação e sparkline (patrimônio, resultado, TWR vs CDI, proventos 12m, reserva); alocação ARCA × meta com bandas; alertas acionáveis; curva base 100 vs benchmarks e proventos por mês.
-- `[ ]` **13.5** **Desempenho:** curva base 100, retorno e risco por classe vs benchmark da classe, drawdown e VaR; estado "histórico insuficiente" explícito.
-- `[ ]` **13.6** **Carteira:** posições agrupadas por classe ARCA (peso atual/alvo, ciclo de vida, score, margem), filtro por conta, composição da classe; sem KPIs gerais.
-- `[ ]` **13.7** **Detalhe do ativo** (`/assets/:id`): cabeçalho com preço/posição/status; abas Resumo, Fundamentos (gráfico histórico), Valuation, Checklist (evidências e histórico do score), Proventos, Lançamentos.
-- `[ ]` **13.8** **Pesquisar:** screener com filtros e atalho "classes abaixo da banda", watchlist, adicionar à watchlist.
-- `[ ]` **13.9** **Aportar:** fluxo em passos (valor → distribuição por classe → ativos elegíveis → revisar e confirmar), com gráfico antes/depois por classe e planos salvos.
-- `[ ]` **13.10** **Lançamentos:** ordens, proventos e eventos corporativos com edição e exclusão validadas, filtros por conta/ativo/período e importação B3 com pré-visualização.
-- `[ ]` **13.11** **Configuração:** Estratégia (metas, bandas, elegibilidade, valuation, versões), Contas e Dados de mercado (frescor das séries e execuções do worker).
-- `[ ]` **13.12** Testes Vitest + Testing Library por página e componente de visualização; ESLint sem avisos; build.
-- `[ ]` **13.13** Atualizar `docs/architecture/FRONTEND_UI_UX.md` para a ADR 0007.
+- `[x]` **13.1** (O-06) Fundação: `react-router-dom` 6, estrutura `src/layout`, `src/pages/<contexto>`, `src/viz`, `src/api`, `src/components`; tokens de espaço/tipografia e papéis `--app-*` claro e escuro; ícones SVG em linha; `App.tsx` só com o portão de sessão e as rotas; tipos gerados do OpenAPI (`scripts/gen_web_types.py`).
+- `[x]` **13.2** (I-06, I-07) `request<T>()` que propaga erros (`ApiError`, servidor fora do ar, 422 resumido, sessão expirada) e `useApi(key, load)`; estados padronizados de carregando/erro/vazio; nenhuma regra de negócio no cliente (o cálculo local de aporte foi removido).
+- `[x]` **13.3** Shell: sidebar com Visão geral, Operação e Configuração, contador de alertas, rodapé com usuário, tema e sair; topbar com título da rota; gaveta abaixo de 900 px; 404; login fora do shell.
+- `[x]` **13.4** Início em atos: manchete gerada, indicadores com variação e minilinha, alocação × meta com banda, alertas com dispensa, base 100 carteira × CDI × Ibovespa e proventos por mês. Backend: `GET /portfolio/snapshots` e curva CDI no analytics.
+- `[x]` **13.5** Desempenho: base 100 por período, risco e retorno, referências, drawdown, resultado por classe ao lado da referência da classe; "histórico insuficiente" explícito.
+- `[x]` **13.6** Carteira por classe ARCA, filtro por conta, composição da classe.
+- `[x]` **13.7** Detalhe do ativo (`/asset/:id`) com abas Resumo, Fundamentos, Valuation, Checklist (edição com evidência e histórico da nota), Proventos e Lançamentos; formulário de ativo com contrato de renda fixa.
+- `[x]` **13.8** Pesquisar: screener com filtros e "classes abaixo da banda", observar candidato, aba Em observação.
+- `[x]` **13.9** Aportar em etapas com antes × depois por classe, execuções editáveis e planos salvos. Backend: execução de ativo estrangeiro sem câmbio é lida em BRL e convertida; `by_class_allocated_brl` passa a ser o que cada classe recebe de fato (com redistribuição).
+- `[x]` **13.10** Lançamentos: compras/vendas, proventos e eventos com filtros, edição e exclusão validadas; importação B3 com pré-visualização. Backend: `GET /transactions/{id}` e `GET /earnings/{id}`; watchlist sem caixa e renda fixa.
+- `[x]` **13.11** Configuração: Estratégia (metas, bandas, divisão, elegibilidade, valuation, projeções, versões), Contas e Dados de mercado.
+- `[x]` **13.12** 45 testes Vitest + Testing Library (cliente, visualizações, história da home e todas as páginas contra API falsa); ESLint sem avisos; `tsc` e build verdes; verificação visual contra API local com dados de exemplo.
+- `[x]` **13.13** `docs/architecture/FRONTEND_UI_UX.md` reescrito para a ADR 0007.
 
-**Aceite:** todas as rotas funcionam contra a API real; home só com analytics e operações só com seu domínio; nenhuma regra de negócio no frontend; `npm run lint && npm test && npm run build` verdes.
+**Aceite:** todas as rotas funcionam contra a API real (verificado em API local isolada com os extratos de exemplo importados); home só com analytics e operações só com seu domínio; `npm run lint && npm test && npm run build` verdes dentro de `scripts/check.sh --smoke`.
 
 ---
 

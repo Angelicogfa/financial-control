@@ -25,6 +25,7 @@ from fincontrol_api.handlers.serializers import to_contribution_plan_dto
 from fincontrol_api.schemas import (
     ContributionConfirmRequest,
     ContributionSimulationRequest,
+    ExecutionDTO,
     SavedContributionPlanDTO,
 )
 from fincontrol_api.services.portfolio_service import PortfolioApplicationService
@@ -44,6 +45,26 @@ def to_saved_plan_dto(saved: SavedContributionPlan) -> SavedContributionPlanDTO:
         account_id=saved.account_id,
         transaction_ids=list(saved.transaction_ids),
         plan=to_contribution_plan_dto(saved.plan),
+    )
+
+
+def _execution(e: ExecutionDTO, usd_brl: Decimal | None) -> Execution:
+    """A foreign asset sent without its FX rate carries the price in BRL, as the plan shows it;
+    it is converted at the day's rate."""
+    if usd_brl is not None and e.fx_rate == Decimal("1"):
+        return Execution(
+            asset_id=e.asset_id,
+            quantity=e.quantity,
+            unit_price=(e.unit_price / usd_brl).quantize(Decimal("0.000001")),
+            fees=(e.fees / usd_brl).quantize(Decimal("0.000001")),
+            fx_rate=usd_brl,
+        )
+    return Execution(
+        asset_id=e.asset_id,
+        quantity=e.quantity,
+        unit_price=e.unit_price,
+        fees=e.fees,
+        fx_rate=e.fx_rate,
     )
 
 
@@ -90,25 +111,21 @@ class ContributionHandler:
             saved = self._get(uow, plan_id)
             account_id = resolve_account_id(uow, req.account_id)
             assets = {o.asset_id: uow.assets.get_by_id(o.asset_id) for o in saved.plan.orders}
+            foreign = {
+                asset_id
+                for asset_id, asset in assets.items()
+                if asset is not None and (asset.currency or "BRL").upper() != "BRL"
+            }
+            usd_brl = (
+                Decimal(str(self.portfolio_service.gateway.get_usd_brl_rate())) if foreign else None
+            )
             if req.executions:
                 executions = [
-                    Execution(
-                        asset_id=e.asset_id,
-                        quantity=e.quantity,
-                        unit_price=e.unit_price,
-                        fees=e.fees,
-                        fx_rate=e.fx_rate,
-                    )
+                    _execution(e, usd_brl if e.asset_id in foreign else None)
                     for e in req.executions
                 ]
             else:
-                usd_brl = Decimal(str(self.portfolio_service.gateway.get_usd_brl_rate()))
-                fx = {
-                    asset_id: usd_brl
-                    for asset_id, asset in assets.items()
-                    if asset is not None and (asset.currency or "BRL").upper() != "BRL"
-                }
-                executions = default_executions(saved.plan, fx)
+                executions = default_executions(saved.plan, dict.fromkeys(foreign, usd_brl))
             check_executions(saved.plan, executions)
 
             transaction_ids: list[int] = []

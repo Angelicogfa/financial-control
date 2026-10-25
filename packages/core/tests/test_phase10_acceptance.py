@@ -79,7 +79,11 @@ def test_reference_portfolio_under_policy(
     allocated = plan.by_class_allocated_brl
     assert allocated[ArcaClass.CAIXA] == 0.0
     assert allocated[ArcaClass.ATIVOS_INTERNACIONAIS] == 0.0
-    assert allocated[ArcaClass.ACOES] + allocated[ArcaClass.REAL_ESTATE] == pytest.approx(5000.0)
+    # Classes receive what was executed (whole shares); the rest stays as cash.
+    assert allocated[ArcaClass.ACOES] + allocated[ArcaClass.REAL_ESTATE] == pytest.approx(
+        plan.executed_total_brl
+    )
+    assert plan.executed_total_brl + plan.unallocated_cash_brl == pytest.approx(5000.0)
     assert "RESERVA" not in {o.ticker for o in plan.orders}
 
 

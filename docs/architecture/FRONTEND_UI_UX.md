@@ -1,114 +1,63 @@
-# Arquitetura Frontend e Design System (UI/UX) — Financial Control
+# Frontend — Estrutura, Navegação e Design System (`apps/web`)
 
-> Especificação arquitetural de Frontend (`apps/web`), Design System (paleta Azul, Branco e Cinza), Layout Full-Canvas com **Menu Hambúrguer (Off-Canvas Drawer)**, Cards com Indicadores de Evolução e Projeção, e **Padrão Universal de Tabelas (`DataGrid`) com Paginação, Ordenação e Filtros Server/Client-Side**.
-
----
-
-## 1. Diretrizes de Layout & Design System (Azul, Branco e Cinza)
-
-### 1.1 Aproveitamento Máximo de Tela (Hamburger Navigation + Full-Width Canvas)
-Para garantir que gráficos financeiros, cards de evolução/projeção e tabelas analíticas aproveitem **100% da largura útil da viewport**:
-- **Sem Sidebar Fixa Permanente**: a navegação principal fica recolhida em um **Menu Hambúrguer (`NavigationDrawer`)** acionado no canto superior esquerdo da Topbar (`☰` ou atalho `Alt+M`), abrindo em sobreposição (*slide-over drawer* em azul-marinho `#0F172A` com backdrop translúcido).
-- **Topbar Clean (`64px`)**:
-  - Esquerda: Botão Hambúrguer + Breadcrumb da página atual + Ticker tape compacto (`CDI`, `IPCA`, `USD/BRL`, `IBOV`, `IFIX`).
-  - Direita: Seletor global de janela temporal (`1M`, `6M`, `12M`, `YTD`, `Máx`) + botão primário `+ Novo Lançamento`.
-- **Grid de Conteúdo (`max-w-[1600px] mx-auto px-6 py-6 gap-6`)**: espaçamento respirável (`24px` entre seções, `20px` de padding interno nos cards), bordas sutis `#E2E8F0` e sombras leves.
-
-### 1.2 Tokens de Cores (Azul, Branco e Cinza)
-
-| Categoria | Token CSS | Hex | Uso na Interface |
-|---|---|---|---|
-| **Superfícies (Branco / Cinza Claro)** | `--surface-canvas` | `#F8FAFC` | Fundo geral da página (`Slate 50`) |
-| | `--surface-card` | `#FFFFFF` | Cards, tabelas, barra de filtros e topbar (`Pure White`) |
-| | `--surface-subtle` | `#F1F5F9` | Cabeçalhos de tabela, paginação, badges neutros (`Slate 100`) |
-| | `--surface-drawer` | `#0F172A` | Drawer do Menu Hambúrguer em azul-marinho profundo (`Slate 900`) |
-| **Azul Principal (Brand & Actions)** | `--brand-primary` | `#1D4ED8` | Botões primários, página ativa da tabela, destaques (`Blue 700`) |
-| | `--brand-primary-hover` | `#1E40AF` | Hover de ações primárias (`Blue 800`) |
-| | `--brand-accent` | `#2563EB` | Indicadores de projeção, linha principal e sparklines (`Blue 600`) |
-| | `--brand-soft` | `#EFF6FF` | Pílulas de projeção, linha selecionada e cabeçalho ativo (`Blue 50`) |
-| **Escala de Cinzas (Tipografia e Bordas)** | `--text-primary` | `#0F172A` | Títulos e valores monetários principais (`Slate 900`) |
-| | `--text-secondary` | `#475569` | Rótulos, subtítulos e células secundárias (`Slate 600`) |
-| | `--text-muted` | `#94A3B8` | Placeholders, legendas e metadados (`Slate 400`) |
-| | `--border-subtle` | `#E2E8F0` | Divisórias de cards e linhas de tabela (`Slate 200`) |
-| **Cores das 4 Classes ARCA** | `--arca-stocks` | `#1D4ED8` | **A** — Ações Brasil (Azul Royal) |
-| | `--arca-real-estate` | `#0284C7` | **R** — Real Estate / FIIs / REITs (Azul Céu Escuro) |
-| | `--arca-cash` | `#475569` | **C** — Caixa / Renda Fixa (Cinza Ardósia) |
-| | `--arca-international` | `#3B82F6` | **A** — Ativos Internacionais & Cripto (Azul Brilhante) |
+> Implementa a ADR 0005 (contextos de operação) e a ADR 0007 (shell de referência, home analítica, telas de operação só com o domínio). Modelo visual: o web do projeto `dynamic-research`.
 
 ---
 
-## 2. Padrão de Cards com Indicadores de Evolução e Projeção
+## 1. Princípios
 
-Todos os cards executivos (KPIs) seguem uma anatomia padronizada de **4 camadas de informação** com espaçamento limpo:
-1. **Cabeçalho do Card**: Título da métrica em cinza (`#475569`) + ícone/badge de contexto.
-2. **Valor Principal + Mini Sparkline**: Valor em destaque (`text-2xl font-bold tabular-nums`) acompanhado de micro-gráfico de linha indicando a trajetória recente.
-3. **Indicador de Evolução (Realizado/Histórico)**: Pílula de variação no período (ex.: `▲ +2,45% no mês | +13,55% em 12m` vs CDI/IPCA).
-4. **Indicador de Projeção (Forward-Looking 12m)**: Rodapé separado por linha sutil (`border-slate-100`) exibindo a **projeção estimada para os próximos 12 meses** com base nas taxas contratadas (curva CDI/IPCA+ da Renda Fixa), *Yield on Cost* de proventos e ritmo de aportes.
+1. **A home responde "como estou?"; cada operação responde "o que faço agora?".** Indicadores gerais moram só na home (Início) e em Desempenho; telas de operação mostram apenas o seu domínio.
+2. **Gráfico só quando é da operação**: antes/depois por classe no Aportar, composição da classe na Carteira, preço, lucro anual e proventos no detalhe do ativo.
+3. **Nenhuma regra de negócio no frontend.** O cálculo (alocação, aporte, checklist, valuation, alertas) é do backend; o cliente formata e apresenta.
+4. **Erro nunca vira zero.** Toda chamada propaga a mensagem da API (ou "servidor fora do ar") com "Tentar de novo".
+5. **Tipos gerados**: `apps/web/src/api/types.ts` vem do OpenAPI da API (`uv run python scripts/gen_web_types.py`); nenhuma forma do backend é redeclarada à mão.
 
----
+## 2. Shell e navegação
 
-## 3. Padrão Obrigatório de Listagens e Tabelas (`StandardDataTable<T>`)
+- **Sidebar fixa de 248 px** com marca, seções em caixa alta, itens com ícone SVG em linha, contador de alertas no Início e rodapé com usuário, troca de tema e sair. Abaixo de 900 px vira **gaveta** (fundo escurecido, fecha ao navegar e com Esc). O botão da topbar recolhe o menu no desktop.
+- **Topbar de 48 px** com o título da página derivado da rota.
+- **Conteúdo** com margem lateral `clamp(16px, 3vw, 48px)` e largura máxima de 1180 px; tabelas rolam na horizontal dentro do cartão, a página nunca.
+- **Login fora do shell**; sessão expirada (401) volta ao login com aviso.
 
-Toda listagem de dados na API e no Frontend (Posições da Carteira, Consolidação de Ganho/Perda, Histórico de Transações, Histórico de Proventos, Busca de Ativos e Auditoria do Cerrado) implementa obrigatoriamente o contrato padronizado de **Paginação, Ordenação e Filtros**.
+| Seção | Item | Rota |
+|---|---|---|
+| Visão geral | Início (analytics) | `/home` (`/` redireciona) |
+| | Desempenho | `/performance` |
+| Operação | Carteira | `/portfolio`, `/asset/new`, `/asset/:id`, `/asset/:id/edit` |
+| | Pesquisar | `/research` (`?tab=watchlist`) |
+| | Aportar | `/contribute`, `/contribute/:planId` |
+| | Lançamentos | `/ledger` (`?tab=earnings|events`), `/ledger/trades/new`, `/ledger/trades/:id/edit`, `/ledger/earnings/new`, `/ledger/earnings/:id/edit`, `/ledger/events/new`, `/ledger/import` |
+| Configuração | Estratégia | `/settings/strategy` |
+| | Contas | `/settings/accounts` |
+| | Dados de mercado | `/settings/market-data` |
 
-### 3.1 Contrato Padronizado de Query & Resposta na API (`FastAPI`)
+URL desconhecida mostra **404**. O detalhe do ativo usa `/asset/` (singular) porque o nginx serve o bundle em `/assets/`. Abas ficam em `?tab=` para que links e "voltar" as preservem.
 
-- **Query Parameters Padrão**:
-  - `page`: número da página (1-indexed, default `1`)
-  - `page_size`: itens por página (`10`, `25`, `50`, `100`, default `10`)
-  - `sort_by`: campo de ordenação (ex.: `ticker`, `invested_value`, `current_value`, `consolidated_pnl`, `trade_date`)
-  - `sort_order`: `asc` | `desc`
-  - `search`: busca textual livre (ticker, nome, notas)
-  - Filtros de domínio específicos (ex.: `arca_class`, `asset_type`, `kind`, `date_from`, `date_to`, `cerrado_status`)
+## 3. Telas
 
-- **Envelope JSON Padronizado (`PaginatedResponse<T>`)**:
-```json
-{
-  "items": [ ... ],
-  "meta": {
-    "page": 1,
-    "page_size": 10,
-    "total_items": 48,
-    "total_pages": 5,
-    "has_prev": false,
-    "has_next": true,
-    "sort_by": "consolidated_pnl",
-    "sort_order": "desc"
-  },
-  "summary": {
-    "filtered_invested_value": 210000.00,
-    "filtered_current_value": 238450.00,
-    "filtered_consolidated_pnl": 42190.00
-  }
-}
-```
+- **Início** (atos): manchete gerada dos números (patrimônio e variação sem aportes, classe mais abaixo da banda, alertas) → indicadores com variação e minilinha (patrimônio, resultado consolidado, rentabilidade 12 m vs CDI, proventos 12 m, reserva) → alocação ARCA atual × meta com banda + "o que precisa de atenção" (alertas com dispensa por 7 dias) → evolução base 100 (carteira, CDI, Ibovespa) e proventos por mês.
+- **Desempenho**: período (6 m, 12 m, 24 m, tudo), base 100 de carteira e referências, risco e retorno (TWR, CAGR, volatilidade, Sharpe, Sortino, queda máxima, VaR/CVaR), comparação com referências, drawdown e resultado por classe ao lado da referência da classe. "Histórico insuficiente" explícito.
+- **Carteira**: posições agrupadas por classe (linha de grupo com valor e peso × meta), peso atual/alvo na classe, situação no ciclo de vida, nota do checklist, preço sem cotação sinalizado; filtro por conta; aba por classe mostra a composição.
+- **Detalhe do ativo**: Resumo (posição, risco, preço 12 m), Fundamentos (indicadores atuais, métricas históricas, lucro anual, demonstrativos), Valuation (veredito, métodos por perfil), Checklist (perfil, Sim/Não/Não se aplica com evidência, respostas automáticas com a evidência calculada, histórico da nota), Proventos e Lançamentos.
+- **Pesquisar**: screener do catálogo B3 (texto, tipos, liquidez, P/L, P/VP, DY, ROE, "só classes abaixo da banda", esconder cadastrados) com veredito de valuation e "Observar"; aba Em observação com situação, checklist, valuation e margem.
+- **Aportar**: etapas Valor → Classes (antes × depois × meta) → Ativos (quantidade, preço e taxas editáveis) → Confirmar (data e conta); planos salvos com situação.
+- **Lançamentos**: compras e vendas, proventos e eventos corporativos com filtros por ativo, conta e período; exclusão mostra a recusa do livro quando houver; importação B3 com pré-visualização por linha, cadastro de tickers desconhecidos e gravação tudo-ou-nada.
+- **Estratégia** (metas devem somar 100%, bandas, divisão interna, elegibilidade, valuation e projeções em %; salvar cria versão), **Contas** e **Dados de mercado** (frescor das séries e última execução de cada rotina do worker).
 
-### 3.2 Anatomia do Componente `StandardDataTable<T>` no Frontend
+## 4. Design system
 
-```mermaid
-flowchart TB
-    subgraph DataTable["StandardDataTable<T> (Componente Reutilizável)"]
-        TB["1. FilterToolbar: Busca instantânea (debounce 300ms) + Selects de Classe/Tipo/Período + Botão Limpar Filtros"]
-        TH["2. SortableHeader: Clique na coluna alterna asc ↑ / desc ↓ / padrão ↕"]
-        TR["3. TableBody: Linhas com hover sutil, células tabular-nums, badges e ações rápidas"]
-        TF["4. PaginationFooter: 'Exibindo X–Y de Z registros' + Seletor (5/10/25/50 por pág.) + Navegação (|« ‹ 1 2 3 › »|)"]
-    end
-    TB --> TH --> TR --> TF
-```
+- **Tokens** (`src/styles/theme.css`): espaço `--space-0..6` (2/4/8/12/16/24/32 px), tipo `--text-micro..hero` (11/12/14/16/20/30 px), papéis `--app-*` (superfície, borda, texto, primário, sucesso, aviso, perigo) e paleta de visualização `--viz-*`.
+- **Tema escuro** redefine só os papéis em `:root[data-theme="dark"]`; `index.html` aplica a escolha salva ou a do sistema antes da primeira pintura.
+- **Componentes**: `PageHeader`, `Async`/`Loading`/`ErrorBanner`/`Empty`, `Badge`/`Signed`, `Tabs` (`useTab`), classes `.app-card`, `.app-table`, `.app-field-grid`, `.app-steps`, `.app-checklist`, `.home-kpi`.
+- **Visualizações SVG próprias** (`src/viz`): `Sparkline` (decorativa), `TrendChart` (linhas com rótulo na ponta, lacunas, linha de base e leitura do ponto em texto), `BarList` (valor em texto, meta, banda e segunda barra antes/depois), `ColumnChart`. Todo gráfico tem `<title>` com a conclusão; a cor nunca é a única forma de ler o número.
+- **Formatação** pt-BR em `src/utils/format.ts`; frações seguem a ADR 0006 (`pct(0.12)` → "12,0%"; campos `_pct` da API já vêm em pontos percentuais → `points`). Rótulos dos enums em `src/utils/labels.ts`.
 
----
+## 5. Dados
 
-## 4. Hierarquia de Navegação (Hamburger Drawer + Full Viewport)
+- `src/api/http.ts`: `request<T>()` com cookie de sessão, `ApiError` (status, código, mensagem), evento de sessão expirada, mensagem de servidor fora do ar e validação 422 resumida.
+- `src/api/endpoints.ts`: chamadas tipadas por contexto (`api.portfolio`, `api.research`, `api.contributions`, `api.ledger`, `api.policy`, …).
+- `src/api/useApi.ts`: `useApi(key, load)` com `data`, `error`, `loading` e `reload`; trocar a `key` recarrega.
 
-```mermaid
-flowchart TD
-    TOP["Topbar Fixa: Botão Hambúrguer (☰) + Breadcrumb + Cotações Macro + '+ Novo Lançamento'"]
-    TOP -->|abre/fecha| DRAWER["Drawer Lateral (Off-Canvas #0F172A)"]
-    DRAWER --> R1["1. Dashboard Executivo (/dashboard)<br/>KPIs com Evolução & Projeção + ARCA + Curva vs Benchmarks"]
-    DRAWER --> R2["2. Carteira & Consolidação (/portfolio)<br/>DataGrid Paginada/Ordenável/Filtrável de Posições e Ganho/Perda"]
-    DRAWER --> R3["3. Detalhe do Ativo (/portfolio/assets/:ticker)<br/>Gráfico, Valuation Graham/Bazin, Risco e Cerrado Opcional"]
-    DRAWER --> R4["4. Lançamentos & Proventos (/transactions)<br/>DataGrid Paginada de Compras/Vendas e Dividendos/JCP/FIIs"]
-    DRAWER --> R5["5. Simulador de Aporte (/contribution)<br/>Rebalanceamento 2 Níveis (ARCA + Cerrado Opcional / Manual / Igual)"]
-    DRAWER --> R6["6. Análises & Benchmarks (/analytics)<br/>TWR vs IBOV, IFIX, S&P 500, CDI, IPCA + Drawdown + Correlação"]
-    DRAWER --> R7["7. Configurações (/settings)<br/>Metas ARCA e Preferências"]
-```
+## 6. Qualidade
+
+`npm run lint` (zero avisos), `npx tsc --noEmit`, `npm test` (Vitest + Testing Library: cliente HTTP, visualizações, história da home e cada página contra uma API falsa em `src/test/mockApi.ts`) e `npm run build`, todos dentro de `scripts/check.sh`.

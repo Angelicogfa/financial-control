@@ -11,6 +11,7 @@ from fincontrol_core.domain.enums import (
     ArcaClass,
     AssetLifecycle,
     AssetType,
+    Market,
 )
 from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
 from fincontrol_core.market.batch import fetch_market_data
@@ -89,8 +90,8 @@ class ResearchHandler:
             assets = [
                 a
                 for a in uow.assets.list_all(active_only=True)
-                if a.fixed_income_term is None
-                and not has_position(a.transactions, fixed_income=False)
+                if a.market not in (Market.MANUAL, Market.FIXED_INCOME_CURVE)
+                and not has_position(a.transactions, fixed_income=False, events=a.corporate_events)
             ]
             return self._items(uow, assets)
 

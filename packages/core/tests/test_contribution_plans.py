@@ -92,3 +92,18 @@ def test_only_drafts_change_state() -> None:
     with pytest.raises(ConflictError):
         discard_plan(confirmed, at=at)
     assert discard_plan(draft, at=at).status == ContributionPlanStatus.DISCARDED
+
+
+def test_classes_report_what_they_receive_after_redistribution() -> None:
+    from fincontrol_core.arca.allocation import ArcaTargets
+    from fincontrol_core.domain.entities import AssetEntity
+    from fincontrol_core.portfolio.consolidation import consolidate_portfolio, plan_contribution
+
+    cash = AssetEntity(
+        ticker="CAIXA", name="Reserva", asset_type=AssetType.CASH, manual_price=Decimal("1"), id=1
+    )
+    report = consolidate_portfolio([cash], ArcaTargets.default())
+    plan = plan_contribution(report, ArcaTargets.default(), 1000.0)
+    assert plan.by_class_allocated_brl[ArcaClass.CAIXA] == 1000.0
+    assert plan.by_class_allocated_brl[ArcaClass.ATIVOS_INTERNACIONAIS] == 0.0
+    assert sum(plan.by_class_allocated_brl.values()) == plan.executed_total_brl
