@@ -95,4 +95,6 @@ done
 published="$("${COMPOSE[@]}" ps --format '{{.Service}} {{.Publishers}}' | grep -vE '^web ' | grep -c 'PublishedPort:[1-9]' || true)"
 [[ "$published" == "0" ]] || fail "only the web service may publish ports"
 
+"${COMPOSE[@]}" exec -T worker python -m fincontrol_worker.seed_demo --help >/dev/null   || fail "seed_demo is not available in the worker image"
+
 echo "SMOKE OK"

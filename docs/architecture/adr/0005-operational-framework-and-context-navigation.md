@@ -42,7 +42,7 @@ Somente `ELIGIBLE`/`HELD` elegíveis recebem aporte. `REVIEW` gera alerta, nunca
 ### 4. Navegação
 - Desktop: trilho lateral persistente e recolhível com os 7 contextos acima (substitui o menu hambúrguer como navegação principal).
 - Mobile (< 768px): o mesmo trilho vira drawer acionado pelo botão de menu.
-- Detalhe do ativo é uma rota única (`/assets/:id`) acessível de Carteira, Pesquisar, Aportar e Início; o conteúdo se adapta ao status (candidato vs posição).
+- Detalhe do ativo é uma rota única (`/asset/:id`; singular porque o nginx serve o bundle em `/assets/`) acessível de Carteira, Pesquisar, Aportar e Início; o conteúdo se adapta ao status (candidato vs posição).
 - Ações globais na topbar: `+ Lançamento` e indicador de frescor dos dados (cotações, BCB, último snapshot).
 
 ## Consequências

@@ -1,28 +1,28 @@
-# Especificação de Funcionalidades (MVP)
+# Especificação de Funcionalidades
 
-## 1. Gestão de Ativos e Termos de Renda Fixa
-- Cadastro de ativos de renda variável (`STOCK_BR`, `ETF_BR`, `FII`, `BDR`, `STOCK_INTL`, `ETF_INTL`, `REIT`, `CRYPTO`) e renda fixa/caixa (`FIXED_INCOME`, `TREASURY`, `CASH`).
-- Associação automática à classe ARCA com opção de alteração manual.
-- Para renda fixa: definição de indexador (`CDI`, `IPCA`, `PRE`, `SELIC`), taxa contratada (ex.: `110% do CDI` ou `IPCA + 6,5% a.a.`), data de emissão/vencimento e isenção de IR (`LCI`/`LCA`).
+Organizadas pelos contextos do menu (ADR 0005 e ADR 0007).
 
-## 2. Lançamentos de Compras, Vendas e Proventos
-- Registro de compras (`BUY`) e vendas (`SELL`) com quantidade, preço unitário, taxas e câmbio na data.
-- Cálculo automático de posição por preço médio ponderado e apuração do lucro/prejuízo realizado em cada venda.
-- Registro de proventos (`DIVIDEND`, `JCP`, `FII_YIELD`, `FIXED_INCOME_COUPON`) com valor bruto, imposto retido e valor líquido.
+## Visão geral
+- **Início (analytics):** manchete gerada dos números, patrimônio com variação sem aportes, resultado consolidado, rentabilidade 12 meses (TWR) contra o CDI, proventos 12 meses e reserva de emergência; alocação ARCA atual × meta com bandas; alertas acionáveis com dispensa; evolução base 100 (carteira, CDI, Ibovespa) e proventos por mês.
+- **Desempenho:** base 100 por período contra CDI, Ibovespa, IFIX e S&P 500; retorno acumulado e anualizado, retorno real, volatilidade, Sharpe, Sortino, queda máxima, VaR e CVaR 95%; beta, excesso e correlação por referência; drawdown; resultado por classe ao lado da referência da classe.
 
-## 3. Acompanhamento da Carteira e Consolidação de Ganho/Perda
-- Exibição por ativo, por classe ARCA e para a carteira total:
-  - **Valor Investido** (custo de aquisição das posições abertas);
-  - **Valor Atual** (cotação atualizada em BRL ou valor líquido na curva da renda fixa);
-  - **Estimativa de Rendimento até o Momento** (calculada conforme o tipo de ativo: variação de preço + proventos acumulados + *Yield on Cost* / curva contratada de RF);
-  - **Consolidação de Ganho / Perda / Rendimento Obtido**: soma de ganho/perda não realizado + ganho/perda realizado em vendas encerradas/parciais + proventos líquidos recebidos, com filtro por período e por classe.
+## Operação
+- **Carteira:** posições por classe ARCA com quantidade, preço médio e atual (cotação, curva, manual ou fallback sinalizado), valor, resultado consolidado (não realizado + realizado + proventos), peso atual × alvo na classe, situação no ciclo de vida e nota do checklist; filtro por conta; composição de cada classe.
+- **Detalhe do ativo:** posição e risco; indicadores atuais e histórico anual de demonstrativos com ROE médio, CAGR de receita e lucro, anos com lucro e regularidade de proventos; valuation por perfil (Graham, Bazin, P/L, EV/EBITDA, P/VP justificado, spread de FIIs) com veredito e margem; checklist por perfil com respostas Sim/Não/Não se aplica, evidência, respostas automáticas e histórico da nota; proventos e lançamentos.
+- **Pesquisar:** screener do catálogo B3 (tipo, setor, texto, liquidez, valor de mercado, P/L, P/VP, DY, ROE, só classes abaixo da banda, esconder cadastrados) com veredito de valuation; lista de observação com situação, checklist e margem.
+- **Aportar:** sugestão em dois níveis (classes abaixo da banda → ativos elegíveis pela estratégia da classe), quantidades inteiras na B3 e fracionárias no exterior, antes × depois por classe, execução editável e confirmação que registra as compras; planos salvos (rascunho, confirmado, descartado).
+- **Lançamentos:** compras e vendas com taxas e câmbio, proventos (dividendo, JCP com IR, rendimento, cupom, restituição) e eventos corporativos (desdobramento, grupamento, bonificação com custo atribuído); toda alteração revalida o livro do ativo; importação das planilhas da B3 com pré-visualização, deduplicação e cadastro de ativos novos.
 
-## 4. Alocação ARCA, Diagrama do Cerrado Opcional e Simulador de Aporte
-- Comparativo visual e numérico entre percentual atual e meta de cada classe ARCA.
-- Questionário do Diagrama do Cerrado por ativo (com respostas automáticas via fundamentos e override manual), **totalmente opcional** (`use_cerrado`).
-- Simulador de novo aporte em 2 níveis (Classes ARCA $\rightarrow$ Ativos da classe via Cerrado, Peso Manual ou Peso Igual), sem venda de ativos.
+## Configuração
+- **Estratégia:** metas e bandas ARCA, divisão interna (checklist, pesos manuais ou iguais), elegibilidade (nota e cobertura mínimas, checklist obrigatório ou não), premissas de valuation e de projeção; cada alteração cria uma versão.
+- **Contas:** corretoras, bancos e exchanges; todo lançamento pertence a uma conta.
+- **Dados de mercado:** frescor de CDI, SELIC, IPCA e índices; última execução de cada rotina do worker.
 
-## 5. Indicadores de Mercado, Valuation e Métricas Estatísticas
-- Cotações, múltiplos fundamentalistas (`P/L`, `P/VP`, `DY`, `ROE`, `Margem Líquida`, `Dívida/EBITDA`, `Crescimento`) e Valuation auxiliar (**Graham** e **Bazin**).
-- Métricas quantitativas: **TWR**, **CAGR**, **Volatilidade**, **Sharpe**, **Sortino**, **Max Drawdown**, **Calmar**, **VaR/CVaR 95%**, **Beta**, **Alpha de Jensen** e **Matriz de Correlação**.
-- Comparação com **IBOV**, **IFIX**, **S&P 500**, **CDI** e **IPCA**.
+## Renda fixa
+CDB, LCI, LCA, CRI, CRA, debêntures, Tesouro Selic/IPCA+/Prefixado e contas remuneradas por indexador (`CDI`, `SELIC`, `IPCA`, `PRE`), com taxa contratada, aplicação, vencimento, isenção, IR regressivo, IOF, resgates proporcionais (FIFO), feriados nacionais e projeção em 252 dias úteis.
+
+## Operação da stack
+- `docker compose up -d --build` sobe Postgres, Redis, migrations, API, worker e web; dados em volumes nomeados (`fincontrol_pgdata`, `fincontrol_redisdata`).
+- Login único (Argon2 + JWT httpOnly); `/health` e `/ready`; logs JSON com `X-Request-ID`.
+- `uv run python -m fincontrol_worker.seed_demo` preenche um banco **vazio** com dois anos de demonstração.
+- Portão local: `scripts/check.sh` (`--fast`, `--smoke`, `--e2e`).

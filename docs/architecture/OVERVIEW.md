@@ -1,6 +1,6 @@
 # Arquitetura e Visão Sistêmica — Financial Control
 
-> Solução para controle, acompanhamento e análise de carteira de investimentos baseada na distribuição **ARCA** (Thiago Nigro) e no **Diagrama do Cerrado** opcional (Raul Sena), com cálculo automático de renda fixa por indexador, controle de proventos, consolidação de ganhos/perdas e métricas quantitativas de mercado.
+> Solução para controle, acompanhamento e análise de carteira de investimentos: **ARCA** (Thiago Nigro) para a segmentação da carteira e **análise fundamentalista** (checklist do Diagrama do Cerrado por perfil, histórico de demonstrativos e valuation por tipo) para escolher os ativos. As duas metodologias vivem numa **política de investimento versionada** e aparecem dentro de cada operação (ADR 0005): Pesquisar → Aportar → Lançamentos → Carteira/Desempenho.
 
 ---
 
@@ -16,11 +16,13 @@ A carteira é dividida em quatro classes com metas percentuais configuráveis (s
 | **C** | `CAIXA` (Caixa / Renda Fixa) | `FIXED_INCOME`, `TREASURY`, `CASH` | 25% |
 | **A** | `ATIVOS_INTERNACIONAIS` | `STOCK_INTL`, `ETF_INTL`, `BDR`, `CRYPTO` | 25% |
 
-### 1.2 Seleção Intra-Classe: Diagrama do Cerrado (Opcional)
-O **Diagrama do Cerrado** **não é obrigatório**. O sistema oferece três modos de distribuição intra-classe (`IntraClassStrategy`):
-1. **`CERRADO`** (padrão quando avaliado): peso proporcional à pontuação positiva do questionário ($\max(\text{score}, 0)$). Ativos com nota $\le 0$ ficam com status `REVISAR` e peso $0$.
-2. **`MANUAL_WEIGHT`**: o investidor define manualmente o peso-alvo do ativo dentro da classe (`custom_class_weight`).
-3. **`EQUAL_WEIGHT`**: peso igualitário ($1/N$) entre os ativos ativos da classe (fallback automático quando o usuário não usa o Cerrado nem pesos manuais).
+### 1.2 Política de investimento e lente fundamentalista
+A **política** (`investment_policies`, uma versão por alteração) reúne as regras das duas metodologias: metas e bandas ARCA com a estratégia intra-classe, critérios de **elegibilidade** (nota mínima e cobertura do checklist) e premissas de **valuation**.
+
+- **Checklist v2 (Diagrama do Cerrado)** por perfil do instrumento (`STOCK`, `BANK`, `FII_BRICK`, `FII_PAPER`, `ETF`, `INTL_STOCK`, `CRYPTO`, `FIXED_INCOME`): respostas `YES`/`NO`/`NA`, manuais (com evidência) ou automáticas, preferindo métricas de até 5 anos de demonstrativos (ROE médio, CAGR, anos com lucro, regularidade de proventos) aos indicadores TTM. As respostas ficam num histórico append-only e a nota é registrada ao longo do tempo.
+- **Valuation por perfil**: Graham, Bazin, P/L e EV/EBITDA (ações), P/VP justificado (bancos), P/VP, DY e spread sobre o juro real (FIIs); ETF, cripto e renda fixa não se aplicam.
+- **Ciclo de vida** do ativo: `WATCHLIST` → `ELIGIBLE` → `HELD` → `REVIEW` → `ARCHIVED`. Só `ELIGIBLE` e `HELD` recebem aporte; `REVIEW` gera alerta, nunca venda automática.
+- **Estratégia intra-classe** (`IntraClassStrategy`): `CERRADO` (peso pela nota positiva), `MANUAL_WEIGHT` ou `EQUAL_WEIGHT`. O checklist continua opcional (`use_cerrado`, `require_evaluation=false`).
 
 ### 1.3 Valores da Carteira, Rendimento Estimado e Consolidação de Ganho/Perda
 Para cada ativo cadastrado e para o consolidado da carteira (por classe ARCA e geral), o sistema calcula:
@@ -75,9 +77,9 @@ flowchart LR
         PG[("postgres:16<br/>vol: fincontrol_pgdata")]
         RD[("redis:7<br/>vol: fincontrol_redisdata")]
     end
-    BRAPI["brapi.dev<br/>(Ações B3, FIIs, ETFs, BDRs)"]
-    YF["Yahoo Finance<br/>(EUA, Cripto, IBOV, IFIX, S&P500, USD/BRL)"]
-    BCB["Banco Central SGS<br/>(CDI série 12, SELIC 11, IPCA 433)"]
+    BRAPI["brapi.dev<br/>(cotações, fundamentos, demonstrativos e lista B3)"]
+    YF["Yahoo Finance<br/>(EUA, cripto, índices, USD/BRL, demonstrativos)"]
+    BCB["Banco Central SGS<br/>(CDI 12, SELIC 11, IPCA 433)"]
 
     U --> WEB
     WEB -->|"/api/v1/*"| API
@@ -94,89 +96,140 @@ flowchart LR
     WK --> BCB
 ```
 
+Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e novas tentativas):
+
+| Rotina | Quando | O que faz |
+|---|---|---|
+| `warm_portfolio_quotes` | a cada `QUOTE_REFRESH_MINUTES` | renova cotações e fundamentos da carteira no cache |
+| `ensure_series_coverage` | idem | completa séries BCB desde a aplicação de renda fixa mais antiga |
+| `sync_bcb_and_benchmarks` | diário (`BCB_SYNC_CRON_*`) | sincroniza CDI/SELIC/IPCA e índices de forma incremental |
+| `record_daily_snapshot` | dias úteis (`SNAPSHOT_CRON_*`) | grava o retrato diário da carteira (TWR) |
+| `sync_instrument_catalog` | dias úteis (`CATALOG_SYNC_CRON_HOUR`) | catálogo de ativos B3 para o screener |
+| `refresh_fundamentals` | semanal (`FUNDAMENTALS_CRON_*`) | demonstrativos anuais das empresas em carteira e em observação |
+| `record_checklist_evaluations` | semanal | reavalia os checklists e registra a nota quando muda |
+
+Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, taxas padrão) e são lembradas por `MARKET_MISS_CACHE_TTL` para as telas responderem na hora; os alertas avisam o usuário.
+
 ---
 
 ## 3. Modelo de Dados (ER)
 
-Todas as tabelas e colunas são definidas em **inglês** e versionadas via migrations Alembic (`script_00001`, `script_00002`, ...):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00015`):
 
 ```mermaid
 erDiagram
+    ACCOUNTS ||--o{ TRANSACTIONS : holds
+    ACCOUNTS ||--o{ EARNINGS : receives
     ASSETS ||--o{ TRANSACTIONS : has
     ASSETS ||--o{ EARNINGS : distributes
     ASSETS ||--o| FIXED_INCOME_TERMS : configures
+    ASSETS ||--o{ CORPORATE_EVENTS : adjusts
+    ASSETS ||--o{ CHECKLIST_ANSWERS : answers
+    ASSETS ||--o{ CHECKLIST_EVALUATIONS : scores
     ASSETS {
         int id PK
         string ticker UK
-        string name
         string asset_type
         string arca_class
-        string currency
-        decimal manual_price
-        decimal custom_class_weight
+        string purpose "ARCA, EMERGENCY_RESERVE, OTHER"
+        string checklist_profile "null means the default of the type"
         bool use_cerrado
-        json cerrado_answers
+        decimal manual_price
         bool is_active
-        text notes
-        timestamp created_at
-        timestamp updated_at
     }
-    FIXED_INCOME_TERMS {
+    ACCOUNTS {
         int id PK
-        int asset_id FK
-        string instrument_kind "CDB, LCI, LCA, TESOURO_SELIC, TESOURO_IPCA, TESOURO_PRE, DEBENTURE"
-        string indexer "CDI, IPCA, PRE, SELIC"
-        decimal contracted_rate "e.g. 1.10 for 110% CDI or 0.065 for IPCA+6.5%"
-        date issue_date
-        date maturity_date
-        bool tax_exempt "true for LCI/LCA/CRA/CRI"
-        string liquidity "DAILY, AT_MATURITY"
-        string issuer
+        string name UK
+        string kind "BROKER, BANK, EXCHANGE, OTHER"
     }
     TRANSACTIONS {
         int id PK
         int asset_id FK
+        int account_id FK
         string kind "BUY, SELL"
         date trade_date
         decimal quantity
         decimal unit_price
         decimal fees
-        decimal fx_rate "1.0 for BRL, USD/BRL on trade date"
-        text notes
+        decimal fx_rate
+        string import_hash UK "B3 import deduplication"
     }
     EARNINGS {
         int id PK
         int asset_id FK
+        int account_id FK
         string kind "DIVIDEND, JCP, FII_YIELD, FIXED_INCOME_COUPON, RESTITUTION"
         date payment_date
-        date ex_date
         decimal gross_amount
         decimal withholding_tax
-        decimal net_amount
-        text notes
+        decimal fx_rate
+        string import_hash UK
     }
-    ARCA_TARGETS {
-        string arca_class PK
-        decimal target_pct
-        string intra_class_strategy "CERRADO, MANUAL_WEIGHT, EQUAL_WEIGHT"
+    CORPORATE_EVENTS {
+        int id PK
+        int asset_id FK
+        string kind "SPLIT, REVERSE_SPLIT, BONUS"
+        date ex_date
+        decimal factor
+        decimal unit_cost "bonus attributed cost"
+        string import_hash UK
+    }
+    CHECKLIST_ANSWERS {
+        int id PK
+        int asset_id FK
+        string question_id
+        string value "YES, NO, NA or null when cleared"
+        string source "MANUAL, AUTO"
+        text evidence
+        timestamp answered_at
+    }
+    CHECKLIST_EVALUATIONS {
+        int id PK
+        int asset_id FK
+        timestamp evaluated_at
+        int score
+        float coverage_pct
+        string recommendation
+    }
+    INVESTMENT_POLICIES {
+        int version PK
+        json arca "targets, bands, intra-class strategy"
+        json eligibility
+        json valuation
+    }
+    FUNDAMENTAL_SNAPSHOTS {
+        string ticker
+        date reference_date
+        string period "ANNUAL, TTM"
+        json metrics
+    }
+    INSTRUMENT_CATALOG {
+        string ticker PK
+        string asset_type
+        float volume_brl
+    }
+    CONTRIBUTION_PLANS {
+        int id PK
+        string status "DRAFT, CONFIRMED, DISCARDED"
+        json payload "orders as suggested"
+        json transaction_ids
     }
     MARKET_SERIES {
-        string symbol PK "Ticker or Benchmark: ^BVSP, IFIX.SA, ^GSPC, CDI, IPCA, USDBRL"
-        date reference_date PK
+        string symbol
+        date reference_date
         float value
+        string unit "PERCENT_PER_DAY, PERCENT_PER_MONTH, PRICE, INDEX_POINTS"
     }
     PORTFOLIO_SNAPSHOTS {
         date snapshot_date PK
-        float invested_value
-        float market_value
-        float unrealized_pnl
-        float realized_pnl_cum
-        float earnings_cum
-        float consolidated_pnl
-        float net_flow
-        json by_class
+        decimal invested_value
+        decimal market_value
+        decimal consolidated_pnl
+        decimal net_flow
     }
 ```
+
+Também: `fixed_income_terms` (indexador, taxa contratada, emissão/vencimento, isenção), `job_runs` (execuções do worker) e `alert_dismissals` (alertas dispensados).
 
 ---
 
@@ -215,19 +268,25 @@ sequenceDiagram
     A-->>W: JSON estruturado para cards, tabelas e gráficos empilhados
 ```
 
-### 4.3 Simulação de Aporte (com Cerrado Opcional)
+### 4.3 Aporte: sugerir, revisar e confirmar
 ```mermaid
 flowchart TD
-    IN["POST /portfolio/contribution<br/>{amount, use_cerrado?}"] --> N1["Nível 1: Distribuir aporte entre as 4 classes ARCA<br/>proporcional ao déficit vs meta"]
-    N1 --> MODE{"Estratégia intra-classe?"}
-    MODE -->|"CERRADO (se ativo e houver notas > 0)"| W1["Pesos = max(score, 0) / soma"]
-    MODE -->|"MANUAL_WEIGHT (se definido)"| W2["Pesos = custom_class_weight normalizado"]
-    MODE -->|"EQUAL_WEIGHT (ou Cerrado desativado)"| W3["Pesos = 1 / N ativos elegíveis"]
-    W1 --> N2["Nível 2: Distribuir valor da classe pelo déficit dos ativos"]
-    W2 --> N2
-    W3 --> N2
-    N2 --> QTY["Converter em quantidade (inteira p/ B3, fracionária p/ EUA, Cripto e RF)"]
+    IN["POST /contributions {amount}"] --> N1["Nível 1: classes ARCA abaixo da banda primeiro"]
+    N1 --> N2["Nível 2: só ativos ELIGIBLE/HELD da classe<br/>pesos CERRADO, MANUAL ou EQUAL"]
+    N2 --> QTY["Quantidades inteiras na B3, fracionárias no exterior<br/>sobras vão para outras classes com ativos"]
+    QTY --> DRAFT["Plano DRAFT gravado como sugerido"]
+    DRAFT -->|"confirmar com o executado de fato"| TX["Um BUY por ativo, validado pelo livro"]
+    DRAFT -->|"descartar"| X["DISCARDED"]
 ```
+
+### 4.4 Pesquisa fundamentalista
+`instrument_catalog` (lista B3 diária) → `GET /research/screener` (filtros de catálogo; indicadores só para os candidatos) → `POST /research/watchlist` (ativo `WATCHLIST`) → demonstrativos semanais, checklist e valuation em `GET /assets/{id}/analysis` → `ELIGIBLE` quando nota e cobertura atendem a política → recebe aporte.
+
+### 4.5 Importação B3
+Planilhas da Área do Investidor (Negociação e Movimentação) → pré-visualização por linha (`NEW`, `DUPLICATE`, `UNKNOWN_ASSET`, `IGNORED`, `INVALID`) → gravação tudo-ou-nada das linhas novas (hash de conteúdo + ocorrência), com eventos corporativos cujo fator sai da posição do dia anterior.
+
+### 4.6 Alertas
+`GET /alerts` combina carteira (livro inválido, classe fora da banda, ativo em revisão, cotação em fallback), valuation (abaixo do preço justo) e dados (série desatualizada, retrato ausente, rotina com falha); cada alerta tem chave estável e rota de ação, e pode ser dispensado por N dias.
 
 ---
 

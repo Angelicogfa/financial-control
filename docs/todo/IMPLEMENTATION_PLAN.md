@@ -27,7 +27,7 @@
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[x]` Implementado | 100% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[x]` Implementado | 100% |
 | **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[x]` Implementado | 100% |
-| **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[ ]` Pendente | 0% |
+| **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[x]` Implementado | 100% |
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
 
@@ -381,14 +381,53 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 14 — Validação Operacional 100% (`[ ]` Pendente)
+## Fase 14 — Validação Operacional 100% (`[x]` Implementado)
 
-- `[ ]` **14.1** Script de dados de demonstração (`uv run python -m fincontrol_worker.seed_demo`) com a carteira de referência e 2 anos de histórico.
-- `[ ]` **14.2** E2E com Playwright contra `docker compose up` cobrindo a jornada: login → definir estratégia → importar B3 → pesquisar e adicionar à watchlist → aportar e confirmar → ver Carteira, Início e Desempenho atualizados → editar/excluir lançamento → reiniciar containers e confirmar persistência.
-- `[ ]` **14.3** Teste de recuperação: provedores externos offline (cotação em fallback, alertas de frescor, nenhuma tela quebrada); Redis offline (cache em memória).
-- `[ ]` **14.4** (O-07) Revisão da documentação: `OVERVIEW.md`, `FEATURES_SPEC.md`, `FRONTEND_UI_UX.md`, ADRs 0002/0005/0006, `TECH_DEBT.md` (encerrar TD-01 e TD-03; manter TD-02 e TD-04) e este plano com status reais.
-- `[ ]` **14.5** Piso de cobertura final: `packages/core` ≥ 90%, API/worker ≥ 80%, frontend ≥ 70%.
-- `[ ]` **14.6** Encerramento: todos os achados da auditoria com item e teste correspondentes; portão local `scripts/check.sh --smoke` verde (GitHub Actions sem créditos); push para o GitHub mediante confirmação do usuário (6.4).
+- `[x]` **14.1** `uv run python -m fincontrol_worker.seed_demo` (também `docker compose exec worker python -m fincontrol_worker.seed_demo`): carteira no estilo da referência (ações, FIIs de tijolo e papel, ETF, ETF americano, CDB, LCI, Tesouro IPCA+, reserva) com aportes mensais, venda parcial, proventos, séries e retratos diários de 2 anos; determinístico e offline; recusa banco com ativos.
+- `[x]` **14.2** E2E Playwright (`scripts/e2e.sh`, `apps/web/e2e`) contra stack Docker isolada (`fincontrol-e2e`, volumes `fincontrol_e2e_*`, porta 18090, credenciais geradas): login → estratégia → importação B3 (Negociação e Movimentação) → observar ticker → cadastrar ativo → aportar e confirmar → Carteira, Início e Desempenho → editar e excluir lançamento → `docker compose restart` → persistência verificada.
+- `[x]` **14.3** Recuperação: falhas de provedor lembradas por `MARKET_MISS_CACHE_TTL` (telas respondem na hora em vez de esperar o timeout), cotação em fallback sinalizada, alertas de frescor, todas as rotas das telas respondendo com provedores fora (`apps/api/tests/test_outage.py`, `packages/core/tests/test_market_outage.py`); Redis indisponível cai para cache em memória (`test_redis_cache_falls_back_to_memory_when_unavailable`); cache de fuso do yfinance em pasta gravável nos containers.
+- `[x]` **14.4** Documentação revista: `OVERVIEW.md` (política, rotinas do worker, modelo de dados até `script_00015`, fluxos de pesquisa, aporte, importação e alertas), `FEATURES_SPEC.md` por contexto, `FRONTEND_UI_UX.md` (ADR 0007), ADRs 0002/0005/0006 atualizadas, `TECH_DEBT.md` (TD-01 e TD-03 encerrados; TD-02 e TD-04 mantidos; TD-05 a TD-08 registrados).
+- `[x]` **14.5** Pisos de cobertura no portão: `packages/core` ≥ 90% (atual 96%), API + worker ≥ 80% (atual 96%), frontend ≥ 70% (atual 88% das linhas).
+- `[x]` **14.6** Encerramento: cada achado com item e teste (tabela abaixo); `scripts/check.sh --e2e` verde; `docker compose build` e subida completa da stack validados. Push para o GitHub aguarda confirmação do usuário (6.4).
+
+### Rastreabilidade dos achados
+
+| Achado | Itens | Testes de regressão |
+|---|---|---|
+| C-01 | 8.1, 8.2 | `test_audit_characterization.py`, golden `test_reference_portfolio_golden.py` |
+| C-02 | 8.4, 8.10 | `test_audit_characterization.py`, `test_ledger.py`, `test_ledger_api.py` |
+| C-03 | 8.8 | `test_analytics_api.py`, `test_audit_characterization_api.py` |
+| C-04 | 8.3 | `test_audit_characterization.py` |
+| I-01 | 8.2, 8.5 | `test_audit_characterization.py`, `test_calendar_and_units.py` |
+| I-02 | 8.11 | `test_audit_characterization.py`, `test_audit_characterization_api.py` |
+| I-03 | 8.9 | `test_audit_characterization_worker.py`, `test_worker_backfill.py` |
+| I-04 | 8.6, 8.7 | `test_ledger.py`, `test_ledger_api.py`, `test_corporate_events.py` |
+| I-05 | 9.x | `test_error_handling.py`, `test_audit_characterization_api.py` |
+| I-06 | 13.2 | `apps/web/src/test/http.test.ts`, `overview.test.tsx` (erro em vez de R$ 0) |
+| I-07 | 13.2, 9.x | `test_market_batch.py`; o cliente não tem regra de aporte (`operations.test.tsx` usa a API) |
+| I-08 | 9.1 | `test_settings.py` |
+| I-09 | 8.8, 8.9 | `test_analytics_alignment.py`, `test_analytics_api.py`, `test_audit_characterization_worker.py` |
+| I-10 | 8.11 | `test_audit_characterization.py` |
+| I-11 | 10.2 | `test_consolidation_engine.py`, `test_policy_api.py` |
+| A-01 | 10.3 | `test_arca_bands.py` |
+| A-02 | 10.7 | `test_etf_exposure.py` |
+| A-03 | 10.4 | `test_lifecycle.py`, `test_phase10_acceptance.py`, `test_seed_demo.py` |
+| A-04 | 8.12, 13.9 | `test_audit_characterization.py`, `test_contribution_plans.py` |
+| F-01 | 11.6–11.8 | `test_research_screener.py`, `test_research_flow.py` |
+| F-02 | 11.1, 11.2 | `test_fundamentals_history.py`, `test_checklist_v2.py` |
+| F-03 | 11.3, 11.5 | `test_checklist_v2.py`, `test_valuation_by_profile.py` |
+| F-04 | 11.4 | `test_checklist_v2.py`, `test_phase11_persistence.py`, `test_checklist_api.py` |
+| F-05 | 11.9, 13.7 | `test_research_flow.py`, `operations.test.tsx` (detalhe do ativo) |
+| D-01 | 10.5 | `test_accounts_api.py`, `test_codes.py` |
+| D-02 | 8.16 | `test_phase8_migrations.py` |
+| D-03 | 12.3, 12.4 | `test_b3_import.py`, `test_b3_import_api.py`, `test_corporate_events.py`, `test_operations_flow.py` |
+| D-04 | 9.x | `test_phase12_persistence.py::test_pagination_is_stable_when_sort_values_tie` |
+| D-05 | 9.x | `test_market_batch.py`, `test_market_outage.py` |
+| O-01, O-02, O-03 | 9.x | `scripts/smoke.sh` (não-root, healthchecks, Redis com senha, só o web publica porta, build por lockfile) |
+| O-04 | 7.x, 14.6 | Git com Conventional Commits; portão local `scripts/check.sh` |
+| O-05 | 7–14 | 395 testes Python, 45 do frontend e 2 E2E |
+| O-06 | 13.1–13.12 | `apps/web/src/test/*.test.tsx` |
+| O-07 | 14.4 | revisão desta fase |
 
 **Definição de "100% operacional":** a stack sobe do zero com um comando; o usuário consegue executar o ciclo completo Estratégia → Pesquisar → Aportar → Lançamentos → Carteira/Desempenho sem editar banco ou arquivos; todos os valores da carteira de referência batem com a planilha golden; falhas externas aparecem como avisos e nunca como números falsos.
 

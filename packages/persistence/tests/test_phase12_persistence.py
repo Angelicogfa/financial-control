@@ -112,3 +112,23 @@ def test_script_00014_downgrade_and_upgrade(db: tuple[Config, Engine]) -> None:
     assert "import_hash" not in columns
     assert "corporate_events" not in tables
     command.upgrade(cfg, "head")
+
+
+def test_pagination_is_stable_when_sort_values_tie(db: tuple[Config, Engine]) -> None:
+    """D-04: the primary key breaks ties, so pages never repeat or skip rows."""
+    from fincontrol_core.domain.pagination import PaginationParams
+
+    _cfg, engine = db
+    factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        for ticker in ("CCC3", "AAA3", "BBB3", "DDD3"):
+            uow.assets.add(AssetEntity(ticker=ticker, name=ticker, asset_type=AssetType.STOCK_BR))
+        uow.commit()
+    seen: list[str] = []
+    with SqlAlchemyUnitOfWork(session_factory=factory) as uow:
+        for page in (1, 2, 3, 4):
+            result = uow.assets.list_paginated(
+                PaginationParams(page=page, page_size=1, sort_by="asset_type", sort_order="asc")
+            )
+            seen.extend(a.ticker for a in result.items)
+    assert sorted(seen) == ["AAA3", "BBB3", "CCC3", "DDD3"]

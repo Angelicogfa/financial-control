@@ -1,6 +1,6 @@
 # ADR 0002 — Alocação ARCA e Diagrama do Cerrado Opcional
 
-- **Status:** Aceito
+- **Status:** Aceito; parcialmente substituído pela ADR 0005 (o Cerrado virou o checklist v2 por perfil do módulo fundamentalista, itens 11.3 e 11.4)
 - **Data:** 2026-10-24
 
 ## Contexto
@@ -17,3 +17,7 @@ A estratégia principal da carteira segue a metodologia **ARCA** (Ações, Real 
 
 ## Consequências
 - **Positivas:** O investidor pode cadastrar rapidamente sua carteira e simular aportes imediatamente sem bloqueio, adotando o questionário do Cerrado de forma progressiva onde fizer sentido.
+
+## Atualização (Fase 11)
+- O questionário tem um perfil por tipo de instrumento (`STOCK`, `BANK`, `FII_BRICK`, `FII_PAPER`, `ETF`, `INTL_STOCK`, `CRYPTO`, `FIXED_INCOME`), respostas `YES`/`NO`/`NA` com evidência e histórico append-only (`checklist_answers`, `checklist_evaluations`).
+- A elegibilidade para aportes (nota mínima e cobertura) mora na política de investimento versionada; com `require_evaluation=false` o checklist continua opcional, como decidido aqui.

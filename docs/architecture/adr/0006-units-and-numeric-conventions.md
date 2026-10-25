@@ -50,3 +50,6 @@ Campos e parâmetros carregam o sufixo da unidade quando ambígua: `_pct` (0–1
 ## Consequências
 - **Positivas:** elimina a classe inteira de bugs de escala (C-01, I-02, I-10); valores tornam-se auditáveis; testes podem afirmar unidades diretamente.
 - **Negativas:** exige migrations de dados (`market_series.unit`, normalização de `contracted_rate`, snapshots em `Numeric`) e revisão de todos os adaptadores de provedores — planejado nos itens 8.1, 8.2, 8.11 e 8.16.
+
+## Situação (Fases 8–14)
+Implementado nos itens 8.1, 8.2, 8.11 e 8.16 e seguido pelos módulos novos: demonstrativos e indicadores fundamentalistas em fração, `ValuationPolicy` com limites em fração ou múltiplo, filtros do screener em fração (`min_dy=0.05`) e o frontend convertendo só na apresentação (`pct()` para frações, `points()` para campos `_pct`).
