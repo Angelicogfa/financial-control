@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
 from fincontrol_core.domain.enums import ArcaClass, AssetType, ContributionPlanStatus
 from fincontrol_core.domain.pagination import PaginationParams
 from fincontrol_core.research.screener import ScreenerCriteria
@@ -17,6 +17,7 @@ from fincontrol_api.dependencies import (
     get_contribution_handler,
     get_earning_handler,
     get_event_handler,
+    get_import_handler,
     get_market_data_handler,
     get_policy_handler,
     get_portfolio_handler,
@@ -35,6 +36,7 @@ from fincontrol_api.handlers.account_handlers import AccountHandler
 from fincontrol_api.handlers.auth_handlers import AuthHandler
 from fincontrol_api.handlers.contribution_handlers import ContributionHandler
 from fincontrol_api.handlers.event_handlers import CorporateEventHandler
+from fincontrol_api.handlers.import_handlers import ImportHandler
 from fincontrol_api.handlers.market_handlers import MarketDataHandler
 from fincontrol_api.handlers.policy_handlers import PolicyHandler
 from fincontrol_api.handlers.research_handlers import ResearchHandler
@@ -59,6 +61,8 @@ from fincontrol_api.schemas import (
     EarningCreateRequest,
     EarningResponseDTO,
     EarningUpdateRequest,
+    ImportCommitDTO,
+    ImportPreviewDTO,
     JobRunDTO,
     LoginRequest,
     PaginatedResponse,
@@ -90,6 +94,7 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 research_router = APIRouter(prefix="/research", tags=["Research"])
 contributions_router = APIRouter(prefix="/contributions", tags=["Contributions"])
 events_router = APIRouter(prefix="/corporate-events", tags=["Corporate Events"])
+imports_router = APIRouter(prefix="/imports", tags=["Imports"])
 
 
 def pagination_query(
@@ -614,3 +619,29 @@ def delete_corporate_event(
 ) -> Response:
     handler.delete(event_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# B3 statement import (item 12.3)
+# ---------------------------------------------------------------------------
+@imports_router.post("/b3/preview", response_model=ImportPreviewDTO)
+async def preview_b3_import(
+    file: UploadFile = File(...),
+    handler: ImportHandler = Depends(get_import_handler),
+) -> ImportPreviewDTO:
+    return handler.preview(file.filename or "", await file.read())
+
+
+@imports_router.post("/b3/commit", response_model=ImportCommitDTO)
+async def commit_b3_import(
+    file: UploadFile = File(...),
+    account_id: int | None = Form(default=None),
+    create_tickers: str = Form(default="", description="Comma-separated unknown tickers to add"),
+    handler: ImportHandler = Depends(get_import_handler),
+) -> ImportCommitDTO:
+    return handler.commit(
+        file.filename or "",
+        await file.read(),
+        account_id=account_id,
+        create_tickers=[t for t in create_tickers.split(",") if t.strip()],
+    )

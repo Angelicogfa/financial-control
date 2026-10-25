@@ -1,0 +1,7 @@
+Data do Negócio;Tipo de Movimentação;Mercado;Prazo/Vencimento;Instituição;Código de Negociação;Quantidade;Preço;Valor
+02/01/2024;Compra;Mercado à Vista;-;XP INVESTIMENTOS CCTVM S/A;ITSA4;100;R$ 9,80;R$ 980,00
+02/01/2024;Compra;Mercado Fracionário;-;XP INVESTIMENTOS CCTVM S/A;ITSA4F;5;R$ 9,80;R$ 49,00
+02/01/2024;Compra;Mercado Fracionário;-;XP INVESTIMENTOS CCTVM S/A;ITSA4F;5;R$ 9,80;R$ 49,00
+15/02/2024;Compra;Mercado à Vista;-;XP INVESTIMENTOS CCTVM S/A;HGLG11;10;R$ 160,00;R$ 1.600,00
+20/03/2024;Compra;Mercado à Vista;-;XP INVESTIMENTOS CCTVM S/A;WEGE3;20;R$ 36,50;R$ 730,00
+10/04/2024;Venda;Mercado à Vista;-;XP INVESTIMENTOS CCTVM S/A;ITSA4;10;R$ 10,40;R$ 104,00
