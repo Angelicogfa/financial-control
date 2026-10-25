@@ -23,6 +23,7 @@ class MarketSettings(Protocol):
     quote_cache_ttl: int
     fundamentals_cache_ttl: int
     history_cache_ttl: int
+    market_miss_cache_ttl: int
 
 
 def build_market_gateway(settings: MarketSettings) -> CachedMarketGateway:
@@ -40,4 +41,5 @@ def build_market_gateway(settings: MarketSettings) -> CachedMarketGateway:
         fundamentals_ttl_seconds=settings.fundamentals_cache_ttl,
         history_ttl_seconds=settings.history_cache_ttl,
         default_usd_brl=settings.default_usd_brl,
+        miss_ttl_seconds=settings.market_miss_cache_ttl,
     )

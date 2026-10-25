@@ -106,7 +106,6 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
         },
         valuation: { ...read(VALUATION_FIELDS, valuationText), projections: read(PROJECTION_FIELDS, projectionText) },
       });
-      setMessage({ ok: true, text: "Nova versão da estratégia salva." });
       onSaved();
     } catch (err) {
       setMessage({ ok: false, text: errorMessage(err) });
@@ -257,6 +256,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
 }
 
 export function StrategyPage() {
+  const [saved, setSaved] = useState(false);
   const policy = useApi("policy", () => api.policy.current());
   const versions = useApi("policy-versions", () => api.policy.versions());
   return (
@@ -265,12 +265,18 @@ export function StrategyPage() {
         title="Estratégia"
         subtitle="As regras que a carteira, a pesquisa e o aporte seguem: ARCA, elegibilidade e valuation."
       />
+      {saved && (
+        <p className="app-success-banner" role="status" style={{ marginBottom: "var(--space-4)" }}>
+          Nova versão da estratégia salva.
+        </p>
+      )}
       <Async state={policy} lines={8}>
         {(data) => (
           <StrategyForm
             key={data.version ?? 0}
             policy={data}
             onSaved={() => {
+              setSaved(true);
               policy.reload();
               versions.reload();
             }}

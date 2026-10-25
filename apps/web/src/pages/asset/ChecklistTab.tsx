@@ -66,7 +66,6 @@ export function ChecklistTab({
         cerrado_answers: answers,
         evidence,
       });
-      setMessage({ ok: true, text: "Checklist salvo." });
       onSaved();
     } catch (err) {
       setMessage({ ok: false, text: errorMessage(err) });

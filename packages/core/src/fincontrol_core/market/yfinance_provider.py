@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from fincontrol_core.domain.enums import Market
@@ -19,6 +20,19 @@ from fincontrol_core.market.models import (
 # profitMargins, revenueGrowth, earningsGrowth and trailingAnnualDividendYield are
 # fractions; dividendYield and debtToEquity are percentages (yfinance >= 0.2.54);
 # averageVolume is a share count.
+
+
+def _use_writable_cache() -> None:
+    """yfinance caches time zones under the home directory; containers run as a user without
+    one, so every quote would refetch it. Point the cache at a writable temp folder."""
+    import tempfile
+
+    try:
+        import yfinance as yf
+
+        yf.set_tz_cache_location(str(Path(tempfile.gettempdir()) / "py-yfinance"))
+    except Exception:  # pragma: no cover - cache is an optimization only
+        pass
 
 
 def resolve_yahoo_symbol(symbol: str, market: Market | None = None) -> str:
@@ -61,6 +75,7 @@ class YFinanceProvider:
         if self._ticker_factory is None:
             import yfinance as yf
 
+            _use_writable_cache()
             self._ticker_factory = yf.Ticker
         return self._ticker_factory(yf_sym)
 

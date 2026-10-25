@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     quote_cache_ttl: int = 300
     fundamentals_cache_ttl: int = 86400
     history_cache_ttl: int = 21600
+    market_miss_cache_ttl: int = Field(default=300, ge=0)
 
     # Worker schedule and resilience
     quote_refresh_minutes: int = Field(default=15, ge=1)

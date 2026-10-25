@@ -31,10 +31,19 @@ const last = (calls: Call[], method: string, path: string) =>
 
 describe("strategy", () => {
   it("validates that targets sum 100% and saves fractions", async () => {
+    let savedVersion = false;
     const { calls } = mockApi([
-      { path: "/policy", reply: policy },
+      // After saving, the current policy is the new version and the form remounts.
+      { path: "/policy", reply: () => (savedVersion ? { ...policy, version: 4 } : policy) },
       { path: "/policy/versions", reply: [policy] },
-      { method: "PUT", path: "/policy", reply: { ...policy, version: 4 } },
+      {
+        method: "PUT",
+        path: "/policy",
+        reply: () => {
+          savedVersion = true;
+          return { ...policy, version: 4 };
+        },
+      },
     ]);
     renderAt("/settings/strategy");
     const target = await screen.findByLabelText("Meta de Ações");

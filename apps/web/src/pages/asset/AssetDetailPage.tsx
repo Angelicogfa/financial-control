@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
@@ -450,6 +451,7 @@ export function AssetDetailPage() {
   const { id } = useParams();
   const assetId = Number(id);
   const [tab, setTab] = useTab(TABS, "summary");
+  const [checklistSaved, setChecklistSaved] = useState(false);
   const analysis = useApi(`asset-${assetId}`, () => api.assets.analysis(assetId));
 
   return (
@@ -491,7 +493,21 @@ export function AssetDetailPage() {
               {tab === "fundamentals" && <Fundamentals analysis={data} />}
               {tab === "valuation" && <Valuation analysis={data} />}
               {tab === "checklist" && (
-                <ChecklistTab key={`${data.asset.checklist_profile}-${(data.checklist_history ?? []).length}`} analysis={data} onSaved={analysis.reload} />
+                <>
+                  {checklistSaved && (
+                    <p className="app-success-banner" role="status" style={{ marginBottom: "var(--space-3)" }}>
+                      Checklist salvo.
+                    </p>
+                  )}
+                  <ChecklistTab
+                    key={`${data.asset.checklist_profile}-${(data.checklist_history ?? []).length}`}
+                    analysis={data}
+                    onSaved={() => {
+                      setChecklistSaved(true);
+                      analysis.reload();
+                    }}
+                  />
+                </>
               )}
               {tab === "earnings" && <Earnings assetId={assetId} />}
               {tab === "ledger" && <Ledger assetId={assetId} />}

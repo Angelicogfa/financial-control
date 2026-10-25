@@ -28,3 +28,7 @@ Thumbs.db
 # Local databases
 *.db
 *.sqlite3
+
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/

@@ -2,9 +2,10 @@
 # Local quality gate: the same checks the GitHub workflow runs, executable on any machine
 # (GitHub Actions minutes are not available for this repository).
 #
-#   scripts/check.sh            # lint, tests, coverage, web build, Docker images
+#   scripts/check.sh            # lint, tests, coverage floors, web build, Docker images
 #   scripts/check.sh --fast     # skip Docker (used by the pre-push hook)
 #   scripts/check.sh --smoke    # everything plus the isolated end-to-end stack test
+#   scripts/check.sh --e2e      # everything plus smoke and the browser E2E journey
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,22 +19,22 @@ uv sync --all-packages --frozen --quiet
 uv run ruff check .
 uv run ruff format --check .
 
-step "Python: core domain tests with coverage floor (85%)"
+step "Python: core domain tests with coverage floor (90%)"
 uv run pytest packages/core/tests -q \
-  --cov=fincontrol_core --cov-report=term:skip-covered --cov-fail-under=85
+  --cov=fincontrol_core --cov-report=term:skip-covered --cov-fail-under=90
 
-step "Python: full unit and integration suite"
+step "Python: full unit and integration suite (API and worker coverage floor 80%)"
 uv run pytest -q \
-  --cov=fincontrol_config --cov=fincontrol_core --cov=fincontrol_persistence \
-  --cov=fincontrol_api --cov=fincontrol_worker --cov-report=term:skip-covered
+  --cov=fincontrol_api --cov=fincontrol_worker --cov-report=term:skip-covered \
+  --cov-fail-under=80
 
-step "Web: install, lint, type-check, tests and build"
+step "Web: install, lint, type-check, tests with coverage floor (70%) and build"
 (
   cd apps/web
   npm ci --no-audit --no-fund --loglevel=error
   npm run lint
   npx tsc --noEmit
-  npm test
+  npm run test:coverage
   npm run build
 )
 
@@ -46,9 +47,14 @@ step "Docker: compose config and image build"
 docker compose -p fincontrol-check --env-file .env.example config -q
 docker compose -p fincontrol-check --env-file .env.example build
 
-if [[ "$MODE" == "--smoke" ]]; then
+if [[ "$MODE" == "--smoke" || "$MODE" == "--e2e" ]]; then
   step "Docker: isolated end-to-end smoke test"
   scripts/smoke.sh
+fi
+
+if [[ "$MODE" == "--e2e" ]]; then
+  step "Docker + browser: isolated E2E journey and persistence after restart"
+  scripts/e2e.sh
 fi
 
 echo; echo "CHECKS OK"

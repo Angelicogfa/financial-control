@@ -284,12 +284,13 @@ function Watchlist() {
   const watchlist = useApi("watchlist", () => api.research.watchlist());
   const [error, setError] = useState<string | null>(null);
   const [ticker, setTicker] = useState("");
+  const [assetType, setAssetType] = useState<AssetType | "">("");
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
     try {
-      await api.research.follow({ ticker: ticker.trim() });
+      await api.research.follow({ ticker: ticker.trim(), asset_type: assetType || null });
       setTicker("");
       watchlist.reload();
     } catch (err) {
@@ -314,6 +315,17 @@ function Watchlist() {
         <div className="app-field">
           <label htmlFor="watch-ticker">Observar código</label>
           <input id="watch-ticker" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} placeholder="Ex.: BBAS3" />
+        </div>
+        <div className="app-field">
+          <label htmlFor="watch-type">Tipo</label>
+          <select id="watch-type" value={assetType} onChange={(e) => setAssetType(e.target.value as AssetType | "")}>
+            <option value="">Pelo catálogo da B3</option>
+            {SCREEN_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {ASSET_TYPE_LABELS[type]}
+              </option>
+            ))}
+          </select>
         </div>
         <button type="submit" className="app-primary-button" disabled={!ticker.trim()}>
           Adicionar

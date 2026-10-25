@@ -257,11 +257,13 @@ def test_build_market_gateway_applies_settings() -> None:
             quote_cache_ttl=60,
             fundamentals_cache_ttl=120,
             history_cache_ttl=180,
+            market_miss_cache_ttl=90,
         )
     )
 
     assert gateway.quote_ttl == 60
     assert gateway.history_ttl == 180
+    assert gateway.miss_ttl == 90
     assert gateway.default_usd_brl == 5.4
     assert gateway.bcb.base_url == "https://example.test/sgs"
     assert gateway.bcb.default_cdi_annual == 0.12

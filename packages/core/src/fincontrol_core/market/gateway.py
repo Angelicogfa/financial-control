@@ -37,6 +37,7 @@ class CachedMarketGateway:
         fundamentals_ttl_seconds: int = 86400,
         history_ttl_seconds: int = 21600,
         default_usd_brl: float = 5.15,
+        miss_ttl_seconds: int = 300,
     ) -> None:
         self.brapi = brapi or BrapiProvider()
         self.yfinance = yfinance or YFinanceProvider()
@@ -45,7 +46,21 @@ class CachedMarketGateway:
         self.quote_ttl = quote_ttl_seconds
         self.fundamentals_ttl = fundamentals_ttl_seconds
         self.history_ttl = history_ttl_seconds
+        self.miss_ttl = miss_ttl_seconds
         self.default_usd_brl = default_usd_brl
+
+    # A provider failure is remembered for `miss_ttl` seconds: while the providers are down,
+    # screens get the fallback at once instead of waiting for the timeout on every request.
+    _MISS = {"miss": True}
+
+    def _cached(self, key: str) -> object:
+        """The cached value, `_MISS` for a recent failure, or None when nothing is cached."""
+        cached = self.cache.get_json(key)
+        return self._MISS if cached == self._MISS else cached
+
+    def _remember_miss(self, key: str) -> None:
+        if self.miss_ttl > 0:
+            self.cache.set_json(key, self._MISS, self.miss_ttl)
 
     def _resolve_market(
         self,
@@ -81,7 +96,9 @@ class CachedMarketGateway:
 
         cache_key = f"quote:{mkt.value}:{norm_sym}"
         if not bypass_cache:
-            cached = self.cache.get_json(cache_key)
+            cached = self._cached(cache_key)
+            if cached is self._MISS:
+                return None
             if isinstance(cached, dict):
                 q = Quote.from_dict(cached)
                 return replace(q, freshness=QuoteFreshness.CACHED)
@@ -98,6 +115,8 @@ class CachedMarketGateway:
 
         if quote is not None:
             self.cache.set_json(cache_key, quote.to_dict(), self.quote_ttl)
+        else:
+            self._remember_miss(cache_key)
         return quote
 
     def get_history(
@@ -117,7 +136,9 @@ class CachedMarketGateway:
 
         cache_key = f"history:{mkt.value}:{norm_sym}:{range_period}"
         if not bypass_cache:
-            cached = self.cache.get_json(cache_key)
+            cached = self._cached(cache_key)
+            if cached is self._MISS:
+                return []
             if isinstance(cached, list):
                 return [PricePoint.from_dict(item) for item in cached]
 
@@ -133,6 +154,8 @@ class CachedMarketGateway:
 
         if points:
             self.cache.set_json(cache_key, [p.to_dict() for p in points], self.history_ttl)
+        else:
+            self._remember_miss(cache_key)
         return points
 
     def get_fundamentals(
@@ -151,7 +174,9 @@ class CachedMarketGateway:
 
         cache_key = f"fundamentals:{mkt.value}:{norm_sym}"
         if not bypass_cache:
-            cached = self.cache.get_json(cache_key)
+            cached = self._cached(cache_key)
+            if cached is self._MISS:
+                return None
             if isinstance(cached, dict):
                 return Fundamentals.from_dict(cached)
 
@@ -165,6 +190,8 @@ class CachedMarketGateway:
 
         if fund is not None:
             self.cache.set_json(cache_key, fund.to_dict(), self.fundamentals_ttl)
+        else:
+            self._remember_miss(cache_key)
         return fund
 
     def get_annual_statements(
@@ -182,7 +209,9 @@ class CachedMarketGateway:
             return []
         cache_key = f"statements:{mkt.value}:{norm_sym}"
         if not bypass_cache:
-            cached = self.cache.get_json(cache_key)
+            cached = self._cached(cache_key)
+            if cached is self._MISS:
+                return []
             if isinstance(cached, list):
                 return [snapshot_from_dict(item) for item in cached]
 
@@ -195,6 +224,8 @@ class CachedMarketGateway:
             self.cache.set_json(
                 cache_key, [snapshot_to_dict(s) for s in snapshots], self.fundamentals_ttl
             )
+        else:
+            self._remember_miss(cache_key)
         return snapshots
 
     def list_instruments(self) -> list[CatalogInstrument]:
