@@ -25,13 +25,18 @@ Monorepo com workspace `uv` (Python 3.12) e frontend React:
 
 ```text
 apps/
-  api/        FastAPI (controllers → handlers → services → unit of work → repositories)
-  worker/     APScheduler: séries do BCB, cotações, retratos diários, demonstrativos, catálogo B3
-  web/        React 18 + Vite, servido por nginx
-apps/packages/
-  config/       configurações (pydantic-settings) e logs
-  core/         domínio puro: posições, renda fixa, ARCA, checklist, valuation, alertas
-  persistence/  SQLAlchemy 2.0, repositórios e migrations Alembic
+  api/          FastAPI, em módulos por feature
+    core/         infraestrutura: configuração, segurança, dependências, middleware, erros
+    modules/      um módulo por feature (router → use cases → service), p. ex. assets, ledger,
+                  portfolio, contributions, policy, research, market, alerts
+    composition.py  raiz de composição: escolhe a Unit of Work, o gateway de mercado e a sonda do banco
+  worker/       APScheduler: séries do BCB, cotações, retratos diários, demonstrativos, catálogo B3
+  web/          React 18 + Vite, servido por nginx
+  packages/     compartilhado pela API e pelo worker
+    config/       configurações (pydantic-settings) e logs
+    core/         domínio puro: posições, renda fixa, ARCA, checklist, valuation, alertas
+    persistence/  SQLAlchemy 2.0: core/ (Unit of Work), models/, repositories/ e mappers/ por
+                  feature, e as migrations Alembic
 docs/           arquitetura, ADRs, funcionalidades, débitos técnicos e plano
 scripts/        portão de qualidade, smoke test e E2E
 ```

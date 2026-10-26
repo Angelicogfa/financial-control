@@ -43,6 +43,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
    - Direct `Base.metadata.create_all()` is forbidden in production/Docker startup; the `migrate` service runs `alembic upgrade head`.
 
 8. **Strict Backend Layering: Controllers $\rightarrow$ Handlers / Services $\rightarrow$ UnitOfWork $\rightarrow$ Repositories (`isolamento de camadas no backend`)**
+   - **Where each layer lives**: API routers in `apps/api/src/fincontrol_api/modules/<feature>/router.py`, handlers in `modules/<feature>/use_cases.py` (the ledger module uses a `use_cases/` package), application services in `modules/<feature>/service.py`, dependency providers in `modules/<feature>/dependencies.py`; infrastructure in `core/`; only `composition.py` chooses the concrete Unit of Work. Repositories and ORM models are one module per feature under `apps/packages/persistence/src/fincontrol_persistence/{repositories,models}/`. A new feature gets its own module folder instead of growing a shared file.
    - **Controllers / FastAPI Routers** MUST ONLY parse/validate HTTP requests, invoke an Application **Handler** or **Service**, and serialize the HTTP response.
    - **Controllers MUST NEVER**:
      - Access `Session` / database connections directly;
@@ -63,10 +64,10 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
 ## 2. Backend Layered Architecture Flow
 
 ```text
-HTTP Request (FastAPI Controller / Router)
+HTTP Request (FastAPI Router: `modules/<feature>/router.py`)
    │  (DTO / Command / Query)
    ▼
-CommandHandler / QueryHandler
+CommandHandler / QueryHandler (`modules/<feature>/use_cases.py`)
    │  (opens `with uow:` boundary, orchestrates Service + Domain)
    ▼
 Application / Domain Service  ──► Pure Domain Engine (`apps/packages/core`)
@@ -91,13 +92,23 @@ financial-control/
 ├── CLAUDE.md                 # Pointer/entry for Claude Code
 ├── GEMINI.md                 # Pointer/entry for Gemini / Antigravity
 ├── .agents/rules/            # Granular workspace rules
-├── apps/
-│   ├── api/                  # FastAPI Controllers -> Handlers -> Services -> UoW
+├── apps/                     # ALL solution code lives here
+│   ├── api/src/fincontrol_api/
+│   │   ├── main.py           # App factory: core middleware/errors + module routers
+│   │   ├── composition.py    # Composition root: picks SqlAlchemyUnitOfWork, gateway, DB probe
+│   │   ├── core/             # Infra: config, security (auth), deps, middleware, http_errors
+│   │   └── modules/<feature>/ # router.py, schemas.py, use_cases.py, dependencies.py,
+│   │                         #   serializers.py, service.py (system, auth, accounts, assets,
+│   │                         #   ledger, portfolio, contributions, policy, research, market,
+│   │                         #   alerts, shared)
 │   ├── worker/               # APScheduler Jobs -> Handlers/Services -> UoW
-│   └── web/                  # React + Vite + TypeScript SPA
-├── apps/packages/
-│   ├── core/                 # Pure domain entities, ports (Repos & UoW interfaces), engines
-│   └── persistence/          # SQLAlchemy 2.0 ORM, Concrete Repositories, SqlAlchemyUnitOfWork, Alembic (`script_#####`)
+│   ├── web/                  # React + Vite + TypeScript SPA
+│   └── packages/             # Shared by api AND worker (uv workspace members)
+│       ├── config/           # pydantic-settings Settings (mirrors .env.example)
+│       ├── core/             # Pure domain entities, ports (Repos & UoW interfaces), engines
+│       └── persistence/      # core/ (db, SqlAlchemyUnitOfWork, health), models/,
+│                             #   repositories/, mappers/ (one module per feature),
+│                             #   migrations/ (Alembic `script_#####`)
 ├── docs/
 │   ├── architecture/         # System design, C4, UI/UX, domain & data models
 │   │   └── adr/              # Architecture Decision Records

@@ -434,4 +434,16 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 ### Dependências entre fases
 `7 → 8 → 10 → 11 → 12 → 14`, com `9` em paralelo a `8` (arquivos distintos) e `13` iniciando após o contrato de API da Fase 10 (13.1–13.3 podem começar logo após a Fase 8).
 
+---
 
+## Fase 15 — Refatoração Estrutural por Módulos (`[x]` Implementado)
+
+**Objetivo:** organizar o backend no padrão estrutural do projeto de referência (`dynamic-research/apps/api`), com controllers, use cases, services, repositórios e infraestrutura segmentados por feature, e todo o código da solução dentro de `apps/`.
+
+- `[x]` **15.1** API em `fincontrol_api/core/` (config, `security` com o login single-user, deps, middleware, `http_errors`) + `composition.py` (única escolha da `SqlAlchemyUnitOfWork`, do gateway de mercado e da sonda do banco) + `modules/<feature>/` (`router`, `schemas`, `use_cases`, `dependencies`, `serializers`, `service`) para system, auth, accounts, assets, ledger, portfolio, contributions, policy, research, market, alerts e shared. O documento OpenAPI ficou idêntico byte a byte ao anterior (sem mudança de contrato nem de tipos do frontend). CLI: `python -m fincontrol_api hash-password`.
+- `[x]` **15.2** Persistence em `core/` (db, `unit_of_work`, health) + `models/`, `repositories/` e `mappers/` com um módulo por feature; models se referenciam só em anotações (`TYPE_CHECKING`), resolvidos pelo registro do SQLAlchemy.
+- `[x]` **15.3** `packages/` movido para `apps/packages/{config,core,persistence}` (continua compartilhado entre API e worker como membros do workspace `uv`); Dockerfiles, `working_dir` do `migrate`, `scripts/check.sh`, caminhos do pytest e documentação atualizados.
+- `[x]` **15.4** Teste de camadas cobre todos os `modules/*/router.py` (nada de SQLAlchemy, persistence ou `uow_factory`) e garante que só `composition.py` referencia a `SqlAlchemyUnitOfWork`; teste de importação a frio de todos os módulos sem ciclos.
+- `[x]` **15.5** Sincronizado com `origin/main` (correção da importação `.xlsx` da B3, `reset_dimensions()`), aplicada em `modules/ledger/use_cases/b3_import.py`.
+
+**Validação (2026-10-25):** `scripts/check.sh --smoke` → ruff e formatação limpos; 409 testes de backend com cobertura de 96,5% (API + worker), `apps/packages/core` acima do piso de 90%; 45 testes do frontend; build das imagens `migrate`, `api`, `worker` e `web` pelos dois arquivos de compose; smoke isolado `ready` em `script_00015`.
