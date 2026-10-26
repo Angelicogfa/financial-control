@@ -19,7 +19,7 @@ BASE="http://localhost:${WEB_PORT}"
 native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
 
 PASSWORD="$(uv run --quiet python -I -c "import secrets; print(secrets.token_urlsafe(16))")"
-HASH="$(uv run --quiet python -I -c "import sys; from fincontrol_api.auth import hash_password; print(hash_password(sys.argv[1]))" "$PASSWORD")"
+HASH="$(uv run --quiet python -I -c "import sys; from fincontrol_api.core.security import hash_password; print(hash_password(sys.argv[1]))" "$PASSWORD")"
 SECRET="$(uv run --quiet python -I -c "import secrets; print(secrets.token_hex(32))")"
 sed -e "s|^PGDATA_VOLUME=.*|PGDATA_VOLUME=fincontrol_e2e_pgdata|" \
     -e "s|^REDISDATA_VOLUME=.*|REDISDATA_VOLUME=fincontrol_e2e_redisdata|" \

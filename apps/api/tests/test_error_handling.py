@@ -6,8 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from fincontrol_api.dependencies import get_asset_handler, require_user
 from fincontrol_api.main import create_app
+from fincontrol_api.modules.assets.dependencies import get_asset_handler
+from fincontrol_api.modules.auth.dependencies import require_user
 from fincontrol_core.arca.allocation import InvalidTargetsError
 from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
 from fincontrol_core.portfolio.positions import InsufficientQuantityError

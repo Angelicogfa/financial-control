@@ -14,7 +14,7 @@ from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.market.models import Fundamentals
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.jobs import record_checklist_evaluations_job, refresh_fundamentals_job
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -26,7 +26,7 @@ UoWFactory = Callable[[], SqlAlchemyUnitOfWork]
 def uow_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> UoWFactory:
     db_url = f"sqlite:///{(tmp_path / 'fundamentals.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     cfg = Config(str(persistence_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     cfg.set_main_option("sqlalchemy.url", db_url)

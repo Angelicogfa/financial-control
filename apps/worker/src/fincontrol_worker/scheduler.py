@@ -12,7 +12,7 @@ from fincontrol_config import Settings, get_settings
 from fincontrol_config.logging import configure_logging
 from fincontrol_core.market.factory import build_market_gateway
 from fincontrol_core.market.gateway import CachedMarketGateway
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_worker.jobs import (
     UoWFactory,

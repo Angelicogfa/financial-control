@@ -10,7 +10,7 @@ from alembic import command
 from alembic.config import Config
 from fincontrol_config import Settings
 from fincontrol_core.domain.enums import JobRunStatus
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.runner import (
     LocalJobLock,
     RedisJobLock,
@@ -28,7 +28,7 @@ UoWFactory = Callable[[], SqlAlchemyUnitOfWork]
 @pytest.fixture
 def uow_factory(tmp_path: Path) -> UoWFactory:
     db_url = f"sqlite:///{(tmp_path / 'runner.db').as_posix()}"
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     cfg = Config(str(persistence_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     cfg.set_main_option("sqlalchemy.url", db_url)

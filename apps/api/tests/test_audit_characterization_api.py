@@ -1,6 +1,6 @@
 """Characterization tests for audit findings at the API/application-service boundary.
 
-Same convention as packages/core/tests/test_audit_characterization.py: each test asserts
+Same convention as apps/packages/core/tests/test_audit_characterization.py: each test asserts
 the correct behavior and stays `xfail(strict=True)` until its finding is fixed.
 """
 
@@ -13,10 +13,8 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from fincontrol_api.dependencies import (
-    get_portfolio_handler,
-)
-from fincontrol_api.services.portfolio_service import PortfolioApplicationService
+from fincontrol_api.modules.portfolio.dependencies import get_portfolio_handler
+from fincontrol_api.modules.portfolio.service import PortfolioApplicationService
 from fincontrol_core.domain.entities import AssetEntity, MarketSeriesPoint, TransactionEntity
 from fincontrol_core.domain.enums import AssetType, TransactionKind
 

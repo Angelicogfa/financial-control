@@ -717,6 +717,7 @@ export interface UnknownTickerDTO {
   ticker: string;
   name?: string | null;
   asset_type?: AssetType | null;
+  arca_class?: ArcaClass | null;
 }
 
 export interface ValuationPolicyDTO {
@@ -778,6 +779,11 @@ export interface WatchlistAddRequest {
   ticker: string;
   asset_type?: AssetType | null;
   name?: string | null;
+  arca_class?: ArcaClass | null;
+}
+
+export interface WatchlistClassifyRequest {
+  arca_class: ArcaClass;
 }
 
 export interface WatchlistItemDTO {

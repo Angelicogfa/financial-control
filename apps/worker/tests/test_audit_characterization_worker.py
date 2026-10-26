@@ -1,6 +1,6 @@
 """Characterization tests for audit findings in background worker jobs.
 
-Same convention as packages/core/tests/test_audit_characterization.py: each test asserts
+Same convention as apps/packages/core/tests/test_audit_characterization.py: each test asserts
 the correct behavior and stays `xfail(strict=True)` until its finding is fixed.
 """
 
@@ -33,7 +33,7 @@ from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import InMemoryCache
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.yfinance_provider import YFinanceProvider
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.jobs import record_daily_snapshot_job, sync_bcb_and_benchmarks_job
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -75,7 +75,7 @@ def uow_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> UoWFactory:
     db_url = f"sqlite:///{(tmp_path / 'audit_worker.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)
 
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     alembic_cfg = Config(str(persistence_dir / "alembic.ini"))
     alembic_cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)

@@ -120,7 +120,7 @@ describe("research", () => {
       {
         method: "POST",
         path: "/research/watchlist",
-        reply: { status: 201, json: { asset_id: 9, ticker: "ITUB4" } },
+        reply: { status: 201, json: { asset_id: 9, ticker: "ITUB4", arca_class: "ATIVOS_INTERNACIONAIS" } },
       },
     ]);
     renderAt("/research");
@@ -133,9 +133,37 @@ describe("research", () => {
     expect(query?.getAll("asset_type")).toEqual(["FII"]);
     expect(screen.getByText(/1 resultado\(s\) de 3 candidato\(s\)/)).toBeInTheDocument();
 
+    // "Observar" asks for the ARCA quadrant first, with the suggestion preselected.
     fireEvent.click(screen.getByRole("button", { name: "Observar" }));
-    expect(await screen.findByText("ITUB4 está em observação.")).toBeInTheDocument();
-    expect(last(calls, "POST", "/research/watchlist")?.body).toMatchObject({ ticker: "ITUB4", asset_type: "STOCK_BR" });
+    const quadrant = screen.getByRole("combobox", { name: "Classe ARCA de ITUB4" });
+    expect(quadrant).toHaveValue("ACOES");
+    expect(within(quadrant).getByRole("option", { name: "Ações (sugerida)" })).toBeInTheDocument();
+    fireEvent.change(quadrant, { target: { value: "ATIVOS_INTERNACIONAIS" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+    expect(await screen.findByText("ITUB4 está em observação em Ativos internacionais.")).toBeInTheDocument();
+    expect(last(calls, "POST", "/research/watchlist")?.body).toMatchObject({
+      ticker: "ITUB4",
+      asset_type: "STOCK_BR",
+      arca_class: "ATIVOS_INTERNACIONAIS",
+    });
+  });
+
+  it("cancels the quadrant choice without following", async () => {
+    const result = {
+      results: [{ ticker: "BBAS3", name: "BB", asset_type: "STOCK_BR", arca_class: "ACOES" }],
+      candidates: 1,
+      scanned: 1,
+      truncated: false,
+      arca_classes: [],
+      catalog_size: 7,
+    };
+    const { calls } = mockApi([{ path: "/research/screener", reply: result }]);
+    renderAt("/research");
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Observar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByRole("button", { name: "Observar" })).toBeInTheDocument();
+    expect(last(calls, "POST", "/research/watchlist")).toBeUndefined();
   });
 
   it("lists and removes watched assets", async () => {
@@ -158,11 +186,31 @@ describe("research", () => {
     };
     const { calls } = mockApi([
       { path: "/research/watchlist", reply: [item] },
+      { method: "PUT", path: "/research/watchlist/9/classification", reply: { ...item, arca_class: "CAIXA" } },
+      { method: "POST", path: "/research/watchlist", reply: { status: 201, json: { ...item, asset_id: 10, ticker: "TAEE11" } } },
       { method: "DELETE", path: "/research/watchlist/9", reply: { status: 204 } },
     ]);
     renderAt("/research?tab=watchlist");
     expect(await screen.findByRole("link", { name: "BBAS3" })).toHaveAttribute("href", "/asset/9");
     expect(screen.getByText("Elegível")).toBeInTheDocument();
+
+    // Reclassify in place.
+    const quadrant = screen.getByRole("combobox", { name: "Classe ARCA de BBAS3" });
+    expect(quadrant).toHaveValue("ACOES");
+    fireEvent.change(quadrant, { target: { value: "CAIXA" } });
+    await waitFor(() =>
+      expect(last(calls, "PUT", "/research/watchlist/9/classification")?.body).toEqual({ arca_class: "CAIXA" }),
+    );
+
+    // Follow by code with a chosen quadrant (empty = the suggestion).
+    fireEvent.change(screen.getByLabelText("Observar código"), { target: { value: "taee11" } });
+    expect(screen.getByLabelText("Classe ARCA")).toHaveValue("");
+    fireEvent.change(screen.getByLabelText("Classe ARCA"), { target: { value: "REAL_ESTATE" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+    await waitFor(() =>
+      expect(last(calls, "POST", "/research/watchlist")?.body).toMatchObject({ ticker: "TAEE11", arca_class: "REAL_ESTATE" }),
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "Remover" }));
     await waitFor(() => expect(last(calls, "DELETE", "/research/watchlist/9")).toBeDefined());
   });
@@ -270,7 +318,10 @@ describe("ledger", () => {
     const preview = {
       kind: "NEGOTIATION",
       counts: { NEW: 1, UNKNOWN_ASSET: 1 },
-      unknown_tickers: [{ ticker: "ITSA4", asset_type: "STOCK_BR" }],
+      unknown_tickers: [
+        { ticker: "ITSA4", asset_type: "STOCK_BR", arca_class: "ACOES" },
+        { ticker: "XPTO1", asset_type: null, arca_class: null },
+      ],
       lines: [
         { line_no: 2, action: "TRADE", status: "NEW", entry_date: "2024-01-02", ticker: "WEGE3", description: "compra", quantity: 10, unit_price: 36.5, amount: 365, trade_kind: "BUY", note: "" },
         { line_no: 3, action: "TRADE", status: "UNKNOWN_ASSET", entry_date: "2024-01-02", ticker: "ITSA4", description: "compra", quantity: 100, unit_price: 9.8, amount: 980, trade_kind: "BUY", note: "Ativo não cadastrado" },
@@ -279,6 +330,16 @@ describe("ledger", () => {
     const { calls } = mockApi([
       { path: "/accounts", reply: accounts },
       { method: "POST", path: "/imports/b3/preview", reply: preview },
+      {
+        path: "/assets/classification",
+        reply: (call: Call) => ({
+          ticker: call.query.get("ticker"),
+          asset_type: call.query.get("asset_type"),
+          arca_class: call.query.get("asset_type") === "BDR" ? "ATIVOS_INTERNACIONAIS" : "ACOES",
+          source: "TYPE",
+          reason: "",
+        }),
+      },
       {
         method: "POST",
         path: "/imports/b3/commit",
@@ -290,8 +351,22 @@ describe("ledger", () => {
     fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [file] } });
     expect(await screen.findByText("Ativos que ainda não estão cadastrados")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /ITSA4/ })).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "Classe ARCA de ITSA4" })).toHaveValue("ACOES");
+
+    // A ticker of unknown type stays off until its type is chosen; the quadrant follows the type.
+    const xpto = screen.getByRole("checkbox", { name: /XPTO1/ });
+    expect(xpto).toBeDisabled();
+    fireEvent.change(screen.getByRole("combobox", { name: "Tipo de XPTO1" }), { target: { value: "BDR" } });
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Classe ARCA de XPTO1" })).toHaveValue("ATIVOS_INTERNACIONAIS"),
+    );
+    expect(xpto).toBeChecked();
+    fireEvent.click(xpto);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Classe ARCA de ITSA4" }), { target: { value: "CAIXA" } });
     fireEvent.click(screen.getByRole("button", { name: "Importar 2 linha(s)" }));
     expect(await screen.findByText(/Importado: 2 operação/)).toBeInTheDocument();
-    expect(last(calls, "POST", "/imports/b3/commit")?.body).toMatchObject({ create_tickers: "ITSA4" });
+    const body = last(calls, "POST", "/imports/b3/commit")?.body as Record<string, string>;
+    expect(JSON.parse(body.new_assets)).toEqual([{ ticker: "ITSA4", asset_type: "STOCK_BR", arca_class: "CAIXA" }]);
   });
 });

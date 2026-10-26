@@ -25,13 +25,18 @@ Monorepo com workspace `uv` (Python 3.12) e frontend React:
 
 ```text
 apps/
-  api/        FastAPI (controllers → handlers → services → unit of work → repositories)
-  worker/     APScheduler: séries do BCB, cotações, retratos diários, demonstrativos, catálogo B3
-  web/        React 18 + Vite, servido por nginx
-packages/
-  config/       configurações (pydantic-settings) e logs
-  core/         domínio puro: posições, renda fixa, ARCA, checklist, valuation, alertas
-  persistence/  SQLAlchemy 2.0, repositórios e migrations Alembic
+  api/          FastAPI, em módulos por feature
+    core/         infraestrutura: configuração, segurança, dependências, middleware, erros
+    modules/      um módulo por feature (router → use cases → service), p. ex. assets, ledger,
+                  portfolio, contributions, policy, research, market, alerts
+    composition.py  raiz de composição: escolhe a Unit of Work, o gateway de mercado e a sonda do banco
+  worker/       APScheduler: séries do BCB, cotações, retratos diários, demonstrativos, catálogo B3
+  web/          React 18 + Vite, servido por nginx
+  packages/     compartilhado pela API e pelo worker
+    config/       configurações (pydantic-settings) e logs
+    core/         domínio puro: posições, renda fixa, ARCA, checklist, valuation, alertas
+    persistence/  SQLAlchemy 2.0: core/ (Unit of Work), models/, repositories/ e mappers/ por
+                  feature, e as migrations Alembic
 docs/           arquitetura, ADRs, funcionalidades, débitos técnicos e plano
 scripts/        portão de qualidade, smoke test e E2E
 ```
@@ -78,10 +83,10 @@ Troque **todos** os valores `change-me-*` e mantenha as credenciais coerentes en
 Gerar o hash da senha de login (pede a senha duas vezes, sem ecoar, e imprime a linha pronta, já entre aspas simples):
 
 ```bash
-uv run python -m fincontrol_api.auth hash-password
+uv run python -m fincontrol_api hash-password
 ```
 
-Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python -m fincontrol_api.auth hash-password`.
+Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python -m fincontrol_api hash-password`.
 
 Gerar o segredo do JWT:
 

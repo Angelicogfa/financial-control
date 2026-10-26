@@ -23,6 +23,7 @@ from fincontrol_core.domain.enums import (
     Market,
     SeriesUnit,
 )
+from fincontrol_core.fundamentals.history import STATEMENT_TYPES
 from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.models import Quote, QuoteFreshness
@@ -181,10 +182,6 @@ def warm_portfolio_quotes_job(
         if q is not None:
             warmed += 1
     return warmed
-
-
-# Asset types whose issuers publish income statements and balance sheets.
-STATEMENT_TYPES = frozenset({AssetType.STOCK_BR, AssetType.STOCK_INTL, AssetType.BDR})
 
 
 def refresh_fundamentals_job(

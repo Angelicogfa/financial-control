@@ -21,7 +21,7 @@ BASE="http://localhost:${WEB_PORT}"
 # Docker Desktop on Windows needs a native path for env files.
 native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
 
-HASH="$(uv run --quiet python -I -c "from fincontrol_api.auth import hash_password; print(hash_password('$PASSWORD'))")"
+HASH="$(uv run --quiet python -I -c "from fincontrol_api.core.security import hash_password; print(hash_password('$PASSWORD'))")"
 SECRET="$(uv run --quiet python -I -c "import secrets; print(secrets.token_hex(32))")"
 sed -e "s|^PGDATA_VOLUME=.*|PGDATA_VOLUME=fincontrol_smoke_pgdata|" \
     -e "s|^REDISDATA_VOLUME=.*|REDISDATA_VOLUME=fincontrol_smoke_redisdata|" \

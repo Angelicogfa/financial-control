@@ -15,7 +15,7 @@ from fincontrol_core.errors import ConflictError
 from fincontrol_core.market.models import Quote
 from fincontrol_core.policy import current_policy
 from fincontrol_core.portfolio.consolidation import LEDGER_VALID, consolidate_portfolio
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.seed_demo import MARKET_ASSETS, main, seed_demo
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -27,7 +27,7 @@ UoWFactory = Callable[[], SqlAlchemyUnitOfWork]
 def uow_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> UoWFactory:
     db_url = f"sqlite:///{(tmp_path / 'demo.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     cfg = Config(str(persistence_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     cfg.set_main_option("sqlalchemy.url", db_url)

@@ -15,7 +15,7 @@
 |---|---|---|---|
 | **Fase 0** | Planejamento Sistêmico, Governança (`AGENTS.md`, Rules) e Documentação Base | `[x]` Concluída | 100% |
 | **Fase 1** | Fundação do Monorepo, Docker Compose (volumes isolados), Ports/Entities, `UnitOfWork`, Repositories e Alembic (`script_00001`) | `[x]` Concluída | 100% |
-| **Fase 2** | Domínio Puro (`packages/core`): Posições, Renda Fixa Calculada, Proventos, Consolidação, ARCA e Cerrado Opcional | `[x]` Concluída | 100% |
+| **Fase 2** | Domínio Puro (`apps/packages/core`): Posições, Renda Fixa Calculada, Proventos, Consolidação, ARCA e Cerrado Opcional | `[x]` Concluída | 100% |
 | **Fase 3** | Provedores de Mercado (`brapi`, `yfinance`, `BCB SGS` CDI/IPCA), Cache Redis e Motor Estatístico/Benchmarks | `[x]` Concluída | 100% |
 | **Fase 4** | Backend API (`apps/api` Controllers $\rightarrow$ Handlers $\rightarrow$ Services $\rightarrow$ UoW) e Worker (`apps/worker`) + Testes de Integração | `[x]` Concluída | 100% |
 | **Fase 5** | Frontend Web (`apps/web` React + TypeScript): Menu Hambúrguer, Cards Evolução/Projeção e Tabelas Paginadas | `[x]` Concluída | 100% |
@@ -49,9 +49,9 @@
 **Objetivo:** Estruturar os pacotes do workspace `uv`, definir entidades imutáveis de domínio e contratos abstratos (`AbstractRepository` e `AbstractUnitOfWork`), configurar SQLAlchemy 2.0 + mappers + `SqlAlchemyUnitOfWork`, criar o sistema de migrations Alembic no formato `script_#####` e configurar o `docker-compose.yml` com volumes nomeados isolados.
 
 ### Itens Implementados
-- `[x]` **1.1** Criar estrutura de pacotes `packages/core`, `packages/persistence`, `apps/api`, `apps/worker` e `apps/web`.
+- `[x]` **1.1** Criar estrutura de pacotes `apps/packages/core`, `apps/packages/persistence`, `apps/api`, `apps/worker` e `apps/web`.
 - `[x]` **1.2** Implementar Entidades Imutáveis de Domínio (`entities.py`), Primitivas Padronizadas de Paginação (`pagination.py`) e Contratos/Ports (`AbstractRepository` em `ports/repositories.py` e `AbstractUnitOfWork` em `ports/unit_of_work.py`).
-- `[x]` **1.3** Implementar modelos SQLAlchemy 2.0 (`models.py`) e mapeadores bidirecionais (`mappers.py`) em `packages/persistence` (código 100% em inglês):
+- `[x]` **1.3** Implementar modelos SQLAlchemy 2.0 (`models.py`) e mapeadores bidirecionais (`mappers.py`) em `apps/packages/persistence` (código 100% em inglês):
   - `AssetModel` (`assets`) $\leftrightarrow$ `AssetEntity`
   - `FixedIncomeTermModel` (`fixed_income_terms`) $\leftrightarrow$ `FixedIncomeTermEntity`
   - `TransactionModel` (`transactions`) $\leftrightarrow$ `TransactionEntity`
@@ -59,7 +59,7 @@
   - `ArcaTargetModel` (`arca_targets`) $\leftrightarrow$ `ArcaTargetEntity`
   - `MarketSeriesModel` (`market_series`) $\leftrightarrow$ `MarketSeriesPoint`
   - `PortfolioSnapshotModel` (`portfolio_snapshots`) $\leftrightarrow$ `PortfolioSnapshotEntity`
-- `[x]` **1.4** Configurar Alembic em `packages/persistence/migrations/` com `file_template = script_%%(slug)s` e criar a migration inicial `script_00001_initial_schema.py` (com seed das 4 metas ARCA padrão de 25%).
+- `[x]` **1.4** Configurar Alembic em `apps/packages/persistence/migrations/` com `file_template = script_%%(slug)s` e criar a migration inicial `script_00001_initial_schema.py` (com seed das 4 metas ARCA padrão de 25%).
 - `[x]` **1.5** Implementar Repositórios SQLAlchemy concretos (`repositories.py`) com paginação, ordenação e filtros padronizados, sem chamadas diretas a `commit()`, e `SqlAlchemyUnitOfWork` (`unit_of_work.py`) gerenciando atomicidade transacional.
 - `[x]` **1.6** Criar `docker-compose.yml` com serviços `postgres`, `redis`, `migrate`, `api`, `worker`, `web` e volumes isolados `fincontrol_pgdata` e `fincontrol_redisdata`.
 - `[x]` **1.7** **Testes de Unidade (Fase 1):** 6 testes unitários passando (`test_domain_entities.py` e `test_unit_of_work.py`).
@@ -67,9 +67,9 @@
 
 ---
 
-## Fase 2 — Domínio Puro (`packages/core`): Posições, Renda Fixa, Proventos, Consolidação, ARCA e Cerrado (`[x]` Concluída)
+## Fase 2 — Domínio Puro (`apps/packages/core`): Posições, Renda Fixa, Proventos, Consolidação, ARCA e Cerrado (`[x]` Concluída)
 
-**Objetivo:** Implementar todas as regras financeiras e de carteira em Python puro (`packages/core`), totalmente independentes de framework web ou banco.
+**Objetivo:** Implementar todas as regras financeiras e de carteira em Python puro (`apps/packages/core`), totalmente independentes de framework web ou banco.
 
 ### Itens Implementados
 - `[x]` **2.1** Enumerações e entidades de domínio (`ArcaClass`, `AssetType`, `Market`, `TransactionKind`, `EarningKind`, `FixedIncomeIndexer`, `IntraClassStrategy`) e modelos normalizados de mercado (`Quote`, `PricePoint`, `Fundamentals`).
@@ -88,8 +88,8 @@
   - Suporte às 3 estratégias intra-classe (`CERRADO`, `MANUAL_WEIGHT`, `EQUAL_WEIGHT`) para que o usuário possa usar ou desativar o Cerrado livremente (`use_cerrado=False`).
   - Conversão do aporte em quantidades inteiras (B3) ou fracionárias (EUA, Cripto, Renda Fixa) com redistribuição de sobras (`plan_contribution`).
 - `[x]` **2.7** Módulo de Valuation (`valuation.py`): Preço Justo de Graham, Preço Teto de Bazin (6%), Margem de Segurança e *Earnings Yield*.
-- `[x]` **2.8** **Testes de Unidade (Fase 2):** Suite `packages/core/tests/test_phase2_domain.py` validando todos os motores de domínio puro em memória.
-- `[x]` **2.9** **Testes de Integração e Build Docker (Fase 2):** Suite `packages/persistence/tests/test_phase2_integration.py` validando `SqlAlchemyUnitOfWork` + `consolidate_portfolio` + `plan_contribution` ponta a ponta sobre o banco migrado com `script_00001` e build Docker validado.
+- `[x]` **2.8** **Testes de Unidade (Fase 2):** Suite `apps/packages/core/tests/test_phase2_domain.py` validando todos os motores de domínio puro em memória.
+- `[x]` **2.9** **Testes de Integração e Build Docker (Fase 2):** Suite `apps/packages/persistence/tests/test_phase2_integration.py` validando `SqlAlchemyUnitOfWork` + `consolidate_portfolio` + `plan_contribution` ponta a ponta sobre o banco migrado com `script_00001` e build Docker validado.
 
 ---
 
@@ -107,8 +107,8 @@
   - Volatilidade anualizada, **Sharpe**, **Sortino**, **Max Drawdown** (série e máximo), **Calmar**.
   - **VaR** e **CVaR** (95% histórico e paramétrico).
   - **Beta**, **Alpha de Jensen** e **Matriz de Correlação** contra **IBOV**, **IFIX**, **S&P 500**, **CDI** e **IPCA** (ganho real).
-- `[x]` **3.6** **Testes de Unidade (Fase 3):** Suite `packages/core/tests/test_phase3_market_and_analytics.py` validando provedores com `httpx.MockTransport` / mocks determinísticos e todas as métricas estatísticas.
-- `[x]` **3.7** **Testes de Integração e Build Docker (Fase 3):** Suite `packages/persistence/tests/test_phase3_integration.py` validando `CachedMarketGateway` + `SqlAlchemyUnitOfWork` (`uow.market_series`, `uow.snapshots`) + `analytics.py` e build Docker validado.
+- `[x]` **3.6** **Testes de Unidade (Fase 3):** Suite `apps/packages/core/tests/test_phase3_market_and_analytics.py` validando provedores com `httpx.MockTransport` / mocks determinísticos e todas as métricas estatísticas.
+- `[x]` **3.7** **Testes de Integração e Build Docker (Fase 3):** Suite `apps/packages/persistence/tests/test_phase3_integration.py` validando `CachedMarketGateway` + `SqlAlchemyUnitOfWork` (`uow.market_series`, `uow.snapshots`) + `analytics.py` e build Docker validado.
 
 ---
 
@@ -245,10 +245,10 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 **Objetivo:** criar a rede de segurança para refatorar sem regressão.
 
 - `[x]` **7.1** (O-04) `git init`, `.gitattributes` (LF), commit baseline do estado atual e branch `main`; trabalho da fase na branch `fix/phase-7-foundation`. O push para o GitHub (item 6.4) só ocorre com confirmação explícita do usuário.
-- `[x]` **7.2** (O-05) Testes de caracterização que reproduzem C-01..C-04, I-01..I-05, I-09, I-10, A-04 (marcados `xfail(strict=True, raises=...)` até a correção, para que a correção os "desmarque"): `packages/core/tests/test_audit_characterization.py`, `apps/api/tests/test_audit_characterization_api.py`, `apps/worker/tests/test_audit_characterization_worker.py` (23 casos).
+- `[x]` **7.2** (O-05) Testes de caracterização que reproduzem C-01..C-04, I-01..I-05, I-09, I-10, A-04 (marcados `xfail(strict=True, raises=...)` até a correção, para que a correção os "desmarque"): `apps/packages/core/tests/test_audit_characterization.py`, `apps/api/tests/test_audit_characterization_api.py`, `apps/worker/tests/test_audit_characterization_worker.py` (23 casos).
 - `[x]` **7.3** (I-02) **ADR 0006 — Convenções de unidades:** taxas sempre como fração decimal (`0.065` = 6,5%); percentual de indexador como multiplicador (`1.10` = 110% do CDI); séries do BCB armazenadas com unidade explícita; dinheiro em `Decimal`/`Numeric` em persistência e fronteiras de API; `float` apenas em estatística.
-- `[x]` **7.4** Carteira de referência (ação BR, FII, ETF internacional em USD, cripto, CDB CDI, LCI, Tesouro IPCA+) em `packages/core/tests/golden/reference_portfolio.json`, exposta pelas fixtures de `packages/core/tests/conftest.py`. Os valores esperados (`reference_portfolio_expected.csv`, 53 linhas) são gerados por `build_reference_golden.py`, cálculo independente só com a biblioteca padrão (substitui a planilha); 18 linhas afetadas por C-01, C-02 e I-01 estão em `xfail` estrito.
-- `[x]` **7.5** Cobertura no CI com `pytest-cov` e piso inicial (`packages/core` ≥ 85%, hoje 87% só com testes em memória após `test_market_gateway_and_cache.py`), elevado ao final da Fase 14.
+- `[x]` **7.4** Carteira de referência (ação BR, FII, ETF internacional em USD, cripto, CDB CDI, LCI, Tesouro IPCA+) em `apps/packages/core/tests/golden/reference_portfolio.json`, exposta pelas fixtures de `apps/packages/core/tests/conftest.py`. Os valores esperados (`reference_portfolio_expected.csv`, 53 linhas) são gerados por `build_reference_golden.py`, cálculo independente só com a biblioteca padrão (substitui a planilha); 18 linhas afetadas por C-01, C-02 e I-01 estão em `xfail` estrito.
+- `[x]` **7.5** Cobertura no CI com `pytest-cov` e piso inicial (`apps/packages/core` ≥ 85%, hoje 87% só com testes em memória após `test_market_gateway_and_cache.py`), elevado ao final da Fase 14.
 
 **Aceite:** baseline commitado; suíte roda com os `xfail` listados; ADR 0006 aceito.
 
@@ -267,7 +267,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ### Renda fixa
 - `[x]` **8.4** (C-04) Venda de renda fixa: FIFO por lote, abatendo o principal proporcional ao valor bruto do lote (`principal × valor_vendido / valor_bruto_lote`); IR/IOF da venda e lucro realizado de RF calculados por lote.
-- `[x]` **8.5** (I-01) IPCA+ pela série mensal 433 com pró-rata do mês corrente (último IPCA conhecido ou projeção da política); SELIC pela série 11; calendário de feriados nacionais (fixos + móveis via Páscoa) em `packages/core/calendar.py`; projeção 12m relativa a `as_of_date`. Convenção: IPCA do mês aplicado pró-rata por dias úteis do mês; mês sem índice usa a taxa anual de fallback e reduz `curve_coverage`. Projeção = variação do valor líquido em 252 dias úteis (ou até o vencimento), incluindo a mudança de faixa do IR.
+- `[x]` **8.5** (I-01) IPCA+ pela série mensal 433 com pró-rata do mês corrente (último IPCA conhecido ou projeção da política); SELIC pela série 11; calendário de feriados nacionais (fixos + móveis via Páscoa) em `apps/packages/core/calendar.py`; projeção 12m relativa a `as_of_date`. Convenção: IPCA do mês aplicado pró-rata por dias úteis do mês; mês sem índice usa a taxa anual de fallback e reduz `curve_coverage`. Projeção = variação do valor líquido em 252 dias úteis (ou até o vencimento), incluindo a mudança de faixa do IR.
 
 ### Consolidação e câmbio
 - `[x]` **8.6** (C-02) Custo em BRL pelo câmbio de cada compra (`total_cost_brl`), lucro realizado em BRL pelo câmbio da venda, valor atual pelo câmbio atual; novo campo `fx_pnl_brl` separando efeito câmbio de efeito preço. Proventos em moeda estrangeira ganham `fx_rate` (migration `script_00004_earnings_fx_rate.py`, default 1 para BRL e câmbio histórico do dia para USD via backfill). Lançamentos e proventos de ativos em moeda estrangeira passam a exigir câmbio (`400 FX_RATE_REQUIRED`).
@@ -282,14 +282,14 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 ### Integridade e contrato
 - `[x]` **8.12** (I-04) Validação do livro inteiro em criação, edição e exclusão de lançamentos (simula o livro resultante antes de persistir). Novo `PUT /transactions/{id}` e `PUT /earnings/{id}`. Exclusões/edições que quebram o livro retornam `409 LEDGER_CONFLICT`.
 - `[x]` **8.13** (I-04) Consolidação tolerante: ativo com livro inválido aparece com `ledger_status: "INVALID"` e mensagem, sem derrubar a carteira.
-- `[x]` **8.14** (I-05) Hierarquia de exceções de domínio (`DomainError`, `NotFoundError`, `ValidationError`, `ConflictError`) em `packages/core/errors.py`; handlers mapeiam só essas; demais exceções viram 500 com `request_id` e log.
+- `[x]` **8.14** (I-05) Hierarquia de exceções de domínio (`DomainError`, `NotFoundError`, `ValidationError`, `ConflictError`) em `apps/packages/core/errors.py`; handlers mapeiam só essas; demais exceções viram 500 com `request_id` e log.
 - `[x]` **8.15** (A-04) Override `MANUAL_WEIGHT` usa `custom_class_weight`; sobra de arredondamento redistribuída entre classes por ordem de déficit.
 - `[x]` **8.16** (D-02, D-04) Colunas monetárias de `portfolio_snapshots` para `Numeric(20, 2)` (`script_00005_snapshot_numeric.py`); `id` como desempate em toda ordenação paginada. O domínio mantém `float` nos snapshots (série estatística derivada, exceção registrada na ADR 0006); o repositório arredonda para centavos.
 - `[x]` **8.17** Reprocessamento: comando `uv run python -m fincontrol_worker.rebuild` que ressincroniza séries e reconstrói snapshots após as correções. Também reprecifica lançamentos e proventos em USD gravados com `fx_rate = 1` usando o USD/BRL histórico. **Ação pendente na base real:** rodar `docker compose run --rm worker python -m fincontrol_worker.rebuild` após aplicar as migrations.
 
 **Aceite:** todos os `xfail` da 7.2 passam; carteira de referência (7.4) bate com a planilha golden em ±R$ 0,01; integração + `docker compose build` verdes.
 
-**Validação (2026-10-24):** os 23 testes de caracterização e as 53 linhas da carteira de referência passam sem `xfail`; `uv run pytest` → 202 passed (cobertura: `packages/core` 88,6% só com testes em memória, backend total 93%); `npm test` 7/7 e `npm run build`; migrations `script_00002`–`script_00005` aplicadas com dados legados e revertidas em PostgreSQL 16 descartável; `docker compose build` dos 4 serviços concluído.
+**Validação (2026-10-24):** os 23 testes de caracterização e as 53 linhas da carteira de referência passam sem `xfail`; `uv run pytest` → 202 passed (cobertura: `apps/packages/core` 88,6% só com testes em memória, backend total 93%); `npm test` 7/7 e `npm run build`; migrations `script_00002`–`script_00005` aplicadas com dados legados e revertidas em PostgreSQL 16 descartável; `docker compose build` dos 4 serviços concluído.
 
 **Testes ajustados durante a fase (expectativas que codificavam defeitos):** `total_invested_brl` da fase 2 (17200 → 17000, C-02); projeção da caracterização I-01 (IR de 15% fixo → faixa regressiva no horizonte); dados do teste de beta I-09 (movimento de 50% em 03/01 → 0%, para manter beta 1 com composição por intervalo); taxas contratadas dos testes antigos convertidas para a escala da ADR 0006.
 
@@ -297,11 +297,11 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ## Fase 9 — Configuração, Segurança, Infraestrutura e CI (`[x]` Concluída)
 
-- `[x]` **9.1** (I-08) Pacote `packages/config` (`fincontrol_config`) com `pydantic-settings` compartilhado por API e worker; nomes idênticos ao `.env.example`; teste que falha se existir variável no `.env.example` sem campo correspondente (e vice-versa). Também corrigiu `BCB_SGS_BASE_URL` (o valor antigo gerava URL inválida) e trouxe `fincontrol_core.market.factory` para montar o gateway igual na API e no worker.
+- `[x]` **9.1** (I-08) Pacote `apps/packages/config` (`fincontrol_config`) com `pydantic-settings` compartilhado por API e worker; nomes idênticos ao `.env.example`; teste que falha se existir variável no `.env.example` sem campo correspondente (e vice-versa). Também corrigiu `BCB_SGS_BASE_URL` (o valor antigo gerava URL inválida) e trouxe `fincontrol_core.market.factory` para montar o gateway igual na API e no worker.
 - `[x]` **9.2** (O-01) Dockerfiles multi-stage (builder com `uv sync --frozen`, runtime slim), usuário não-root, imagem da API só com `core`+`persistence`+`config`+`api`, imagem do worker só com o que usa; `HEALTHCHECK` em API e web. `uv` 0.12.7 fixado no builder; uid 10001 no runtime; a imagem do worker não contém `fincontrol_api` e vice-versa.
 - `[x]` **9.3** (O-02) Web: copiar `package-lock.json` e usar `npm ci`.
 - `[x]` **9.4** (O-03) Postgres e Redis sem portas publicadas por padrão (acesso de desenvolvimento pelo `docker-compose.yml`, vinculado a `127.0.0.1`; a produção é o `docker-compose.prod.yml`); Redis com `requirepass`; `.env.example` com placeholders `change-me`. Nomes de volume (`PGDATA_VOLUME`, `REDISDATA_VOLUME`) e arquivo de env dos apps (`APP_ENV_FILE`) são configuráveis para rodar uma segunda stack isolada; `container_name` fixo removido.
-- `[x]` **9.5** (O-03, TD-01) Autenticação single-user: credencial definida no `.env` (hash Argon2), login emite JWT em cookie `httpOnly`/`SameSite=Strict`; todas as rotas exceto `/health` protegidas. Estrutura preparada para `users` futuramente. `/ready` também fica aberto. CLI `python -m fincontrol_api.auth hash-password|new-secret` imprime linhas prontas (com aspas simples, por causa do `$` do Argon2). Placeholders `change-me` contam como não configurado (503 `AUTH_NOT_CONFIGURED`). Web ganhou tela de login e volta para ela em qualquer 401.
+- `[x]` **9.5** (O-03, TD-01) Autenticação single-user: credencial definida no `.env` (hash Argon2), login emite JWT em cookie `httpOnly`/`SameSite=Strict`; todas as rotas exceto `/health` protegidas. Estrutura preparada para `users` futuramente. `/ready` também fica aberto. CLI `python -m fincontrol_api hash-password|new-secret` imprime linhas prontas (com aspas simples, por causa do `$` do Argon2). Placeholders `change-me` contam como não configurado (503 `AUTH_NOT_CONFIGURED`). Web ganhou tela de login e volta para ela em qualquer 401.
 - `[x]` **9.6** Observabilidade: logs estruturados JSON com `request_id`; `/health` (liveness) e `/ready` (DB, Redis, migrations em `head`). `/ready` responde 503 sem banco ou fora do `head` e `degraded` quando só o cache cai; respostas 500 trazem o `request_id`.
 - `[x]` **9.7** Worker: agenda e fuso lidos de settings; lock distribuído no Redis por job; retries com backoff; tabela `job_runs` (`script_00006_job_runs.py`) com início, fim, status e contagens — base do indicador de frescor da UI. Endpoint `GET /api/v1/market/job-runs`. Novo job `ensure_series_coverage` (no intervalo das cotações) completa o histórico do BCB assim que entra uma posição mais antiga — falha revelada pelo smoke.
 - `[x]` **9.8** (D-05, I-07) Busca de cotações/fundamentos em lote e concorrente (`httpx.AsyncClient` ou pool de threads limitado), com timeout global por request; API lê preferencialmente do cache aquecido pelo worker. Implementado com pool de threads limitado (`MARKET_FETCH_WORKERS`) e prazo global (`MARKET_FETCH_TIMEOUT_SECONDS`).
@@ -309,7 +309,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 **Aceite:** stack sobe do zero com `cp .env.example .env && docker compose up -d --wait`; nenhuma porta de banco exposta; rotas exigem login; portão de qualidade local (`scripts/check.sh --smoke`) verde.
 
-**Validação (2026-10-24):** `scripts/check.sh --smoke` → ruff e formatação limpos; `packages/core` 88,3% de cobertura só com testes em memória; 230 testes de backend (cobertura total 94%); web com ESLint sem avisos, `tsc`, 10 testes e build; imagens buildadas; stack isolada `fincontrol-smoke` subiu do zero com `/ready` = ready (migrations em `script_00006`, cache Redis), 401 sem sessão, login, cadastro de CDB e compra, cabeçalhos de segurança, containers sem root, Redis exigindo senha e apenas a porta do web publicada. A stack em uso e os volumes `fincontrol_pgdata`/`fincontrol_redisdata` não foram tocados.
+**Validação (2026-10-24):** `scripts/check.sh --smoke` → ruff e formatação limpos; `apps/packages/core` 88,3% de cobertura só com testes em memória; 230 testes de backend (cobertura total 94%); web com ESLint sem avisos, `tsc`, 10 testes e build; imagens buildadas; stack isolada `fincontrol-smoke` subiu do zero com `/ready` = ready (migrations em `script_00006`, cache Redis), 401 sem sessão, login, cadastro de CDB e compra, cabeçalhos de segurança, containers sem root, Redis exigindo senha e apenas a porta do web publicada. A stack em uso e os volumes `fincontrol_pgdata`/`fincontrol_redisdata` não foram tocados.
 
 **Ação pendente na base real (antes de subir esta versão):** o `.env` em uso precisa das novas variáveis — `REDIS_PASSWORD` (e `REDIS_URL` com `:senha@`), `AUTH_PASSWORD_HASH`, `AUTH_JWT_SECRET` e as demais listadas em `.env.example`. Manter `POSTGRES_PASSWORD` igual ao usado na criação do volume.
 
@@ -319,16 +319,16 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 **Objetivo:** implementar a ADR 0005 no backend.
 
-- `[x]` **10.1** Agregado `InvestmentPolicy` (`ArcaPolicy`, `EligibilityPolicy`, `ValuationPolicy`) em `packages/core/policy/`; tabela `investment_policy` versionada (`script_00007_investment_policy.py`) migrando `arca_targets`; endpoints `GET/PUT /api/v1/policy` com validação (metas somam 100%, bandas ≥ 0). Tabela `investment_policies` é append-only (cada alteração cria uma versão); `GET /api/v1/policy/versions` lista o histórico. `/settings/arca-targets` virou fachada que cria nova versão mantendo bandas e demais regras. As premissas de projeção saíram do `.env` (`PROJECTION_*` removidas) e passaram para `ValuationPolicy`.
+- `[x]` **10.1** Agregado `InvestmentPolicy` (`ArcaPolicy`, `EligibilityPolicy`, `ValuationPolicy`) em `apps/packages/core/policy/`; tabela `investment_policy` versionada (`script_00007_investment_policy.py`) migrando `arca_targets`; endpoints `GET/PUT /api/v1/policy` com validação (metas somam 100%, bandas ≥ 0). Tabela `investment_policies` é append-only (cada alteração cria uma versão); `GET /api/v1/policy/versions` lista o histórico. `/settings/arca-targets` virou fachada que cria nova versão mantendo bandas e demais regras. As premissas de projeção saíram do `.env` (`PROJECTION_*` removidas) e passaram para `ValuationPolicy`.
 - `[x]` **10.2** (A-01) Bandas de tolerância por classe; `compute_allocation` devolve `band_status` (`WITHIN`, `BELOW`, `ABOVE`); aporte prioriza classes abaixo da banda. `distribute_with_bands` leva as classes abaixo da banda até a meta antes de distribuir o restante pelas metas.
-- `[x]` **10.3** (A-02) Campo `exposure_class` separado de `asset_type`/mercado de listagem; sugestão automática para ETFs conhecidos (lista curada em `packages/core/catalog/etf_exposure.py`) e confirmação no cadastro. **Desvio:** não foi criada coluna `exposure_class`; o próprio `arca_class` é a classe de exposição e uma segunda coluna duplicaria a informação. O problema (padrão pelo local de listagem) foi resolvido com o catálogo e `GET /api/v1/assets/classification`, usado no cadastro quando a classe não é informada. A confirmação visual fica para a Fase 13.
+- `[x]` **10.3** (A-02) Campo `exposure_class` separado de `asset_type`/mercado de listagem; sugestão automática para ETFs conhecidos (lista curada em `apps/packages/core/catalog/etf_exposure.py`) e confirmação no cadastro. **Desvio:** não foi criada coluna `exposure_class`; o próprio `arca_class` é a classe de exposição e uma segunda coluna duplicaria a informação. O problema (padrão pelo local de listagem) foi resolvido com o catálogo e `GET /api/v1/assets/classification`, usado no cadastro quando a classe não é informada. A confirmação visual fica para a Fase 13.
 - `[x]` **10.4** (A-03) Campo `purpose` (`ARCA`, `EMERGENCY_RESERVE`, `OTHER`); apenas `ARCA` entra na alocação e no aporte; reserva aparece separada no Início e na Carteira. Migration `script_00008_asset_purpose.py`; relatório traz `value_by_purpose_brl` (patrimônio total inclui a reserva; alocação e aporte só o ARCA).
 - `[x]` **10.5** (D-01) Entidade `accounts` (corretora/banco/custódia) e `account_id` em transações e proventos (`script_00008_accounts.py`, conta "Principal" para dados existentes); unicidade de `ticker` apenas para ativos negociados em bolsa; renda fixa identificada por código gerado + emissor + vencimento. Migration renumerada para `script_00009_accounts.py`. Endpoints `/api/v1/accounts`; `account_id` em lançamentos, proventos e no filtro de `/portfolio`. **Desvio:** a unicidade de `ticker` continua valendo para todos, mas renda fixa e caixa podem omitir o ticker e recebem código gerado (`CDB-BANCOINTER-20270115`, `-2`…), o que resolve os tickers inventados.
 - `[x]` **10.6** Ciclo de vida `WATCHLIST → ELIGIBLE → HELD → REVIEW → ARCHIVED` calculado por `AssetLifecycleService` a partir da política, da posição e da avaliação fundamentalista; exposto em todas as respostas de ativo. Regras em `fincontrol_core.policy.lifecycle`; elegibilidade opcional por padrão (ativo nunca avaliado é elegível, ADR 0002) com `require_evaluation`, `min_score` e `min_coverage_pct` na política. Só `ELIGIBLE` e `HELD` recebem aporte; livro inválido aparece como `REVIEW`.
 
 **Aceite:** carteira de referência consolidada com bandas, exposição, reserva separada e status de ciclo de vida corretos; testes de unidade e integração verdes.
 
-**Validação (2026-10-25):** `scripts/check.sh --smoke` → 279 testes de backend (cobertura total 94%, `packages/core` 88,5% só em memória), web com ESLint, `tsc`, 10 testes e build; stack isolada do zero com `/ready` = ready em `script_00009`. Migrations `script_00007`–`script_00009` aplicadas e revertidas em PostgreSQL 16 descartável com dados legados (metas ARCA personalizadas viraram a versão 1 da política; lançamentos e proventos foram para a conta Principal; sequência de `accounts` correta). O primeiro smoke revelou um import circular (`policy` ↔ `consolidation`) que a suíte não pegava; corrigido e coberto por `test_import_graph.py`, que importa cada módulo com o cache limpo.
+**Validação (2026-10-25):** `scripts/check.sh --smoke` → 279 testes de backend (cobertura total 94%, `apps/packages/core` 88,5% só em memória), web com ESLint, `tsc`, 10 testes e build; stack isolada do zero com `/ready` = ready em `script_00009`. Migrations `script_00007`–`script_00009` aplicadas e revertidas em PostgreSQL 16 descartável com dados legados (metas ARCA personalizadas viraram a versão 1 da política; lançamentos e proventos foram para a conta Principal; sequência de `accounts` correta). O primeiro smoke revelou um import circular (`policy` ↔ `consolidation`) que a suíte não pegava; corrigido e coberto por `test_import_graph.py`, que importa cada módulo com o cache limpo.
 
 ---
 
@@ -385,9 +385,9 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 - `[x]` **14.1** `uv run python -m fincontrol_worker.seed_demo` (também `docker compose exec worker python -m fincontrol_worker.seed_demo`): carteira no estilo da referência (ações, FIIs de tijolo e papel, ETF, ETF americano, CDB, LCI, Tesouro IPCA+, reserva) com aportes mensais, venda parcial, proventos, séries e retratos diários de 2 anos; determinístico e offline; recusa banco com ativos.
 - `[x]` **14.2** E2E Playwright (`scripts/e2e.sh`, `apps/web/e2e`) contra stack Docker isolada (`fincontrol-e2e`, volumes `fincontrol_e2e_*`, porta 18090, credenciais geradas): login → estratégia → importação B3 (Negociação e Movimentação) → observar ticker → cadastrar ativo → aportar e confirmar → Carteira, Início e Desempenho → editar e excluir lançamento → `docker compose restart` → persistência verificada.
-- `[x]` **14.3** Recuperação: falhas de provedor lembradas por `MARKET_MISS_CACHE_TTL` (telas respondem na hora em vez de esperar o timeout), cotação em fallback sinalizada, alertas de frescor, todas as rotas das telas respondendo com provedores fora (`apps/api/tests/test_outage.py`, `packages/core/tests/test_market_outage.py`); Redis indisponível cai para cache em memória (`test_redis_cache_falls_back_to_memory_when_unavailable`); cache de fuso do yfinance em pasta gravável nos containers.
+- `[x]` **14.3** Recuperação: falhas de provedor lembradas por `MARKET_MISS_CACHE_TTL` (telas respondem na hora em vez de esperar o timeout), cotação em fallback sinalizada, alertas de frescor, todas as rotas das telas respondendo com provedores fora (`apps/api/tests/test_outage.py`, `apps/packages/core/tests/test_market_outage.py`); Redis indisponível cai para cache em memória (`test_redis_cache_falls_back_to_memory_when_unavailable`); cache de fuso do yfinance em pasta gravável nos containers.
 - `[x]` **14.4** Documentação revista: `OVERVIEW.md` (política, rotinas do worker, modelo de dados até `script_00015`, fluxos de pesquisa, aporte, importação e alertas), `FEATURES_SPEC.md` por contexto, `FRONTEND_UI_UX.md` (ADR 0007), ADRs 0002/0005/0006 atualizadas, `TECH_DEBT.md` (TD-01 e TD-03 encerrados; TD-02 e TD-04 mantidos; TD-05 a TD-08 registrados).
-- `[x]` **14.5** Pisos de cobertura no portão: `packages/core` ≥ 90% (atual 96%), API + worker ≥ 80% (atual 96%), frontend ≥ 70% (atual 88% das linhas).
+- `[x]` **14.5** Pisos de cobertura no portão: `apps/packages/core` ≥ 90% (atual 96%), API + worker ≥ 80% (atual 96%), frontend ≥ 70% (atual 88% das linhas).
 - `[x]` **14.6** Encerramento: cada achado com item e teste (tabela abaixo); `scripts/check.sh --e2e` verde; `docker compose build` e subida completa da stack validados. Push para o GitHub aguarda confirmação do usuário (6.4).
 
 ### Rastreabilidade dos achados
@@ -434,4 +434,30 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 ### Dependências entre fases
 `7 → 8 → 10 → 11 → 12 → 14`, com `9` em paralelo a `8` (arquivos distintos) e `13` iniciando após o contrato de API da Fase 10 (13.1–13.3 podem começar logo após a Fase 8).
 
+---
 
+## Fase 15 — Refatoração Estrutural por Módulos (`[x]` Implementado)
+
+**Objetivo:** organizar o backend no padrão estrutural do projeto de referência (`dynamic-research/apps/api`), com controllers, use cases, services, repositórios e infraestrutura segmentados por feature, e todo o código da solução dentro de `apps/`.
+
+- `[x]` **15.1** API em `fincontrol_api/core/` (config, `security` com o login single-user, deps, middleware, `http_errors`) + `composition.py` (única escolha da `SqlAlchemyUnitOfWork`, do gateway de mercado e da sonda do banco) + `modules/<feature>/` (`router`, `schemas`, `use_cases`, `dependencies`, `serializers`, `service`) para system, auth, accounts, assets, ledger, portfolio, contributions, policy, research, market, alerts e shared. O documento OpenAPI ficou idêntico byte a byte ao anterior (sem mudança de contrato nem de tipos do frontend). CLI: `python -m fincontrol_api hash-password`.
+- `[x]` **15.2** Persistence em `core/` (db, `unit_of_work`, health) + `models/`, `repositories/` e `mappers/` com um módulo por feature; models se referenciam só em anotações (`TYPE_CHECKING`), resolvidos pelo registro do SQLAlchemy.
+- `[x]` **15.3** `packages/` movido para `apps/packages/{config,core,persistence}` (continua compartilhado entre API e worker como membros do workspace `uv`); Dockerfiles, `working_dir` do `migrate`, `scripts/check.sh`, caminhos do pytest e documentação atualizados.
+- `[x]` **15.4** Teste de camadas cobre todos os `modules/*/router.py` (nada de SQLAlchemy, persistence ou `uow_factory`) e garante que só `composition.py` referencia a `SqlAlchemyUnitOfWork`; teste de importação a frio de todos os módulos sem ciclos.
+- `[x]` **15.5** Sincronizado com `origin/main` (correção da importação `.xlsx` da B3, `reset_dimensions()`), aplicada em `modules/ledger/use_cases/b3_import.py`.
+
+**Validação (2026-10-25):** `scripts/check.sh --smoke` → ruff e formatação limpos; 409 testes de backend com cobertura de 96,5% (API + worker), `apps/packages/core` acima do piso de 90%; 45 testes do frontend; build das imagens `migrate`, `api`, `worker` e `web` pelos dois arquivos de compose; smoke isolado `ready` em `script_00015`.
+
+---
+
+## Fase 16 — Pesquisa e Importação Integradas (`[x]` Implementado)
+
+**Objetivo:** todo ativo novo entra pelo mesmo caminho da Pesquisa, com o quadrante ARCA confirmado pelo usuário, venha ele do screener, da lista de observação ou da importação da B3.
+
+- `[x]` **16.1** `modules/research/service.py`: `register_researched_asset` (catálogo da B3 → tipo → quadrante ARCA escolhido ou sugerido) é o único cadastro de ativo novo da Pesquisa e da importação B3; `STATEMENT_TYPES` passou para `fincontrol_core.fundamentals.history`, compartilhado com o worker.
+- `[x]` **16.2** Pesquisa: `POST /api/v1/research/watchlist` aceita `arca_class`; `PUT /api/v1/research/watchlist/{asset_id}/classification` reclassifica. Na tela, "Observar" pede o quadrante com a sugestão marcada; a lista de observação ganhou a coluna "Classe ARCA" editável e o formulário por código, a escolha do quadrante.
+- `[x]` **16.3** Importação B3: a pré-visualização devolve o quadrante sugerido de cada ticker novo; o commit aceita `new_assets` (JSON com `ticker`, `asset_type`, `arca_class`) além de `create_tickers`; um ticker de tipo desconhecido passa a ser cadastrável escolhendo o tipo na tela; `created_assets` lista só os ativos criados naquele commit.
+- `[x]` **16.4** Demonstrativos anuais buscados logo após o cadastro (observação e importação) por `StatementRefresher` em `BackgroundTasks` da API, sem atrasar a resposta; falha de provedor só é registrada em log e fica para a rotina semanal do worker.
+- `[x]` **16.5** Testes: `test_research_service.py` (cadastro, sugestão, falha de provedor, tipos sem demonstrativo), `test_research_flow.py` (quadrante escolhido, demonstrativos gravados, reclassificação, 404/422), `test_b3_import_api.py` (escolhas por ticker, tipo desconhecido, `new_assets` inválido) e `operations.test.tsx` (escolha e cancelamento no screener, reclassificação, tipo e quadrante na importação).
+
+**Validação (2026-10-26):** `scripts/check.sh --smoke` → ruff e formatação limpos; cobertura de 96,1% em `apps/packages/core` e 96,7% em API + worker; 46 testes do frontend; build das quatro imagens pelos dois arquivos de compose; smoke isolado `ready`.

@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api } from "../../api/endpoints";
+import { api, type ImportNewAssetRequest } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
-import type { ImportCommitDTO, ImportPreviewDTO } from "../../api/types";
+import type { ArcaClass, AssetType, ImportCommitDTO, ImportPreviewDTO } from "../../api/types";
+import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { day, num, quantity } from "../../utils/format";
-import { ASSET_TYPE_LABELS, EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
+import { ASSET_TYPES, ASSET_TYPE_LABELS, EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
 import { AccountSelect } from "./AssetSelect";
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -25,11 +26,39 @@ function describe(line: ImportPreviewDTO["lines"][number]): string {
   return line.description;
 }
 
+/** How an unknown ticker is registered with the import (the same registration as the research flow). */
+interface NewAssetChoice {
+  selected: boolean;
+  asset_type: AssetType | "";
+  arca_class: ArcaClass | "";
+  suggested: ArcaClass | null;
+}
+
+function initialChoices(preview: ImportPreviewDTO): Record<string, NewAssetChoice> {
+  return Object.fromEntries(
+    preview.unknown_tickers.map((u) => [
+      u.ticker,
+      {
+        selected: Boolean(u.asset_type),
+        asset_type: u.asset_type ?? "",
+        arca_class: u.arca_class ?? "",
+        suggested: u.arca_class ?? null,
+      },
+    ]),
+  );
+}
+
+function toNewAssets(choices: Record<string, NewAssetChoice>): ImportNewAssetRequest[] {
+  return Object.entries(choices)
+    .filter(([, c]) => c.selected && c.asset_type)
+    .map(([ticker, c]) => ({ ticker, asset_type: c.asset_type || null, arca_class: c.arca_class || null }));
+}
+
 /** B3 statement import: preview what each line becomes, then apply the new lines at once. */
 export function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreviewDTO | null>(null);
-  const [create, setCreate] = useState<string[]>([]);
+  const [choices, setChoices] = useState<Record<string, NewAssetChoice>>({});
   const [accountId, setAccountId] = useState<number | null>(null);
   const [result, setResult] = useState<ImportCommitDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +71,7 @@ export function ImportPage() {
     try {
       const data = await api.ledger.previewImport(chosen);
       setPreview(data);
-      setCreate(data.unknown_tickers.filter((u) => u.asset_type).map((u) => u.ticker));
+      setChoices(initialChoices(data));
     } catch (err) {
       setPreview(null);
       setError(errorMessage(err));
@@ -56,7 +85,7 @@ export function ImportPage() {
     setBusy(true);
     setError(null);
     try {
-      setResult(await api.ledger.commitImport(file, accountId, create));
+      setResult(await api.ledger.commitImport(file, accountId, toNewAssets(choices)));
       setPreview(await api.ledger.previewImport(file));
     } catch (err) {
       setError(errorMessage(err));
@@ -65,6 +94,24 @@ export function ImportPage() {
     }
   };
 
+  const choose = (ticker: string, change: Partial<NewAssetChoice>) =>
+    setChoices((current) => ({ ...current, [ticker]: { ...current[ticker], ...change } }));
+
+  /** A new type changes the suggested quadrant: ask the API, as the asset form does. */
+  const chooseType = async (ticker: string, assetType: AssetType | "") => {
+    choose(ticker, { asset_type: assetType, selected: Boolean(assetType) });
+    if (!assetType) return;
+    try {
+      const suggestion = await api.assets.classify(ticker, assetType);
+      choose(ticker, { arca_class: suggestion.arca_class, suggested: suggestion.arca_class });
+    } catch {
+      // Keep the current quadrant; the backend falls back to its own suggestion.
+    }
+  };
+
+  const create = Object.entries(choices)
+    .filter(([, c]) => c.selected && c.asset_type)
+    .map(([ticker]) => ticker);
   const newLines = preview?.counts.NEW ?? 0;
   const fromUnknown = preview
     ? preview.lines.filter((l) => l.status === "UNKNOWN_ASSET" && l.ticker && create.includes(l.ticker)).length
@@ -132,26 +179,66 @@ export function ImportPage() {
             {preview.unknown_tickers.length > 0 && (
               <section className="app-card app-card-padded">
                 <h2 className="app-card-heading">Ativos que ainda não estão cadastrados</h2>
-                <p className="app-card-hint">Marque os que devem ser cadastrados junto com a importação.</p>
-                <div className="app-chip-group">
-                  {preview.unknown_tickers.map((u) => (
-                    <label key={u.ticker} className="app-check" style={{ marginRight: "var(--space-4)" }}>
-                      <input
-                        type="checkbox"
-                        checked={create.includes(u.ticker)}
-                        disabled={!u.asset_type}
-                        onChange={(e) =>
-                          setCreate((current) =>
-                            e.target.checked ? [...current, u.ticker] : current.filter((t) => t !== u.ticker),
-                          )
-                        }
-                      />
-                      {u.ticker}
-                      <span className="app-muted">
-                        {u.asset_type ? ASSET_TYPE_LABELS[u.asset_type] : "tipo desconhecido — cadastre antes"}
-                      </span>
-                    </label>
-                  ))}
+                <p className="app-card-hint">
+                  Marque os que devem ser cadastrados junto com a importação. Cada um entra como um ativo pesquisado:
+                  confira o tipo e o quadrante ARCA; os demonstrativos são buscados logo depois.
+                </p>
+                <div className="app-table-wrap">
+                  <table className="app-table">
+                    <thead>
+                      <tr>
+                        <th>Cadastrar</th>
+                        <th>Tipo</th>
+                        <th>Classe ARCA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.unknown_tickers.map((u) => {
+                        const choice = choices[u.ticker];
+                        if (!choice) return null;
+                        return (
+                          <tr key={u.ticker}>
+                            <td>
+                              <label className="app-check">
+                                <input
+                                  type="checkbox"
+                                  checked={choice.selected}
+                                  disabled={!choice.asset_type}
+                                  onChange={(e) => choose(u.ticker, { selected: e.target.checked })}
+                                />
+                                {u.ticker}
+                                {u.name && <span className="app-muted"> {u.name}</span>}
+                              </label>
+                            </td>
+                            <td>
+                              <select
+                                aria-label={`Tipo de ${u.ticker}`}
+                                value={choice.asset_type}
+                                onChange={(e) => void chooseType(u.ticker, e.target.value as AssetType | "")}
+                              >
+                                <option value="">Escolha o tipo</option>
+                                {ASSET_TYPES.map((type) => (
+                                  <option key={type} value={type}>
+                                    {ASSET_TYPE_LABELS[type]}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <ArcaClassSelect
+                                label={`Classe ARCA de ${u.ticker}`}
+                                value={choice.arca_class}
+                                suggested={choice.suggested}
+                                emptyLabel="Sugerida pelo tipo"
+                                disabled={!choice.asset_type}
+                                onChange={(value) => choose(u.ticker, { arca_class: value })}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             )}

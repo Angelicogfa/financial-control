@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from fincontrol_api.dependencies import get_market_gateway
+from fincontrol_api.composition import get_market_gateway
 from fincontrol_core.market.bcb import BcbSgsProvider
 from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import InMemoryCache

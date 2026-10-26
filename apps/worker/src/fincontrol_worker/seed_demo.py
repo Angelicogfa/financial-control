@@ -468,7 +468,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--today", type=date.fromisoformat, default=None)
     args = parser.parse_args(argv)
 
-    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 
     summary = seed_demo(SqlAlchemyUnitOfWork, today=args.today, years=args.years, seed=args.seed)
     print(

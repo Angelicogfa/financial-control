@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import re
 import zipfile
 from pathlib import Path
@@ -141,3 +142,81 @@ def test_import_rejects_bad_files_and_oversold_ledgers(api: SimpleNamespace) -> 
     )
     assert unknown.status_code == 400
     assert unknown.json()["code"] == "UNKNOWN_INSTRUMENT"
+
+
+def _arca_classes(api: SimpleNamespace) -> dict[str, tuple[str, str]]:
+    with api.uow_factory() as uow:
+        return {
+            a.ticker: (a.asset_type.value, a.arca_class.value)
+            for a in uow.assets.list_all(active_only=False)
+        }
+
+
+def test_unknown_tickers_are_registered_with_the_type_and_quadrant_chosen(
+    api: SimpleNamespace,
+) -> None:
+    client = api.client
+    preview = _upload(client, "preview", "negociacao.csv", TRADES).json()
+    suggested = {u["ticker"]: u["arca_class"] for u in preview["unknown_tickers"]}
+    assert suggested == {"HGLG11": "REAL_ESTATE", "ITSA4": "ACOES", "WEGE3": "ACOES"}
+
+    committed = _upload(
+        client,
+        "commit",
+        "negociacao.csv",
+        TRADES,
+        create_tickers="HGLG11",  # the suggestion, as before
+        new_assets=json.dumps(
+            [
+                {"ticker": "wege3", "arca_class": "ATIVOS_INTERNACIONAIS"},
+                {"ticker": "ITSA4", "asset_type": "STOCK_BR", "arca_class": "ACOES"},
+            ]
+        ),
+    )
+    assert committed.status_code == 200, committed.text
+    assert committed.json()["created_assets"] == ["HGLG11", "ITSA4", "WEGE3"]
+    assert _arca_classes(api) == {
+        "HGLG11": ("FII", "REAL_ESTATE"),
+        "ITSA4": ("STOCK_BR", "ACOES"),
+        "WEGE3": ("STOCK_BR", "ATIVOS_INTERNACIONAIS"),
+    }
+
+    # Already registered tickers are not reported as created again.
+    again = _upload(client, "commit", "negociacao.csv", TRADES, create_tickers="HGLG11")
+    assert again.json()["created_assets"] == []
+
+
+def test_a_ticker_of_unknown_type_needs_the_type_chosen_in_the_preview(
+    api: SimpleNamespace,
+) -> None:
+    client = api.client
+    statement = (
+        "Data do Negócio;Tipo de Movimentação;Mercado;Prazo/Vencimento;Instituição;"
+        "Código de Negociação;Quantidade;Preço;Valor\n"
+        "02/01/2024;Compra;Mercado à Vista;-;XP INVESTIMENTOS CCTVM S/A;XPTO1;10;R$ 5,00;R$ 50,00\n"
+    ).encode()
+    preview = _upload(client, "preview", "negociacao.csv", statement).json()
+    assert preview["unknown_tickers"] == [
+        {"ticker": "XPTO1", "name": None, "asset_type": None, "arca_class": None}
+    ]
+
+    untyped = _upload(client, "commit", "negociacao.csv", statement, create_tickers="XPTO1")
+    assert untyped.status_code == 400
+    assert untyped.json()["code"] == "UNKNOWN_INSTRUMENT"
+
+    typed = _upload(
+        client,
+        "commit",
+        "negociacao.csv",
+        statement,
+        new_assets=json.dumps([{"ticker": "XPTO1", "asset_type": "STOCK_BR"}]),
+    )
+    assert typed.status_code == 200, typed.text
+    assert typed.json()["created"]["TRADE"] == 1
+    assert _arca_classes(api)["XPTO1"] == ("STOCK_BR", "ACOES")
+
+
+def test_new_assets_must_be_a_json_list(api: SimpleNamespace) -> None:
+    response = _upload(api.client, "commit", "negociacao.csv", TRADES, new_assets="{not json")
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_NEW_ASSETS"

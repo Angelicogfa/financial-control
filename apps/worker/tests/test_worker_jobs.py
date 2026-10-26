@@ -17,7 +17,7 @@ from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import InMemoryCache
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.yfinance_provider import YFinanceProvider
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.jobs import (
     record_daily_snapshot_job,
     sync_bcb_and_benchmarks_job,
@@ -58,7 +58,7 @@ def test_worker_jobs_and_scheduler_integration(tmp_path: Path, monkeypatch) -> N
     db_url = f"sqlite:///{db_file.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)
 
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     alembic_cfg = Config(str(persistence_dir / "alembic.ini"))
     alembic_cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
