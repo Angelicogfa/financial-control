@@ -108,6 +108,24 @@ Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e nova
 | `refresh_fundamentals` | semanal (`FUNDAMENTALS_CRON_*`) | demonstrativos anuais das empresas em carteira e em observação |
 | `record_checklist_evaluations` | semanal | reavalia os checklists e registra a nota quando muda |
 
+Além da rotina semanal, a API busca os demonstrativos de um ativo **logo após cadastrá-lo** pela Pesquisa ou pela importação B3 (`StatementRefresher`, em `BackgroundTasks`, sem atrasar a resposta).
+
+### 2.1 Estrutura do backend (ADR 0008)
+
+```text
+apps/api/src/fincontrol_api/
+  main.py            app factory: middleware, erros e routers
+  composition.py     raiz de composição (SqlAlchemyUnitOfWork, gateway, sonda do banco)
+  core/              config, security, deps, middleware, http_errors
+  modules/<feature>/ router → use_cases → service, com schemas, dependencies e serializers
+apps/packages/
+  config/            Settings compartilhado (espelha o .env.example)
+  core/              domínio puro e portas (repositórios, Unit of Work, gateway)
+  persistence/       core/ (Unit of Work), models/, repositories/, mappers/ por feature, migrations/
+```
+
+A API e o worker usam os mesmos pacotes de `apps/packages/`; o worker nunca importa a API.
+
 Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, taxas padrão) e são lembradas por `MARKET_MISS_CACHE_TTL` para as telas responderem na hora; os alertas avisam o usuário.
 
 ---
@@ -280,10 +298,10 @@ flowchart TD
 ```
 
 ### 4.4 Pesquisa fundamentalista
-`instrument_catalog` (lista B3 diária) → `GET /research/screener` (filtros de catálogo; indicadores só para os candidatos) → `POST /research/watchlist` (ativo `WATCHLIST`) → demonstrativos semanais, checklist e valuation em `GET /assets/{id}/analysis` → `ELIGIBLE` quando nota e cobertura atendem a política → recebe aporte.
+`instrument_catalog` (lista B3 diária) → `GET /research/screener` (filtros de catálogo; indicadores só para os candidatos) → `POST /research/watchlist` (ativo `WATCHLIST`, cadastrado por `register_researched_asset` no quadrante ARCA escolhido ou sugerido; `PUT /research/watchlist/{id}/classification` reclassifica) → demonstrativos buscados logo após o cadastro e depois toda semana, checklist e valuation em `GET /assets/{id}/analysis` → `ELIGIBLE` quando nota e cobertura atendem a política → recebe aporte.
 
 ### 4.5 Importação B3
-Planilhas da Área do Investidor (Negociação e Movimentação) → pré-visualização por linha (`NEW`, `DUPLICATE`, `UNKNOWN_ASSET`, `IGNORED`, `INVALID`) → gravação tudo-ou-nada das linhas novas (hash de conteúdo + ocorrência), com eventos corporativos cujo fator sai da posição do dia anterior.
+Planilhas da Área do Investidor (Negociação e Movimentação) → pré-visualização por linha (`NEW`, `DUPLICATE`, `UNKNOWN_ASSET`, `IGNORED`, `INVALID`) → tickers desconhecidos cadastrados pelo mesmo `register_researched_asset` da Pesquisa, com o tipo e o quadrante ARCA escolhidos na pré-visualização (`new_assets`) e demonstrativos buscados em seguida → gravação tudo-ou-nada das linhas novas (hash de conteúdo + ocorrência), com eventos corporativos cujo fator sai da posição do dia anterior.
 
 ### 4.6 Alertas
 `GET /alerts` combina carteira (livro inválido, classe fora da banda, ativo em revisão, cotação em fallback), valuation (abaixo do preço justo) e dados (série desatualizada, retrato ausente, rotina com falha); cada alerta tem chave estável e rota de ação, e pode ser dispensado por N dias.

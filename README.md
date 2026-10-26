@@ -12,9 +12,9 @@ As duas vivem numa **política de investimento versionada** e aparecem dentro de
 | **Início** | Analytics: patrimônio, resultado, rentabilidade contra o CDI, proventos, alocação × meta, alertas e evolução |
 | **Desempenho** | Rentabilidade ponderada pelo tempo, risco (volatilidade, Sharpe, drawdown, VaR) e comparação com CDI, Ibovespa, IFIX e S&P 500 |
 | **Carteira** | Posições por classe ARCA, peso atual × alvo, situação de cada ativo na política |
-| **Pesquisar** | Screener do catálogo da B3 e lista de observação |
+| **Pesquisar** | Screener do catálogo da B3 e lista de observação; ao observar um ativo você escolhe o quadrante ARCA (a sugestão vem marcada) e pode reclassificá-lo depois |
 | **Aportar** | Sugestão de aporte em dois níveis (classes → ativos elegíveis), revisão e confirmação que registra as compras |
-| **Lançamentos** | Compras, vendas, proventos e eventos corporativos; importação dos extratos da B3 |
+| **Lançamentos** | Compras, vendas, proventos e eventos corporativos; importação dos extratos da B3, que cadastra os ativos novos pelo mesmo caminho da Pesquisa |
 | **Configuração** | Estratégia (metas, elegibilidade, valuation), contas e frescor dos dados de mercado |
 
 Renda fixa (CDB, LCI/LCA, CRI/CRA, debêntures, Tesouro Direto) é calculada pela curva contratada (CDI, SELIC, IPCA+ ou prefixado), com IR regressivo, IOF e feriados.
@@ -124,7 +124,7 @@ docker compose -f docker-compose.prod.yml ps -a
 
 1. **Configuração › Estratégia:** defina as metas ARCA (somando 100%), as bandas e os critérios de elegibilidade.
 2. **Configuração › Contas:** cadastre suas corretoras e bancos.
-3. **Lançamentos › Importar extrato B3:** na [Área do Investidor da B3](https://www.investidor.b3.com.br), exporte *Extratos › Negociação* (compras e vendas) e *Extratos › Movimentação* (proventos e eventos) e importe os dois arquivos. Importar o mesmo arquivo de novo não duplica nada.
+3. **Lançamentos › Importar extrato B3:** na [Área do Investidor da B3](https://www.investidor.b3.com.br), exporte *Extratos › Negociação* (compras e vendas) e *Extratos › Movimentação* (proventos e eventos) e importe os dois arquivos. Importar o mesmo arquivo de novo não duplica nada. Para cada ativo que ainda não está cadastrado, a pré-visualização mostra o tipo e o quadrante ARCA sugeridos: confira, ajuste se preciso e marque os que devem entrar; os demonstrativos deles são buscados logo depois.
 4. Renda fixa e caixa: **Carteira › Novo ativo**, informando o contrato (indexador, taxa, aplicação e vencimento).
 5. **Aportar:** informe o valor, revise a distribuição e confirme as compras executadas.
 
@@ -208,7 +208,7 @@ uv run python scripts/gen_web_types.py
 
 ### Testes e portão de qualidade
 
-O GitHub Actions não está disponível para este repositório; o mesmo conjunto de verificações roda localmente:
+O workflow `.github/workflows/ci.yml` roda o mesmo portão no GitHub, mas hoje os jobs não chegam a iniciar (a conta está sem crédito de Actions). Enquanto isso, o portão roda localmente e é ele que valida cada PR:
 
 | Comando | O que roda |
 |---|---|
