@@ -14,6 +14,7 @@ import type {
   FixedIncomeLiquidity,
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
+import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async } from "../../components/States";
 import { parseDecimal, today } from "../../utils/format";
@@ -218,7 +219,10 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
           <input id="asset-name" value={form.name} onChange={(e) => set("name", e.target.value)} required />
         </div>
         <div className="app-field">
-          <label htmlFor="asset-class">Classe ARCA</label>
+          <span className="app-field-label">
+            <label htmlFor="asset-class">Classe ARCA</label>
+            {suggestion && !form.arcaClass && <Hint about="Classe ARCA">{`Sugestão: ${suggestion}`}</Hint>}
+          </span>
           <select
             id="asset-class"
             value={form.arcaClass}
@@ -231,7 +235,6 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
               </option>
             ))}
           </select>
-          {suggestion && !form.arcaClass && <small>Sugestão: {suggestion}</small>}
         </div>
         <div className="app-field">
           <label htmlFor="asset-purpose">Objetivo</label>
@@ -263,7 +266,10 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
           </select>
         </div>
         <div className="app-field">
-          <label htmlFor="asset-price">Preço manual</label>
+          <span className="app-field-label">
+            <label htmlFor="asset-price">Preço manual</label>
+            <Hint about="Preço manual">Informe apenas para ativos sem cotação automática de mercado.</Hint>
+          </span>
           <input
             id="asset-price"
             inputMode="decimal"
@@ -310,7 +316,10 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
               </select>
             </div>
             <div className="app-field">
-              <label htmlFor="fi-rate">Taxa (%)</label>
+              <span className="app-field-label">
+                <label htmlFor="fi-rate">Taxa (%)</label>
+                <Hint about="Taxa">{INDEXER_HINTS[form.indexer]}</Hint>
+              </span>
               <input
                 id="fi-rate"
                 inputMode="decimal"
@@ -318,7 +327,6 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
                 onChange={(e) => set("ratePercent", e.target.value)}
                 required
               />
-              <small>{INDEXER_HINTS[form.indexer]}</small>
             </div>
             <div className="app-field">
               <label htmlFor="fi-issue">Aplicação</label>

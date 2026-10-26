@@ -5,6 +5,7 @@ import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import type { EarningKind, EarningResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
+import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async } from "../../components/States";
 import { parseDecimal, today } from "../../utils/format";
@@ -90,9 +91,11 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
           <input id="earning-gross" inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} required />
         </div>
         <div className="app-field">
-          <label htmlFor="earning-tax">IR retido</label>
+          <span className="app-field-label">
+            <label htmlFor="earning-tax">IR retido</label>
+            {kind === "JCP" && <Hint about="IR retido">JCP tem 15% retidos na fonte.</Hint>}
+          </span>
           <input id="earning-tax" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} />
-          {kind === "JCP" && <small>JCP tem 15% retidos na fonte.</small>}
         </div>
         {currency !== "BRL" && (
           <div className="app-field">

@@ -14,7 +14,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
 2. **Mandatory Unit Tests (`testes de unidade obrigatorios`)**
    - Every domain rule, calculation, service, handler, Unit of Work, repository method, and UI utility/component MUST have accompanying unit tests.
    - No feature or bugfix is considered complete without unit tests covering happy paths, edge cases, and error conditions.
-   - Domain (`apps/packages/core`) tests must run purely in-memory with zero network or database dependencies.
+   - Domain (`apps/api/domain`) tests must run purely in-memory with zero network or database dependencies.
 
 3. **Integration Tests After Each Implementation (`testes de integração ao final de cada implementação`)**
    - At the end of every implementation step or phase, integration tests MUST be executed and pass before advancing to the next item.
@@ -36,14 +36,14 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
    - Stateful services (`postgres` and `redis`) MUST use dedicated, explicitly named Docker volumes (`fincontrol_pgdata`, `fincontrol_redisdata`) mapped outside container ephemeral filesystems so that container rebuilds or `docker compose down` (without `-v`) never lose user data.
 
 7. **Alembic Migrations with `script_#####` Naming (`utilizar migrations (alembic) para controle de versionamento sempre no formato script_#####`)**
-   - All database schema changes MUST be managed through **Alembic** in `apps/packages/persistence/migrations/versions/`.
+   - All database schema changes MUST be managed through **Alembic** in `apps/api/infra/data/migrations/versions/`.
    - Every migration file and revision ID MUST follow the sequential naming convention:
      - `script_00001_initial_schema.py` (revision = `"script_00001"`)
      - `script_00002_<short_description>.py` (revision = `"script_00002"`)
    - Direct `Base.metadata.create_all()` is forbidden in production/Docker startup; the `migrate` service runs `alembic upgrade head`.
 
 8. **Strict Backend Layering: Controllers $\rightarrow$ Handlers / Services $\rightarrow$ UnitOfWork $\rightarrow$ Repositories (`isolamento de camadas no backend`)**
-   - **Where each layer lives**: API routers in `apps/api/src/fincontrol_api/modules/<feature>/router.py`, handlers in `modules/<feature>/use_cases.py` (the ledger module uses a `use_cases/` package), application services in `modules/<feature>/service.py`, dependency providers in `modules/<feature>/dependencies.py`; infrastructure in `core/`; only `composition.py` chooses the concrete Unit of Work. Repositories and ORM models are one module per feature under `apps/packages/persistence/src/fincontrol_persistence/{repositories,models}/`. A new feature gets its own module folder instead of growing a shared file. Any new asset coming from research or from the B3 import is registered only through `modules/research/service.py::register_researched_asset` (B3 catalog → type → chosen or suggested ARCA quadrant). See ADR 0008.
+   - **Where each layer lives**: API routers in `apps/api/controllers/<domain>/router.py`, DTOs in `apps/api/controllers/<domain>/{requests,responses}/`, handlers & application services in `apps/api/domain/<domain>/services/` (or dedicated handlers), abstract domain ports in `apps/api/domain/<domain>/repositories/`; infrastructure & concrete repositories in `apps/api/infra/data/repositories/<domain>/`; ORM models in `apps/api/infra/data/models/<domain>/`; cross-cutting foundations in `apps/api/core/`; and composition root in `apps/api/composition.py` (which chooses the concrete Unit of Work). Background worker and scheduler live in `apps/api/worker/`. See ADR 0009.
    - **Controllers / FastAPI Routers** MUST ONLY parse/validate HTTP requests, invoke an Application **Handler** or **Service**, and serialize the HTTP response.
    - **Controllers MUST NEVER**:
      - Access `Session` / database connections directly;
@@ -51,7 +51,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
      - Manipulate SQLAlchemy ORM models or execute queries directly;
      - Contain business calculations.
    - **Handlers (Command / Query Handlers)** coordinate a single use case (validating input commands/queries, opening a `UnitOfWork` transaction boundary, delegating domain/application orchestration to **Services**, and committing via `uow.commit()`).
-   - **Services (Application & Domain Services)** encapsulate reusable business workflows and coordinate domain calculations (`apps/packages/core`) with abstract ports (`UnitOfWork`, `MarketDataGateway`).
+   - **Services (Application & Domain Services)** encapsulate reusable business workflows and coordinate domain calculations (`apps/api/domain`) with abstract ports (`UnitOfWork`, `MarketDataGateway`).
    - **Unit of Work (`AbstractUnitOfWork` / `SqlAlchemyUnitOfWork`)** manages atomic transaction boundaries (`__enter__`, `__exit__`, `commit()`, `rollback()`) and exposes all repositories (`uow.assets`, `uow.transactions`, `uow.earnings`, `uow.arca_targets`, `uow.market_series`, `uow.snapshots`).
    - **Repositories (`AbstractRepository` / SQLAlchemy Repositories)** encapsulate all persistence queries, pagination, sorting, filtering, and mapping between ORM models and pure Domain Entities/DTOs. Repositories NEVER call `session.commit()` — transaction completion is exclusively owned by the `UnitOfWork`.
 
@@ -64,19 +64,19 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
 ## 2. Backend Layered Architecture Flow
 
 ```text
-HTTP Request (FastAPI Router: `modules/<feature>/router.py`)
-   │  (DTO / Command / Query)
+HTTP Request (FastAPI Router: `controllers/<domain>/router.py`)
+   │  (DTO / Command / Query from `controllers/<domain>/requests/`)
    ▼
-CommandHandler / QueryHandler (`modules/<feature>/use_cases.py`)
-   │  (opens `with uow:` boundary, orchestrates Service + Domain)
+CommandHandler / QueryHandler / Service (`domain/<domain>/services/`)
+   │  (opens `with uow:` boundary, orchestrates Service + Domain Engine)
    ▼
-Application / Domain Service  ──► Pure Domain Engine (`apps/packages/core`)
+Application / Domain Service  ──► Pure Domain Entities (`domain/<domain>/entities/`)
    │
    ▼
-UnitOfWork (`AbstractUnitOfWork` / `SqlAlchemyUnitOfWork`)
+UnitOfWork (`domain/shared/unit_of_work.py` / `infra/data/unit_of_work/`)
    │  (`uow.assets`, `uow.transactions`, `uow.earnings`, ... + `uow.commit()`)
    ▼
-Repositories (`apps/packages/persistence`)
+Repositories (`infra/data/repositories/<domain>/`)
    │  (maps ORM Models ◄──► Domain Entities)
    ▼
 PostgreSQL / Redis
@@ -93,22 +93,20 @@ financial-control/
 ├── GEMINI.md                 # Pointer/entry for Gemini / Antigravity
 ├── .agents/rules/            # Granular workspace rules
 ├── apps/                     # ALL solution code lives here
-│   ├── api/src/fincontrol_api/
-│   │   ├── main.py           # App factory: core middleware/errors + module routers
+│   ├── api/                  # Unified backend: API, Worker, Persistence, Domain, and Core
+│   │   ├── main.py           # App factory: middleware/errors + router registration
 │   │   ├── composition.py    # Composition root: picks SqlAlchemyUnitOfWork, gateway, DB probe
-│   │   ├── core/             # Infra: config, security (auth), deps, middleware, http_errors
-│   │   └── modules/<feature>/ # router.py, schemas.py, use_cases.py, dependencies.py,
-│   │                         #   serializers.py, service.py (system, auth, accounts, assets,
-│   │                         #   ledger, portfolio, contributions, policy, research, market,
-│   │                         #   alerts, shared)
-│   ├── worker/               # APScheduler Jobs -> Handlers/Services -> UoW
-│   ├── web/                  # React + Vite + TypeScript SPA
-│   └── packages/             # Shared by api AND worker (uv workspace members)
-│       ├── config/           # pydantic-settings Settings (mirrors .env.example)
-│       ├── core/             # Pure domain entities, ports (Repos & UoW interfaces), engines
-│       └── persistence/      # core/ (db, SqlAlchemyUnitOfWork, health), models/,
-│                             #   repositories/, mappers/ (one module per feature),
-│                             #   migrations/ (Alembic `script_#####`)
+│   │   ├── cli.py            # CLI commands (hash-password, import-b3, etc.)
+│   │   ├── alembic.ini       # Alembic migrations configuration
+│   │   ├── Dockerfile        # Unified Dockerfile for api, worker, and migrate
+│   │   ├── pyproject.toml    # Backend dependencies & tools configuration
+│   │   ├── controllers/      # Presentation: router.py, serializers.py, requests/, responses/
+│   │   ├── domain/           # Pure Domain: entities/, services/, repositories/
+│   │   ├── infra/            # Concrete Infra: data/{db, models, mappers, uow, repos, migrations}, cache, providers
+│   │   ├── core/             # Cross-cutting: settings, logging, middleware, security, http_errors, helpers
+│   │   ├── worker/           # Background scheduler: scheduler.py, runner.py, jobs.py
+│   │   └── tests/            # Consolidated test suite (unit and integration)
+│   └── web/                  # React + Vite + TypeScript SPA
 ├── docs/
 │   ├── architecture/         # System design, C4, UI/UX, domain & data models
 │   │   └── adr/              # Architecture Decision Records

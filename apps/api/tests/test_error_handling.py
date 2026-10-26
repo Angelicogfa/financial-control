@@ -6,12 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from fincontrol_api.main import create_app
-from fincontrol_api.modules.assets.dependencies import get_asset_handler
-from fincontrol_api.modules.auth.dependencies import require_user
-from fincontrol_core.arca.allocation import InvalidTargetsError
-from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
-from fincontrol_core.portfolio.positions import InsufficientQuantityError
+
+from controllers.assets.dependencies import get_asset_handler
+from controllers.auth.dependencies import require_user
+from core.errors import ConflictError, NotFoundError, ValidationError
+from domain.policy.services.allocation import InvalidTargetsError
+from domain.portfolio.services.positions import InsufficientQuantityError
+from main import create_app
 
 
 def _client_raising(exc: BaseException) -> TestClient:

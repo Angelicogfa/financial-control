@@ -9,12 +9,13 @@ from typing import Any
 
 import httpx
 import pytest
-from fincontrol_api.composition import get_market_gateway
-from fincontrol_core.market.bcb import BcbSgsProvider
-from fincontrol_core.market.brapi import BrapiProvider
-from fincontrol_core.market.cache import InMemoryCache
-from fincontrol_core.market.gateway import CachedMarketGateway
-from fincontrol_core.market.yfinance_provider import YFinanceProvider
+
+from composition import get_market_gateway
+from infra.cache.redis_cache import InMemoryCache
+from infra.providers.bcb import BcbSgsProvider
+from infra.providers.brapi import BrapiProvider
+from infra.providers.gateway import CachedMarketGateway
+from infra.providers.yfinance_provider import YFinanceProvider
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PRICES = {"ITSA4": 10.0, "HGLG11": 158.0, "WEGE3": 26.0}

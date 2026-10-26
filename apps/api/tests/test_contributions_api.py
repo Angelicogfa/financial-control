@@ -6,12 +6,13 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from fincontrol_api.composition import get_market_gateway
-from fincontrol_core.market.bcb import BcbSgsProvider
-from fincontrol_core.market.brapi import BrapiProvider
-from fincontrol_core.market.cache import InMemoryCache
-from fincontrol_core.market.gateway import CachedMarketGateway
-from fincontrol_core.market.yfinance_provider import YFinanceProvider
+
+from composition import get_market_gateway
+from infra.cache.redis_cache import InMemoryCache
+from infra.providers.bcb import BcbSgsProvider
+from infra.providers.brapi import BrapiProvider
+from infra.providers.gateway import CachedMarketGateway
+from infra.providers.yfinance_provider import YFinanceProvider
 
 PRICES = {"ITUB4": 32.0, "HGLG11": 155.0}
 
@@ -144,8 +145,8 @@ def test_custom_executions_and_discard(client) -> None:  # type: ignore[no-untyp
 def test_foreign_execution_without_fx_is_read_in_brl() -> None:
     from decimal import Decimal
 
-    from fincontrol_api.modules.contributions.schemas import ExecutionDTO
-    from fincontrol_api.modules.contributions.use_cases import _execution
+    from controllers.contributions.requests import ExecutionDTO
+    from domain.contributions.services.use_cases import _execution
 
     brl_priced = _execution(
         ExecutionDTO(asset_id=1, quantity="2", unit_price="1000", fees="5"), Decimal("5")

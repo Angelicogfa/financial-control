@@ -13,10 +13,11 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from fincontrol_api.modules.portfolio.dependencies import get_portfolio_handler
-from fincontrol_api.modules.portfolio.service import PortfolioApplicationService
-from fincontrol_core.domain.entities import AssetEntity, MarketSeriesPoint, TransactionEntity
-from fincontrol_core.domain.enums import AssetType, TransactionKind
+
+from controllers.portfolio.dependencies import get_portfolio_handler
+from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.entities import AssetEntity, MarketSeriesPoint, TransactionEntity
+from domain.shared.enums import AssetType, TransactionKind
 
 
 def _xfail(finding: str, description: str):

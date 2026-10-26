@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import type { CorporateEventKind } from "../../api/types";
+import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { parseDecimal, today } from "../../utils/format";
 import { EVENT_KINDS, EVENT_LABELS, FIXED_INCOME_TYPES } from "../../utils/labels";
@@ -85,15 +86,19 @@ export function EventFormPage() {
             <input id="event-date" type="date" value={exDate} onChange={(e) => setExDate(e.target.value)} required />
           </div>
           <div className="app-field">
-            <label htmlFor="event-factor">Fator</label>
+            <span className="app-field-label">
+              <label htmlFor="event-factor">Fator</label>
+              <Hint about="Fator">{FACTOR_HINTS[kind]}</Hint>
+            </span>
             <input id="event-factor" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} required />
-            <small>{FACTOR_HINTS[kind]}</small>
           </div>
           {kind === "BONUS" && (
             <div className="app-field">
-              <label htmlFor="event-cost">Custo atribuído por ação (R$)</label>
+              <span className="app-field-label">
+                <label htmlFor="event-cost">Custo atribuído por ação (R$)</label>
+                <Hint about="Custo atribuído por ação">Informado pela empresa no fato relevante.</Hint>
+              </span>
               <input id="event-cost" inputMode="decimal" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
-              <small>Informado pela empresa no fato relevante.</small>
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import type { ArcaClass, IntraClassStrategy, PolicyDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
+import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async } from "../../components/States";
 import { dateTime, parseDecimal } from "../../utils/format";
@@ -186,14 +187,18 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
         <p className="app-card-hint">Quando um ativo pode receber aportes.</p>
         <div className="app-field-grid">
           <div className="app-field">
-            <label htmlFor="policy-min-score">Nota mínima do checklist</label>
+            <span className="app-field-label">
+              <label htmlFor="policy-min-score">Nota mínima do checklist</label>
+              <Hint about="Nota mínima do checklist">Sim = +1, Não = −1.</Hint>
+            </span>
             <input id="policy-min-score" inputMode="numeric" value={minScore} onChange={(e) => setMinScore(e.target.value)} />
-            <small>Sim = +1, Não = −1.</small>
           </div>
           <div className="app-field">
-            <label htmlFor="policy-coverage">Cobertura mínima (%)</label>
+            <span className="app-field-label">
+              <label htmlFor="policy-coverage">Cobertura mínima (%)</label>
+              <Hint about="Cobertura mínima">Parte das perguntas aplicáveis respondida.</Hint>
+            </span>
             <input id="policy-coverage" inputMode="decimal" value={minCoverage} onChange={(e) => setMinCoverage(e.target.value)} />
-            <small>Parte das perguntas aplicáveis respondida.</small>
           </div>
           <label className="app-check">
             <input type="checkbox" checked={requireEvaluation} onChange={(e) => setRequireEvaluation(e.target.checked)} />
@@ -207,17 +212,19 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
         <div className="app-field-grid">
           {VALUATION_FIELDS.map((f) => (
             <div key={f.key} className="app-field">
-              <label htmlFor={`valuation-${f.key}`}>
-                {f.label}
-                {f.percent ? " (%)" : ""}
-              </label>
+              <span className="app-field-label">
+                <label htmlFor={`valuation-${f.key}`}>
+                  {f.label}
+                  {f.percent ? " (%)" : ""}
+                </label>
+                {f.hint && <Hint about={f.label}>{f.hint}</Hint>}
+              </span>
               <input
                 id={`valuation-${f.key}`}
                 inputMode="decimal"
                 value={valuationText[f.key]}
                 onChange={(e) => setValuationText((all) => ({ ...all, [f.key]: e.target.value }))}
               />
-              {f.hint && <small>{f.hint}</small>}
             </div>
           ))}
         </div>

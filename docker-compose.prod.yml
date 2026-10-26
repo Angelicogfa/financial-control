@@ -49,7 +49,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    working_dir: /app/apps/packages/persistence
+    working_dir: /app/apps/api
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     depends_on:
@@ -74,7 +74,11 @@ services:
     <<: *app-env
     build:
       context: .
-      dockerfile: apps/worker/Dockerfile
+      dockerfile: apps/api/Dockerfile
+    working_dir: /app/apps/api
+    command: ["python", "-m", "worker.scheduler"]
+    healthcheck:
+      disable: true
     restart: unless-stopped
     depends_on:
       postgres:

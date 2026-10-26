@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from fincontrol_api.main import create_app
+from main import create_app
 
 OUT = Path(__file__).resolve().parents[1] / "apps" / "web" / "src" / "api" / "types.ts"
 SKIP = re.compile(r"^(HTTPValidationError|ValidationError|Body_.*)$")

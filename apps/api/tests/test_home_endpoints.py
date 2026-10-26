@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from types import SimpleNamespace
 
-from fincontrol_core.domain.entities import PortfolioSnapshotEntity
-from fincontrol_core.domain.enums import SeriesUnit
+from domain.shared.entities import PortfolioSnapshotEntity
+from domain.shared.enums import SeriesUnit
 
 
 def test_snapshots_and_cdi_curve(api: SimpleNamespace) -> None:

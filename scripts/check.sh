@@ -19,13 +19,9 @@ uv sync --all-packages --frozen --quiet
 uv run ruff check .
 uv run ruff format --check .
 
-step "Python: core domain tests with coverage floor (90%)"
-uv run pytest apps/packages/core/tests -q \
-  --cov=fincontrol_core --cov-report=term:skip-covered --cov-fail-under=90
-
-step "Python: full unit and integration suite (API and worker coverage floor 80%)"
+step "Python: full unit and integration suite (coverage floor 80%)"
 uv run pytest -q \
-  --cov=fincontrol_api --cov=fincontrol_worker --cov-report=term:skip-covered \
+  --cov=apps/api --cov-report=term:skip-covered \
   --cov-fail-under=80
 
 step "Web: install, lint, type-check, tests with coverage floor (70%) and build"

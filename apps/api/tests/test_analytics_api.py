@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import date
 from types import SimpleNamespace
 
-from fincontrol_core.domain.entities import PortfolioSnapshotEntity
-from fincontrol_core.domain.enums import SeriesUnit
+from domain.shared.entities import PortfolioSnapshotEntity
+from domain.shared.enums import SeriesUnit
 
 DAYS = [date(2025, 1, d) for d in (2, 3, 6, 7)]
 URL = "/api/v1/portfolio/analytics?date_from=2025-01-01&date_to=2025-01-31"

@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from types import SimpleNamespace
 
-from fincontrol_core.calendar import previous_business_day
-from fincontrol_core.domain.enums import SeriesUnit
+from core.helpers.calendar import previous_business_day
+from domain.shared.enums import SeriesUnit
 
 
 def test_series_status_reports_every_tracked_series(api: SimpleNamespace) -> None:
@@ -38,8 +38,8 @@ def test_series_status_reports_every_tracked_series(api: SimpleNamespace) -> Non
 def test_job_runs_lists_latest_execution_per_job(api: SimpleNamespace) -> None:
     from datetime import UTC, datetime
 
-    from fincontrol_core.domain.entities import JobRunEntity
-    from fincontrol_core.domain.enums import JobRunStatus
+    from domain.shared.entities import JobRunEntity
+    from domain.shared.enums import JobRunStatus
 
     with api.uow_factory() as uow:
         for status in (JobRunStatus.FAILED, JobRunStatus.SUCCESS):

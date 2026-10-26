@@ -6,14 +6,15 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
-from fincontrol_api.modules.research.service import (
+
+from core.errors import ValidationError
+from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
+from domain.research.services.service import (
     StatementRefresher,
     register_researched_asset,
     suggested_arca_class,
 )
-from fincontrol_core.domain.enums import ArcaClass, AssetType
-from fincontrol_core.errors import ValidationError
-from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
+from domain.shared.enums import ArcaClass, AssetType
 
 
 class _Gateway:

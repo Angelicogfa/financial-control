@@ -7,10 +7,11 @@ import logging
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
-from fincontrol_api.composition import get_database_probe
-from fincontrol_api.modules.assets.dependencies import get_asset_handler
-from fincontrol_config.logging import JsonFormatter, request_id_var
-from fincontrol_persistence.core.health import DatabaseStatus, check_database, head_revision
+
+from composition import get_database_probe
+from controllers.assets.dependencies import get_asset_handler
+from core.logging import JsonFormatter, request_id_var
+from infra.data.health import DatabaseStatus, check_database, head_revision
 
 
 def test_request_id_is_echoed_or_generated(api: SimpleNamespace) -> None:

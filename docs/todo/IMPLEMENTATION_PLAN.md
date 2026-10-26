@@ -27,7 +27,9 @@
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[x]` Implementado | 100% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[x]` Implementado | 100% |
 | **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[x]` Implementado | 100% |
-| **Fase 14** | Validação Operacional 100% (E2E, documentação e aceite) | `[x]` Implementado | 100% |
+| **Fase 15** | Refatoração Estrutural por Módulos (`apps/packages/*`, `apps/worker`, `fincontrol_api`) | `[x]` Concluída | 100% |
+| **Fase 16** | Pesquisa e Importação Integradas (Cadastro Único de Ativos) | `[x]` Concluída | 100% |
+| **Fase 17** | Arquitetura Unificada de Backend em Camadas por Domínio em `apps/api` (ADR 0009) | `[x]` Concluída | 100% |
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
 
@@ -462,3 +464,20 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **16.6** Documentação: ADR 0008 (módulos por feature, `apps/packages` e cadastro único de ativo), README (menus, importação, CI), `OVERVIEW.md` (estrutura do backend, fluxos 4.4 e 4.5), `FRONTEND_UI_UX.md` (telas e `ArcaClassSelect`), `FEATURES_SPEC.md`, `AGENTS.md` e débitos TD-09 a TD-11.
 
 **Validação (2026-10-26):** `scripts/check.sh --smoke` → ruff e formatação limpos; cobertura de 96,1% em `apps/packages/core` e 96,7% em API + worker; 46 testes do frontend; build das quatro imagens pelos dois arquivos de compose; smoke isolado `ready`.
+
+---
+
+## Fase 17 — Arquitetura Unificada de Backend em Camadas por Domínio em `apps/api` (`[x]` Implementado)
+
+**Objetivo:** unificar todo o código do backend exclusivamente sob `apps/api/`, eliminando subpacotes aninhados (`apps/packages/*`, `apps/worker`, `apps/api/src/fincontrol_api`), organizando o código em camadas por domínio (`controllers/{domain}`, `domain/{domain}`, `infra/data/repositories/{domain}`) com separação clara de `requests` e `responses`, resolvendo o ciclo de vida do worker e preservando 100% de paridade com o contrato OpenAPI.
+
+- `[x]` **17.1** Unificação do backend em `apps/api/`: pastas `apps/packages/`, `apps/worker/` e `apps/api/src/fincontrol_api` eliminadas; workspace `uv` simplificado com `members = ["apps/api"]`.
+- `[x]` **17.2** Camada de Apresentação em `controllers/`: organizado por domínio (`auth`, `accounts`, `assets`, `ledger`, `portfolio`, `contributions`, `policy`, `research`, `market`, `alerts`, `system`, `shared`) contendo `router.py`, `dependencies.py`, `serializers.py` e separação estrita de subpacotes `requests/` e `responses/`.
+- `[x]` **17.3** Camada de Domínio Puro em `domain/`: organizado por domínio contendo `entities/`, `services/` (regras e cálculos como ARCA, Cerrado e Fixed Income) e `repositories/` (portas abstratas).
+- `[x]` **17.4** Camada de Infraestrutura Concreta em `infra/`: `data/db.py`, `health.py`, `models/`, `mappers/`, `unit_of_work/`, `repositories/` e `migrations/` (Alembic `script_#####`); `cache/` (Redis) e `providers/` (gateways BRAPI, B3, Tesouro).
+- `[x]` **17.5** Fundações transversais em `core/`: `settings.py`, `logging.py`, `middleware.py`, `http_errors.py`, `security.py`, `errors.py` e `helpers/`.
+- `[x]` **17.6** Worker assíncrono em `worker/`: `scheduler.py`, `runner.py`, `jobs.py`, `rebuild.py`, `seed_demo.py` usando as mesmas camadas da API; resolução de dependência circular de importação a frio e desativação do healthcheck HTTP no Compose para o worker.
+- `[x]` **17.7** Dockerfile e Compose: um único `apps/api/Dockerfile` multiuso para `api`, `migrate` e `worker`; `docker-compose.yml` e `docker-compose.prod.yml` atualizados.
+- `[x]` **17.8** Testes e Validação: consolidação da suite de testes em `apps/api/tests/` (414 testes de backend passando), 46 testes de frontend passando (`npm test`), build do frontend Vite concluído, lint/formatação ruff 100% limpos e contrato OpenAPI idêntico.
+- `[x]` **17.9** Documentação: ADR 0009 criado; `AGENTS.md`, `GEMINI.md`, `.agents/rules/project-rules.md`, `README.md` e `IMPLEMENTATION_PLAN.md` atualizados.
+

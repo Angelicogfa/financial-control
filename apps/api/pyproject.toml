@@ -1,12 +1,9 @@
 [project]
 name = "fincontrol-api"
 version = "0.1.0"
-description = "FastAPI HTTP backend for Financial Control"
+description = "Unified backend (API, domain, infrastructure, migrations, and worker) for Financial Control"
 requires-python = ">=3.12"
 dependencies = [
-    "fincontrol-config",
-    "fincontrol-core",
-    "fincontrol-persistence",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
@@ -15,16 +12,21 @@ dependencies = [
     "pyjwt>=2.9",
     "openpyxl>=3.1",
     "python-multipart>=0.0.12",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "httpx>=0.27",
+    "yfinance>=0.2.50",
+    "redis>=5.0",
+    "sqlalchemy>=2.0.35",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "apscheduler>=3.10",
 ]
-
-[tool.uv.sources]
-fincontrol-config = { workspace = true }
-fincontrol-core = { workspace = true }
-fincontrol-persistence = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fincontrol_api"]
+packages = ["controllers", "domain", "infra", "core", "worker"]
+py-modules = ["main", "composition", "cli"]

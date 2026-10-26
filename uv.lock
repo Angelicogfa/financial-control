@@ -12,19 +12,8 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "financial-control-workspace",
     "fincontrol-api",
-    "fincontrol-config",
-    "fincontrol-core",
-    "fincontrol-persistence",
-    "fincontrol-worker",
-]
-
-[manifest.dependency-groups]
-dev = [
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "pytest", specifier = ">=8.3" },
-    { name = "pytest-cov", specifier = ">=5.0" },
-    { name = "ruff", specifier = ">=0.7" },
 ]
 
 [[package]]
@@ -566,106 +555,73 @@ wheels = [
 ]
 
 [[package]]
+name = "financial-control-workspace"
+version = "0.1.0"
+source = { virtual = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pytest-cov", specifier = ">=5.0" },
+    { name = "ruff", specifier = ">=0.7" },
+]
+
+[[package]]
 name = "fincontrol-api"
 version = "0.1.0"
 source = { editable = "apps/api" }
 dependencies = [
+    { name = "alembic" },
+    { name = "apscheduler" },
     { name = "argon2-cffi" },
     { name = "fastapi" },
-    { name = "fincontrol-config" },
-    { name = "fincontrol-core" },
-    { name = "fincontrol-persistence" },
+    { name = "httpx" },
+    { name = "numpy" },
     { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "python-multipart" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "argon2-cffi", specifier = ">=23.1" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "fincontrol-config", editable = "apps/packages/config" },
-    { name = "fincontrol-core", editable = "apps/packages/core" },
-    { name = "fincontrol-persistence", editable = "apps/packages/persistence" },
-    { name = "openpyxl", specifier = ">=3.1" },
-    { name = "pydantic", specifier = ">=2.9" },
-    { name = "pydantic-settings", specifier = ">=2.6" },
-    { name = "pyjwt", specifier = ">=2.9" },
-    { name = "python-multipart", specifier = ">=0.0.12" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
-]
-
-[[package]]
-name = "fincontrol-config"
-version = "0.1.0"
-source = { editable = "apps/packages/config" }
-dependencies = [
-    { name = "pydantic-settings" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "pydantic-settings", specifier = ">=2.6" }]
-
-[[package]]
-name = "fincontrol-core"
-version = "0.1.0"
-source = { editable = "apps/packages/core" }
-dependencies = [
-    { name = "httpx" },
-    { name = "numpy" },
-    { name = "pandas" },
     { name = "redis" },
+    { name = "sqlalchemy" },
+    { name = "uvicorn", extra = ["standard"] },
     { name = "yfinance" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "alembic", specifier = ">=1.13" },
+    { name = "apscheduler", specifier = ">=3.10" },
+    { name = "argon2-cffi", specifier = ">=23.1" },
+    { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "openpyxl", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.2" },
-    { name = "redis", specifier = ">=5.0" },
-    { name = "yfinance", specifier = ">=0.2.50" },
-]
-
-[[package]]
-name = "fincontrol-persistence"
-version = "0.1.0"
-source = { editable = "apps/packages/persistence" }
-dependencies = [
-    { name = "alembic" },
-    { name = "fincontrol-core" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "sqlalchemy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.13" },
-    { name = "fincontrol-core", editable = "apps/packages/core" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "pyjwt", specifier = ">=2.9" },
+    { name = "python-multipart", specifier = ">=0.0.12" },
+    { name = "redis", specifier = ">=5.0" },
     { name = "sqlalchemy", specifier = ">=2.0.35" },
-]
-
-[[package]]
-name = "fincontrol-worker"
-version = "0.1.0"
-source = { editable = "apps/worker" }
-dependencies = [
-    { name = "apscheduler" },
-    { name = "fincontrol-config" },
-    { name = "fincontrol-core" },
-    { name = "fincontrol-persistence" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "apscheduler", specifier = ">=3.10" },
-    { name = "fincontrol-config", editable = "apps/packages/config" },
-    { name = "fincontrol-core", editable = "apps/packages/core" },
-    { name = "fincontrol-persistence", editable = "apps/packages/persistence" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+    { name = "yfinance", specifier = ">=0.2.50" },
 ]
 
 [[package]]
@@ -1509,6 +1465,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
+]
+
+[[package]]
+name = "pytest-asyncio"
+version = "1.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/9a/887535e477847f5159377ab35303923644840b13c0ca03c0a467f84d4680/pytest_asyncio-1.4.1.tar.gz", hash = "sha256:e8266eb094e5ee9ffdb2068c9836f33e209ea77a970eb846933d416b5602669b", size = 145237, upload-time = "2026-10-25T21:05:37.135Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/d7/cd9e2708afdbf059658adaf08bdb0792ca52489871051d6ce7d498b51277/pytest_asyncio-1.4.1-py3-none-any.whl", hash = "sha256:507afa78ec77c6661164ef1a2368bc7820383fd1a14b2a7f813de8b5a92949cc", size = 17061, upload-time = "2026-10-25T21:05:35.473Z" },
 ]
 
 [[package]]

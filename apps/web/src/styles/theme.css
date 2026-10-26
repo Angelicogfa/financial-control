@@ -670,6 +670,20 @@ input[type="radio"] {
   font-size: var(--text-sm);
 }
 
+/* Label and help marker side by side. The help marker must not live INSIDE
+   the <label>: its bubble text would become part of the control's accessible name,
+   and the trigger button would be interactive content inside the label. */
+.app-field-label {
+  display: flex;
+  align-items: center;
+}
+
+.app-field-label label {
+  font-weight: inherit;
+  color: inherit;
+  font-size: inherit;
+}
+
 .app-field small {
   color: var(--app-text-muted);
   font-size: var(--text-sm);

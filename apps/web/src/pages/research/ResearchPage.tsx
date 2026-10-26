@@ -8,6 +8,7 @@ import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
+import { Hint } from "../../components/Hint";
 import { Async, Empty, ErrorBanner, Loading } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brlCompact, dateTime, num, pct, parseDecimal, points } from "../../utils/format";
@@ -229,23 +230,38 @@ function Screener() {
             <input id="screen-q" value={form.q} onChange={(e) => set("q", e.target.value)} placeholder="Ex.: banco, ITUB" />
           </div>
           <div className="app-field">
-            <label htmlFor="screen-volume">Volume diário mínimo (R$)</label>
+            <span className="app-field-label">
+              <label htmlFor="screen-volume">Volume diário mínimo (R$)</label>
+              <Hint about="Volume diário mínimo">Média diária negociada para filtrar liquidez.</Hint>
+            </span>
             <input id="screen-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set("minVolume", e.target.value)} placeholder="1000000" />
           </div>
           <div className="app-field">
-            <label htmlFor="screen-pe">P/L máximo</label>
+            <span className="app-field-label">
+              <label htmlFor="screen-pe">P/L máximo</label>
+              <Hint about="P/L máximo">Preço sobre Lucro. Relação entre o valor de mercado e o lucro anual.</Hint>
+            </span>
             <input id="screen-pe" inputMode="decimal" value={form.maxPe} onChange={(e) => set("maxPe", e.target.value)} />
           </div>
           <div className="app-field">
-            <label htmlFor="screen-pb">P/VP máximo</label>
+            <span className="app-field-label">
+              <label htmlFor="screen-pb">P/VP máximo</label>
+              <Hint about="P/VP máximo">Preço sobre Valor Patrimonial por ação.</Hint>
+            </span>
             <input id="screen-pb" inputMode="decimal" value={form.maxPb} onChange={(e) => set("maxPb", e.target.value)} />
           </div>
           <div className="app-field">
-            <label htmlFor="screen-dy">DY mínimo (%)</label>
+            <span className="app-field-label">
+              <label htmlFor="screen-dy">DY mínimo (%)</label>
+              <Hint about="DY mínimo">Dividend Yield anual distribuído nos últimos 12 meses.</Hint>
+            </span>
             <input id="screen-dy" inputMode="decimal" value={form.minDy} onChange={(e) => set("minDy", e.target.value)} />
           </div>
           <div className="app-field">
-            <label htmlFor="screen-roe">ROE mínimo (%)</label>
+            <span className="app-field-label">
+              <label htmlFor="screen-roe">ROE mínimo (%)</label>
+              <Hint about="ROE mínimo">Retorno sobre o patrimônio líquido.</Hint>
+            </span>
             <input id="screen-roe" inputMode="decimal" value={form.minRoe} onChange={(e) => set("minRoe", e.target.value)} />
           </div>
         </div>

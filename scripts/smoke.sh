@@ -21,7 +21,7 @@ BASE="http://localhost:${WEB_PORT}"
 # Docker Desktop on Windows needs a native path for env files.
 native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
 
-HASH="$(uv run --quiet python -I -c "from fincontrol_api.core.security import hash_password; print(hash_password('$PASSWORD'))")"
+HASH="$(uv run --quiet python -I -c "from core.security import hash_password; print(hash_password('$PASSWORD'))")"
 SECRET="$(uv run --quiet python -I -c "import secrets; print(secrets.token_hex(32))")"
 sed -e "s|^PGDATA_VOLUME=.*|PGDATA_VOLUME=fincontrol_smoke_pgdata|" \
     -e "s|^REDISDATA_VOLUME=.*|REDISDATA_VOLUME=fincontrol_smoke_redisdata|" \
@@ -95,6 +95,6 @@ done
 published="$("${COMPOSE[@]}" ps --format '{{.Service}} {{.Publishers}}' | grep -vE '^web ' | grep -c 'PublishedPort:[1-9]' || true)"
 [[ "$published" == "0" ]] || fail "only the web service may publish ports"
 
-"${COMPOSE[@]}" exec -T worker python -m fincontrol_worker.seed_demo --help >/dev/null   || fail "seed_demo is not available in the worker image"
+"${COMPOSE[@]}" exec -T worker python -m worker.seed_demo --help >/dev/null   || fail "seed_demo is not available in the worker image"
 
 echo "SMOKE OK"
