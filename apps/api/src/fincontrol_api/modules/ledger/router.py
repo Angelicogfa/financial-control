@@ -7,8 +7,21 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fincontrol_core.domain.pagination import PaginationParams
+from fincontrol_core.errors import ValidationError
+from pydantic import TypeAdapter
+from pydantic import ValidationError as PydanticValidationError
 
 from fincontrol_api.core.deps import pagination_query
 from fincontrol_api.modules.ledger.dependencies import (
@@ -24,6 +37,7 @@ from fincontrol_api.modules.ledger.schemas import (
     EarningResponseDTO,
     EarningUpdateRequest,
     ImportCommitDTO,
+    ImportNewAssetRequest,
     ImportPreviewDTO,
     TransactionCreateRequest,
     TransactionResponseDTO,
@@ -33,6 +47,8 @@ from fincontrol_api.modules.ledger.use_cases.b3_import import ImportHandler
 from fincontrol_api.modules.ledger.use_cases.corporate_events import CorporateEventHandler
 from fincontrol_api.modules.ledger.use_cases.earnings import EarningHandler
 from fincontrol_api.modules.ledger.use_cases.transactions import TransactionHandler
+from fincontrol_api.modules.research.dependencies import get_statement_refresher
+from fincontrol_api.modules.research.service import StatementRefresher
 from fincontrol_api.modules.shared.schemas import PaginatedResponse
 
 transactions_router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -192,14 +208,41 @@ async def preview_b3_import(
 
 @imports_router.post("/b3/commit", response_model=ImportCommitDTO)
 async def commit_b3_import(
+    background: BackgroundTasks,
     file: UploadFile = File(...),
     account_id: int | None = Form(default=None),
-    create_tickers: str = Form(default="", description="Comma-separated unknown tickers to add"),
+    create_tickers: str = Form(
+        default="", description="Comma-separated unknown tickers to add with the suggestions"
+    ),
+    new_assets: str = Form(
+        default="",
+        description=(
+            "JSON list of {ticker, asset_type, arca_class}: unknown tickers to add with the "
+            "type and ARCA quadrant chosen in the preview"
+        ),
+    ),
     handler: ImportHandler = Depends(get_import_handler),
+    statements: StatementRefresher = Depends(get_statement_refresher),
 ) -> ImportCommitDTO:
-    return handler.commit(
+    result = handler.commit(
         file.filename or "",
         await file.read(),
         account_id=account_id,
         create_tickers=[t for t in create_tickers.split(",") if t.strip()],
+        new_assets=parse_new_assets(new_assets),
     )
+    background.add_task(statements.refresh, result.created_assets)
+    return result
+
+
+def parse_new_assets(raw: str) -> list[ImportNewAssetRequest]:
+    """Parse the `new_assets` form field (multipart cannot carry a JSON body)."""
+    if not raw.strip():
+        return []
+    try:
+        return _NEW_ASSETS.validate_json(raw)
+    except PydanticValidationError as exc:
+        raise ValidationError("new_assets must be a JSON list", code="INVALID_NEW_ASSETS") from exc
+
+
+_NEW_ASSETS = TypeAdapter(list[ImportNewAssetRequest])

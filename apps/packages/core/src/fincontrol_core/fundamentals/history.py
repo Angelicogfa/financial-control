@@ -14,7 +14,12 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
 
+from fincontrol_core.domain.enums import AssetType
+
 DEFAULT_WINDOW_YEARS = 5
+
+# Asset types whose issuers publish income statements and balance sheets.
+STATEMENT_TYPES = frozenset({AssetType.STOCK_BR, AssetType.STOCK_INTL, AssetType.BDR})
 
 
 class FundamentalPeriod(StrEnum):

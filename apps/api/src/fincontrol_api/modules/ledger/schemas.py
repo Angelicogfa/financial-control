@@ -9,6 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from fincontrol_core.domain.enums import (
+    ArcaClass,
     AssetType,
     CorporateEventKind,
     EarningKind,
@@ -130,6 +131,17 @@ class UnknownTickerDTO(BaseModel):
     ticker: str
     name: str | None = None
     asset_type: AssetType | None = None
+    arca_class: ArcaClass | None = Field(
+        default=None, description="Suggested ARCA quadrant (known once the type is known)"
+    )
+
+
+class ImportNewAssetRequest(BaseModel):
+    """An unknown ticker to register with the import, as the research flow would."""
+
+    ticker: str = Field(..., min_length=1, max_length=32)
+    asset_type: AssetType | None = None
+    arca_class: ArcaClass | None = None
 
 
 class ImportPreviewDTO(BaseModel):

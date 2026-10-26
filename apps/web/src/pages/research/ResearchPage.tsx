@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 
 import { api, type ScreenerFilters } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
-import type { AssetType, ScreenerItemDTO, ScreenerResponseDTO, WatchlistItemDTO } from "../../api/types";
+import type { ArcaClass, AssetType, ScreenerItemDTO, ScreenerResponseDTO, WatchlistItemDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Async, Empty, ErrorBanner, Loading } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brlCompact, dateTime, num, pct, parseDecimal, points } from "../../utils/format";
@@ -73,11 +74,41 @@ function toFilters(form: ScreenForm): ScreenerFilters {
   };
 }
 
+type FollowHandler = (item: ScreenerItemDTO, arcaClass: ArcaClass) => void;
+
+/** "Observar" asks for the ARCA quadrant first, with the suggested one preselected. */
+function FollowAction({ item, onFollow, busy }: Readonly<{ item: ScreenerItemDTO; onFollow: FollowHandler; busy: boolean }>) {
+  const [arcaClass, setArcaClass] = useState<ArcaClass | null>(null);
+  if (arcaClass === null) {
+    return (
+      <button type="button" className="app-secondary-button" disabled={busy} onClick={() => setArcaClass(item.arca_class)}>
+        Observar
+      </button>
+    );
+  }
+  return (
+    <span className="app-button-row">
+      <ArcaClassSelect
+        label={`Classe ARCA de ${item.ticker}`}
+        value={arcaClass}
+        suggested={item.arca_class}
+        onChange={(value) => value && setArcaClass(value)}
+      />
+      <button type="button" className="app-primary-button" disabled={busy} onClick={() => onFollow(item, arcaClass)}>
+        Confirmar
+      </button>
+      <button type="button" className="app-link-button" onClick={() => setArcaClass(null)}>
+        Cancelar
+      </button>
+    </span>
+  );
+}
+
 function ResultsTable({
   result,
   onFollow,
   following,
-}: Readonly<{ result: ScreenerResponseDTO; onFollow: (item: ScreenerItemDTO) => void; following: string | null }>) {
+}: Readonly<{ result: ScreenerResponseDTO; onFollow: FollowHandler; following: string | null }>) {
   if (result.results.length === 0) {
     return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o tipo." />;
   }
@@ -134,14 +165,7 @@ function ResultsTable({
                 {item.lifecycle_status ? (
                   <Badge tone={LIFECYCLE_TONES[item.lifecycle_status]}>{LIFECYCLE_LABELS[item.lifecycle_status]}</Badge>
                 ) : (
-                  <button
-                    type="button"
-                    className="app-secondary-button"
-                    disabled={following === item.ticker}
-                    onClick={() => onFollow(item)}
-                  >
-                    Observar
-                  </button>
+                  <FollowAction item={item} onFollow={onFollow} busy={following === item.ticker} />
                 )}
               </td>
             </tr>
@@ -174,12 +198,17 @@ function Screener() {
     }
   };
 
-  const follow = async (item: ScreenerItemDTO) => {
+  const follow = async (item: ScreenerItemDTO, arcaClass: ArcaClass) => {
     setFollowing(item.ticker);
     setNotice(null);
     try {
-      const added = await api.research.follow({ ticker: item.ticker, asset_type: item.asset_type, name: item.name });
-      setNotice(`${added.ticker} está em observação.`);
+      const added = await api.research.follow({
+        ticker: item.ticker,
+        asset_type: item.asset_type,
+        name: item.name,
+        arca_class: arcaClass,
+      });
+      setNotice(`${added.ticker} está em observação em ${ARCA_LABELS[added.arca_class]}.`);
       await run();
     } catch (err) {
       setNotice(errorMessage(err));
@@ -269,7 +298,7 @@ function Screener() {
               hint="O worker sincroniza a lista de ativos da B3 em dias úteis; confira em Dados de mercado."
             />
           ) : (
-            <ResultsTable result={result} onFollow={(item) => void follow(item)} following={following} />
+            <ResultsTable result={result} onFollow={(item, arca) => void follow(item, arca)} following={following} />
           )}
         </>
       )}
@@ -285,13 +314,25 @@ function Watchlist() {
   const [error, setError] = useState<string | null>(null);
   const [ticker, setTicker] = useState("");
   const [assetType, setAssetType] = useState<AssetType | "">("");
+  const [arcaClass, setArcaClass] = useState<ArcaClass | "">("");
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
     try {
-      await api.research.follow({ ticker: ticker.trim(), asset_type: assetType || null });
+      await api.research.follow({ ticker: ticker.trim(), asset_type: assetType || null, arca_class: arcaClass || null });
       setTicker("");
+      setArcaClass("");
+      watchlist.reload();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const reclassify = async (item: WatchlistItemDTO, value: ArcaClass) => {
+    setError(null);
+    try {
+      await api.research.classify(item.asset_id, value);
       watchlist.reload();
     } catch (err) {
       setError(errorMessage(err));
@@ -327,6 +368,10 @@ function Watchlist() {
             ))}
           </select>
         </div>
+        <div className="app-field">
+          <label htmlFor="watch-arca">Classe ARCA</label>
+          <ArcaClassSelect id="watch-arca" value={arcaClass} onChange={setArcaClass} emptyLabel="Sugerida pelo tipo" />
+        </div>
         <button type="submit" className="app-primary-button" disabled={!ticker.trim()}>
           Adicionar
         </button>
@@ -342,6 +387,7 @@ function Watchlist() {
                 <thead>
                   <tr>
                     <th>Ativo</th>
+                    <th>Classe ARCA</th>
                     <th>Situação</th>
                     <th className="app-numeric">Preço</th>
                     <th>Checklist</th>
@@ -362,6 +408,13 @@ function Watchlist() {
                             {item.name} · {PROFILE_LABELS[item.checklist_profile]}
                           </small>
                         </span>
+                      </td>
+                      <td>
+                        <ArcaClassSelect
+                          label={`Classe ARCA de ${item.ticker}`}
+                          value={item.arca_class}
+                          onChange={(value) => value && void reclassify(item, value)}
+                        />
                       </td>
                       <td>
                         <Badge tone={LIFECYCLE_TONES[item.lifecycle_status]}>{LIFECYCLE_LABELS[item.lifecycle_status]}</Badge>

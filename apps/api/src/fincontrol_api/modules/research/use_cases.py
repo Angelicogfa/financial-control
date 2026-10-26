@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from fincontrol_core.catalog.etf_exposure import suggest_arca_class
 from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import (
     ArcaClass,
@@ -15,7 +14,7 @@ from fincontrol_core.domain.enums import (
     AssetType,
     Market,
 )
-from fincontrol_core.errors import ConflictError, NotFoundError, ValidationError
+from fincontrol_core.errors import ConflictError, NotFoundError
 from fincontrol_core.market.batch import fetch_market_data
 from fincontrol_core.policy.lifecycle import has_position
 from fincontrol_core.ports.unit_of_work import AbstractUnitOfWork
@@ -26,9 +25,11 @@ from fincontrol_api.modules.portfolio.service import PortfolioApplicationService
 from fincontrol_api.modules.research.schemas import (
     ScreenerResponseDTO,
     WatchlistAddRequest,
+    WatchlistClassifyRequest,
     WatchlistItemDTO,
 )
 from fincontrol_api.modules.research.serializers import to_screener_item_dto
+from fincontrol_api.modules.research.service import register_researched_asset
 
 WATCHLIST_STATUSES = frozenset({AssetLifecycle.WATCHLIST, AssetLifecycle.ELIGIBLE})
 
@@ -103,26 +104,34 @@ class ResearchHandler:
             if existing is not None and existing.is_active:
                 raise ConflictError(f"{ticker} is already registered", code="ASSET_EXISTS")
             if existing is not None:
-                asset = uow.assets.update(replace(existing, is_active=True))
+                asset = uow.assets.update(
+                    replace(
+                        existing,
+                        is_active=True,
+                        arca_class=req.arca_class or existing.arca_class,
+                    )
+                )
             else:
-                listed = uow.catalog.get(ticker)
-                asset_type = req.asset_type or (listed.asset_type if listed else None)
-                if asset_type is None:
-                    raise ValidationError(
-                        f"{ticker} is not in the catalog; inform asset_type",
-                        code="UNKNOWN_INSTRUMENT",
-                    )
-                name = req.name or (listed.name if listed else ticker)
-                asset = uow.assets.add(
-                    AssetEntity(
-                        ticker=ticker,
-                        name=name,
-                        asset_type=asset_type,
-                        arca_class=suggest_arca_class(ticker, asset_type).arca_class,
-                    )
+                asset = register_researched_asset(
+                    uow,
+                    ticker,
+                    asset_type=req.asset_type,
+                    name=req.name,
+                    arca_class=req.arca_class,
                 )
             uow.commit()
             reloaded = uow.assets.get_by_id(asset.id or 0) or asset
+            return self._items(uow, [reloaded])[0]
+
+    def classify(self, asset_id: int, req: WatchlistClassifyRequest) -> WatchlistItemDTO:
+        """Move a researched asset to another ARCA quadrant."""
+        with self.uow_factory() as uow:
+            asset = uow.assets.get_by_id(asset_id)
+            if asset is None or not asset.is_active:
+                raise NotFoundError(f"Asset id={asset_id} not found")
+            uow.assets.update(replace(asset, arca_class=req.arca_class))
+            uow.commit()
+            reloaded = uow.assets.get_by_id(asset_id) or asset
             return self._items(uow, [reloaded])[0]
 
     def remove(self, asset_id: int) -> None:

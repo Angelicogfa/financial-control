@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import csv
 import io
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import date, timedelta
 from decimal import Decimal
 
-from fincontrol_core.catalog.etf_exposure import suggest_arca_class
 from fincontrol_core.domain.entities import (
     AssetEntity,
     CorporateEventEntity,
@@ -35,8 +34,13 @@ from fincontrol_api.modules.accounts.use_cases import resolve_account_id
 from fincontrol_api.modules.ledger.schemas import (
     ImportCommitDTO,
     ImportLineDTO,
+    ImportNewAssetRequest,
     ImportPreviewDTO,
     UnknownTickerDTO,
+)
+from fincontrol_api.modules.research.service import (
+    register_researched_asset,
+    suggested_arca_class,
 )
 
 MAX_STATEMENT_BYTES = 5 * 1024 * 1024
@@ -134,12 +138,13 @@ class ImportHandler:
             unknown = []
             for ticker in preview.unknown_tickers:
                 listed = uow.catalog.get(ticker)
+                asset_type = (listed.asset_type if listed else None) or guess_asset_type(ticker)
                 unknown.append(
                     UnknownTickerDTO(
                         ticker=ticker,
                         name=listed.name if listed else None,
-                        asset_type=(listed.asset_type if listed else None)
-                        or guess_asset_type(ticker),
+                        asset_type=asset_type,
+                        arca_class=suggested_arca_class(ticker, asset_type) if asset_type else None,
                     )
                 )
         return ImportPreviewDTO(
@@ -156,28 +161,36 @@ class ImportHandler:
         *,
         account_id: int | None,
         create_tickers: list[str],
+        new_assets: Iterable[ImportNewAssetRequest] = (),
     ) -> ImportCommitDTO:
+        """Register the chosen unknown tickers through the research flow, then apply the
+        new lines. `create_tickers` takes the suggestions; `new_assets` carries choices."""
         parsed = _parse(filename, content)
+        chosen = {
+            t.strip().upper(): ImportNewAssetRequest(ticker=t) for t in create_tickers if t.strip()
+        }
+        chosen |= {a.ticker.strip().upper(): a for a in new_assets}
+        registered: list[str] = []
         with self.uow_factory() as uow:
             account = resolve_account_id(uow, account_id)
-            for ticker in sorted({t.strip().upper() for t in create_tickers if t.strip()}):
+            for ticker, wanted in sorted(chosen.items()):
                 if uow.assets.get_by_ticker(ticker) is not None:
                     continue
                 listed = uow.catalog.get(ticker)
-                asset_type = (listed.asset_type if listed else None) or guess_asset_type(ticker)
+                asset_type = (
+                    wanted.asset_type
+                    or (listed.asset_type if listed else None)
+                    or guess_asset_type(ticker)
+                )
                 if asset_type is None:
                     raise ValidationError(
-                        f"Cannot tell the type of {ticker}; register it first",
+                        f"Cannot tell the type of {ticker}; choose it in the preview",
                         code="UNKNOWN_INSTRUMENT",
                     )
-                uow.assets.add(
-                    AssetEntity(
-                        ticker=ticker,
-                        name=listed.name if listed else ticker,
-                        asset_type=asset_type,
-                        arca_class=suggest_arca_class(ticker, asset_type).arca_class,
-                    )
+                register_researched_asset(
+                    uow, ticker, asset_type=asset_type, arca_class=wanted.arca_class
                 )
+                registered.append(ticker)
 
             assets = {a.ticker: a for a in uow.assets.list_all(active_only=False)}
             preview = classify(
@@ -193,9 +206,7 @@ class ImportHandler:
             kind=preview.kind.value,
             created=created,
             skipped={k: v for k, v in preview.counts.items() if k != LineStatus.NEW.value},
-            created_assets=sorted(
-                t.strip().upper() for t in create_tickers if t.strip().upper() in assets
-            ),
+            created_assets=registered,
         )
 
     @staticmethod

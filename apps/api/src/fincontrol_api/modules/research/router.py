@@ -5,16 +5,21 @@ Scope: B3 catalog screener and watchlist.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 from fincontrol_core.domain.enums import ArcaClass, AssetType
 from fincontrol_core.research.screener import ScreenerCriteria
 
-from fincontrol_api.modules.research.dependencies import get_research_handler
+from fincontrol_api.modules.research.dependencies import (
+    get_research_handler,
+    get_statement_refresher,
+)
 from fincontrol_api.modules.research.schemas import (
     ScreenerResponseDTO,
     WatchlistAddRequest,
+    WatchlistClassifyRequest,
     WatchlistItemDTO,
 )
+from fincontrol_api.modules.research.service import StatementRefresher
 from fincontrol_api.modules.research.use_cases import ResearchHandler
 
 research_router = APIRouter(prefix="/research", tags=["Research"])
@@ -66,9 +71,22 @@ def list_watchlist(
 )
 def add_to_watchlist(
     payload: WatchlistAddRequest,
+    background: BackgroundTasks,
+    handler: ResearchHandler = Depends(get_research_handler),
+    statements: StatementRefresher = Depends(get_statement_refresher),
+) -> WatchlistItemDTO:
+    item = handler.add(payload)
+    background.add_task(statements.refresh, [item.ticker])
+    return item
+
+
+@research_router.put("/watchlist/{asset_id}/classification", response_model=WatchlistItemDTO)
+def classify_watchlist_item(
+    asset_id: int,
+    payload: WatchlistClassifyRequest,
     handler: ResearchHandler = Depends(get_research_handler),
 ) -> WatchlistItemDTO:
-    return handler.add(payload)
+    return handler.classify(asset_id, payload)
 
 
 @research_router.delete("/watchlist/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)

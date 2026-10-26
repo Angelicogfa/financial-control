@@ -6,6 +6,7 @@ import type {
   AccountRequest,
   AlertDismissRequest,
   AlertsResponseDTO,
+  ArcaClass,
   ArcaSuggestionDTO,
   AssetAnalysisResponseDTO,
   AssetCreateRequest,
@@ -41,6 +42,16 @@ import type {
   WatchlistAddRequest,
   WatchlistItemDTO,
 } from "./types";
+
+/**
+ * Mirrors the backend `ImportNewAssetRequest`: it travels as JSON inside the multipart
+ * `new_assets` field, so it is not one of the generated OpenAPI schemas.
+ */
+export interface ImportNewAssetRequest {
+  ticker: string;
+  asset_type?: AssetType | null;
+  arca_class?: ArcaClass | null;
+}
 
 export interface LedgerFilters {
   page?: number;
@@ -112,6 +123,11 @@ export const api = {
       request<WatchlistItemDTO>("/research/watchlist", { method: "POST", body }),
     unfollow: (assetId: number) =>
       request<void>(`/research/watchlist/${assetId}`, { method: "DELETE" }),
+    classify: (assetId: number, arcaClass: ArcaClass) =>
+      request<WatchlistItemDTO>(`/research/watchlist/${assetId}/classification`, {
+        method: "PUT",
+        body: { arca_class: arcaClass },
+      }),
   },
   contributions: {
     list: (status?: ContributionPlanStatus) =>
@@ -155,11 +171,12 @@ export const api = {
       form.append("file", file);
       return request<ImportPreviewDTO>("/imports/b3/preview", { method: "POST", form });
     },
-    commitImport: (file: File, accountId: number | null, createTickers: string[]) => {
+    /** `newAssets`: unknown tickers to register, with the type and ARCA quadrant chosen. */
+    commitImport: (file: File, accountId: number | null, newAssets: ImportNewAssetRequest[]) => {
       const form = new FormData();
       form.append("file", file);
       if (accountId !== null) form.append("account_id", String(accountId));
-      form.append("create_tickers", createTickers.join(","));
+      form.append("new_assets", JSON.stringify(newAssets));
       return request<ImportCommitDTO>("/imports/b3/commit", { method: "POST", form });
     },
   },

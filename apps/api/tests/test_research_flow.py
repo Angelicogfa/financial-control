@@ -205,3 +205,46 @@ def test_below_band_shortcut_without_positions_returns_nothing(research: SimpleN
     body = research.client.get("/api/v1/research/screener", params={"below_band": True}).json()
     assert body["results"] == []
     assert body["catalog_size"] == 7
+
+
+def test_follow_picks_the_arca_quadrant_and_fetches_the_statements(
+    research: SimpleNamespace,
+) -> None:
+    client = research.client
+    with research.uow_factory() as uow:
+        assert uow.fundamentals.list_for_many(["ITUB4"]) == {}
+
+    # The suggestion is used when no quadrant is chosen...
+    suggested = client.post("/api/v1/research/watchlist", json={"ticker": "BBAS3"})
+    assert suggested.status_code == 201, suggested.text
+    assert suggested.json()["arca_class"] == "ACOES"
+
+    # ...and the chosen one otherwise.
+    chosen = client.post(
+        "/api/v1/research/watchlist",
+        json={"ticker": "ITUB4", "arca_class": "ATIVOS_INTERNACIONAIS"},
+    )
+    assert chosen.status_code == 201, chosen.text
+    assert chosen.json()["arca_class"] == "ATIVOS_INTERNACIONAIS"
+
+    # The yearly statements were fetched right after it was registered (background task).
+    with research.uow_factory() as uow:
+        assert uow.fundamentals.list_for_many(["ITUB4"])["ITUB4"]
+
+    asset_id = chosen.json()["asset_id"]
+    moved = client.put(
+        f"/api/v1/research/watchlist/{asset_id}/classification", json={"arca_class": "ACOES"}
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["arca_class"] == "ACOES"
+    listed = {w["ticker"]: w["arca_class"] for w in client.get("/api/v1/research/watchlist").json()}
+    assert listed == {"BBAS3": "ACOES", "ITUB4": "ACOES"}
+
+    missing = client.put(
+        "/api/v1/research/watchlist/9999/classification", json={"arca_class": "ACOES"}
+    )
+    assert missing.status_code == 404
+    invalid = client.put(
+        f"/api/v1/research/watchlist/{asset_id}/classification", json={"arca_class": "GOLD"}
+    )
+    assert invalid.status_code == 422

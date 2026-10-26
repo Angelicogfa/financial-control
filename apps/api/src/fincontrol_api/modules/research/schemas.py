@@ -52,6 +52,13 @@ class WatchlistAddRequest(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=32)
     asset_type: AssetType | None = None
     name: str | None = Field(default=None, max_length=160)
+    arca_class: ArcaClass | None = Field(
+        default=None, description="ARCA quadrant chosen by the user; omitted = the suggested one"
+    )
+
+
+class WatchlistClassifyRequest(BaseModel):
+    arca_class: ArcaClass
 
 
 class WatchlistItemDTO(BaseModel):

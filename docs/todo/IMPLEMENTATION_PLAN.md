@@ -447,3 +447,17 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **15.5** Sincronizado com `origin/main` (correção da importação `.xlsx` da B3, `reset_dimensions()`), aplicada em `modules/ledger/use_cases/b3_import.py`.
 
 **Validação (2026-10-25):** `scripts/check.sh --smoke` → ruff e formatação limpos; 409 testes de backend com cobertura de 96,5% (API + worker), `apps/packages/core` acima do piso de 90%; 45 testes do frontend; build das imagens `migrate`, `api`, `worker` e `web` pelos dois arquivos de compose; smoke isolado `ready` em `script_00015`.
+
+---
+
+## Fase 16 — Pesquisa e Importação Integradas (`[x]` Implementado)
+
+**Objetivo:** todo ativo novo entra pelo mesmo caminho da Pesquisa, com o quadrante ARCA confirmado pelo usuário, venha ele do screener, da lista de observação ou da importação da B3.
+
+- `[x]` **16.1** `modules/research/service.py`: `register_researched_asset` (catálogo da B3 → tipo → quadrante ARCA escolhido ou sugerido) é o único cadastro de ativo novo da Pesquisa e da importação B3; `STATEMENT_TYPES` passou para `fincontrol_core.fundamentals.history`, compartilhado com o worker.
+- `[x]` **16.2** Pesquisa: `POST /api/v1/research/watchlist` aceita `arca_class`; `PUT /api/v1/research/watchlist/{asset_id}/classification` reclassifica. Na tela, "Observar" pede o quadrante com a sugestão marcada; a lista de observação ganhou a coluna "Classe ARCA" editável e o formulário por código, a escolha do quadrante.
+- `[x]` **16.3** Importação B3: a pré-visualização devolve o quadrante sugerido de cada ticker novo; o commit aceita `new_assets` (JSON com `ticker`, `asset_type`, `arca_class`) além de `create_tickers`; um ticker de tipo desconhecido passa a ser cadastrável escolhendo o tipo na tela; `created_assets` lista só os ativos criados naquele commit.
+- `[x]` **16.4** Demonstrativos anuais buscados logo após o cadastro (observação e importação) por `StatementRefresher` em `BackgroundTasks` da API, sem atrasar a resposta; falha de provedor só é registrada em log e fica para a rotina semanal do worker.
+- `[x]` **16.5** Testes: `test_research_service.py` (cadastro, sugestão, falha de provedor, tipos sem demonstrativo), `test_research_flow.py` (quadrante escolhido, demonstrativos gravados, reclassificação, 404/422), `test_b3_import_api.py` (escolhas por ticker, tipo desconhecido, `new_assets` inválido) e `operations.test.tsx` (escolha e cancelamento no screener, reclassificação, tipo e quadrante na importação).
+
+**Validação (2026-10-26):** `scripts/check.sh --smoke` → ruff e formatação limpos; cobertura de 96,1% em `apps/packages/core` e 96,7% em API + worker; 46 testes do frontend; build das quatro imagens pelos dois arquivos de compose; smoke isolado `ready`.
