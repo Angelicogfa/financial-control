@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import io
+import re
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,6 +29,18 @@ def _xlsx(csv_bytes: bytes) -> bytes:
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()
+
+
+def _with_stale_dimension(xlsx: bytes) -> bytes:
+    """Rewrite the sheet's <dimension> to "A1", as the B3 Área do Investidor export does."""
+    source, target = io.BytesIO(xlsx), io.BytesIO()
+    with zipfile.ZipFile(source) as zin, zipfile.ZipFile(target, "w") as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                data = re.sub(rb'<dimension ref="[^"]*"/>', b'<dimension ref="A1"/>', data)
+            zout.writestr(item, data)
+    return target.getvalue()
 
 
 def _positions(client) -> dict[str, dict]:  # type: ignore[no-untyped-def]
@@ -89,6 +103,19 @@ def test_import_trades_then_movements_without_manual_entries(api: SimpleNamespac
         "EARNING": 0,
         "EVENT": 0,
     }
+
+
+def test_preview_reads_every_row_of_an_xlsx_with_a_stale_dimension(api: SimpleNamespace) -> None:
+    content = _with_stale_dimension(_xlsx(MOVEMENTS))
+    assert b'<dimension ref="A1"/>' in zipfile.ZipFile(io.BytesIO(content)).read(
+        "xl/worksheets/sheet1.xml"
+    )
+
+    preview = _upload(api.client, "preview", "movimentacao.xlsx", content)
+
+    assert preview.status_code == 200
+    expected_lines = len(MOVEMENTS.decode("utf-8").strip().splitlines()) - 1
+    assert len(preview.json()["lines"]) == expected_lines
 
 
 def test_import_rejects_bad_files_and_oversold_ledgers(api: SimpleNamespace) -> None:
