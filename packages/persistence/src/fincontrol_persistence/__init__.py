@@ -1,53 +1,18 @@
-"""Persistence layer for Financial Control (SQLAlchemy 2.0, Alembic, Repositories, UnitOfWork)."""
+"""Persistence layer for Financial Control (SQLAlchemy 2.0, Alembic, Repositories, UnitOfWork).
 
-from fincontrol_persistence.db import Base, build_engine, build_session_factory
-from fincontrol_persistence.models import (
-    AssetModel,
-    EarningModel,
-    FixedIncomeTermModel,
-    InvestmentPolicyModel,
-    MarketSeriesModel,
-    PortfolioSnapshotModel,
-    TransactionModel,
-)
-from fincontrol_persistence.repositories import (
-    AssetRepository,
-    EarningRepository,
-    MarketSeriesRepository,
-    PolicyRepository,
-    PortfolioSnapshotRepository,
-    SqlAlchemyAssetRepository,
-    SqlAlchemyEarningRepository,
-    SqlAlchemyMarketSeriesRepository,
-    SqlAlchemyPolicyRepository,
-    SqlAlchemyPortfolioSnapshotRepository,
-    SqlAlchemyTransactionRepository,
-    TransactionRepository,
-)
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+Layout:
+    core/          engine/session factory, SqlAlchemyUnitOfWork, database health
+    models/        ORM models, one module per feature
+    repositories/  repositories returning pure domain entities, one module per feature
+    mappers/       ORM model <-> domain entity conversion, one module per feature
+"""
+
+from fincontrol_persistence.core.db import Base, build_engine, build_session_factory
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 
 __all__ = [
-    "InvestmentPolicyModel",
-    "PolicyRepository",
-    "AssetModel",
-    "AssetRepository",
     "Base",
-    "EarningModel",
-    "EarningRepository",
-    "FixedIncomeTermModel",
-    "MarketSeriesModel",
-    "MarketSeriesRepository",
-    "PortfolioSnapshotModel",
-    "PortfolioSnapshotRepository",
-    "SqlAlchemyPolicyRepository",
-    "SqlAlchemyAssetRepository",
-    "SqlAlchemyEarningRepository",
-    "SqlAlchemyMarketSeriesRepository",
-    "SqlAlchemyPortfolioSnapshotRepository",
-    "SqlAlchemyTransactionRepository",
     "SqlAlchemyUnitOfWork",
-    "TransactionModel",
-    "TransactionRepository",
     "build_engine",
     "build_session_factory",
 ]

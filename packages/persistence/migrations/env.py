@@ -7,7 +7,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from fincontrol_persistence import models as _models  # noqa: F401
-from fincontrol_persistence.db import Base
+from fincontrol_persistence.core.db import Base
 from sqlalchemy import engine_from_config, pool
 
 config = context.config

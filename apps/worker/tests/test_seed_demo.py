@@ -15,7 +15,7 @@ from fincontrol_core.errors import ConflictError
 from fincontrol_core.market.models import Quote
 from fincontrol_core.policy import current_policy
 from fincontrol_core.portfolio.consolidation import LEDGER_VALID, consolidate_portfolio
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.seed_demo import MARKET_ASSETS, main, seed_demo
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

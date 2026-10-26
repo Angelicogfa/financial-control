@@ -1,46 +1,50 @@
-"""FastAPI application factory, exception translation, and router registration."""
+"""FastAPI application factory: wires core infrastructure and the module routers."""
 
 from __future__ import annotations
 
-import logging
-import time
-import uuid
+from fastapi import Depends, FastAPI
+from fincontrol_config import get_settings
+from fincontrol_config.logging import configure_logging
 
-from fastapi import Depends, FastAPI, Request, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fincontrol_config.logging import configure_logging, request_id_var
-from fincontrol_core.errors import ConflictError, DomainError, NotFoundError, ValidationError
-
-from fincontrol_api.auth import AuthenticationError, AuthNotConfiguredError
-from fincontrol_api.config import get_settings
-from fincontrol_api.controllers import (
-    accounts_router,
-    alerts_router,
-    assets_router,
-    auth_router,
-    contributions_router,
+from fincontrol_api.core.http_errors import install_error_handlers
+from fincontrol_api.core.middleware import install_middleware
+from fincontrol_api.modules.accounts.router import accounts_router
+from fincontrol_api.modules.alerts.router import alerts_router
+from fincontrol_api.modules.assets.router import assets_router
+from fincontrol_api.modules.auth.dependencies import require_user
+from fincontrol_api.modules.auth.router import auth_router
+from fincontrol_api.modules.contributions.router import contributions_router
+from fincontrol_api.modules.ledger.router import (
     earnings_router,
     events_router,
-    health_router,
     imports_router,
-    market_router,
-    policy_router,
-    portfolio_router,
-    research_router,
-    settings_router,
     transactions_router,
 )
-from fincontrol_api.dependencies import require_user
+from fincontrol_api.modules.market.router import market_router
+from fincontrol_api.modules.policy.router import policy_router, settings_router
+from fincontrol_api.modules.portfolio.router import portfolio_router
+from fincontrol_api.modules.research.router import research_router
+from fincontrol_api.modules.system.router import health_router
 
-logger = logging.getLogger("fincontrol_api")
-access_logger = logging.getLogger("fincontrol_api.access")
+API_PREFIX = "/api/v1"
 
-REQUEST_ID_HEADER = "X-Request-ID"
-
-
-def _error_response(status_code: int, exc: DomainError) -> JSONResponse:
-    return JSONResponse(status_code=status_code, content={"detail": exc.message, "code": exc.code})
+# Public routers first, then the ones behind the session; the order is the OpenAPI order.
+PUBLIC_ROUTERS = (health_router, auth_router)
+PROTECTED_ROUTERS = (
+    assets_router,
+    transactions_router,
+    earnings_router,
+    portfolio_router,
+    settings_router,
+    market_router,
+    policy_router,
+    accounts_router,
+    research_router,
+    contributions_router,
+    events_router,
+    imports_router,
+    alerts_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -54,98 +58,14 @@ def create_app() -> FastAPI:
             "Investment portfolio control with ARCA methodology and optional Diagrama do Cerrado"
         ),
     )
+    install_middleware(app, settings)
+    install_error_handlers(app)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origin_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    @app.middleware("http")
-    async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
-        request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex
-        request.state.request_id = request_id
-        token = request_id_var.set(request_id)
-        started = time.perf_counter()
-        try:
-            response = await call_next(request)
-        finally:
-            request_id_var.reset(token)
-        response.headers[REQUEST_ID_HEADER] = request_id
-        access_logger.info(
-            "%s %s %s",
-            request.method,
-            request.url.path,
-            response.status_code,
-            extra={
-                "request_id": request_id,
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-                "duration_ms": round((time.perf_counter() - started) * 1000, 1),
-            },
-        )
-        return response
-
-    @app.exception_handler(NotFoundError)
-    async def not_found_handler(_request: Request, exc: NotFoundError) -> JSONResponse:
-        return _error_response(status.HTTP_404_NOT_FOUND, exc)
-
-    @app.exception_handler(ValidationError)
-    async def validation_error_handler(_request: Request, exc: ValidationError) -> JSONResponse:
-        return _error_response(status.HTTP_400_BAD_REQUEST, exc)
-
-    @app.exception_handler(ConflictError)
-    async def conflict_error_handler(_request: Request, exc: ConflictError) -> JSONResponse:
-        return _error_response(status.HTTP_409_CONFLICT, exc)
-
-    @app.exception_handler(AuthenticationError)
-    async def unauthenticated_handler(_request: Request, exc: AuthenticationError) -> JSONResponse:
-        return _error_response(status.HTTP_401_UNAUTHORIZED, exc)
-
-    @app.exception_handler(AuthNotConfiguredError)
-    async def auth_not_configured_handler(
-        _request: Request, exc: AuthNotConfiguredError
-    ) -> JSONResponse:
-        logger.error(exc.message)
-        return _error_response(status.HTTP_503_SERVICE_UNAVAILABLE, exc)
-
-    @app.exception_handler(Exception)
-    async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
-        request_id = getattr(request.state, "request_id", None)
-        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "detail": "Internal server error",
-                "code": "INTERNAL_ERROR",
-                "request_id": request_id,
-            },
-        )
-
-    api_prefix = "/api/v1"
-    app.include_router(health_router, prefix=api_prefix)
-    app.include_router(auth_router, prefix=api_prefix)
+    for router in PUBLIC_ROUTERS:
+        app.include_router(router, prefix=API_PREFIX)
     protected = [Depends(require_user)]
-    for router in (
-        assets_router,
-        transactions_router,
-        earnings_router,
-        portfolio_router,
-        settings_router,
-        market_router,
-        policy_router,
-        accounts_router,
-        research_router,
-        contributions_router,
-        events_router,
-        imports_router,
-        alerts_router,
-    ):
-        app.include_router(router, prefix=api_prefix, dependencies=protected)
-
+    for router in PROTECTED_ROUTERS:
+        app.include_router(router, prefix=API_PREFIX, dependencies=protected)
     return app
 
 

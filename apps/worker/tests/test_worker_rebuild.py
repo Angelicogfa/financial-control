@@ -17,7 +17,7 @@ from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import InMemoryCache
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.yfinance_provider import YFinanceProvider
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.rebuild import rebuild
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

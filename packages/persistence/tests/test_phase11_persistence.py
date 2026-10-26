@@ -17,7 +17,7 @@ from fincontrol_core.domain.entities import (
     ChecklistEvaluationRecord,
 )
 from fincontrol_core.domain.enums import AnswerSource, AnswerValue, AssetType, ChecklistProfile
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import sessionmaker
 

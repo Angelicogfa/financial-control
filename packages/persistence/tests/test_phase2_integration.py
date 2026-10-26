@@ -29,7 +29,7 @@ from fincontrol_core.portfolio.consolidation import (
     consolidate_portfolio,
     plan_contribution,
 )
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

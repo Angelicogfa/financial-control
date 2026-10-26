@@ -14,7 +14,7 @@ from fincontrol_core.domain.entities import AssetEntity
 from fincontrol_core.domain.enums import AssetType
 from fincontrol_core.fundamentals.history import FundamentalPeriod, FundamentalSnapshot
 from fincontrol_core.market.models import Fundamentals
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.jobs import record_checklist_evaluations_job, refresh_fundamentals_job
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

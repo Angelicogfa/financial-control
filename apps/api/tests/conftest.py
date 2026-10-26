@@ -12,14 +12,15 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from fincontrol_api.dependencies import get_market_gateway, get_uow_factory, require_user
+from fincontrol_api.composition import get_market_gateway, get_uow_factory
 from fincontrol_api.main import create_app
+from fincontrol_api.modules.auth.dependencies import require_user
 from fincontrol_core.market.bcb import BcbSgsProvider
 from fincontrol_core.market.brapi import BrapiProvider
 from fincontrol_core.market.cache import InMemoryCache
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.market.yfinance_provider import YFinanceProvider
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

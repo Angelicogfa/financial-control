@@ -152,7 +152,7 @@ def test_script_00005_keeps_snapshot_values_as_numeric(db: tuple[Config, Engine]
     command.upgrade(cfg, "head")
 
     from fincontrol_core.domain.entities import PortfolioSnapshotEntity
-    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
     from sqlalchemy.orm import sessionmaker
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -190,7 +190,7 @@ def test_pagination_breaks_ties_by_id(db: tuple[Config, Engine]) -> None:
         TransactionEntity,
         TransactionKind,
     )
-    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
     from sqlalchemy.orm import sessionmaker
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -235,7 +235,7 @@ def test_script_00007_turns_arca_targets_into_policy_version(db: tuple[Config, E
     command.upgrade(cfg, "script_00007")
 
     from fincontrol_core.domain.enums import ArcaClass, IntraClassStrategy
-    from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+    from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
     from sqlalchemy.orm import sessionmaker
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)

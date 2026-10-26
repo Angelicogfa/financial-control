@@ -24,7 +24,7 @@ from fincontrol_config.logging import configure_logging
 from fincontrol_core.domain.enums import Market
 from fincontrol_core.market.gateway import CachedMarketGateway
 from fincontrol_core.portfolio.snapshots import PriceLookup, first_trade_date, history_range_for
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 
 from fincontrol_worker.jobs import (
     USD_BRL_SYMBOL,

@@ -10,7 +10,7 @@ from alembic import command
 from alembic.config import Config
 from fincontrol_config import Settings
 from fincontrol_core.domain.enums import JobRunStatus
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from fincontrol_worker.runner import (
     LocalJobLock,
     RedisJobLock,

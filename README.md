@@ -78,10 +78,10 @@ Troque **todos** os valores `change-me-*` e mantenha as credenciais coerentes en
 Gerar o hash da senha de login (pede a senha duas vezes, sem ecoar, e imprime a linha pronta, já entre aspas simples):
 
 ```bash
-uv run python -m fincontrol_api.auth hash-password
+uv run python -m fincontrol_api hash-password
 ```
 
-Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python -m fincontrol_api.auth hash-password`.
+Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python -m fincontrol_api hash-password`.
 
 Gerar o segredo do JWT:
 

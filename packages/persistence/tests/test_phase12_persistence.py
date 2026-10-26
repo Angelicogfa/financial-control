@@ -22,7 +22,7 @@ from fincontrol_core.domain.enums import (
     EarningKind,
     TransactionKind,
 )
-from fincontrol_persistence.unit_of_work import SqlAlchemyUnitOfWork
+from fincontrol_persistence.core.unit_of_work import SqlAlchemyUnitOfWork
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker

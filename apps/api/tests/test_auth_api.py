@@ -8,10 +8,9 @@ from types import SimpleNamespace
 import jwt
 import pytest
 from fastapi.testclient import TestClient
-from fincontrol_api.auth import SESSION_COOKIE, hash_password, main, verify_password
-from fincontrol_api.config import get_settings
-from fincontrol_api.dependencies import require_user
-from fincontrol_config import Settings
+from fincontrol_api.core.security import SESSION_COOKIE, hash_password, main, verify_password
+from fincontrol_api.modules.auth.dependencies import require_user
+from fincontrol_config import Settings, get_settings
 
 PASSWORD = "correct horse battery"
 SECRET = "s" * 64
