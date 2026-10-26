@@ -1,7 +1,7 @@
 # Virtual root of the uv workspace (Python monorepo).
 # Each package and app defines its own pyproject.toml.
 [tool.uv.workspace]
-members = ["packages/*", "apps/api", "apps/worker"]
+members = ["apps/packages/*", "apps/api", "apps/worker"]
 
 [dependency-groups]
 dev = [
@@ -26,9 +26,9 @@ markers = [
     "integration: integration tests verifying persistence, migrations, and service boundaries",
 ]
 testpaths = [
-    "packages/config/tests",
-    "packages/core/tests",
-    "packages/persistence/tests",
+    "apps/packages/config/tests",
+    "apps/packages/core/tests",
+    "apps/packages/persistence/tests",
     "apps/api/tests",
     "apps/worker/tests",
 ]

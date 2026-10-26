@@ -20,7 +20,7 @@ Heurística de magnitude é indecidível nas faixas de fronteira e falha silenci
 
 ## Decisão
 
-### 1. Representação canônica no domínio (`packages/core`)
+### 1. Representação canônica no domínio (`apps/packages/core`)
 | Grandeza | Representação | Exemplo |
 |---|---|---|
 | Taxa anual (PRE, spread real do IPCA+, CDI anual, yield exigido) | fração decimal | `0.065` = 6,5% a.a. |

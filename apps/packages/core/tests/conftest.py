@@ -1,4 +1,4 @@
-"""Shared fixtures for `packages/core` tests: the reference portfolio (golden inputs)."""
+"""Shared fixtures for `apps/packages/core` tests: the reference portfolio (golden inputs)."""
 
 from __future__ import annotations
 

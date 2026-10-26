@@ -1,8 +1,8 @@
 """Immutable domain entities shared across repositories, Unit of Work, services, and handlers.
 
-ORM models in `packages/persistence` are strictly internal to the persistence layer and are mapped
-to and from these pure domain entities so that application services, handlers, and controllers
-never depend on SQLAlchemy models.
+ORM models in `apps/packages/persistence` are strictly internal to the persistence layer and
+are mapped to and from these pure domain entities so that application services, handlers, and
+controllers never depend on SQLAlchemy models.
 """
 
 from __future__ import annotations

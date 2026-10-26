@@ -1,6 +1,6 @@
 """Characterization tests for audit findings at the API/application-service boundary.
 
-Same convention as packages/core/tests/test_audit_characterization.py: each test asserts
+Same convention as apps/packages/core/tests/test_audit_characterization.py: each test asserts
 the correct behavior and stays `xfail(strict=True)` until its finding is fixed.
 """
 

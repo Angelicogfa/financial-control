@@ -10,11 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 SOURCES = [
-    ROOT / "packages/config/src",
-    ROOT / "packages/core/src",
-    ROOT / "packages/persistence/src",
+    ROOT / "apps/packages/config/src",
+    ROOT / "apps/packages/core/src",
+    ROOT / "apps/packages/persistence/src",
     ROOT / "apps/api/src",
     ROOT / "apps/worker/src",
 ]

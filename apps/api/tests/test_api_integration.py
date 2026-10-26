@@ -105,7 +105,7 @@ def test_full_api_end_to_end_workflow(tmp_path: Path, monkeypatch) -> None:
     db_url = f"sqlite:///{db_file.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)
 
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     alembic_cfg = Config(str(persistence_dir / "alembic.ini"))
     alembic_cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)

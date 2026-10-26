@@ -7,7 +7,7 @@
 O projeto precisa reunir API (`FastAPI`), Worker de sincronização (`APScheduler`), regras de domínio compartilhadas, camada de persistência relacional (`SQLAlchemy` + `Alembic`) e SPA (`React` + `TypeScript`) no mesmo repositório, mantendo governança rigorosa para evolução assistida por agentes de IA (Gemini / Claude) e desenvolvedores.
 
 ## Decisão
-1. Adotar um **monorepo** gerenciado por **uv workspaces** para Python (`packages/core`, `packages/persistence`, `apps/api`, `apps/worker`) e **npm/Vite** para o frontend (`apps/web`).
+1. Adotar um **monorepo** gerenciado por **uv workspaces** para Python (`apps/packages/core`, `apps/packages/persistence`, `apps/api`, `apps/worker`) e **npm/Vite** para o frontend (`apps/web`).
 2. Padronizar todo o **código-fonte em inglês** (identificadores, rotas, tabelas, colunas, commits e comentários).
 3. Exigir **testes de unidade obrigatórios** para qualquer regra ou componente e **testes de integração ao final de cada etapa de implementação**.
 4. Isolar configurações sensíveis em arquivo `.env` não versionado (com `.env.example` versionado).

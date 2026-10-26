@@ -14,7 +14,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
 2. **Mandatory Unit Tests (`testes de unidade obrigatorios`)**
    - Every domain rule, calculation, service, handler, Unit of Work, repository method, and UI utility/component MUST have accompanying unit tests.
    - No feature or bugfix is considered complete without unit tests covering happy paths, edge cases, and error conditions.
-   - Domain (`packages/core`) tests must run purely in-memory with zero network or database dependencies.
+   - Domain (`apps/packages/core`) tests must run purely in-memory with zero network or database dependencies.
 
 3. **Integration Tests After Each Implementation (`testes de integração ao final de cada implementação`)**
    - At the end of every implementation step or phase, integration tests MUST be executed and pass before advancing to the next item.
@@ -36,7 +36,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
    - Stateful services (`postgres` and `redis`) MUST use dedicated, explicitly named Docker volumes (`fincontrol_pgdata`, `fincontrol_redisdata`) mapped outside container ephemeral filesystems so that container rebuilds or `docker compose down` (without `-v`) never lose user data.
 
 7. **Alembic Migrations with `script_#####` Naming (`utilizar migrations (alembic) para controle de versionamento sempre no formato script_#####`)**
-   - All database schema changes MUST be managed through **Alembic** in `packages/persistence/migrations/versions/`.
+   - All database schema changes MUST be managed through **Alembic** in `apps/packages/persistence/migrations/versions/`.
    - Every migration file and revision ID MUST follow the sequential naming convention:
      - `script_00001_initial_schema.py` (revision = `"script_00001"`)
      - `script_00002_<short_description>.py` (revision = `"script_00002"`)
@@ -50,7 +50,7 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
      - Manipulate SQLAlchemy ORM models or execute queries directly;
      - Contain business calculations.
    - **Handlers (Command / Query Handlers)** coordinate a single use case (validating input commands/queries, opening a `UnitOfWork` transaction boundary, delegating domain/application orchestration to **Services**, and committing via `uow.commit()`).
-   - **Services (Application & Domain Services)** encapsulate reusable business workflows and coordinate domain calculations (`packages/core`) with abstract ports (`UnitOfWork`, `MarketDataGateway`).
+   - **Services (Application & Domain Services)** encapsulate reusable business workflows and coordinate domain calculations (`apps/packages/core`) with abstract ports (`UnitOfWork`, `MarketDataGateway`).
    - **Unit of Work (`AbstractUnitOfWork` / `SqlAlchemyUnitOfWork`)** manages atomic transaction boundaries (`__enter__`, `__exit__`, `commit()`, `rollback()`) and exposes all repositories (`uow.assets`, `uow.transactions`, `uow.earnings`, `uow.arca_targets`, `uow.market_series`, `uow.snapshots`).
    - **Repositories (`AbstractRepository` / SQLAlchemy Repositories)** encapsulate all persistence queries, pagination, sorting, filtering, and mapping between ORM models and pure Domain Entities/DTOs. Repositories NEVER call `session.commit()` — transaction completion is exclusively owned by the `UnitOfWork`.
 
@@ -69,13 +69,13 @@ HTTP Request (FastAPI Controller / Router)
 CommandHandler / QueryHandler
    │  (opens `with uow:` boundary, orchestrates Service + Domain)
    ▼
-Application / Domain Service  ──► Pure Domain Engine (`packages/core`)
+Application / Domain Service  ──► Pure Domain Engine (`apps/packages/core`)
    │
    ▼
 UnitOfWork (`AbstractUnitOfWork` / `SqlAlchemyUnitOfWork`)
    │  (`uow.assets`, `uow.transactions`, `uow.earnings`, ... + `uow.commit()`)
    ▼
-Repositories (`packages/persistence`)
+Repositories (`apps/packages/persistence`)
    │  (maps ORM Models ◄──► Domain Entities)
    ▼
 PostgreSQL / Redis
@@ -95,7 +95,7 @@ financial-control/
 │   ├── api/                  # FastAPI Controllers -> Handlers -> Services -> UoW
 │   ├── worker/               # APScheduler Jobs -> Handlers/Services -> UoW
 │   └── web/                  # React + Vite + TypeScript SPA
-├── packages/
+├── apps/packages/
 │   ├── core/                 # Pure domain entities, ports (Repos & UoW interfaces), engines
 │   └── persistence/          # SQLAlchemy 2.0 ORM, Concrete Repositories, SqlAlchemyUnitOfWork, Alembic (`script_#####`)
 ├── docs/

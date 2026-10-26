@@ -40,7 +40,7 @@ class _Ticker:
 def test_rebuild_reprices_usd_entries_and_rebuilds_snapshots(tmp_path: Path, monkeypatch) -> None:
     db_url = f"sqlite:///{(tmp_path / 'rebuild.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", db_url)
-    persistence_dir = Path(__file__).resolve().parents[3] / "packages" / "persistence"
+    persistence_dir = Path(__file__).resolve().parents[2] / "packages" / "persistence"
     cfg = Config(str(persistence_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(persistence_dir / "migrations"))
     cfg.set_main_option("sqlalchemy.url", db_url)

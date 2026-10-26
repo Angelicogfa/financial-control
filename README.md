@@ -28,7 +28,7 @@ apps/
   api/        FastAPI (controllers → handlers → services → unit of work → repositories)
   worker/     APScheduler: séries do BCB, cotações, retratos diários, demonstrativos, catálogo B3
   web/        React 18 + Vite, servido por nginx
-packages/
+apps/packages/
   config/       configurações (pydantic-settings) e logs
   core/         domínio puro: posições, renda fixa, ARCA, checklist, valuation, alertas
   persistence/  SQLAlchemy 2.0, repositórios e migrations Alembic

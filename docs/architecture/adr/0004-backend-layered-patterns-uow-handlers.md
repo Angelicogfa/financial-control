@@ -4,20 +4,20 @@
 - **Data:** 2026-10-24
 
 ## Contexto
-Para evitar acoplamento entre a camada HTTP (`FastAPI`), as regras de negócio (`packages/core`) e o banco de dados (`SQLAlchemy`), precisamos garantir que cada camada tenha responsabilidade única, fronteiras bem definidas por interfaces (Protocols/ABCs) e que os controllers jamais manipulem modelos de banco ou sessões diretamente.
+Para evitar acoplamento entre a camada HTTP (`FastAPI`), as regras de negócio (`apps/packages/core`) e o banco de dados (`SQLAlchemy`), precisamos garantir que cada camada tenha responsabilidade única, fronteiras bem definidas por interfaces (Protocols/ABCs) e que os controllers jamais manipulem modelos de banco ou sessões diretamente.
 
 ## Decisão
-Adotar os seguintes padrões de projeto em todo o backend (`packages/core`, `packages/persistence`, `apps/api`, `apps/worker`):
+Adotar os seguintes padrões de projeto em todo o backend (`apps/packages/core`, `apps/packages/persistence`, `apps/api`, `apps/worker`):
 
 1. **Entidades de Domínio e Mappers (`Domain Entities` $\leftrightarrow$ `ORM Models`)**:
-   - Os repositórios recebem e devolvem **Entidades de Domínio imutáveis** (`AssetEntity`, `FixedIncomeTermEntity`, `TransactionEntity`, `EarningEntity`, `ArcaTargetEntity`, `MarketSeriesPoint`, `PortfolioSnapshotEntity`) definidas em `packages/core/domain/entities.py`.
-   - Modelos SQLAlchemy (`AssetModel`, etc.) ficam encapsulados dentro de `packages/persistence` e nunca vazam para os Controllers ou para o `packages/core`.
+   - Os repositórios recebem e devolvem **Entidades de Domínio imutáveis** (`AssetEntity`, `FixedIncomeTermEntity`, `TransactionEntity`, `EarningEntity`, `ArcaTargetEntity`, `MarketSeriesPoint`, `PortfolioSnapshotEntity`) definidas em `apps/packages/core/domain/entities.py`.
+   - Modelos SQLAlchemy (`AssetModel`, etc.) ficam encapsulados dentro de `apps/packages/persistence` e nunca vazam para os Controllers ou para o `apps/packages/core`.
 2. **Repository Pattern (`AbstractRepository` $\rightarrow$ `SqlAlchemyRepository`)**:
-   - Interfaces abstratas definidas em `packages/core/ports/repositories.py`.
-   - Implementações concretas em `packages/persistence/repositories.py`.
+   - Interfaces abstratas definidas em `apps/packages/core/ports/repositories.py`.
+   - Implementações concretas em `apps/packages/persistence/repositories.py`.
    - Repositórios executam queries, filtros, ordenação e paginação (`PaginatedResult[DomainEntity]`), mas **nunca** chamam `session.commit()`.
 3. **Unit of Work Pattern (`AbstractUnitOfWork` $\rightarrow$ `SqlAlchemyUnitOfWork`)**:
-   - Interface definida em `packages/core/ports/unit_of_work.py` e implementação concreta em `packages/persistence/unit_of_work.py`.
+   - Interface definida em `apps/packages/core/ports/unit_of_work.py` e implementação concreta em `apps/packages/persistence/unit_of_work.py`.
    - Gerencia o ciclo de vida da sessão e a atomicidade da transação (`with uow: ... uow.commit()`), expondo os repositórios (`uow.assets`, `uow.transactions`, `uow.earnings`, `uow.arca_targets`, `uow.market_series`, `uow.snapshots`).
 4. **Services (`Application / Domain Services`)**:
    - Coordenam regras de negócio complexas que envolvem múltiplos agregados, cálculos financeiros do `core` e provedores externos (`MarketDataGateway`).

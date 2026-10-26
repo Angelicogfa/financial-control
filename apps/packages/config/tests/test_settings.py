@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fincontrol_config import COMPOSE_ONLY_VARIABLES, Settings
 
-ENV_EXAMPLE = Path(__file__).resolve().parents[3] / ".env.example"
+ENV_EXAMPLE = Path(__file__).resolve().parents[4] / ".env.example"
 
 
 def _example_variables() -> dict[str, str]:

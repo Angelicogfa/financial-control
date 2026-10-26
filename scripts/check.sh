@@ -20,7 +20,7 @@ uv run ruff check .
 uv run ruff format --check .
 
 step "Python: core domain tests with coverage floor (90%)"
-uv run pytest packages/core/tests -q \
+uv run pytest apps/packages/core/tests -q \
   --cov=fincontrol_core --cov-report=term:skip-covered --cov-fail-under=90
 
 step "Python: full unit and integration suite (API and worker coverage floor 80%)"

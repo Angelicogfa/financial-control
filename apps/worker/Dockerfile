@@ -14,9 +14,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 # Only the manifest of the API is needed to load the workspace; its code is not shipped.
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
-COPY packages/config packages/config
-COPY packages/core packages/core
-COPY packages/persistence packages/persistence
+COPY apps/packages/config apps/packages/config
+COPY apps/packages/core apps/packages/core
+COPY apps/packages/persistence apps/packages/persistence
 COPY apps/worker apps/worker
 
 RUN --mount=type=cache,target=/root/.cache/uv \
