@@ -8,6 +8,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PLACEHOLDER_PREFIX = "change-me"
+ARGON2_PREFIX = "$argon2"
 
 # Read by the compose files only (container credentials, published ports).
 COMPOSE_ONLY_VARIABLES = frozenset(
@@ -93,9 +94,15 @@ class Settings(BaseSettings):
 
     @property
     def auth_configured(self) -> bool:
-        """True when a real password hash and JWT secret were provided (not placeholders)."""
+        """True when a real Argon2 password hash and JWT secret were provided (not placeholders).
+
+        A plain password or a hash mangled by "$" expansion is rejected here, so the login
+        screen reports "not configured" instead of failing every attempt as invalid.
+        """
         values = (self.auth_password_hash, self.auth_jwt_secret)
-        return all(v and not v.startswith(PLACEHOLDER_PREFIX) for v in values)
+        if not all(v and not v.startswith(PLACEHOLDER_PREFIX) for v in values):
+            return False
+        return bool(self.auth_password_hash and self.auth_password_hash.startswith(ARGON2_PREFIX))
 
 
 @lru_cache(maxsize=1)

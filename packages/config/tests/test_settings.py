@@ -49,3 +49,11 @@ def test_auth_is_configured_only_with_hash_and_secret() -> None:
     assert Settings(
         _env_file=None, auth_password_hash="$argon2id$x", auth_jwt_secret="s" * 32
     ).auth_configured
+
+
+def test_auth_is_not_configured_when_the_hash_is_not_argon2() -> None:
+    # A plain password, or a hash whose "$" parts were expanded away by the shell/compose.
+    for value in ("my-plain-password", "=19=65536,t=3,p=4"):
+        assert not Settings(
+            _env_file=None, auth_password_hash=value, auth_jwt_secret="s" * 32
+        ).auth_configured

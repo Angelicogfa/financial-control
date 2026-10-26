@@ -62,7 +62,9 @@ def verify_password(password_hash: str, password: str) -> bool:
 def _require_configured(settings: Settings) -> None:
     if not settings.auth_configured:
         raise AuthNotConfiguredError(
-            "Authentication is not configured: set AUTH_PASSWORD_HASH and AUTH_JWT_SECRET in .env"
+            "Authentication is not configured: set AUTH_PASSWORD_HASH (an Argon2 hash from "
+            "'python -m fincontrol_api.auth hash-password', in single quotes) and "
+            "AUTH_JWT_SECRET in .env"
         )
 
 
