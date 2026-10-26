@@ -54,6 +54,9 @@ def read_statement_rows(filename: str, content: bytes) -> list[dict[str, object]
             sheet = load_workbook(io.BytesIO(content), read_only=True, data_only=True).active
         except Exception as exc:
             raise ValidationError("Unreadable spreadsheet", code="INVALID_FILE") from exc
+        # B3 exports declare a stale <dimension ref="A1"/>; read-only mode trusts it and would
+        # return only the first cell, so scan the actual rows instead.
+        sheet.reset_dimensions()
         values = [list(r) for r in sheet.iter_rows(values_only=True)]
     elif name.endswith(".csv"):
         text = content.decode("utf-8-sig", errors="replace")
