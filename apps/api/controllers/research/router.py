@@ -12,11 +12,15 @@ from controllers.research.dependencies import (
     get_statement_refresher,
 )
 from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
-from controllers.research.responses import ScreenerResponseDTO, WatchlistItemDTO
+from controllers.research.responses import (
+    ScreenerResponseDTO,
+    TreasurySearchResponseDTO,
+    WatchlistItemDTO,
+)
 from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.service import StatementRefresher
 from domain.research.services.use_cases import ResearchHandler
-from domain.shared.enums import ArcaClass, AssetType
+from domain.shared.enums import ArcaClass, AssetType, FixedIncomeIndexer
 
 research_router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -53,6 +57,17 @@ def run_screener(
         limit=limit,
     )
     return handler.screener(criteria, below_band=below_band)
+
+
+@research_router.get("/treasury", response_model=TreasurySearchResponseDTO)
+def list_treasury_bonds(
+    q: str | None = Query(default=None, max_length=60),
+    indexer: FixedIncomeIndexer | None = Query(default=None),
+    coupon_type: str | None = Query(default=None, pattern="^(zero|semestral)$"),
+    handler: ResearchHandler = Depends(get_research_handler),
+) -> TreasurySearchResponseDTO:
+    return handler.treasury(query=q, indexer=indexer, coupon_type=coupon_type)
+
 
 
 @research_router.get("/watchlist", response_model=list[WatchlistItemDTO])

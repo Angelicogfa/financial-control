@@ -713,6 +713,36 @@ export interface TransactionUpdateRequest {
   account_id?: number | null;
 }
 
+export interface TreasuryBondDTO {
+  symbol: string;
+  name: string;
+  bond_type: string;
+  instrument_kind: FixedIncomeInstrumentKind;
+  indexer: FixedIncomeIndexer;
+  raw_indexer: string;
+  coupon_type: string;
+  maturity_date: string;
+  duration_days?: number | null;
+  base_date?: string | null;
+  buy_rate?: number | null;
+  sell_rate?: number | null;
+  buy_price?: number | null;
+  sell_price?: number | null;
+  base_price?: number | null;
+  rate_type?: string | null;
+  rate_unit?: string | null;
+  rate_description?: string | null;
+  contracted_rate_percent: number;
+  liquidity: FixedIncomeLiquidity;
+  asset_id?: number | null;
+}
+
+export interface TreasurySearchResponseDTO {
+  results: TreasuryBondDTO[];
+  total: number;
+  unavailable_reason?: string | null;
+}
+
 export interface UnknownTickerDTO {
   ticker: string;
   name?: string | null;

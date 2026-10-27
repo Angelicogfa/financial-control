@@ -7,6 +7,12 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
+from domain.shared.enums import (
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
+    FixedIncomeLiquidity,
+)
+
 
 class QuoteFreshness(StrEnum):
     """Indicates how the quote or curve price was obtained."""
@@ -123,3 +129,63 @@ def financial_volume(volume_shares: float | None, price: float | None) -> float 
     if volume_shares is None or price is None or price <= 0:
         return None
     return volume_shares * price
+
+
+@dataclass(frozen=True)
+class TreasuryBond:
+    """Normalized Brazilian Treasury bond (Tesouro Direto) from upstream market provider."""
+
+    symbol: str
+    name: str
+    bond_type: str
+    instrument_kind: FixedIncomeInstrumentKind
+    indexer: FixedIncomeIndexer
+    raw_indexer: str
+    coupon_type: str
+    maturity_date: date
+    duration_days: int | None = None
+    base_date: date | None = None
+    buy_rate: float | None = None
+    sell_rate: float | None = None
+    buy_price: float | None = None
+    sell_price: float | None = None
+    base_price: float | None = None
+    rate_type: str | None = None
+    rate_unit: str | None = None
+    rate_description: str | None = None
+    contracted_rate_percent: float = 100.0
+    liquidity: FixedIncomeLiquidity = FixedIncomeLiquidity.DAILY
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["instrument_kind"] = self.instrument_kind.value
+        data["indexer"] = self.indexer.value
+        data["liquidity"] = self.liquidity.value
+        data["maturity_date"] = self.maturity_date.isoformat()
+        data["base_date"] = self.base_date.isoformat() if self.base_date else None
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TreasuryBond:
+        payload = dict(data)
+        if isinstance(payload.get("instrument_kind"), str):
+            payload["instrument_kind"] = FixedIncomeInstrumentKind(payload["instrument_kind"])
+        if isinstance(payload.get("indexer"), str):
+            payload["indexer"] = FixedIncomeIndexer(payload["indexer"])
+        if isinstance(payload.get("liquidity"), str):
+            payload["liquidity"] = FixedIncomeLiquidity(payload["liquidity"])
+        if isinstance(payload.get("maturity_date"), str):
+            payload["maturity_date"] = date.fromisoformat(payload["maturity_date"])
+        if isinstance(payload.get("base_date"), str):
+            payload["base_date"] = date.fromisoformat(payload["base_date"])
+        valid_fields = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in payload.items() if k in valid_fields})
+
+
+@dataclass(frozen=True)
+class TreasuryCatalogResult:
+    """Outcome of querying the upstream Treasury catalog."""
+
+    results: list[TreasuryBond] = field(default_factory=list)
+    unavailable_reason: str | None = None
+
