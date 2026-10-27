@@ -97,11 +97,11 @@ function initialChoices(preview: ImportPreviewDTO): Record<string, NewAssetChoic
   );
 }
 
-/** A choice can be registered once its type (and, for fixed income, rate and issue date) is known. */
+/** A choice can be registered once its type (and, for fixed income, rate and name) is known. */
 function ready(choice: NewAssetChoice): boolean {
   if (!choice.asset_type) return false;
   if (!choice.term) return true;
-  return parseDecimal(choice.term.ratePercent) !== null && Boolean(choice.term.issueDate) && Boolean(choice.term.name.trim());
+  return parseDecimal(choice.term.ratePercent) !== null && Boolean(choice.term.name.trim());
 }
 
 function toNewAssets(choices: Record<string, NewAssetChoice>): ImportNewAssetRequest[] {
@@ -118,11 +118,12 @@ function toNewAssets(choices: Record<string, NewAssetChoice>): ImportNewAssetReq
           instrument_kind: base.instrument_kind,
           indexer,
           contracted_rate: percentToContractedRate(parseDecimal(ratePercent) as number),
-          issue_date: issueDate,
+          issue_date: issueDate || null,
           maturity_date: maturityDate || null,
           tax_exempt: base.tax_exempt ?? false,
           liquidity,
           issuer: base.issuer ?? null,
+          semiannual_coupons: base.semiannual_coupons ?? false,
         },
       };
     });
@@ -386,7 +387,7 @@ export function ImportPage() {
                                       />
                                     </div>
                                     <div className="app-field">
-                                      <label htmlFor={`issue-${u.ticker}`}>Data de emissão</label>
+                                      <label htmlFor={`issue-${u.ticker}`}>Data de emissão (opcional)</label>
                                       <input
                                         id={`issue-${u.ticker}`}
                                         type="date"

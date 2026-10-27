@@ -132,7 +132,7 @@ def value_variable_income(asset: dict, usd_brl: float) -> dict[str, float]:
 def value_fixed_income(asset: dict, cal: Calendar, data: dict, as_of: date) -> dict[str, float]:
     term = asset["fixed_income_term"]
     (tx,) = asset["transactions"]
-    start = max(_d(tx["date"]), _d(term["issue_date"]))
+    start = _d(tx["date"])
     principal = float(tx["qty"]) * float(tx["price"]) + float(tx["fees"])
     rate = float(term["contracted_rate"])
     if term["indexer"] in ("CDI", "SELIC"):

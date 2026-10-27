@@ -21,6 +21,7 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from domain.shared.enums import (
@@ -148,11 +149,14 @@ class FixedIncomeTermModel(Base):
     instrument_kind: Mapped[str] = mapped_column(String(32), nullable=False)
     indexer: Mapped[str] = mapped_column(String(16), nullable=False)
     contracted_rate: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False)
-    issue_date: Mapped[date] = mapped_column(Date, nullable=False)
+    issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     maturity_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     tax_exempt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     liquidity: Mapped[str] = mapped_column(String(24), nullable=False, default="AT_MATURITY")
     issuer: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    semiannual_coupons: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
 
     asset: Mapped[AssetModel] = relationship("AssetModel", back_populates="fixed_income_term")
 

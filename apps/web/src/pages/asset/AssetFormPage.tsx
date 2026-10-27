@@ -19,7 +19,7 @@ import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Spinner } from "../../components/States";
-import { brl, day, parseDecimal, today } from "../../utils/format";
+import { brl, day, parseDecimal } from "../../utils/format";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -60,6 +60,7 @@ interface FormState {
   taxExempt: boolean;
   liquidity: FixedIncomeLiquidity;
   issuer: string;
+  semiannualCoupons: boolean;
 }
 
 const EMPTY: FormState = {
@@ -75,12 +76,20 @@ const EMPTY: FormState = {
   instrumentKind: "CDB",
   indexer: "CDI",
   ratePercent: DEFAULT_RATE_PERCENT.CDI,
-  issueDate: today(),
+  issueDate: "",
   maturityDate: "",
   taxExempt: false,
   liquidity: "AT_MATURITY",
   issuer: "",
+  semiannualCoupons: false,
 };
+
+const TREASURY_KINDS: FixedIncomeInstrumentKind[] = ["TESOURO_SELIC", "TESOURO_IPCA", "TESOURO_PRE"];
+
+/** Zero-coupon Tesouro Prefixado: each purchase accrues at the rate implied by the price paid. */
+function ratesFromPurchasePrice(kind: FixedIncomeInstrumentKind, semiannualCoupons: boolean): boolean {
+  return kind === "TESOURO_PRE" && !semiannualCoupons;
+}
 
 function fromAsset(asset: AssetResponseDTO): FormState {
   const term = asset.fixed_income_term;
@@ -100,11 +109,12 @@ function fromAsset(asset: AssetResponseDTO): FormState {
           instrumentKind: term.instrument_kind,
           indexer: term.indexer,
           ratePercent: String(contractedRateToPercent(term.contracted_rate)).replace(".", ","),
-          issueDate: term.issue_date,
+          issueDate: term.issue_date ?? "",
           maturityDate: term.maturity_date ?? "",
           taxExempt: term.tax_exempt ?? false,
           liquidity: term.liquidity ?? "AT_MATURITY",
           issuer: term.issuer ?? "",
+          semiannualCoupons: term.semiannual_coupons ?? false,
         }
       : {}),
   };
@@ -225,6 +235,7 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
       maturityDate: bond.maturity_date,
       liquidity: bond.liquidity,
       issuer: f.issuer.trim() || "Tesouro Nacional",
+      semiannualCoupons: bond.coupon_type === "semestral",
     }));
   };
 
@@ -271,11 +282,12 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
             instrument_kind: form.instrumentKind,
             indexer: form.indexer,
             contracted_rate: percentToContractedRate(rate as number),
-            issue_date: form.issueDate,
+            issue_date: form.issueDate || null,
             maturity_date: form.maturityDate || null,
             tax_exempt: form.taxExempt,
             liquidity: form.liquidity,
             issuer: form.issuer.trim() || null,
+            semiannual_coupons: TREASURY_KINDS.includes(form.instrumentKind) && form.semiannualCoupons,
           }
         : null,
     };
@@ -468,15 +480,24 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
                 onChange={(e) => set("ratePercent", e.target.value)}
                 required
               />
+              {ratesFromPurchasePrice(form.instrumentKind, form.semiannualCoupons) && (
+                <span className="app-muted">
+                  Referência: cada compra rende pela taxa implícita no preço (PU) pago.
+                </span>
+              )}
             </div>
             <div className="app-field">
-              <label htmlFor="fi-issue">Aplicação</label>
+              <span className="app-field-label">
+                <label htmlFor="fi-issue">Data de emissão (opcional)</label>
+                <Hint about="Data de emissão">
+                  Apenas informativa. O rendimento de cada compra é calculado a partir da data da compra informada no lançamento.
+                </Hint>
+              </span>
               <input
                 id="fi-issue"
                 type="date"
                 value={form.issueDate}
                 onChange={(e) => set("issueDate", e.target.value)}
-                required
               />
             </div>
             <div className="app-field">
@@ -514,6 +535,16 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
               />
               Isento de IR
             </label>
+            {TREASURY_KINDS.includes(form.instrumentKind) && (
+              <label className="app-check">
+                <input
+                  type="checkbox"
+                  checked={form.semiannualCoupons}
+                  onChange={(e) => set("semiannualCoupons", e.target.checked)}
+                />
+                Paga juros semestrais
+              </label>
+            )}
           </div>
         </fieldset>
       )}

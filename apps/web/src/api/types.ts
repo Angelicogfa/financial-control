@@ -490,22 +490,24 @@ export interface FixedIncomeTermPayload_Input {
   instrument_kind: FixedIncomeInstrumentKind;
   indexer: FixedIncomeIndexer;
   contracted_rate: number | string;
-  issue_date: string;
+  issue_date?: string | null;
   maturity_date?: string | null;
   tax_exempt?: boolean;
   liquidity?: FixedIncomeLiquidity;
   issuer?: string | null;
+  semiannual_coupons?: boolean;
 }
 
 export interface FixedIncomeTermPayload_Output {
   instrument_kind: FixedIncomeInstrumentKind;
   indexer: FixedIncomeIndexer;
   contracted_rate: string;
-  issue_date: string;
+  issue_date?: string | null;
   maturity_date?: string | null;
   tax_exempt?: boolean;
   liquidity?: FixedIncomeLiquidity;
   issuer?: string | null;
+  semiannual_coupons?: boolean;
 }
 
 export interface FixedIncomeValuationDTO {
@@ -579,6 +581,7 @@ export interface ImportFixedIncomeTermDTO {
   tax_exempt?: boolean;
   liquidity?: FixedIncomeLiquidity;
   issuer?: string | null;
+  semiannual_coupons?: boolean;
 }
 
 export interface ImportLineDTO {

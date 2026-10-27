@@ -69,11 +69,12 @@ class FixedIncomeTermEntity:
     instrument_kind: FixedIncomeInstrumentKind
     indexer: FixedIncomeIndexer
     contracted_rate: Decimal
-    issue_date: date
+    issue_date: date | None = None  # informational: lots accrue from their trade dates
     maturity_date: date | None = None
     tax_exempt: bool = False
     liquidity: FixedIncomeLiquidity = FixedIncomeLiquidity.AT_MATURITY
     issuer: str | None = None
+    semiannual_coupons: bool = False
     id: int | None = None
     asset_id: int | None = None
 

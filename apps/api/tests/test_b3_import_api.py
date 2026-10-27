@@ -346,11 +346,12 @@ def test_treasury_and_bank_securities_import_from_the_movement_statement(
         "instrument_kind": "CDB",
         "indexer": "CDI",
         "contracted_rate": None,
-        "issue_date": "2026-02-20",  # first date of the issuer in the statement
+        "issue_date": None,  # informational: never inferred from the statement dates
         "maturity_date": None,
         "tax_exempt": False,
         "liquidity": "AT_MATURITY",
         "issuer": "ITAU UNIBANCO S.A.",
+        "semiannual_coupons": False,
     }
     treasury = unknown["TESOURO_PRE-2028"]["fixed_income_term"]
     assert (treasury["instrument_kind"], treasury["maturity_date"]) == (

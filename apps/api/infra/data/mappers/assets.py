@@ -52,6 +52,7 @@ def to_fixed_income_term_entity(model: FixedIncomeTermModel) -> FixedIncomeTermE
         tax_exempt=bool(model.tax_exempt),
         liquidity=FixedIncomeLiquidity(model.liquidity),
         issuer=model.issuer,
+        semiannual_coupons=bool(model.semiannual_coupons),
     )
 
 
@@ -65,6 +66,7 @@ def to_fixed_income_term_model(entity: FixedIncomeTermEntity) -> FixedIncomeTerm
         tax_exempt=entity.tax_exempt,
         liquidity=entity.liquidity.value,
         issuer=entity.issuer,
+        semiannual_coupons=entity.semiannual_coupons,
     )
 
 

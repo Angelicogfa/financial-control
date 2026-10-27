@@ -12,6 +12,8 @@ from core.helpers.calendar import business_days_between
 from domain.portfolio.services.fixed_income import (
     RateCurves,
     accrual_factor,
+    implied_purchase_rate,
+    replay_lots,
     value_fixed_income_position,
 )
 from domain.portfolio.services.positions import InsufficientQuantityError
@@ -163,3 +165,142 @@ def test_projection_is_capped_at_maturity() -> None:
     assert now.projected_12m_net_yield == pytest.approx(
         at_maturity.net_value - now.net_value, abs=0.02
     )
+
+
+def _treasury_term(**kwargs) -> FixedIncomeTermEntity:
+    return FixedIncomeTermEntity(
+        instrument_kind=kwargs.pop("instrument_kind", FixedIncomeInstrumentKind.TESOURO_PRE),
+        indexer=FixedIncomeIndexer.PRE,
+        contracted_rate=Decimal(kwargs.pop("rate", "0.1526")),
+        maturity_date=kwargs.pop("maturity_date", date(2029, 1, 1)),
+        **kwargs,
+    )
+
+
+def _ltn_buy(on: date, quantity: str, unit_price: str) -> TransactionEntity:
+    return TransactionEntity(
+        asset_id=1,
+        kind=TransactionKind.BUY,
+        trade_date=on,
+        quantity=Decimal(quantity),
+        unit_price=Decimal(unit_price),
+    )
+
+
+def _ltn_price(rate: float, on: date, maturity: date = date(2029, 1, 1)) -> str:
+    business_days = len(business_days_between(on, maturity))
+    return f"{1000.0 / (1.0 + rate) ** (business_days / 252.0):.6f}"
+
+
+def test_issue_date_is_optional_and_informational() -> None:
+    txs = [_tx(TransactionKind.BUY, date(2025, 2, 20), "1000")]
+    without = value_fixed_income_position(
+        txs, _term(FixedIncomeIndexer.PRE, "0.12", issue_date=None), date(2025, 8, 1)
+    )
+    later = value_fixed_income_position(
+        txs, _term(FixedIncomeIndexer.PRE, "0.12", issue_date=date(2025, 6, 1)), date(2025, 8, 1)
+    )
+    business_days = len(business_days_between(date(2025, 2, 20), date(2025, 8, 1)))
+
+    assert without == later
+    assert without.gross_yield == pytest.approx(
+        1000.0 * (1.12 ** (business_days / 252.0) - 1.0), abs=0.01
+    )
+
+
+def test_implied_purchase_rate_recovers_the_ltn_rate_from_the_price() -> None:
+    on = date(2026, 3, 17)
+    term = _treasury_term()
+
+    rate = implied_purchase_rate(term, on, float(_ltn_price(0.1375, on)))
+
+    assert rate == pytest.approx(0.1375, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("term_kwargs", "unit_price", "on"),
+    [
+        ({"semiannual_coupons": True}, 700.0, date(2026, 3, 17)),
+        ({"instrument_kind": FixedIncomeInstrumentKind.TESOURO_IPCA}, 700.0, date(2026, 3, 17)),
+        ({"maturity_date": None}, 700.0, date(2026, 3, 17)),
+        ({}, 700.0, date(2029, 1, 1)),
+        ({}, 1000.0, date(2026, 3, 17)),
+        ({}, 0.0, date(2026, 3, 17)),
+        ({}, 1.0, date(2028, 12, 1)),
+    ],
+)
+def test_implied_purchase_rate_is_none_when_it_cannot_be_implied(
+    term_kwargs: dict, unit_price: float, on: date
+) -> None:
+    if term_kwargs.get("instrument_kind") == FixedIncomeInstrumentKind.TESOURO_IPCA:
+        term = FixedIncomeTermEntity(
+            instrument_kind=FixedIncomeInstrumentKind.TESOURO_IPCA,
+            indexer=FixedIncomeIndexer.IPCA,
+            contracted_rate=Decimal("0.07"),
+            maturity_date=date(2029, 5, 15),
+        )
+    else:
+        term = _treasury_term(**term_kwargs)
+
+    assert implied_purchase_rate(term, on, unit_price) is None
+
+
+def test_each_ltn_purchase_accrues_at_the_rate_it_was_bought() -> None:
+    first, second, today = date(2025, 3, 17), date(2026, 3, 17), date(2026, 10, 27)
+    txs = [
+        _ltn_buy(first, "1", _ltn_price(0.15, first)),
+        _ltn_buy(second, "2", _ltn_price(0.13, second)),
+    ]
+    term = _treasury_term(rate="0.20")
+
+    lots, _ = replay_lots(txs, term, today)
+    valuation = value_fixed_income_position(txs, term, today)
+
+    assert [round(lot.rate or 0.0, 6) for lot in lots] == [0.15, 0.13]
+    expected = sum(
+        lot.principal
+        * ((1.0 + (lot.rate or 0.0)) ** (len(business_days_between(lot.start, today)) / 252.0))
+        for lot in lots
+    )
+    assert valuation.gross_value == pytest.approx(expected, abs=0.02)
+
+
+def test_ltn_reaches_face_value_at_maturity() -> None:
+    on = date(2026, 3, 17)
+    txs = [_ltn_buy(on, "2.45", _ltn_price(0.1375, on))]
+
+    valuation = value_fixed_income_position(txs, _treasury_term(), date(2029, 1, 1))
+
+    assert valuation.gross_value == pytest.approx(2450.0, abs=0.01)
+
+
+def test_partial_redemption_keeps_the_lot_purchase_rate() -> None:
+    on = date(2025, 3, 17)
+    term = _treasury_term(rate="0.20")
+    txs = [
+        _ltn_buy(on, "2", _ltn_price(0.14, on)),
+        TransactionEntity(
+            asset_id=1,
+            kind=TransactionKind.SELL,
+            trade_date=date(2026, 3, 17),
+            quantity=Decimal("1"),
+            unit_price=Decimal("500"),
+        ),
+    ]
+
+    lots, realized = replay_lots(txs, term, date(2026, 10, 27))
+
+    assert len(lots) == 1
+    assert lots[0].rate == pytest.approx(0.14, abs=1e-6)
+    assert realized > 0
+
+
+def test_semiannual_prefixado_falls_back_to_the_contracted_rate() -> None:
+    on = date(2026, 3, 17)
+    txs = [_ltn_buy(on, "1", "950")]
+    term = _treasury_term(rate="0.13", semiannual_coupons=True)
+
+    valuation = value_fixed_income_position(txs, term, date(2026, 10, 27))
+    business_days = len(business_days_between(on, date(2026, 10, 27)))
+
+    assert valuation.gross_value == pytest.approx(950.0 * 1.13 ** (business_days / 252.0), abs=0.01)

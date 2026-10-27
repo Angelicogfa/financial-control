@@ -42,11 +42,18 @@ class FixedIncomeTermPayload(BaseModel):
             "annual fraction for PRE/IPCA (0.065 = 6.5% a.a.)"
         ),
     )
-    issue_date: date
+    issue_date: date | None = Field(
+        default=None,
+        description="Informational only: every purchase accrues from its own trade date",
+    )
     maturity_date: date | None = None
     tax_exempt: bool = False
     liquidity: FixedIncomeLiquidity = FixedIncomeLiquidity.AT_MATURITY
     issuer: str | None = None
+    semiannual_coupons: bool = Field(
+        default=False,
+        description="Pays semiannual coupons (Juros Semestrais); no implied rate from the price",
+    )
 
 
 class AssetCreateRequest(BaseModel):

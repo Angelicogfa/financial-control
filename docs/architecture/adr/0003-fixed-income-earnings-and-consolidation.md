@@ -11,7 +11,8 @@ Uma carteira real no Brasil combina renda variável (Ações, FIIs, ETFs, BDRs, 
 
 ## Decisão
 1. **Renda Fixa calculada na curva**:
-   - Títulos de renda fixa armazenam seus parâmetros em `fixed_income_terms` (`indexer`: `CDI`, `IPCA`, `PRE`, `SELIC`; `contracted_rate`; `issue_date`; `maturity_date`; `tax_exempt`).
+   - Títulos de renda fixa armazenam seus parâmetros em `fixed_income_terms` (`indexer`: `CDI`, `IPCA`, `PRE`, `SELIC`; `contracted_rate`; `issue_date` opcional e apenas informativo; `maturity_date`; `tax_exempt`; `semiannual_coupons`).
+   - Cada compra (lote) rende a partir da sua própria data de compra (`transactions.trade_date`, nunca a data de registro `created_at`). No Tesouro Prefixado sem cupom (LTN), cada lote usa a taxa implícita no PU pago (`PU = 1000 / (1 + r)^(du/252)`); `contracted_rate` é o fallback (adendo de 2026-10-27).
    - O sistema busca as séries oficiais do Banco Central (SGS 12 para CDI, 11 para SELIC, 433 para IPCA) e calcula o valor bruto acumulado, o desconto estimado de IOF/IR regressivo (22,5% a 15%, ou 0% para isentos) e o valor líquido atual. O `manual_price` permanece apenas como override opcional.
 2. **Proventos no MVP (`earnings`)**:
    - Lançamento de `DIVIDEND`, `JCP`, `FII_YIELD`, `FIXED_INCOME_COUPON` e `RESTITUTION`, registrando valor bruto, IR retido e valor líquido.

@@ -93,12 +93,67 @@ describe("asset form", () => {
     fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "FIXED_INCOME" } });
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "CDB Banco X" } });
     fireEvent.change(screen.getByLabelText("Taxa (%)"), { target: { value: "112,5" } });
+    expect(screen.getByLabelText("Data de emissão (opcional)")).toHaveValue("");
+    expect(screen.getByLabelText("Data de emissão (opcional)")).not.toBeRequired();
+    expect(screen.queryByLabelText("Paga juros semestrais")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar ativo" }));
     await waitFor(() => expect(last(calls, "POST", "/assets")).toBeDefined());
     const body = last(calls, "POST", "/assets")?.body as Record<string, unknown>;
     expect(body.asset_type).toBe("FIXED_INCOME");
     expect(body.ticker).toBeNull();
-    expect(body.fixed_income_term).toMatchObject({ indexer: "CDI", contracted_rate: 1.125 });
+    expect(body.fixed_income_term).toMatchObject({
+      indexer: "CDI",
+      contracted_rate: 1.125,
+      issue_date: null,
+      semiannual_coupons: false,
+    });
+  });
+
+  it("flags a semiannual Tesouro Prefixado and explains the purchase rate otherwise", async () => {
+    const treasuryReply = {
+      results: [
+        {
+          symbol: "tesouro-prefixado-com-juros-semestrais-01012035",
+          name: "Tesouro Prefixado com Juros Semestrais 2035",
+          bond_type: "Tesouro Prefixado com Juros Semestrais",
+          instrument_kind: "TESOURO_PRE",
+          indexer: "PRE",
+          raw_indexer: "prefixado",
+          coupon_type: "semestral",
+          maturity_date: "2035-01-01",
+          contracted_rate_percent: 13.5,
+          liquidity: "AT_MATURITY",
+          asset_id: null,
+        },
+      ],
+      total: 1,
+      unavailable_reason: null,
+    };
+    const { calls } = mockApi([
+      { path: "/research/treasury", reply: treasuryReply },
+      { method: "POST", path: "/assets", reply: asset({ id: 13, asset_type: "TREASURY" }) },
+    ]);
+    renderAt("/asset/new");
+    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "TREASURY" } });
+    fireEvent.change(screen.getByLabelText("Título ou vencimento"), { target: { value: "2035" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Usar título" }));
+
+    const semiannual = screen.getByLabelText("Paga juros semestrais");
+    expect(semiannual).toBeChecked();
+    expect(screen.queryByText(/taxa implícita no preço/)).not.toBeInTheDocument();
+    fireEvent.click(semiannual);
+    expect(screen.getByText(/taxa implícita no preço/)).toBeInTheDocument();
+    fireEvent.click(semiannual);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar ativo" }));
+    await waitFor(() => expect(last(calls, "POST", "/assets")).toBeDefined());
+    const body = last(calls, "POST", "/assets")?.body as Record<string, unknown>;
+    expect(body.fixed_income_term).toMatchObject({
+      instrument_kind: "TESOURO_PRE",
+      issue_date: null,
+      semiannual_coupons: true,
+    });
   });
 
   it("searches Tesouro Direto via Brapi and fills the contract fields", async () => {
@@ -327,8 +382,11 @@ describe("research", () => {
         contracted_rate: 1,
         maturity_date: "2031-03-01",
         liquidity: "DAILY",
+        semiannual_coupons: false,
       },
     });
+    const followed = last(calls, "POST", "/assets")?.body as { fixed_income_term: Record<string, unknown> };
+    expect(followed.fixed_income_term).not.toHaveProperty("issue_date");
   });
 
   it("displays unavailable_reason when Brapi requires Pro plan for Tesouro Direto", async () => {
@@ -608,7 +666,7 @@ describe("ledger", () => {
       instrument_kind: "CDB",
       indexer: "CDI",
       contracted_rate: null,
-      issue_date: "2026-02-20",
+      issue_date: null,
       maturity_date: null,
       tax_exempt: false,
       liquidity: "AT_MATURITY",
@@ -640,7 +698,7 @@ describe("ledger", () => {
     expect(security).not.toBeChecked();
     expect(security).toBeDisabled(); // the rate is never in a B3 statement
     expect(screen.getByRole("combobox", { name: "Tipo de CDB-ITAUUNIBANCO" })).toBeDisabled();
-    expect(screen.getByLabelText("Data de emissão")).toHaveValue("2026-02-20");
+    expect(screen.getByLabelText("Data de emissão (opcional)")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Importar 0 linha(s)" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "CDB Itaú liquidez diária" } });
@@ -661,11 +719,12 @@ describe("ledger", () => {
           instrument_kind: "CDB",
           indexer: "CDI",
           contracted_rate: 1,
-          issue_date: "2026-02-20",
+          issue_date: null,
           maturity_date: null,
           tax_exempt: false,
           liquidity: "DAILY",
           issuer: "ITAU UNIBANCO S.A.",
+          semiannual_coupons: false,
         },
       },
     ]);

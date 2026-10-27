@@ -125,7 +125,7 @@ def test_rate_curves_read_daily_and_monthly_series_as_fractions() -> None:
     assert empty.annual_cdi_rate == 0.14 and not empty.cdi_daily
 
 
-def test_earliest_fixed_income_start_uses_issue_or_purchase() -> None:
+def test_earliest_fixed_income_start_is_the_first_purchase() -> None:
     term = FixedIncomeTermEntity(
         instrument_kind=FixedIncomeInstrumentKind.CDB,
         indexer=FixedIncomeIndexer.CDI,
@@ -147,5 +147,5 @@ def test_earliest_fixed_income_start_uses_issue_or_purchase() -> None:
         transactions=(buy,),
     )
     stock = AssetEntity(ticker="X3", name="X", asset_type=AssetType.STOCK_BR, transactions=(buy,))
-    assert earliest_fixed_income_start([cdb, stock]) == date(2025, 2, 1)
+    assert earliest_fixed_income_start([cdb, stock]) == date(2025, 1, 15)
     assert earliest_fixed_income_start([stock]) is None

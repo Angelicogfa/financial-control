@@ -632,3 +632,14 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **29.6** Rigor estatístico: janela mínima por métrica com estado "dados insuficientes" e intervalo de confiança por bootstrap para Sharpe e retorno.
 - `[ ]` **29.7** Tela "Saúde da carteira" com o pilar em pior estado primeiro (sem média que dilua um crítico), limites configuráveis na Estratégia e operação MCP.
 - `[ ]` **29.8** Testes de unidade com séries sintéticas de resultado conhecido (pesos iguais, ativo único, ativos independentes), integração e UI.
+
+## Fase 30 — Tesouro: Rendimento Pró-Rata por Compra (`[x]` Implementado)
+
+**Objetivo:** o rendimento dos títulos do Tesouro aparece automaticamente, proporcional ao tempo desde cada compra. A data de emissão gravada no cadastro (preenchida com a data do cadastro pela tela de Pesquisa ou com a primeira data do extrato B3) cortava o rendimento das compras anteriores a ela.
+
+- `[x]` **30.1** Motor de renda fixa (`domain/portfolio/services/fixed_income.py`): todo lote começa na data da compra (`transactions.trade_date`, não a data de registro `created_at`); `issue_date` passa a ser só informativo (`earliest_fixed_income_start` também usa as compras).
+- `[x]` **30.2** Taxa por compra no Tesouro Prefixado sem cupom (LTN): `implied_purchase_rate` deriva a taxa do PU pago (`PU = 1000 / (1 + r)^(du/252)`), guardada no lote (`FixedIncomeLot.rate`) e usada na curva, nos resgates FIFO, na projeção de 12 meses e na situação tributária por lote; `contracted_rate` é o fallback (títulos com juros semestrais, PU inválido ou sem vencimento).
+- `[x]` **30.3** `fixed_income_terms.issue_date` opcional e nova coluna `semiannual_coupons` (migration `script_00020_fixed_income_issue_date_optional.py`, com preenchimento pelo nome "Juros Semestrais"); API, importação B3 (sem inferir a data de emissão pelo extrato e com a marca de juros semestrais da referência) e operações MCP aceitam os campos.
+- `[x]` **30.4** Interface web: "Data de emissão (opcional)" informativa no cadastro e na importação (sem padrão "hoje" e sem obrigatoriedade); cadastro pela Pesquisa sem data de emissão; opção "Paga juros semestrais" para títulos do Tesouro (marcada pelo catálogo) e aviso de que o Prefixado rende pela taxa implícita no PU; tipos regenerados.
+- `[x]` **30.5** Testes: `test_fixed_income_engine.py` (taxa implícita, lotes com taxas diferentes, valor de face no vencimento, resgate parcial mantendo a taxa, fallback com juros semestrais, data de emissão sem efeito), `test_treasury_pro_rata_api.py` (rotas, carteira e migration 00020), `test_b3_import_api.py` e `operations.test.tsx`.
+
