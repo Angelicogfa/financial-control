@@ -100,6 +100,64 @@ describe("asset form", () => {
     expect(body.ticker).toBeNull();
     expect(body.fixed_income_term).toMatchObject({ indexer: "CDI", contracted_rate: 1.125 });
   });
+
+  it("searches Tesouro Direto via Brapi and fills the contract fields", async () => {
+    const treasuryReply = {
+      results: [
+        {
+          symbol: "tesouro-ipca-15052035",
+          name: "Tesouro IPCA+ 2035",
+          bond_type: "Tesouro IPCA+",
+          instrument_kind: "TESOURO_IPCA",
+          indexer: "IPCA",
+          raw_indexer: "ipca",
+          coupon_type: "zero",
+          maturity_date: "2035-05-15",
+          buy_rate: 6.42,
+          sell_rate: 6.54,
+          buy_price: 2345.67,
+          sell_price: 2310.12,
+          base_price: 2310.12,
+          rate_type: "realAnnualRateOverIpca",
+          rate_unit: "% a.a.",
+          contracted_rate_percent: 6.42,
+          liquidity: "AT_MATURITY",
+          asset_id: null,
+        },
+      ],
+      total: 1,
+      unavailable_reason: null,
+    };
+    const { calls } = mockApi([
+      { path: "/research/treasury", reply: treasuryReply },
+      { method: "POST", path: "/assets", reply: asset({ id: 12, asset_type: "TREASURY" }) },
+    ]);
+    renderAt("/asset/new");
+    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "TREASURY" } });
+    fireEvent.change(screen.getByLabelText("Título ou vencimento"), { target: { value: "2035" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
+    expect(await screen.findByText("Tesouro IPCA+ 2035")).toBeInTheDocument();
+    expect(last(calls, "GET", "/research/treasury")?.query.get("q")).toBe("2035");
+
+    fireEvent.click(screen.getByRole("button", { name: "Usar título" }));
+    expect(screen.getByLabelText("Nome")).toHaveValue("Tesouro IPCA+ 2035");
+    expect(screen.getByLabelText("Taxa (%)")).toHaveValue("6,42");
+    expect(screen.getByLabelText("Vencimento")).toHaveValue("2035-05-15");
+    expect(screen.getByLabelText("Emissor")).toHaveValue("Tesouro Nacional");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar ativo" }));
+    await waitFor(() => expect(last(calls, "POST", "/assets")).toBeDefined());
+    const body = last(calls, "POST", "/assets")?.body as Record<string, unknown>;
+    expect(body.asset_type).toBe("TREASURY");
+    expect(body.name).toBe("Tesouro IPCA+ 2035");
+    expect(body.fixed_income_term).toMatchObject({
+      instrument_kind: "TESOURO_IPCA",
+      indexer: "IPCA",
+      contracted_rate: 0.0642,
+      maturity_date: "2035-05-15",
+      issuer: "Tesouro Nacional",
+    });
+  });
 });
 
 describe("research", () => {
@@ -213,6 +271,80 @@ describe("research", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remover" }));
     await waitFor(() => expect(last(calls, "DELETE", "/research/watchlist/9")).toBeDefined());
+  });
+
+  it("searches Tesouro Direto in the research tab and registers a bond", async () => {
+    const treasuryReply = {
+      results: [
+        {
+          symbol: "tesouro-selic-01032031",
+          name: "Tesouro Selic 2031",
+          bond_type: "Tesouro Selic",
+          instrument_kind: "TESOURO_SELIC",
+          indexer: "SELIC",
+          raw_indexer: "selic",
+          coupon_type: "zero",
+          maturity_date: "2031-03-01",
+          buy_rate: 0.1,
+          sell_rate: 0.11,
+          buy_price: 20074.43,
+          sell_price: 20055.44,
+          base_price: 20055.44,
+          rate_type: "spreadOverSelic",
+          rate_unit: "% a.a.",
+          contracted_rate_percent: 100,
+          liquidity: "DAILY",
+          asset_id: null,
+        },
+      ],
+      total: 1,
+      unavailable_reason: null,
+    };
+    const { calls } = mockApi([
+      { path: "/research/treasury", reply: treasuryReply },
+      {
+        method: "POST",
+        path: "/assets",
+        reply: { status: 201, json: asset({ id: 25, ticker: "TESOURO_SELIC-TESOURONAC-20310301", name: "Tesouro Selic 2031", asset_type: "TREASURY" }) },
+      },
+    ]);
+    renderAt("/research?tab=treasury");
+    fireEvent.change(screen.getByLabelText("Indexador"), { target: { value: "SELIC" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    expect(await screen.findByText("Tesouro Selic 2031")).toBeInTheDocument();
+    expect(screen.getByText("SELIC + 0,10% a.a.")).toBeInTheDocument();
+    expect(last(calls, "GET", "/research/treasury")?.query.get("indexer")).toBe("SELIC");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar" }));
+    expect(await screen.findByText(/Tesouro Selic 2031 .* cadastrado com sucesso/)).toBeInTheDocument();
+    expect(last(calls, "POST", "/assets")?.body).toMatchObject({
+      name: "Tesouro Selic 2031",
+      asset_type: "TREASURY",
+      arca_class: "CAIXA",
+      fixed_income_term: {
+        instrument_kind: "TESOURO_SELIC",
+        indexer: "SELIC",
+        contracted_rate: 1,
+        maturity_date: "2031-03-01",
+        liquidity: "DAILY",
+      },
+    });
+  });
+
+  it("displays unavailable_reason when Brapi requires Pro plan for Tesouro Direto", async () => {
+    mockApi([
+      {
+        path: "/research/treasury",
+        reply: {
+          results: [],
+          total: 0,
+          unavailable_reason: "Tesouro Direto e renda fixa requer o plano Pro.",
+        },
+      },
+    ]);
+    renderAt("/research?tab=treasury");
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    expect(await screen.findByText("Tesouro Direto e renda fixa requer o plano Pro.")).toBeInTheDocument();
   });
 });
 

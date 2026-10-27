@@ -13,10 +13,17 @@ from domain.market.entities import (
     PricePoint,
     Quote,
     QuoteFreshness,
+    TreasuryBond,
+    TreasuryCatalogResult,
     financial_volume,
 )
 from domain.shared.entities import CatalogInstrument
-from domain.shared.enums import AssetType
+from domain.shared.enums import (
+    AssetType,
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
+    FixedIncomeLiquidity,
+)
 from infra.providers.error_tracker import report_provider_error
 
 # Units of the quoteSummary fields consumed from brapi (ADR 0006): returnOnEquity,
@@ -192,6 +199,76 @@ class BrapiProvider:
             if not payload.get("hasNextPage") or page >= int(payload.get("totalPages") or page):
                 break
         return list(instruments.values())
+
+    def list_treasury_bonds(
+        self,
+        *,
+        indexer: str | None = None,
+        coupon_type: str | None = None,
+        search: str | None = None,
+        sort_by: str = "maturityDate",
+        sort_order: str = "asc",
+        page_size: int = 100,
+        max_pages: int = 10,
+    ) -> TreasuryCatalogResult:
+        """Fetch available Brazilian Treasury bonds from /v2/treasury/list."""
+        bonds: dict[str, TreasuryBond] = {}
+        for page in range(1, max_pages + 1):
+            params: dict[str, Any] = {
+                "page": page,
+                "limit": page_size,
+                "sortBy": sort_by,
+                "sortOrder": sort_order,
+            }
+            if indexer:
+                params["indexer"] = indexer
+            if coupon_type:
+                params["couponType"] = coupon_type
+            if search:
+                params["search"] = search.strip()
+            try:
+                resp = self._client.get(
+                    f"{self.base_url}/v2/treasury/list",
+                    params=params,
+                    headers=self._headers(),
+                )
+            except Exception:
+                return TreasuryCatalogResult(
+                    results=list(bonds.values()),
+                    unavailable_reason=(
+                        "Não foi possível conectar à API de Tesouro Direto da Brapi."
+                    ),
+                )
+
+            if resp.status_code in (401, 403):
+                message = _extract_error_message(resp) or (
+                    "A consulta de Tesouro Direto na Brapi (/api/v2/treasury/list) "
+                    "requer token autenticado no plano Pro."
+                )
+                return TreasuryCatalogResult(results=[], unavailable_reason=message)
+
+            try:
+                resp.raise_for_status()
+                payload = resp.json()
+            except Exception:
+                return TreasuryCatalogResult(
+                    results=list(bonds.values()),
+                    unavailable_reason=(
+                        "A API de Tesouro Direto da Brapi retornou uma resposta inválida."
+                    ),
+                )
+
+            for item in payload.get("results") or []:
+                bond = parse_brapi_treasury_item(item)
+                if bond is not None:
+                    bonds.setdefault(bond.symbol, bond)
+
+            pagination = payload.get("pagination") or {}
+            has_next = bool(pagination.get("hasNextPage") or payload.get("hasNextPage"))
+            total_pages = int(pagination.get("totalPages") or payload.get("totalPages") or page)
+            if not has_next or page >= total_pages:
+                break
+        return TreasuryCatalogResult(results=list(bonds.values()))
 
     def get_annual_statements(self, symbol: str) -> list[FundamentalSnapshot]:
         """Yearly statement history for a B3 symbol (empty when unavailable)."""
@@ -392,4 +469,104 @@ def parse_brapi_list_item(item: dict[str, Any], fetched_at: datetime) -> Catalog
         market_cap=_float_or_none(item.get("market_cap")),
         logo_url=item.get("logo") or None,
         updated_at=fetched_at,
+    )
+
+
+def _extract_error_message(resp: httpx.Response) -> str | None:
+    try:
+        payload = resp.json()
+    except Exception:
+        return None
+    if isinstance(payload, dict):
+        msg = payload.get("message")
+        if isinstance(msg, str) and msg.strip():
+            return msg.strip()
+    return None
+
+
+def classify_brapi_treasury_indexer(
+    raw_indexer: str | None,
+) -> tuple[FixedIncomeInstrumentKind, FixedIncomeIndexer, FixedIncomeLiquidity]:
+    """Map brapi's treasury `indexer` (selic, prefixado, ipca, igpm) to fixed income enums."""
+    kind = (raw_indexer or "").strip().lower()
+    if kind == "selic":
+        return (
+            FixedIncomeInstrumentKind.TESOURO_SELIC,
+            FixedIncomeIndexer.SELIC,
+            FixedIncomeLiquidity.DAILY,
+        )
+    if kind in ("prefixado", "pre"):
+        return (
+            FixedIncomeInstrumentKind.TESOURO_PRE,
+            FixedIncomeIndexer.PRE,
+            FixedIncomeLiquidity.AT_MATURITY,
+        )
+    return (
+        FixedIncomeInstrumentKind.TESOURO_IPCA,
+        FixedIncomeIndexer.IPCA,
+        FixedIncomeLiquidity.AT_MATURITY,
+    )
+
+
+def _iso_date_or_none(val: Any) -> date | None:
+    if isinstance(val, str) and len(val) >= 10:
+        try:
+            return date.fromisoformat(val[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def parse_brapi_treasury_item(item: dict[str, Any]) -> TreasuryBond | None:
+    """Parse a single Treasury bond entry from `/v2/treasury/list` or `/v2/treasury/indicators`."""
+    symbol = str(item.get("symbol") or "").strip().lower()
+    maturity = _iso_date_or_none(item.get("maturityDate"))
+    if not symbol or maturity is None:
+        return None
+
+    bond_type = str(item.get("bondType") or symbol).strip()
+    year_str = str(maturity.year)
+    name = bond_type if year_str in bond_type else f"{bond_type} {year_str}"
+    raw_indexer = str(item.get("indexer") or "ipca").strip().lower()
+    instrument_kind, indexer, liquidity = classify_brapi_treasury_indexer(raw_indexer)
+    coupon_type = str(item.get("couponType") or "zero").strip().lower()
+
+    buy_rate = _float_or_none(item.get("buyRate"))
+    sell_rate = _float_or_none(item.get("sellRate"))
+    ref_rate = buy_rate if buy_rate is not None and buy_rate > 0 else sell_rate
+    if indexer == FixedIncomeIndexer.SELIC:
+        # In the fixed income engine, SELIC contracted_rate is a multiplier of Selic (100% = 1.0).
+        contracted_rate_percent = 100.0
+    elif ref_rate is not None and ref_rate > 0:
+        contracted_rate_percent = round(ref_rate, 4)
+    else:
+        contracted_rate_percent = 12.0 if indexer == FixedIncomeIndexer.PRE else 6.0
+
+    rate_info = item.get("rateInfo") if isinstance(item.get("rateInfo"), dict) else {}
+    duration_raw = item.get("durationDays")
+    duration_days = int(duration_raw) if isinstance(duration_raw, int | float) else None
+
+    return TreasuryBond(
+        symbol=symbol,
+        name=name,
+        bond_type=bond_type,
+        instrument_kind=instrument_kind,
+        indexer=indexer,
+        raw_indexer=raw_indexer,
+        coupon_type=coupon_type,
+        maturity_date=maturity,
+        duration_days=duration_days,
+        base_date=_iso_date_or_none(item.get("baseDate")),
+        buy_rate=buy_rate,
+        sell_rate=sell_rate,
+        buy_price=_float_or_none(item.get("buyPrice")),
+        sell_price=_float_or_none(item.get("sellPrice")),
+        base_price=_float_or_none(item.get("basePrice")),
+        rate_type=str(rate_info.get("rateType")) if rate_info.get("rateType") else None,
+        rate_unit=str(rate_info.get("rateUnit")) if rate_info.get("rateUnit") else None,
+        rate_description=(
+            str(rate_info.get("description")) if rate_info.get("description") else None
+        ),
+        contracted_rate_percent=contracted_rate_percent,
+        liquidity=liquidity,
     )

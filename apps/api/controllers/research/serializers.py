@@ -5,7 +5,8 @@ Scope: B3 catalog screener and watchlist.
 
 from __future__ import annotations
 
-from controllers.research.responses import ScreenerItemDTO
+from controllers.research.responses import ScreenerItemDTO, TreasuryBondDTO
+from domain.market.entities import TreasuryBond
 from domain.research.services.screener import ScreenerResult
 from domain.shared.enums import AssetType, default_arca_class
 
@@ -33,4 +34,30 @@ def to_screener_item_dto(result: ScreenerResult) -> ScreenerItemDTO:
         margin=valuation.margin if valuation else None,
         asset_id=result.asset_id,
         lifecycle_status=result.lifecycle_status,
+    )
+
+
+def to_treasury_bond_dto(bond: TreasuryBond, *, asset_id: int | None = None) -> TreasuryBondDTO:
+    return TreasuryBondDTO(
+        symbol=bond.symbol,
+        name=bond.name,
+        bond_type=bond.bond_type,
+        instrument_kind=bond.instrument_kind,
+        indexer=bond.indexer,
+        raw_indexer=bond.raw_indexer,
+        coupon_type=bond.coupon_type,
+        maturity_date=bond.maturity_date,
+        duration_days=bond.duration_days,
+        base_date=bond.base_date,
+        buy_rate=bond.buy_rate,
+        sell_rate=bond.sell_rate,
+        buy_price=bond.buy_price,
+        sell_price=bond.sell_price,
+        base_price=bond.base_price,
+        rate_type=bond.rate_type,
+        rate_unit=bond.rate_unit,
+        rate_description=bond.rate_description,
+        contracted_rate_percent=bond.contracted_rate_percent,
+        liquidity=bond.liquidity,
+        asset_id=asset_id,
     )

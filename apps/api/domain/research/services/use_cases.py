@@ -8,10 +8,15 @@ from __future__ import annotations
 from dataclasses import replace
 
 from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
-from controllers.research.responses import ScreenerResponseDTO, WatchlistItemDTO
-from controllers.research.serializers import to_screener_item_dto
+from controllers.research.responses import (
+    ScreenerResponseDTO,
+    TreasurySearchResponseDTO,
+    WatchlistItemDTO,
+)
+from controllers.research.serializers import to_screener_item_dto, to_treasury_bond_dto
 from controllers.shared.dependencies import UoWFactory
 from core.errors import ConflictError, NotFoundError
+from domain.market.entities import TreasuryBond
 from domain.policy.services.lifecycle import has_position
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.research.services.screener import ScreenerCriteria, screen
@@ -21,6 +26,7 @@ from domain.shared.enums import (
     ArcaClass,
     AssetLifecycle,
     AssetType,
+    FixedIncomeIndexer,
     Market,
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -68,6 +74,42 @@ class ResearchHandler:
             arca_classes=sorted(criteria.arca_classes),
             catalog_size=len(catalog),
             catalog_updated_at=max((c.updated_at for c in catalog if c.updated_at), default=None),
+        )
+
+    def treasury(
+        self,
+        *,
+        query: str | None = None,
+        indexer: FixedIncomeIndexer | None = None,
+        coupon_type: str | None = None,
+    ) -> TreasurySearchResponseDTO:
+        brapi_indexer = _BRAPI_INDEXER_BY_ENUM.get(indexer) if indexer is not None else None
+        catalog_result = self.portfolio_service.gateway.list_treasury_bonds(
+            indexer=brapi_indexer,
+            coupon_type=coupon_type,
+        )
+        bonds = catalog_result.results
+        if indexer is not None:
+            bonds = [b for b in bonds if b.indexer == indexer]
+        if coupon_type:
+            bonds = [b for b in bonds if b.coupon_type == coupon_type.strip().lower()]
+        if query and query.strip():
+            needle = query.strip().casefold()
+            bonds = [b for b in bonds if _matches_treasury_query(b, needle)]
+
+        with self.uow_factory() as uow:
+            treasury_assets = [
+                a
+                for a in uow.assets.list_all(active_only=True)
+                if a.asset_type == AssetType.TREASURY
+            ]
+        return TreasurySearchResponseDTO(
+            results=[
+                to_treasury_bond_dto(b, asset_id=_matching_treasury_asset_id(b, treasury_assets))
+                for b in bonds
+            ],
+            total=len(bonds),
+            unavailable_reason=catalog_result.unavailable_reason,
         )
 
     def _empty(self, uow: AbstractUnitOfWork, criteria: ScreenerCriteria) -> ScreenerResponseDTO:
@@ -189,3 +231,34 @@ class ResearchHandler:
 
 def parse_asset_types(values: list[str] | None) -> frozenset[AssetType]:
     return frozenset(AssetType(v) for v in values or [])
+
+
+_BRAPI_INDEXER_BY_ENUM: dict[FixedIncomeIndexer, str] = {
+    FixedIncomeIndexer.SELIC: "selic",
+    FixedIncomeIndexer.PRE: "prefixado",
+    FixedIncomeIndexer.IPCA: "ipca",
+}
+
+
+def _matches_treasury_query(bond: TreasuryBond, needle: str) -> bool:
+    haystack = (
+        bond.symbol.casefold(),
+        bond.name.casefold(),
+        bond.bond_type.casefold(),
+        bond.maturity_date.isoformat(),
+    )
+    return any(needle in part for part in haystack)
+
+
+def _matching_treasury_asset_id(bond: TreasuryBond, assets: list[AssetEntity]) -> int | None:
+    for asset in assets:
+        term = asset.fixed_income_term
+        if (
+            term is not None
+            and term.instrument_kind == bond.instrument_kind
+            and term.maturity_date == bond.maturity_date
+        ):
+            return asset.id
+        if asset.name.strip().casefold() == bond.name.strip().casefold():
+            return asset.id
+    return None

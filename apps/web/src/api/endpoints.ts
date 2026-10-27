@@ -26,6 +26,7 @@ import type {
   EarningCreateRequest,
   EarningResponseDTO,
   EarningUpdateRequest,
+  FixedIncomeIndexer,
   GrantOptionsDTO,
   ImportCommitDTO,
   ImportPreviewDTO,
@@ -45,6 +46,7 @@ import type {
   TransactionCreateRequest,
   TransactionResponseDTO,
   TransactionUpdateRequest,
+  TreasurySearchResponseDTO,
   WatchlistAddRequest,
   WatchlistItemDTO,
   WorkerErrorsResponseDTO,
@@ -82,6 +84,12 @@ export interface ScreenerFilters {
   below_band?: boolean;
   exclude_registered?: boolean;
   limit?: number;
+}
+
+export interface TreasuryFilters {
+  q?: string;
+  indexer?: FixedIncomeIndexer;
+  coupon_type?: "zero" | "semestral";
 }
 
 const newestFirst = { sort_by: "id", sort_order: "desc" };
@@ -125,6 +133,8 @@ export const api = {
   research: {
     screener: (filters: ScreenerFilters) =>
       request<ScreenerResponseDTO>("/research/screener", { query: { ...filters } }),
+    treasury: (filters: TreasuryFilters = {}) =>
+      request<TreasurySearchResponseDTO>("/research/treasury", { query: { ...filters } }),
     watchlist: () => request<WatchlistItemDTO[]>("/research/watchlist"),
     follow: (body: WatchlistAddRequest) =>
       request<WatchlistItemDTO>("/research/watchlist", { method: "POST", body }),

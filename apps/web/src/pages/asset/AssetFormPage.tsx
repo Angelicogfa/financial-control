@@ -12,12 +12,14 @@ import type {
   FixedIncomeIndexer,
   FixedIncomeInstrumentKind,
   FixedIncomeLiquidity,
+  TreasuryBondDTO,
+  TreasurySearchResponseDTO,
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async } from "../../components/States";
-import { parseDecimal, today } from "../../utils/format";
+import { brl, day, parseDecimal, today } from "../../utils/format";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -33,7 +35,12 @@ import {
   PROFILES,
   PURPOSE_LABELS,
 } from "../../utils/labels";
-import { DEFAULT_RATE_PERCENT, contractedRateToPercent, percentToContractedRate } from "../../utils/rates";
+import {
+  DEFAULT_RATE_PERCENT,
+  contractedRateToPercent,
+  formatTreasuryRate,
+  percentToContractedRate,
+} from "../../utils/rates";
 
 interface FormState {
   ticker: string;
@@ -105,6 +112,96 @@ function fromAsset(asset: AssetResponseDTO): FormState {
 
 const CODE_GENERATED: AssetType[] = ["FIXED_INCOME", "TREASURY", "CASH"];
 
+function TreasuryPicker({ onSelect }: Readonly<{ onSelect: (bond: TreasuryBondDTO) => void }>) {
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState<TreasurySearchResponseDTO | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const search = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setResult(await api.research.treasury({ q: query.trim() || undefined }));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <fieldset className="app-fieldset">
+      <legend>Buscar título do Tesouro Direto (Brapi)</legend>
+      <div className="app-filter-bar" style={{ marginBottom: 0 }}>
+        <div className="app-field" style={{ flex: 1 }}>
+          <label htmlFor="treasury-search">Título ou vencimento</label>
+          <input
+            id="treasury-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Ex.: Selic, IPCA, 2031"
+          />
+        </div>
+        <button
+          type="button"
+          className="app-secondary-button"
+          disabled={loading}
+          onClick={() => void search()}
+        >
+          {loading ? "Buscando…" : "Buscar títulos"}
+        </button>
+      </div>
+      {error && <p className="app-error-banner">{error}</p>}
+      {result?.unavailable_reason && <p className="app-info-banner">{result.unavailable_reason}</p>}
+      {result && !result.unavailable_reason && result.results.length === 0 && (
+        <p className="app-muted">Nenhum título do Tesouro Direto encontrado para esse filtro.</p>
+      )}
+      {result && result.results.length > 0 && (
+        <div className="app-table-wrap" style={{ marginTop: "var(--space-2)" }}>
+          <table className="app-table">
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Indexador</th>
+                <th>Vencimento</th>
+                <th className="app-numeric">Taxa compra</th>
+                <th className="app-numeric">PU compra</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {result.results.map((bond) => (
+                <tr key={bond.symbol}>
+                  <td>
+                    <span className="app-cell-main">
+                      <strong>{bond.name}</strong>
+                      <small>{bond.symbol}</small>
+                    </span>
+                  </td>
+                  <td>{bond.indexer}</td>
+                  <td>{day(bond.maturity_date)}</td>
+                  <td className="app-numeric">{formatTreasuryRate(bond, bond.buy_rate ?? bond.sell_rate)}</td>
+                  <td className="app-numeric">{brl(bond.buy_price ?? bond.base_price)}</td>
+                  <td className="app-row-actions">
+                    <button
+                      type="button"
+                      className="app-secondary-button"
+                      onClick={() => onSelect(bond)}
+                    >
+                      Usar título
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(() => (asset ? fromAsset(asset) : EMPTY));
@@ -113,6 +210,19 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
   const [saving, setSaving] = useState(false);
   const fixedIncome = FIXED_INCOME_TYPES.includes(form.assetType);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  const applyTreasuryBond = (bond: TreasuryBondDTO) => {
+    setForm((f) => ({
+      ...f,
+      name: bond.name,
+      instrumentKind: bond.instrument_kind,
+      indexer: bond.indexer,
+      ratePercent: String(bond.contracted_rate_percent).replace(".", ","),
+      maturityDate: bond.maturity_date,
+      liquidity: bond.liquidity,
+      issuer: f.issuer.trim() || "Tesouro Nacional",
+    }));
+  };
 
   // ARCA class suggested by the instrument's exposure (ETF catalog) or by its type.
   useEffect(() => {
@@ -279,6 +389,8 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
           />
         </div>
       </div>
+
+      {form.assetType === "TREASURY" && <TreasuryPicker onSelect={applyTreasuryBond} />}
 
       {fixedIncome && (
         <fieldset className="app-fieldset">
