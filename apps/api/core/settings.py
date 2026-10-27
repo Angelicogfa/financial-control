@@ -52,9 +52,7 @@ class Settings(BaseSettings):
     brapi_token: str | None = None
     bcb_sgs_base_url: str = "https://api.bcb.gov.br/dados/serie"
     tesouro_transparente_csv_url: str = (
-        "https://www.tesourotransparente.gov.br/ckan/dataset/"
-        "df56aa42-484a-4a59-8184-7676580c81e3/resource/"
-        "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/PrecoTaxaTesouroDireto.csv"
+        "https://www.tesourodireto.com.br/documents/d/guest/rendimento-investir-csv?download=true"
     )
     market_fetch_workers: int = Field(default=8, ge=1, le=32)
     market_fetch_timeout_seconds: float = Field(default=20.0, gt=0)
