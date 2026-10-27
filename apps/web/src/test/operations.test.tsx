@@ -446,6 +446,65 @@ describe("ledger", () => {
     await waitFor(() => expect(last(calls, "POST", "/transactions")?.body).toMatchObject({ asset_id: 1, quantity: 10, unit_price: 40.5, kind: "BUY" }));
   });
 
+  const usfr = asset({ id: 7, ticker: "USFR", name: "WisdomTree Floating Rate Treasury", asset_type: "ETF_INTL", currency: "USD" });
+
+  it("shows the FX field and the BRL total for a preset USD asset", async () => {
+    mockApi([
+      { path: "/assets", reply: page([asset(), usfr]) },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/ledger/trades/new?asset=7");
+    const fx = await screen.findByLabelText("Câmbio USD/BRL do dia");
+    expect(screen.getByLabelText(/Preço unitário \(USD\)/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText(/Preço unitário/), { target: { value: "50,25" } });
+    fireEvent.change(screen.getByLabelText("Taxas"), { target: { value: "1" } });
+    fireEvent.change(fx, { target: { value: "5,2" } });
+    expect(screen.getByText(/Total em reais/)).toHaveTextContent("R$ 2.618,20");
+  });
+
+  it("keeps the FX field and the saved rate when editing a USD trade", async () => {
+    const usdTrade = { ...trade, id: 6, asset_id: 7, ticker: "USFR", quantity: 2, unit_price: 50, fees: 0, fx_rate: 5.5, total_brl: 550 };
+    const { calls } = mockApi([
+      { path: "/transactions/6", reply: usdTrade },
+      { path: "/assets", reply: page([asset(), usfr]) },
+      { path: "/accounts", reply: accounts },
+      { method: "PUT", path: "/transactions/6", reply: usdTrade },
+      { path: "/transactions", reply: page([usdTrade]) },
+    ]);
+    renderAt("/ledger/trades/6/edit");
+    expect(await screen.findByLabelText("Câmbio USD/BRL do dia")).toHaveValue("5,5");
+    expect(screen.getByText(/Total em reais/)).toHaveTextContent("R$ 550,00");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(last(calls, "PUT", "/transactions/6")?.body).toMatchObject({ fx_rate: 5.5, quantity: 2, unit_price: 50 }));
+  });
+
+  it("hides the FX field for a BRL asset", async () => {
+    mockApi([
+      { path: "/assets", reply: page([asset(), usfr]) },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/ledger/trades/new?asset=1");
+    await screen.findByRole("option", { name: /WEGE3/ });
+    expect(screen.queryByLabelText(/Câmbio/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the FX field and the saved rate when editing a USD earning", async () => {
+    const earning = { id: 9, asset_id: 7, kind: "DIVIDEND", payment_date: "2026-02-01", gross_amount: 10, withholding_tax: 3, net_amount: 7, fx_rate: 5, net_amount_brl: 35 };
+    const { calls } = mockApi([
+      { path: "/earnings/9", reply: earning },
+      { path: "/assets", reply: page([asset(), usfr]) },
+      { path: "/accounts", reply: accounts },
+      { method: "PUT", path: "/earnings/9", reply: earning },
+      { path: "/earnings", reply: page([earning]) },
+    ]);
+    renderAt("/ledger/earnings/9/edit");
+    expect(await screen.findByLabelText("Câmbio do pagamento")).toHaveValue("5");
+    expect(screen.getByText(/Líquido em reais/)).toHaveTextContent("R$ 35,00");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(last(calls, "PUT", "/earnings/9")?.body).toMatchObject({ fx_rate: 5, gross_amount: 10 }));
+  });
+
   it("previews and commits a B3 statement", async () => {
     const preview = {
       kind: "NEGOTIATION",

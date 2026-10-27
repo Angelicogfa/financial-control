@@ -7,9 +7,15 @@ import type { TransactionKind, TransactionResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Spinner } from "../../components/States";
-import { parseDecimal, today } from "../../utils/format";
+import { brl, parseDecimal, today } from "../../utils/format";
 import { TRADE_LABELS } from "../../utils/labels";
 import { AccountSelect, AssetSelect } from "./AssetSelect";
+
+/** Same rule as the API's `total_brl`: (quantity × price + fees) × FX, null while incomplete. */
+function brlTotal(qty: number | null, price: number | null, fees: number, fx: number | null): number | null {
+  if (qty === null || price === null || fx === null) return null;
+  return Math.round((qty * price + fees) * fx * 100) / 100;
+}
 
 function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponseDTO | null; presetAsset: number | null }>) {
   const navigate = useNavigate();
@@ -25,6 +31,7 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
   const [notes, setNotes] = useState(trade?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const totalBrl = brlTotal(parseDecimal(qty), parseDecimal(price), parseDecimal(fees) ?? 0, parseDecimal(fx));
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -70,6 +77,7 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
               setAssetId(a?.id ?? "");
               setCurrency(a?.currency ?? "BRL");
             }}
+            onResolve={(a) => setCurrency(a?.currency ?? "BRL")}
           />
         </div>
         <div className="app-field">
@@ -102,6 +110,9 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
           <div className="app-field">
             <label htmlFor="trade-fx">Câmbio {currency}/BRL do dia</label>
             <input id="trade-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required disabled={saving} />
+            <output htmlFor="trade-qty trade-price trade-fees trade-fx" className="app-muted">
+              Total em reais: {brl(totalBrl)}
+            </output>
           </div>
         )}
         <div className="app-field">
