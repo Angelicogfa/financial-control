@@ -50,6 +50,9 @@ class Settings(BaseSettings):
 
     # Market data providers
     brapi_token: str | None = None
+    # Longest history range and parallel calls the brapi plan allows (free: 3mo, 1).
+    brapi_max_history_range: str | None = "3mo"
+    brapi_max_concurrency: int = 1
     bcb_sgs_base_url: str = "https://api.bcb.gov.br/dados/serie"
     tesouro_transparente_csv_url: str = (
         "https://www.tesourodireto.com.br/documents/d/guest/rendimento-investir-csv?download=true"
