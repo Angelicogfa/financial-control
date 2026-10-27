@@ -39,7 +39,7 @@ def test_policy_handler_rejects_non_100_targets_without_committing() -> None:
 
 
 def test_every_feature_router_is_checked() -> None:
-    assert len(ROUTERS) == 11
+    assert len(ROUTERS) == 12
 
 
 @pytest.mark.parametrize("router_path", ROUTERS, ids=lambda p: p.parent.name)
@@ -66,9 +66,11 @@ def test_controllers_strictly_isolated_from_orm_and_repositories(router_path: Pa
         "TransactionModel",
         "EarningModel",
         "ArcaTargetModel",
+        "AgentApiKeyModel",
         "SqlAlchemyAssetRepository",
         "SqlAlchemyTransactionRepository",
         "SqlAlchemyEarningRepository",
+        "SqlAlchemyAgentKeyRepository",
         "SqlAlchemyUnitOfWork",
         "uow_factory",
     }

@@ -1365,6 +1365,294 @@ button:disabled {
   font-size: var(--text-sm);
 }
 
+/* --- agentic keys, MCP connection & scope picker --- */
+
+.app-key-use-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.app-key-use-body {
+  margin: 4px 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.app-mcp-connection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.app-mcp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: 6px;
+  min-height: 2.25rem;
+}
+
+.app-mcp-label {
+  flex: 0 0 11rem;
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}
+
+@media (max-width: 560px) {
+  .app-mcp-label {
+    flex-basis: 100%;
+  }
+}
+
+.app-mcp-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-mcp-value {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.app-key-renew-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-mcp-snippet {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  font-size: var(--text-sm);
+  overflow-x: auto;
+}
+
+.app-mcp-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.app-badge-plain {
+  text-transform: none;
+}
+
+.app-collapsible {
+  position: relative;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+}
+
+.app-collapsible-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  padding-right: calc(var(--space-3) + 24px);
+  background: none;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-body);
+  color: var(--app-text-secondary);
+}
+
+.app-collapsible-head:hover {
+  background: var(--app-surface-muted);
+}
+
+.app-collapsible-head:focus {
+  outline: none;
+}
+
+.app-collapsible-head:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: -2px;
+}
+
+.app-collapsible-title {
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.app-collapsible-hint {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.app-collapsible-body {
+  padding: 0 var(--space-3) var(--space-2);
+  border-top: 1px solid var(--app-border);
+}
+
+.app-scope-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0 var(--space-1);
+}
+
+.app-scope-filter {
+  flex: 1 1 220px;
+  font-size: var(--text-body);
+}
+
+.app-scope-shortcuts {
+  display: flex;
+  gap: var(--space-3);
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+
+.app-scope-module-title {
+  margin: var(--space-3) 0 0;
+  padding-bottom: var(--space-1);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--app-text-muted);
+}
+
+.app-scope-context {
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-scope-context:last-child {
+  border-bottom: 0;
+}
+
+.app-scope-context.is-whole {
+  background: var(--app-primary-subtle);
+}
+
+.app-scope-context-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+}
+
+.app-scope-context-toggle {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  padding: var(--space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-body);
+  color: var(--app-text-muted);
+}
+
+.app-scope-context-toggle:hover .app-scope-context-label {
+  color: var(--app-link);
+}
+
+.app-scope-context-toggle:focus {
+  outline: none;
+}
+
+.app-scope-context-toggle:focus-visible {
+  outline: 2px solid var(--app-primary);
+}
+
+.app-scope-context-label {
+  font-weight: 500;
+  color: var(--app-text);
+}
+
+.app-scope-context-code {
+  font-size: var(--text-micro);
+  color: var(--app-text-muted);
+}
+
+.app-scope-whole {
+  flex-shrink: 0;
+  min-height: 0;
+  padding-right: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.app-scope-operations {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--space-2) var(--space-3) calc(14px + var(--space-3));
+}
+
+.app-scope-quick {
+  gap: var(--space-3);
+  padding-bottom: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.app-scope-whole-note {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.app-scope-operation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+}
+
+.app-scope-operation:hover:not(.is-locked) {
+  background: var(--app-surface-muted);
+}
+
+.app-scope-operation.is-locked {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.app-scope-operation input {
+  margin-top: 2px;
+}
+
+.app-scope-operation-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-scope-operation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+}
+
+.app-scope-operation-desc,
+.app-scope-locked {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
 /* --- login --- */
 
 .login-canvas {

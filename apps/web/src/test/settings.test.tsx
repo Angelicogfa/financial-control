@@ -2,7 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { App } from "../App";
-import type { PolicyDTO } from "../api/types";
+import type { GrantOptionsDTO, PolicyDTO } from "../api/types";
+import { daysLeft, expiryState } from "../pages/settings/agentic/expiry";
+import { mcpClientConfig, mcpEndpoint } from "../pages/settings/agentic/mcpConnection";
+import { scopeSize } from "../pages/settings/agentic/scope";
 import { alerts, analytics, report } from "./fixtures";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
@@ -152,3 +155,215 @@ describe("session", () => {
     expect(await screen.findByText(/O login ainda não foi configurado/)).toBeInTheDocument();
   });
 });
+
+const grantOptions: GrantOptionsDTO = {
+  contexts: [
+    {
+      name: "portfolio",
+      label: "Carteira & Desempenho",
+      grantable: true,
+      operations: [
+        {
+          name: "portfolio.consolidated",
+          kind: "query",
+          description: "Retorna o relatório consolidado da carteira.",
+          grantable: true,
+        },
+      ],
+    },
+    {
+      name: "assets",
+      label: "Ativos & Checklist do Cerrado",
+      grantable: true,
+      operations: [
+        {
+          name: "assets.list",
+          kind: "query",
+          description: "Lista os ativos cadastrados.",
+          grantable: true,
+        },
+        {
+          name: "assets.create",
+          kind: "command",
+          description: "Cadastra um novo ativo.",
+          grantable: true,
+        },
+      ],
+    },
+  ],
+};
+
+describe("agentic mcp settings", () => {
+  it("computes expiry states, scope size, and MCP client config", () => {
+    const now = new Date("2026-03-10T12:00:00Z").getTime();
+    expect(daysLeft("2026-03-20T12:00:00Z", now)).toBe(10);
+    expect(expiryState("2026-03-20T12:00:00Z", now)).toBe("soon");
+    expect(expiryState("2026-06-20T12:00:00Z", now)).toBe("ok");
+    expect(expiryState("2026-03-01T12:00:00Z", now)).toBe("expired");
+
+    expect(
+      scopeSize(grantOptions.contexts, {
+        contexts: ["assets"],
+        operations: ["portfolio.consolidated"],
+      }),
+    ).toBe(3);
+
+    expect(mcpEndpoint()).toContain("/api/v1/mcp");
+    const parsed = JSON.parse(mcpClientConfig("fck_secret123")) as {
+      mcpServers: { "financial-control": { url: string; headers: { Authorization: string } } };
+    };
+    expect(parsed.mcpServers["financial-control"].headers.Authorization).toBe("Bearer fck_secret123");
+  });
+
+  it("creates a personal MCP key with scoped permissions and displays the secret once", async () => {
+    const { calls } = mockApi([
+      { path: "/agents/keys/options", reply: grantOptions },
+      {
+        path: "/agents/keys",
+        reply: [
+          {
+            id: 1,
+            name: "Claude Desktop",
+            prefix: "fck_abcd1234",
+            contexts: ["portfolio"],
+            operations: ["assets.list"],
+            created_at: "2026-03-10T10:00:00Z",
+            expires_at: "2026-06-08T10:00:00Z",
+            last_used_at: null,
+            revision: 1,
+          },
+        ],
+      },
+      {
+        method: "POST",
+        path: "/agents/keys",
+        reply: {
+          status: 201,
+          json: {
+            id: 2,
+            name: "Cursor Local",
+            prefix: "fck_99887766",
+            key: "fck_99887766_full_secret_token",
+            contexts: ["portfolio"],
+            operations: ["assets.list"],
+            created_at: "2026-03-10T12:00:00Z",
+            expires_at: "2026-06-08T12:00:00Z",
+            last_used_at: null,
+            revision: 1,
+          },
+        },
+      },
+    ]);
+
+    renderAt("/settings/agentic/new");
+    const nameInput = await screen.findByLabelText("Nome da chave");
+    expect(await screen.findByText("Carteira & Desempenho")).toBeInTheDocument();
+
+    fireEvent.change(nameInput, { target: { value: "Cursor Local" } });
+
+    // Submitting without scope shows validation error
+    fireEvent.click(screen.getByRole("button", { name: "Criar chave MCP" }));
+    expect(await screen.findByText("Selecione ao menos um contexto ou operação para esta chave.")).toBeInTheDocument();
+    expect(last(calls, "POST", "/agents/keys")).toBeUndefined();
+
+    // Use "Somente leitura em tudo" shortcut (selects portfolio.consolidated + assets.list)
+    fireEvent.click(screen.getByRole("button", { name: "Somente leitura em tudo" }));
+    expect(screen.getByText("2 operações liberadas")).toBeInTheDocument();
+
+    // Also check whole context for portfolio
+    fireEvent.click(screen.getByLabelText("Conceder contexto inteiro portfolio"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Criar chave MCP" }));
+
+    expect(
+      await screen.findByText("Guarde esta chave agora — ela não será mostrada novamente"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("fck_99887766_full_secret_token")).toBeInTheDocument();
+    expect(last(calls, "POST", "/agents/keys")?.body).toEqual({
+      name: "Cursor Local",
+      contexts: ["portfolio"],
+      operations: ["assets.list"],
+      expires_in_days: 90,
+    });
+  });
+
+  it("edits, renews, and revokes an existing MCP key", async () => {
+    let revoked = false;
+    const keyItem = {
+      id: 1,
+      name: "Claude Desktop",
+      prefix: "fck_abcd1234",
+      contexts: ["portfolio"],
+      operations: ["assets.list"],
+      created_at: "2026-03-10T10:00:00Z",
+      expires_at: "2026-06-08T10:00:00Z",
+      last_used_at: null,
+      revision: 1,
+    };
+
+    const { calls } = mockApi([
+      { path: "/agents/keys/options", reply: grantOptions },
+      { path: "/agents/keys", reply: () => (revoked ? [] : [keyItem]) },
+      { path: "/agents/keys/1", reply: keyItem },
+      {
+        method: "POST",
+        path: "/agents/keys/1/renew",
+        reply: { ...keyItem, expires_at: "2026-12-08T10:00:00Z", revision: 2 },
+      },
+      {
+        method: "PUT",
+        path: "/agents/keys/1",
+        reply: {
+          ...keyItem,
+          name: "Claude Desktop Principal",
+          contexts: ["portfolio", "assets"],
+          operations: [],
+          revision: 3,
+        },
+      },
+      {
+        method: "DELETE",
+        path: "/agents/keys/1",
+        reply: () => {
+          revoked = true;
+          return { status: 204 };
+        },
+      },
+    ]);
+
+    renderAt("/settings/agentic/1");
+    expect(await screen.findByDisplayValue("Claude Desktop")).toBeInTheDocument();
+
+    // Renew validity
+    fireEvent.change(screen.getByLabelText("Renovar por"), { target: { value: "180" } });
+    fireEvent.click(screen.getByRole("button", { name: "Renovar validade" }));
+    expect(await screen.findByText(/Validade renovada até/)).toBeInTheDocument();
+    expect(last(calls, "POST", "/agents/keys/1/renew")?.body).toEqual({ expires_in_days: 180 });
+
+    // Open collapsible scope section and grant whole assets context
+    fireEvent.click(screen.getByRole("button", { name: /Escopo de ferramentas MCP/ }));
+    fireEvent.click(await screen.findByLabelText("Conceder contexto inteiro assets"));
+    fireEvent.change(screen.getByLabelText("Nome da chave"), {
+      target: { value: "Claude Desktop Principal" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(await screen.findByText(/Alterações salvas/)).toBeInTheDocument();
+    expect(last(calls, "PUT", "/agents/keys/1")?.body).toEqual({
+      name: "Claude Desktop Principal",
+      contexts: ["portfolio", "assets"],
+      operations: [],
+      expected_revision: 2,
+    });
+
+    // Return to list and revoke
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(await screen.findByText("fck_abcd1234…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Revogar" }));
+    expect(screen.getByRole("dialog", { name: "Confirmar revogação" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar revogação" }));
+    expect(await screen.findByText(/Nenhuma chave MCP ativa/)).toBeInTheDocument();
+    expect(last(calls, "DELETE", "/agents/keys/1")).toBeDefined();
+  });
+});
+

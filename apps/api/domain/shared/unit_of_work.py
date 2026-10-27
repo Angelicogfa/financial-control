@@ -7,6 +7,7 @@ from types import TracebackType
 
 from domain.shared.repositories import (
     AbstractAccountRepository,
+    AbstractAgentKeyRepository,
     AbstractAlertDismissalRepository,
     AbstractAssetRepository,
     AbstractCatalogRepository,
@@ -42,6 +43,7 @@ class AbstractUnitOfWork(ABC):
     corporate_events: AbstractCorporateEventRepository
     ledger_imports: AbstractLedgerImportRepository
     alert_dismissals: AbstractAlertDismissalRepository
+    agent_keys: AbstractAgentKeyRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

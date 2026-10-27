@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from infra.data.db import get_default_session_factory
 from infra.data.repositories.accounts import SqlAlchemyAccountRepository
+from infra.data.repositories.agent_keys import SqlAlchemyAgentKeyRepository
 from infra.data.repositories.alerts import SqlAlchemyAlertDismissalRepository
 from infra.data.repositories.assets import (
     SqlAlchemyAssetRepository,
@@ -57,6 +58,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.corporate_events = SqlAlchemyCorporateEventRepository(self.session)
         self.ledger_imports = SqlAlchemyLedgerImportRepository(self.session)
         self.alert_dismissals = SqlAlchemyAlertDismissalRepository(self.session)
+        self.agent_keys = SqlAlchemyAgentKeyRepository(self.session)
         return self
 
     def __exit__(

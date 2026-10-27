@@ -481,3 +481,17 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **17.8** Testes e Validação: consolidação da suite de testes em `apps/api/tests/` (414 testes de backend passando), 46 testes de frontend passando (`npm test`), build do frontend Vite concluído, lint/formatação ruff 100% limpos e contrato OpenAPI idêntico.
 - `[x]` **17.9** Documentação: ADR 0009 criado; `AGENTS.md`, `GEMINI.md`, `.agents/rules/project-rules.md`, `README.md` e `IMPLEMENTATION_PLAN.md` atualizados.
 
+---
+
+## Fase 18 — Configuração Agêntica e Servidor MCP Pessoal (`[x]` Implementado)
+
+**Objetivo:** expor uma seção de configuração agêntica (`/settings/agentic`) para gerenciamento de chaves pessoais (`fck_...`) e disponibilizar todas as operações das telas da aplicação via protocolo MCP (Streamable HTTP) em `/api/v1/mcp`, seguindo o padrão arquitetural de `dynamic-research` adaptado ao modelo single-user pessoal.
+
+- `[x]` **18.1** Persistência e Domínio de Chaves Agênticas: `AgentGrant`, `AgentApiKeyEntity`, `AbstractAgentKeyRepository`, `AgentApiKeyModel` (`agent_api_keys`), `SqlAlchemyAgentKeyRepository` integrado à `SqlAlchemyUnitOfWork` (`uow.agent_keys`) e migration Alembic `script_00016_agent_api_keys.py`.
+- `[x]` **18.2** Catálogo de Operações e Escopo: `domain/agentic/services/catalog.py` mapeando as 38 operações das telas em 12 contextos (`portfolio`, `assets`, `contributions`, `ledger.trades`, `ledger.earnings`, `ledger.events`, `ledger.imports`, `research`, `policy`, `accounts`, `alerts`, `market`), com verificação de escopo (`reaches`, `validate_grant`).
+- `[x]` **18.3** Casos de Uso e Rotas REST: `AgentKeyHandler` (`domain/agentic/services/use_cases.py`) com geração de chave `fck_<token>`, resumo SHA-256, comparação em tempo constante (`hmac.compare_digest`), controle de concorrência otimista (`revision`) e rotas `/api/v1/agents/keys` (`controllers/agentic/router.py`).
+- `[x]` **18.4** Servidor MCP ASGI (`infra/mcp/server.py`): `McpPort` montado em `/api/v1/mcp` com `StreamableHTTPSessionManager`, verificação de `Origin` contra DNS rebinding, autenticação Bearer `fck_...`, `tools/list` filtrado pelo escopo da chave, `tools/call` com validação Pydantic, `idempotency_key` em comandos e saída estruturada.
+- `[x]` **18.5** Interface Web (`apps/web/src/pages/settings/agentic/`): `AgenticPage`, `AgentKeyFormPage`, `ScopePicker`, `KeyExpiry`, `McpConnection` e rotas `/settings/agentic`, `/settings/agentic/new`, `/settings/agentic/:keyId` no menu Configuração.
+- `[x]` **18.6** Testes e Validação: `apps/api/tests/test_agentic_mcp.py` (migrations, catálogo, CRUD REST, protocolo MCP `tools/list`, `tools/call` e `idempotency_key`), testes unitários e de página no frontend (`apps/web/src/test/settings.test.tsx`), build Vite e `docker compose build`.
+
+

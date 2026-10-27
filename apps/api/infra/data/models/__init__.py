@@ -7,6 +7,7 @@ relationship() string targets rely on it).
 from __future__ import annotations
 
 from infra.data.models.accounts import AccountModel
+from infra.data.models.agent_keys import AgentApiKeyModel
 from infra.data.models.alerts import AlertDismissalModel
 from infra.data.models.assets import (
     AssetModel,
@@ -26,6 +27,7 @@ from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshot
 
 __all__ = [
     "AccountModel",
+    "AgentApiKeyModel",
     "AlertDismissalModel",
     "AssetModel",
     "ChecklistAnswerModel",

@@ -143,3 +143,31 @@ export const EyeOffIcon = (p: IconProps) => (
     <path d="M10.6 5.1A10 10 0 0 1 12 5c5 0 9 4.5 10 7-0.4 1-1.2 2.3-2.4 3.5M6.6 6.6C4.4 8 2.9 10.2 2 12c1 2.5 5 7 10 7 1.8 0 3.4-.6 4.8-1.4" />
   </Icon>
 );
+
+export const BotIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="8" width="16" height="12" rx="2" />
+    <path d="M12 4v4M9 4h6" />
+    <circle cx="9" cy="14" r="1" />
+    <circle cx="15" cy="14" r="1" />
+  </Icon>
+);
+
+export const ChevronDownIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m9 18 6-6-6-6" />
+  </Icon>
+);
+
+export const PlusIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+

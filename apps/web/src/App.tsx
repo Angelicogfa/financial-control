@@ -19,6 +19,8 @@ import { PerformancePage } from "./pages/performance/PerformancePage";
 import { PortfolioPage } from "./pages/portfolio/PortfolioPage";
 import { ResearchPage } from "./pages/research/ResearchPage";
 import { AccountsPage } from "./pages/settings/AccountsPage";
+import { AgenticPage } from "./pages/settings/agentic/AgenticPage";
+import { AgentKeyFormPage } from "./pages/settings/agentic/AgentKeyFormPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
 import { StrategyPage } from "./pages/settings/StrategyPage";
 
@@ -45,6 +47,9 @@ export function AppRoutes() {
       <Route path="/settings/strategy" element={<StrategyPage />} />
       <Route path="/settings/accounts" element={<AccountsPage />} />
       <Route path="/settings/market-data" element={<MarketDataPage />} />
+      <Route path="/settings/agentic" element={<AgenticPage />} />
+      <Route path="/settings/agentic/new" element={<AgentKeyFormPage />} />
+      <Route path="/settings/agentic/:keyId" element={<AgentKeyFormPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

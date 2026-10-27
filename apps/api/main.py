@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
+from starlette.routing import Route
 
 from controllers.accounts.router import accounts_router
+from controllers.agentic.router import agentic_router
 from controllers.alerts.router import alerts_router
 from controllers.assets.router import assets_router
 from controllers.auth.dependencies import require_user
@@ -25,6 +30,7 @@ from core.http_errors import install_error_handlers
 from core.logging import configure_logging
 from core.middleware import install_middleware
 from core.settings import get_settings
+from infra.mcp import mcp_port
 
 API_PREFIX = "/api/v1"
 
@@ -44,7 +50,14 @@ PROTECTED_ROUTERS = (
     events_router,
     imports_router,
     alerts_router,
+    agentic_router,
 )
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async with mcp_port.running():
+        yield
 
 
 def create_app() -> FastAPI:
@@ -57,6 +70,7 @@ def create_app() -> FastAPI:
         description=(
             "Investment portfolio control with ARCA methodology and optional Diagrama do Cerrado"
         ),
+        lifespan=_lifespan,
     )
     install_middleware(app, settings)
     install_error_handlers(app)
@@ -66,6 +80,9 @@ def create_app() -> FastAPI:
     protected = [Depends(require_user)]
     for router in PROTECTED_ROUTERS:
         app.include_router(router, prefix=API_PREFIX, dependencies=protected)
+    app.router.routes.append(
+        Route(f"{API_PREFIX}/mcp", endpoint=mcp_port, methods=["GET", "POST", "DELETE"])
+    )
     return app
 
 

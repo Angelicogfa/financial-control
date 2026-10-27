@@ -805,3 +805,58 @@ export interface WatchlistItemDTO {
   fair_value?: number | null;
   margin?: number | null;
 }
+
+export type KeyExpiryDays = 30 | 90 | 180 | 365;
+
+export interface AgentKeyCreateRequest {
+  name: string;
+  contexts: string[];
+  operations: string[];
+  expires_in_days?: KeyExpiryDays;
+}
+
+export interface AgentKeyUpdateRequest {
+  name: string;
+  contexts: string[];
+  operations: string[];
+  expected_revision: number;
+}
+
+export interface AgentKeyRenewRequest {
+  expires_in_days: KeyExpiryDays;
+}
+
+export interface AgentKeyDTO {
+  id: number;
+  name: string;
+  prefix: string;
+  contexts: string[];
+  operations: string[];
+  created_at: string;
+  expires_at: string;
+  last_used_at?: string | null;
+  revision: number;
+}
+
+export interface AgentKeyCreatedDTO extends AgentKeyDTO {
+  key: string;
+}
+
+export interface GrantableOperationDTO {
+  name: string;
+  kind: "command" | "query";
+  description: string;
+  grantable: boolean;
+}
+
+export interface GrantableContextDTO {
+  name: string;
+  label: string;
+  operations: GrantableOperationDTO[];
+  grantable: boolean;
+}
+
+export interface GrantOptionsDTO {
+  contexts: GrantableContextDTO[];
+}
+

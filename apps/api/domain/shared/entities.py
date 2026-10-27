@@ -383,3 +383,70 @@ class CatalogInstrument:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "ticker", self.ticker.strip().upper())
+
+
+def context_of(operation: str) -> str:
+    """Return the context prefix of an operation name (e.g. 'assets.create' -> 'assets')."""
+    return operation.rsplit(".", 1)[0] if "." in operation else operation
+
+
+@dataclass(frozen=True)
+class AgentGrant:
+    """Permission scope granted to an agent API key."""
+
+    contexts: frozenset[str] = frozenset()
+    operations: frozenset[str] = frozenset()
+
+    def allows(self, operation: str) -> bool:
+        """Whether this grant reaches `operation` directly or via its context/module."""
+        if operation in self.operations:
+            return True
+        ctx = context_of(operation)
+        if ctx in self.contexts:
+            return True
+        top_module = operation.split(".", 1)[0]
+        return top_module in self.contexts
+
+    def to_dict(self) -> dict[str, list[str]]:
+        return {
+            "contexts": sorted(self.contexts),
+            "operations": sorted(self.operations),
+        }
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any] | None) -> AgentGrant:
+        if not raw:
+            return cls()
+        return cls(
+            contexts=frozenset(str(c) for c in raw.get("contexts", []) if c),
+            operations=frozenset(str(o) for o in raw.get("operations", []) if o),
+        )
+
+
+@dataclass(frozen=True)
+class AgentApiKeyEntity:
+    """Pure domain representation of an MCP agent API key owned by the user."""
+
+    name: str
+    key_hash: str
+    prefix: str
+    user_id: str
+    expires_at: datetime
+    grant: AgentGrant = field(default_factory=AgentGrant)
+    last_used_at: datetime | None = None
+    revoked_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    revision: int = 1
+    id: int | None = None
+
+    def __post_init__(self) -> None:
+        normalized = self.name.strip()
+        if not normalized:
+            raise ValidationError("agent key name cannot be empty", code="INVALID_AGENT_KEY_NAME")
+        object.__setattr__(self, "name", normalized)
+
+    def is_active(self, now: datetime) -> bool:
+        """Whether the key is neither revoked nor expired at `now`."""
+        return self.revoked_at is None and self.expires_at > now
+

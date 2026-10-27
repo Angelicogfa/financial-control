@@ -6,13 +6,14 @@ Services and Handlers depend on these abstractions, never on concrete SQLAlchemy
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from core.helpers.pagination import PaginatedResult, PaginationParams
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
 from domain.shared.entities import (
     AccountEntity,
+    AgentApiKeyEntity,
     AssetEntity,
     CatalogInstrument,
     ChecklistAnswer,
@@ -391,3 +392,33 @@ class AbstractAlertDismissalRepository(ABC):
     @abstractmethod
     def delete(self, key: str) -> bool:
         raise NotImplementedError
+
+
+class AbstractAgentKeyRepository(ABC):
+    """Repository port for MCP agent API keys."""
+
+    @abstractmethod
+    def add(self, key: AgentApiKeyEntity) -> AgentApiKeyEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, key: AgentApiKeyEntity) -> AgentApiKeyEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_by_id(self, key_id: int) -> AgentApiKeyEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_by_hash(self, key_hash: str) -> AgentApiKeyEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_active(self, *, user_id: str | None = None) -> list[AgentApiKeyEntity]:
+        """Non-revoked keys, ordered newest first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def touch_last_used(self, key_id: int, used_at: datetime) -> None:
+        raise NotImplementedError
+
