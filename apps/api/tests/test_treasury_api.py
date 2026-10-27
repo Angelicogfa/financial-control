@@ -31,6 +31,7 @@ from infra.providers.gateway import CachedMarketGateway
 from infra.providers.tesouro import (
     TesouroTransparenteProvider,
     classify_tesouro_bond_type,
+    merge_invest_and_redeem_bonds,
     parse_tesouro_transparente_csv,
     slugify_treasury_symbol,
 )
@@ -136,6 +137,42 @@ def test_parse_tesouro_transparente_csv_picks_latest_base_date_and_filters_matur
     # Rejects HTML WAF challenge or empty text
     assert parse_tesouro_transparente_csv("<html><head></head><body>429</body></html>") == []
     assert parse_tesouro_transparente_csv("") == []
+
+
+def test_parse_tesouro_direto_invest_and_redeem_csv_and_merge() -> None:
+    invest_csv = (
+        "\ufeffT\ufffdtulo;Rendimento anual do t\ufffdtulo;Investimento m\ufffdnimo;"
+        "Pre\ufffdo unit\ufffdrio de investimento;Vencimento do T\ufffdtulo\n"
+        "Tesouro Selic 2031;SELIC + 0,0992%;R$\xa0200,84;R$\xa020.084,44;01/03/2031\n"
+        "Tesouro Prefixado 2029;15,26%;R$\xa07,35;R$\xa0735,95;01/01/2029\n"
+    )
+    redeem_csv = (
+        "\ufeffT\ufffdtulo;Rendimento anual do t\ufffdtulo;"
+        "Pre\ufffdo unit\ufffdrio de resgate;Vencimento do T\ufffdtulo\n"
+        "Tesouro Selic 2031;SELIC + 0,1092%;R$\xa020.075,79;01/03/2031\n"
+        "Tesouro IPCA+ 2029;IPCA + 7,91%;R$\xa03.937,55;15/05/2029\n"
+    )
+    ref = date(2026, 10, 26)
+    invest_bonds = parse_tesouro_transparente_csv(invest_csv, reference_date=ref)
+    redeem_bonds = parse_tesouro_transparente_csv(redeem_csv, reference_date=ref)
+    merged = merge_invest_and_redeem_bonds(invest_bonds, redeem_bonds)
+
+    assert [b.symbol for b in merged] == [
+        "tesouro-prefixado-01012029",
+        "tesouro-ipca-15052029",
+        "tesouro-selic-01032031",
+    ]
+    selic = next(b for b in merged if b.symbol == "tesouro-selic-01032031")
+    assert selic.buy_rate == pytest.approx(0.0992)
+    assert selic.buy_price == pytest.approx(20084.44)
+    assert selic.sell_rate == pytest.approx(0.1092)
+    assert selic.sell_price == pytest.approx(20075.79)
+    assert selic.base_price == pytest.approx(20075.79)
+
+    ipca = next(b for b in merged if b.symbol == "tesouro-ipca-15052029")
+    assert ipca.buy_rate is None
+    assert ipca.sell_rate == pytest.approx(7.91)
+    assert ipca.contracted_rate_percent == pytest.approx(7.91)
 
 
 def test_tesouro_transparente_provider_happy_path_and_waf_or_http_error() -> None:
