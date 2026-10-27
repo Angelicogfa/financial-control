@@ -3,7 +3,16 @@ import { Link } from "react-router-dom";
 
 import { api, type ScreenerFilters } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
-import type { ArcaClass, AssetType, ScreenerItemDTO, ScreenerResponseDTO, WatchlistItemDTO } from "../../api/types";
+import type {
+  ArcaClass,
+  AssetType,
+  FixedIncomeIndexer,
+  ScreenerItemDTO,
+  ScreenerResponseDTO,
+  TreasuryBondDTO,
+  TreasurySearchResponseDTO,
+  WatchlistItemDTO,
+} from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
@@ -11,7 +20,7 @@ import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Hint } from "../../components/Hint";
 import { Async, Empty, ErrorBanner, Loading } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brlCompact, dateTime, num, pct, parseDecimal, points } from "../../utils/format";
+import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points, today } from "../../utils/format";
 import {
   ARCA_LABELS,
   ASSET_TYPE_LABELS,
@@ -22,10 +31,12 @@ import {
   VERDICT_LABELS,
   VERDICT_TONES,
 } from "../../utils/labels";
+import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
 
-type TabKey = "screener" | "watchlist";
+type TabKey = "screener" | "treasury" | "watchlist";
 const TABS: TabSpec<TabKey>[] = [
   { key: "screener", label: "Screener" },
+  { key: "treasury", label: "Tesouro Direto" },
   { key: "watchlist", label: "Em observação" },
 ];
 
@@ -471,10 +482,197 @@ export function ResearchPage() {
     <div className="app-page">
       <PageHeader
         title="Pesquisar"
-        subtitle="Encontre ativos no catálogo da B3, observe-os e analise antes de comprar."
+        subtitle="Encontre ativos no catálogo da B3, títulos do Tesouro Direto e acompanhe candidatos antes de comprar."
       />
       <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Pesquisa" />
-      {tab === "screener" ? <Screener /> : <Watchlist />}
+      {tab === "screener" && <Screener />}
+      {tab === "treasury" && <TreasuryScreener />}
+      {tab === "watchlist" && <Watchlist />}
+    </div>
+  );
+}
+
+function TreasuryScreener() {
+  const [q, setQ] = useState("");
+  const [indexer, setIndexer] = useState<FixedIncomeIndexer | "">("");
+  const [couponType, setCouponType] = useState<"" | "zero" | "semestral">("");
+  const [result, setResult] = useState<TreasurySearchResponseDTO | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+  const [registering, setRegistering] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const run = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      setResult(
+        await api.research.treasury({
+          q: q.trim() || undefined,
+          indexer: indexer || undefined,
+          coupon_type: couponType || undefined,
+        }),
+      );
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerBond = async (bond: TreasuryBondDTO) => {
+    setRegistering(bond.symbol);
+    setNotice(null);
+    try {
+      const created = await api.assets.create({
+        name: bond.name,
+        asset_type: "TREASURY",
+        arca_class: "CAIXA",
+        purpose: "ARCA",
+        fixed_income_term: {
+          instrument_kind: bond.instrument_kind,
+          indexer: bond.indexer,
+          contracted_rate: percentToContractedRate(bond.contracted_rate_percent),
+          issue_date: today(),
+          maturity_date: bond.maturity_date,
+          tax_exempt: false,
+          liquidity: bond.liquidity,
+          issuer: "Tesouro Nacional",
+        },
+      });
+      setNotice(`${created.name} (${created.ticker}) cadastrado com sucesso.`);
+      await run();
+    } catch (err) {
+      setNotice(errorMessage(err));
+    } finally {
+      setRegistering(null);
+    }
+  };
+
+  return (
+    <div className="app-page-stack">
+      <form className="app-card app-card-padded" onSubmit={run}>
+        <div className="app-filter-bar" style={{ marginBottom: 0 }}>
+          <div className="app-field" style={{ flex: 1 }}>
+            <label htmlFor="treasury-q">Título ou vencimento</label>
+            <input
+              id="treasury-q"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Ex.: Selic, IPCA, 2031"
+            />
+          </div>
+          <div className="app-field">
+            <label htmlFor="treasury-indexer">Indexador</label>
+            <select
+              id="treasury-indexer"
+              value={indexer}
+              onChange={(e) => setIndexer(e.target.value as FixedIncomeIndexer | "")}
+            >
+              <option value="">Todos</option>
+              <option value="SELIC">SELIC</option>
+              <option value="IPCA">IPCA</option>
+              <option value="PRE">PRE</option>
+            </select>
+          </div>
+          <div className="app-field">
+            <label htmlFor="treasury-coupon">Cupom</label>
+            <select
+              id="treasury-coupon"
+              value={couponType}
+              onChange={(e) => setCouponType(e.target.value as "" | "zero" | "semestral")}
+            >
+              <option value="">Todos</option>
+              <option value="zero">Sem cupom</option>
+              <option value="semestral">Juros semestrais</option>
+            </select>
+          </div>
+          <button type="submit" className="app-primary-button" disabled={loading}>
+            {loading ? "Buscando…" : "Buscar"}
+          </button>
+        </div>
+      </form>
+      {notice && <p className="app-info-banner">{notice}</p>}
+      <ErrorBanner error={error} onRetry={() => void run()} />
+      {loading && !result && <Loading lines={4} />}
+      {result?.unavailable_reason && <p className="app-info-banner">{result.unavailable_reason}</p>}
+      {result && !result.unavailable_reason && (
+        <>
+          <p className="app-muted" style={{ margin: 0 }}>
+            {result.results.length} título(s) encontrado(s) na API de Tesouro Direto da Brapi.
+          </p>
+          {result.results.length === 0 ? (
+            <Empty title="Nenhum título encontrado" hint="Ajuste o filtro de indexador, cupom ou texto." />
+          ) : (
+            <div className="app-table-wrap">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>Título</th>
+                    <th>Indexador</th>
+                    <th>Vencimento</th>
+                    <th className="app-numeric">Taxa compra</th>
+                    <th className="app-numeric">Taxa venda</th>
+                    <th className="app-numeric">PU compra</th>
+                    <th className="app-numeric">PU venda / base</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.results.map((bond) => (
+                    <tr key={bond.symbol}>
+                      <td>
+                        <span className="app-cell-main">
+                          {bond.asset_id ? (
+                            <Link className="app-link" to={`/asset/${bond.asset_id}`}>
+                              {bond.name}
+                            </Link>
+                          ) : (
+                            <strong>{bond.name}</strong>
+                          )}
+                          <small>
+                            {bond.symbol}
+                            {bond.coupon_type === "semestral" ? " · Juros semestrais" : ""}
+                          </small>
+                        </span>
+                      </td>
+                      <td>{bond.indexer}</td>
+                      <td>{day(bond.maturity_date)}</td>
+                      <td className="app-numeric">{formatTreasuryRate(bond, bond.buy_rate)}</td>
+                      <td className="app-numeric">{formatTreasuryRate(bond, bond.sell_rate)}</td>
+                      <td className="app-numeric">{brl(bond.buy_price)}</td>
+                      <td className="app-numeric">{brl(bond.sell_price ?? bond.base_price)}</td>
+                      <td className="app-row-actions">
+                        {bond.asset_id ? (
+                          <Link className="app-link" to={`/asset/${bond.asset_id}`}>
+                            Cadastrado
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className="app-secondary-button"
+                            disabled={registering === bond.symbol}
+                            onClick={() => void registerBond(bond)}
+                          >
+                            Cadastrar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+      {!result && !loading && !error && (
+        <Empty
+          title="Consulte títulos do Tesouro Direto"
+          hint="Filtre por indexador ou vencimento e clique em Buscar para consultar taxas e preços via Brapi (/api/v2/treasury/list)."
+        />
+      )}
     </div>
   );
 }

@@ -15,6 +15,8 @@ from domain.market.entities import (
     PricePoint,
     Quote,
     QuoteFreshness,
+    TreasuryBond,
+    TreasuryCatalogResult,
 )
 from domain.shared.entities import CatalogInstrument, MarketSeriesPoint
 from domain.shared.enums import AssetType, Market, market_for
@@ -231,6 +233,46 @@ class CachedMarketGateway:
     def list_instruments(self) -> list[CatalogInstrument]:
         """Listed B3 instruments (not cached: the worker stores them once a day)."""
         return self.brapi.list_instruments()
+
+    def list_treasury_bonds(
+        self,
+        *,
+        indexer: str | None = None,
+        coupon_type: str | None = None,
+        search: str | None = None,
+        bypass_cache: bool = False,
+    ) -> TreasuryCatalogResult:
+        """Fetch Brazilian Treasury bonds from Brapi (/v2/treasury/list) with short cache."""
+        norm_idx = (indexer or "").strip().lower() or None
+        norm_coupon = (coupon_type or "").strip().lower() or None
+        norm_search = (search or "").strip() or None
+        cache_key = (
+            f"treasury:list:{norm_idx or 'all'}:{norm_coupon or 'all'}:"
+            f"{(norm_search or '').casefold()}"
+        )
+        if not bypass_cache:
+            cached = self._cached(cache_key)
+            if isinstance(cached, dict) and isinstance(cached.get("results"), list):
+                return TreasuryCatalogResult(
+                    results=[TreasuryBond.from_dict(item) for item in cached["results"]],
+                    unavailable_reason=cached.get("unavailable_reason"),
+                )
+
+        result = self.brapi.list_treasury_bonds(
+            indexer=norm_idx,
+            coupon_type=norm_coupon,
+            search=norm_search,
+        )
+        if not result.unavailable_reason:
+            self.cache.set_json(
+                cache_key,
+                {
+                    "results": [b.to_dict() for b in result.results],
+                    "unavailable_reason": None,
+                },
+                self.quote_ttl,
+            )
+        return result
 
     def get_usd_brl_rate(self) -> float:
         """Fetch live or cached USD/BRL exchange rate with safe fallback."""

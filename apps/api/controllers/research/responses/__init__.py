@@ -5,7 +5,7 @@ Scope: B3 catalog screener and watchlist.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,9 @@ from domain.shared.enums import (
     AssetLifecycle,
     AssetType,
     ChecklistProfile,
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
+    FixedIncomeLiquidity,
 )
 
 
@@ -80,3 +83,34 @@ class WatchlistItemDTO(BaseModel):
     valuation_verdict: str
     fair_value: float | None = None
     margin: float | None = None
+
+
+class TreasuryBondDTO(BaseModel):
+    symbol: str
+    name: str
+    bond_type: str
+    instrument_kind: FixedIncomeInstrumentKind
+    indexer: FixedIncomeIndexer
+    raw_indexer: str
+    coupon_type: str
+    maturity_date: date
+    duration_days: int | None = None
+    base_date: date | None = None
+    buy_rate: float | None = None
+    sell_rate: float | None = None
+    buy_price: float | None = None
+    sell_price: float | None = None
+    base_price: float | None = None
+    rate_type: str | None = None
+    rate_unit: str | None = None
+    rate_description: str | None = None
+    contracted_rate_percent: float
+    liquidity: FixedIncomeLiquidity
+    asset_id: int | None = None
+
+
+class TreasurySearchResponseDTO(BaseModel):
+    results: list[TreasuryBondDTO]
+    total: int
+    unavailable_reason: str | None = None
+
