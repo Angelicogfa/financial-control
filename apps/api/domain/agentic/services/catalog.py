@@ -229,6 +229,10 @@ class B3ImportPreviewToolInput(BaseModel):
         default=None,
         description="Base64-encoded bytes of the .xlsx or .csv B3 statement",
     )
+    skip_lines: list[int] = Field(
+        default_factory=list,
+        description="Statement line numbers (line_no in the preview) to leave out",
+    )
 
 
 class B3ImportCommitToolInput(B3ImportPreviewToolInput):
@@ -713,7 +717,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         ),
         input_model=B3ImportPreviewToolInput,
         output_type=ImportPreviewDTO,
-        invoke=lambda h, p: h.imports.preview(p.filename, _decode_statement_bytes(p)),
+        invoke=lambda h, p: h.imports.preview(
+            p.filename, _decode_statement_bytes(p), skip_lines=p.skip_lines
+        ),
     ),
     OperationSpec(
         name="ledger.imports.commit",
@@ -730,6 +736,7 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             account_id=p.account_id,
             create_tickers=p.create_tickers,
             new_assets=p.new_assets,
+            skip_lines=p.skip_lines,
         ),
     ),
     # 8. Research & Watchlist

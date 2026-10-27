@@ -33,6 +33,7 @@
 | **Fase 18** | Configuração Agêntica e Servidor MCP Pessoal (`/settings/agentic`, `/api/v1/mcp`) | `[x]` Concluída | 100% |
 | **Fase 19** | Notificações de Erros de Requisição do Worker (Badge no menu e Log detalhado em Dados de Mercado) | `[x]` Concluída | 100% |
 | **Fase 22** | Importação B3: Tesouro Direto, CDB e Fracionário com Dígito | `[x]` Implementado | 100% |
+| **Fase 23** | Importação B3: Ignorar Linhas e Vendas sem Saldo | `[x]` Implementado | 100% |
 | **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[x]` Implementado | 100% |
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
@@ -541,6 +542,17 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **22.5** Resgates maiores que o saldo (aplicação anterior ao período do extrato) ficam `INVALID` na pré-visualização e no commit, sem bloquear o restante do arquivo.
 - `[x]` **22.6** Tela de importação: taxa, indexador, emissão, vencimento, liquidez e nome por título/emissor; o item só fica marcável com a taxa preenchida.
 - `[x]` **22.7** Testes: `test_b3_import.py` (fracionário, Tesouro, CDB/LCA, resolução, ambiguidade), `test_b3_import_api.py` (pré-visualização, cadastro com termos, resgate sem saldo, reimportação sem duplicar, B3SA3F) e `operations.test.tsx` (termos do CDB e envio no commit).
+
+---
+
+## Fase 23 — Importação B3: Ignorar Linhas e Vendas sem Saldo (`[x]` Implementado)
+
+**Objetivo:** um extrato que cobre só um período (ou um ativo que mudou de código, como TIET11 → AESB3) traz vendas sem a compra correspondente; antes uma única linha assim abortava a importação inteira com `LEDGER_CONFLICT`.
+
+- `[x]` **23.1** Vendas de qualquer ativo maiores que o saldo (livro + compras do próprio extrato) ficam `INVALID` na pré-visualização e no commit, com o motivo, sem bloquear o restante do arquivo (generaliza o 22.5).
+- `[x]` **23.2** `skip_lines` (números das linhas do extrato) em `POST /imports/b3/preview`, `POST /imports/b3/commit` e nas ferramentas MCP `ledger.imports.preview`/`ledger.imports.commit`: as linhas ficam `IGNORED` ("Ignorada por você") e a validação de saldo é refeita sem elas; entrada inválida → 400 `INVALID_SKIP_LINES`. Ticker sem nenhuma linha restante não é cadastrado no commit.
+- `[x]` **23.3** Tela de importação: coluna "Importar" com caixa por linha nova ou de ativo não cadastrado; desmarcar refaz a pré-visualização mantendo as escolhas de cadastro.
+- `[x]` **23.4** Testes: `test_b3_import.py` (`mark_skipped`), `test_b3_import_api.py` (venda sem saldo inválida e sem cadastro do ativo, linhas ignoradas na pré-visualização e no commit, `INVALID_SKIP_LINES`) e `operations.test.tsx` (desmarcar linha reenvia `skip_lines`).
 
 ---
 
