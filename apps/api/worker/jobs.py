@@ -31,6 +31,7 @@ from domain.portfolio.services.snapshots import (
     net_flow_between,
     snapshot_from_report,
 )
+from domain.portfolio.services.treasury_rates import IPCA_HISTORY_START
 from domain.shared.entities import AssetEntity, PortfolioSnapshotEntity
 from domain.shared.enums import (
     ArcaClass,
@@ -83,6 +84,13 @@ def _missing_windows(
     return windows
 
 
+def _sync_start(symbol: str, start: date) -> date:
+    """First date to keep of a BCB series: IPCA always since July 2000 (Tesouro IPCA+ VNA)."""
+    if symbol == "IPCA":
+        return min(date(start.year, start.month, 1), IPCA_HISTORY_START)
+    return start
+
+
 def sync_bcb_and_benchmarks_job(
     uow_factory: UoWFactory,
     gateway: CachedMarketGateway,
@@ -93,8 +101,9 @@ def sync_bcb_and_benchmarks_job(
 ) -> dict[str, int]:
     """Persist BCB series (CDI, SELIC, IPCA) and benchmarks (IBOV, IFIX, SP500).
 
-    The history starts at the oldest fixed income position or trade (capped at ten years)
-    and only missing windows are fetched unless `full` is set.
+    The history starts at the oldest fixed income position or trade (capped at ten years;
+    IPCA always since July 2000 for the VNA) and only missing windows are fetched unless
+    `full` is set.
     """
     end = as_of_date or date.today()
     counts: dict[str, int] = {}
@@ -105,7 +114,7 @@ def sync_bcb_and_benchmarks_job(
 
         for symbol in BCB_SYMBOLS:
             counts[symbol] = 0
-            sync_start = date(start.year, start.month, 1) if symbol == "IPCA" else start
+            sync_start = _sync_start(symbol, start)
             for window_start, window_end in _missing_windows(
                 uow.market_series.date_range(symbol), sync_start, end, full=full
             ):
@@ -155,8 +164,7 @@ def ensure_series_coverage_job(
             symbol
             for symbol in BCB_SYMBOLS
             if (stored := uow.market_series.date_range(symbol)) is not None
-            and (date(start.year, start.month, 1) if symbol == "IPCA" else start)
-            < stored[0] - COVERAGE_TOLERANCE
+            and _sync_start(symbol, start) < stored[0] - COVERAGE_TOLERANCE
         ]
     if not gaps:
         return {}

@@ -11,9 +11,10 @@ Conventions (ADR 0006):
 - Business days follow the national holiday calendar (`fincontrol_core.calendar`).
 - Every lot accrues from its own purchase (trade) date; the issue date of the terms is
   informational only and never changes the valuation.
-- Zero-coupon Tesouro Prefixado (LTN) lots accrue at the rate implied by the unit price paid
-  (PU = 1000 / (1 + r) ^ (business days to maturity / 252)), so each purchase keeps the rate
-  it was actually bought at; `contracted_rate` is only the fallback when it cannot be implied.
+- Tesouro Prefixado and IPCA+ lots accrue at the rate implied by the unit price paid
+  (`domain.portfolio.services.treasury_rates`: LTN, NTN-F, NTN-B Principal and NTN-B, the
+  IPCA+ ones through the VNA built from the IPCA series), so each purchase keeps the rate it
+  was actually bought at; `contracted_rate` is only the fallback when it cannot be implied.
 - Redemptions (SELL) are gross amounts taken from the curve: they consume lots FIFO,
   reducing each lot's principal proportionally to the share of its gross value redeemed.
   Realized P/L is net of the regressive IOF/IR due on the redeemed yield and of fees.
@@ -31,16 +32,12 @@ from datetime import date, timedelta
 
 from core.helpers.calendar import business_days_between
 from domain.portfolio.services.positions import InsufficientQuantityError
+from domain.portfolio.services.treasury_rates import implied_purchase_rate
 from domain.shared.entities import FixedIncomeTermEntity, TransactionEntity
-from domain.shared.enums import (
-    FixedIncomeIndexer,
-    FixedIncomeInstrumentKind,
-    TransactionKind,
-)
+from domain.shared.enums import FixedIncomeIndexer, TransactionKind
 from domain.tax.entities import TaxRegime, TaxRuleBook
 from domain.tax.services.rules import DEFAULT_RULE_BOOK, income_tax_regime
 
-LTN_FACE_VALUE = 1000.0
 BUSINESS_DAYS_PER_YEAR = 252.0
 PROJECTION_CALENDAR_DAYS = 365
 DEFAULT_OVERSELL_TOLERANCE = 0.05
@@ -123,28 +120,6 @@ def regressive_iof_rate(
         return 0.0
     book = rules or DEFAULT_RULE_BOOK
     return book.rate(TaxRegime.IOF_REGRESSIVE, calendar_days, on or date.today())
-
-
-def implied_purchase_rate(
-    term: FixedIncomeTermEntity, trade_date: date, unit_price: float
-) -> float | None:
-    """Annual rate implied by the price paid for a zero-coupon Tesouro Prefixado (LTN).
-
-    Returns `None` for any other bond, or when the price cannot imply a sane rate.
-    """
-    if (
-        term.instrument_kind != FixedIncomeInstrumentKind.TESOURO_PRE
-        or term.semiannual_coupons
-        or term.maturity_date is None
-        or term.maturity_date <= trade_date
-        or not 0.0 < unit_price < LTN_FACE_VALUE
-    ):
-        return None
-    business_days = count_business_days(trade_date, term.maturity_date)
-    if business_days <= 0:
-        return None
-    rate = (LTN_FACE_VALUE / unit_price) ** (BUSINESS_DAYS_PER_YEAR / business_days) - 1.0
-    return round(rate, 8) if 0.0 < rate <= 1.0 else None
 
 
 def count_business_days(start_date: date, end_date: date) -> int:
@@ -342,7 +317,13 @@ def replay_lots(
                 FixedIncomeLot(
                     tx.trade_date,
                     float(tx.quantity * tx.unit_price + tx.fees),
-                    implied_purchase_rate(term, tx.trade_date, float(tx.unit_price)),
+                    implied_purchase_rate(
+                        term,
+                        tx.trade_date,
+                        float(tx.unit_price),
+                        ipca_monthly=rates.ipca_monthly,
+                        annual_ipca_rate=rates.annual_ipca_rate,
+                    ),
                 )
             )
         else:

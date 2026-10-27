@@ -109,7 +109,7 @@ describe("asset form", () => {
     });
   });
 
-  it("flags a semiannual Tesouro Prefixado and explains the purchase rate otherwise", async () => {
+  it("flags a semiannual Tesouro Prefixado and explains the purchase rate", async () => {
     const treasuryReply = {
       results: [
         {
@@ -139,12 +139,11 @@ describe("asset form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
     fireEvent.click(await screen.findByRole("button", { name: "Usar título" }));
 
-    const semiannual = screen.getByLabelText("Paga juros semestrais");
-    expect(semiannual).toBeChecked();
-    expect(screen.queryByText(/taxa implícita no preço/)).not.toBeInTheDocument();
-    fireEvent.click(semiannual);
+    expect(screen.getByLabelText("Paga juros semestrais")).toBeChecked();
     expect(screen.getByText(/taxa implícita no preço/)).toBeInTheDocument();
-    fireEvent.click(semiannual);
+    fireEvent.change(screen.getByLabelText("Instrumento"), { target: { value: "TESOURO_SELIC" } });
+    expect(screen.queryByText(/taxa implícita no preço/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Instrumento"), { target: { value: "TESOURO_PRE" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar ativo" }));
     await waitFor(() => expect(last(calls, "POST", "/assets")).toBeDefined());

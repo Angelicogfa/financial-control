@@ -139,7 +139,7 @@ def test_bcb_sync_only_requests_missing_windows(uow_factory: UoWFactory) -> None
 
     sync_bcb_and_benchmarks_job(uow_factory, gateway, as_of_date=date(2025, 1, 20))
 
-    assert first_run == 3
+    assert first_run == 5  # CDI, SELIC and IPCA since July 2000 in three 10-year windows
     cdi = [r for r in requests if r[0] == "12"]
     assert cdi == [("12", date(2025, 1, 11), date(2025, 1, 20))]
 
@@ -154,7 +154,9 @@ def test_series_coverage_fetches_early_gap_only_once(uow_factory: UoWFactory) ->
                 symbol, [(date(2024, 7, 1), 0.05)], unit=SeriesUnit.PERCENT_PER_DAY
             )
         uow.market_series.upsert_points(
-            "IPCA", [(date(2024, 6, 1), 0.16)], unit=SeriesUnit.PERCENT_PER_MONTH
+            "IPCA",
+            [(date(2000, 7, 1), 1.61), (date(2024, 6, 1), 0.16)],
+            unit=SeriesUnit.PERCENT_PER_MONTH,
         )
         uow.commit()
 
