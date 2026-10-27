@@ -11,7 +11,6 @@ import hmac
 import secrets
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import get_args
 
 from controllers.agentic.requests import (
     AgentKeyCreateRequest,
@@ -35,7 +34,7 @@ from domain.shared.entities import AgentApiKeyEntity, AgentGrant
 KEY_PREFIX_TAG = "fck_"
 KEY_ENTROPY_BYTES = 32
 VISIBLE_PREFIX_LEN = 12
-EXPIRY_OPTIONS: tuple[int, ...] = get_args(KeyExpiryDays)
+EXPIRY_OPTIONS: tuple[int, ...] = tuple(int(item) for item in KeyExpiryDays)
 DEFAULT_EXPIRY_DAYS = 90
 
 
@@ -144,9 +143,7 @@ class AgentKeyHandler:
             dto = to_agent_key_dto(saved)
             return AgentKeyCreatedDTO(**dto.model_dump(), key=raw_key)
 
-    def update_key(
-        self, key_id: int, user_id: str, req: AgentKeyUpdateRequest
-    ) -> AgentKeyDTO:
+    def update_key(self, key_id: int, user_id: str, req: AgentKeyUpdateRequest) -> AgentKeyDTO:
         """Update the name and permission scope of an existing personal agent key."""
         grant = AgentGrant(
             contexts=frozenset(req.contexts),
@@ -171,9 +168,7 @@ class AgentKeyHandler:
             uow.commit()
             return to_agent_key_dto(updated)
 
-    def renew_key(
-        self, key_id: int, user_id: str, req: AgentKeyRenewRequest
-    ) -> AgentKeyDTO:
+    def renew_key(self, key_id: int, user_id: str, req: AgentKeyRenewRequest) -> AgentKeyDTO:
         """Extend the expiration date of an existing personal agent key from today."""
         with self.uow_factory() as uow:
             current = self._require_owned_key(uow.agent_keys.get_by_id(key_id), key_id, user_id)

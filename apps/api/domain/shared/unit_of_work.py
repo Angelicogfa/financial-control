@@ -22,6 +22,7 @@ from domain.shared.repositories import (
     AbstractPolicyRepository,
     AbstractPortfolioSnapshotRepository,
     AbstractTransactionRepository,
+    AbstractWorkerErrorRepository,
 )
 
 
@@ -36,6 +37,7 @@ class AbstractUnitOfWork(ABC):
     market_series: AbstractMarketSeriesRepository
     snapshots: AbstractPortfolioSnapshotRepository
     job_runs: AbstractJobRunRepository
+    worker_errors: AbstractWorkerErrorRepository
     fundamentals: AbstractFundamentalsRepository
     checklists: AbstractChecklistRepository
     catalog: AbstractCatalogRepository

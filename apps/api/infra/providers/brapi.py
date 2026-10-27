@@ -17,6 +17,7 @@ from domain.market.entities import (
 )
 from domain.shared.entities import CatalogInstrument
 from domain.shared.enums import AssetType
+from infra.providers.error_tracker import report_provider_error
 
 # Units of the quoteSummary fields consumed from brapi (ADR 0006): returnOnEquity,
 # profitMargins, revenueGrowth, earningsGrowth and dividendYield are fractions;
@@ -63,7 +64,14 @@ class BrapiProvider:
             resp = self._client.get(url, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="quote",
+                target=clean,
+                request_url=url,
+                exc=exc,
+            )
             return None
 
         results = payload.get("results") or []
@@ -112,7 +120,14 @@ class BrapiProvider:
             resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="history",
+                target=f"{clean} ({range_period})",
+                request_url=f"{url}?range={range_period}&interval=1d",
+                exc=exc,
+            )
             return []
 
         results = payload.get("results") or []
@@ -152,15 +167,23 @@ class BrapiProvider:
         fetched_at = datetime.now(UTC)
         instruments: dict[str, CatalogInstrument] = {}
         for page in range(1, max_pages + 1):
+            url = f"{self.base_url}/quote/list"
             try:
                 resp = self._client.get(
-                    f"{self.base_url}/quote/list",
+                    url,
                     params={"page": page, "limit": page_size, "sortBy": "volume"},
                     headers=self._headers(),
                 )
                 resp.raise_for_status()
                 payload = resp.json()
-            except Exception:
+            except Exception as exc:
+                report_provider_error(
+                    provider=self.PROVIDER_NAME,
+                    operation="catalog",
+                    target=f"B3 (page {page})",
+                    request_url=f"{url}?page={page}&limit={page_size}&sortBy=volume",
+                    exc=exc,
+                )
                 break
             for item in payload.get("stocks") or []:
                 instrument = parse_brapi_list_item(item, fetched_at)
@@ -173,14 +196,21 @@ class BrapiProvider:
     def get_annual_statements(self, symbol: str) -> list[FundamentalSnapshot]:
         """Yearly statement history for a B3 symbol (empty when unavailable)."""
         clean = symbol.strip().upper().removesuffix(".SA")
-        params = {"modules": "incomeStatementHistory,balanceSheetHistory,cashflowHistory"}
+        url = f"{self.base_url}/quote/{clean}"
+        modules = "incomeStatementHistory,balanceSheetHistory,cashflowHistory"
+        params = {"modules": modules}
         try:
-            resp = self._client.get(
-                f"{self.base_url}/quote/{clean}", params=params, headers=self._headers()
-            )
+            resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             results = resp.json().get("results") or []
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="statements",
+                target=clean,
+                request_url=f"{url}?modules={modules}",
+                exc=exc,
+            )
             return []
         return parse_brapi_statements(clean, results[0]) if results else []
 
@@ -188,15 +218,23 @@ class BrapiProvider:
         """Fetch fundamental indicators for B3 stocks/FIIs from brapi.dev."""
         clean = symbol.strip().upper().removesuffix(".SA")
         url = f"{self.base_url}/quote/{clean}"
+        modules = "defaultKeyStatistics,financialData,summaryDetail,summaryProfile"
         params = {
             "fundamental": "true",
-            "modules": "defaultKeyStatistics,financialData,summaryDetail,summaryProfile",
+            "modules": modules,
         }
         try:
             resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="fundamentals",
+                target=clean,
+                request_url=f"{url}?fundamental=true&modules={modules}",
+                exc=exc,
+            )
             return None
 
         results = payload.get("results") or []

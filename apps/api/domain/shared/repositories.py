@@ -24,6 +24,7 @@ from domain.shared.entities import (
     MarketSeriesPoint,
     PortfolioSnapshotEntity,
     TransactionEntity,
+    WorkerRequestErrorEntity,
 )
 from domain.shared.enums import SeriesUnit
 
@@ -234,6 +235,40 @@ class AbstractJobRunRepository(ABC):
         raise NotImplementedError
 
 
+class AbstractWorkerErrorRepository(ABC):
+    """Repository port for failed external HTTP/API requests recorded during worker jobs."""
+
+    @abstractmethod
+    def add(self, error: WorkerRequestErrorEntity) -> WorkerRequestErrorEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_many(self, errors: list[WorkerRequestErrorEntity]) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_recent(
+        self, *, include_resolved: bool = False, limit: int = 100
+    ) -> list[WorkerRequestErrorEntity]:
+        """Most recent worker request errors, newest first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_unresolved(self) -> int:
+        """Number of unresolved worker request errors."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve(self, error_id: int, resolved_at: datetime) -> bool:
+        """Mark a single worker request error as resolved."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve_all(self, resolved_at: datetime) -> int:
+        """Mark all unresolved worker request errors as resolved."""
+        raise NotImplementedError
+
+
 class AbstractAccountRepository(ABC):
     """Repository port for custody accounts."""
 
@@ -421,4 +456,3 @@ class AbstractAgentKeyRepository(ABC):
     @abstractmethod
     def touch_last_used(self, key_id: int, used_at: datetime) -> None:
         raise NotImplementedError
-

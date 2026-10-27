@@ -15,7 +15,7 @@ from infra.data.models.assets import (
     ChecklistEvaluationModel,
     FixedIncomeTermModel,
 )
-from infra.data.models.jobs import JobRunModel
+from infra.data.models.jobs import JobRunModel, WorkerRequestErrorModel
 from infra.data.models.ledger import CorporateEventModel, EarningModel, TransactionModel
 from infra.data.models.market import (
     FundamentalSnapshotModel,
@@ -43,4 +43,5 @@ __all__ = [
     "MarketSeriesModel",
     "PortfolioSnapshotModel",
     "TransactionModel",
+    "WorkerRequestErrorModel",
 ]

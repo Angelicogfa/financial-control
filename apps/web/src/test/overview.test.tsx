@@ -16,6 +16,10 @@ function overviewApi(overrides: Record<string, unknown> = {}) {
     { path: "/portfolio/snapshots", reply: snapshots },
     { path: "/portfolio/analytics", reply: overrides.analytics ?? analytics() },
     { path: "/alerts", reply: overrides.alerts ?? alerts() },
+    {
+      path: "/market/worker-errors",
+      reply: overrides.workerErrors ?? { unresolved_count: 2, errors: [] },
+    },
     { method: "POST", path: "/alerts/dismissals", reply: { status: 204 } },
     { path: "/accounts", reply: [{ id: 1, name: "XP", is_active: true }] },
   ]);
@@ -29,9 +33,10 @@ describe("shell", () => {
     for (const label of ["Visão geral", "Operação", "Configuração"]) {
       expect(within(nav).getByText(label)).toBeInTheDocument();
     }
-    expect(within(nav).getByRole("link", { name: "Carteira" })).toHaveClass("active");
+    expect(within(nav).getByRole("link", { name: /Carteira/ })).toHaveClass("active");
     expect(screen.getByText("Carteira", { selector: ".app-topbar-title" })).toBeInTheDocument();
     expect(await within(nav).findByLabelText("1 alertas")).toBeInTheDocument();
+    expect(await within(nav).findByLabelText("2 erros do worker")).toBeInTheDocument();
   });
 
   it("answers unknown addresses with a 404 page and redirects / to the home", async () => {

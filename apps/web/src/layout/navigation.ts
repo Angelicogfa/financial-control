@@ -21,6 +21,8 @@ export interface NavItem {
   icon: (props: IconProps) => JSX.Element;
   /** Shows the number of pending alerts next to the item. */
   showsAlertCount?: boolean;
+  /** Shows the number of unresolved worker request errors next to the item. */
+  showsWorkerErrorCount?: boolean;
 }
 
 export interface NavSection {
@@ -50,7 +52,12 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/settings/strategy", label: "Estratégia", icon: SlidersIcon },
       { to: "/settings/accounts", label: "Contas", icon: BankIcon },
-      { to: "/settings/market-data", label: "Dados de mercado", icon: DatabaseIcon },
+      {
+        to: "/settings/market-data",
+        label: "Dados de mercado",
+        icon: DatabaseIcon,
+        showsWorkerErrorCount: true,
+      },
       { to: "/settings/agentic", label: "Acesso agêntico", icon: BotIcon },
     ],
   },

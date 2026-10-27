@@ -47,6 +47,7 @@ import type {
   TransactionUpdateRequest,
   WatchlistAddRequest,
   WatchlistItemDTO,
+  WorkerErrorsResponseDTO,
 } from "./types";
 
 /**
@@ -200,6 +201,14 @@ export const api = {
   market: {
     series: () => request<SeriesStatusDTO[]>("/market/series-status"),
     jobs: () => request<JobRunDTO[]>("/market/job-runs"),
+    workerErrors: (includeResolved = false) =>
+      request<WorkerErrorsResponseDTO>("/market/worker-errors", {
+        query: { include_resolved: includeResolved },
+      }),
+    resolveWorkerError: (errorId: number) =>
+      request<void>(`/market/worker-errors/${errorId}`, { method: "DELETE" }),
+    resolveAllWorkerErrors: () =>
+      request<void>("/market/worker-errors", { method: "DELETE" }),
   },
   agents: {
     options: () => request<GrantOptionsDTO>("/agents/keys/options"),

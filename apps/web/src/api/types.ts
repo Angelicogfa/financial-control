@@ -18,6 +18,51 @@ export interface AccountRequest {
   is_active?: boolean;
 }
 
+export interface AgentKeyCreateRequest {
+  name: string;
+  contexts?: string[];
+  operations?: string[];
+  expires_in_days?: KeyExpiryDays;
+}
+
+export interface AgentKeyCreatedDTO {
+  id: number;
+  name: string;
+  prefix: string;
+  user_id: string;
+  contexts: string[];
+  operations: string[];
+  expires_at: string;
+  last_used_at?: string | null;
+  created_at?: string | null;
+  revision?: number;
+  key: string;
+}
+
+export interface AgentKeyDTO {
+  id: number;
+  name: string;
+  prefix: string;
+  user_id: string;
+  contexts: string[];
+  operations: string[];
+  expires_at: string;
+  last_used_at?: string | null;
+  created_at?: string | null;
+  revision?: number;
+}
+
+export interface AgentKeyRenewRequest {
+  expires_in_days?: KeyExpiryDays;
+}
+
+export interface AgentKeyUpdateRequest {
+  name: string;
+  contexts?: string[];
+  operations?: string[];
+  expected_revision?: number;
+}
+
 export interface AlertDTO {
   key: string;
   kind: string;
@@ -424,6 +469,24 @@ export interface FundamentalSnapshotDTO {
   source?: string | null;
 }
 
+export interface GrantOptionsDTO {
+  contexts: GrantableContextDTO[];
+}
+
+export interface GrantableContextDTO {
+  name: string;
+  label: string;
+  grantable?: boolean;
+  operations: GrantableOperationDTO[];
+}
+
+export interface GrantableOperationDTO {
+  name: string;
+  kind: "query" | "command";
+  description: string;
+  grantable?: boolean;
+}
+
 export interface HistoricalMetricsDTO {
   years: number;
   first_year?: number | null;
@@ -479,6 +542,8 @@ export interface JobRunDTO {
   details?: Record<string, unknown>;
   error?: string | null;
 }
+
+export type KeyExpiryDays = 30 | 90 | 180 | 365;
 
 export interface LoginRequest {
   username: string;
@@ -806,57 +871,22 @@ export interface WatchlistItemDTO {
   margin?: number | null;
 }
 
-export type KeyExpiryDays = 30 | 90 | 180 | 365;
-
-export interface AgentKeyCreateRequest {
-  name: string;
-  contexts: string[];
-  operations: string[];
-  expires_in_days?: KeyExpiryDays;
+export interface WorkerErrorsResponseDTO {
+  unresolved_count: number;
+  errors: WorkerRequestErrorDTO[];
 }
 
-export interface AgentKeyUpdateRequest {
-  name: string;
-  contexts: string[];
-  operations: string[];
-  expected_revision: number;
-}
-
-export interface AgentKeyRenewRequest {
-  expires_in_days: KeyExpiryDays;
-}
-
-export interface AgentKeyDTO {
+export interface WorkerRequestErrorDTO {
   id: number;
-  name: string;
-  prefix: string;
-  contexts: string[];
-  operations: string[];
-  created_at: string;
-  expires_at: string;
-  last_used_at?: string | null;
-  revision: number;
+  job_run_id?: number | null;
+  job_name: string;
+  provider: string;
+  operation: string;
+  target: string;
+  request_url: string;
+  status_code?: number | null;
+  error_type: string;
+  error_detail: string;
+  occurred_at: string;
+  resolved_at?: string | null;
 }
-
-export interface AgentKeyCreatedDTO extends AgentKeyDTO {
-  key: string;
-}
-
-export interface GrantableOperationDTO {
-  name: string;
-  kind: "command" | "query";
-  description: string;
-  grantable: boolean;
-}
-
-export interface GrantableContextDTO {
-  name: string;
-  label: string;
-  operations: GrantableOperationDTO[];
-  grantable: boolean;
-}
-
-export interface GrantOptionsDTO {
-  contexts: GrantableContextDTO[];
-}
-

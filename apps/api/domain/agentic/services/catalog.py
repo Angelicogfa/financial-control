@@ -46,7 +46,11 @@ from controllers.ledger.responses import (
     ImportPreviewDTO,
     TransactionResponseDTO,
 )
-from controllers.market.responses import JobRunDTO, SeriesStatusDTO
+from controllers.market.responses import (
+    JobRunDTO,
+    SeriesStatusDTO,
+    WorkerErrorsResponseDTO,
+)
 from controllers.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -262,6 +266,15 @@ class AlertRestoreInput(BaseModel):
     key: str = Field(..., min_length=1, max_length=160)
 
 
+class WorkerErrorsListInput(BaseModel):
+    include_resolved: bool = False
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+class WorkerErrorIdInput(BaseModel):
+    error_id: int
+
+
 class OperationStatusDTO(BaseModel):
     """Standard acknowledgement for operations that return HTTP 204 in REST."""
 
@@ -295,15 +308,11 @@ class AgenticRuntimeHandlers:
 
     @property
     def alerts(self) -> AlertHandler:
-        return AlertHandler(
-            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
-        )
+        return AlertHandler(uow_factory=self.uow_factory, portfolio_service=self.portfolio_service)
 
     @property
     def assets(self) -> AssetHandler:
-        return AssetHandler(
-            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
-        )
+        return AssetHandler(uow_factory=self.uow_factory, portfolio_service=self.portfolio_service)
 
     @property
     def contributions(self) -> ContributionHandler:
@@ -390,9 +399,7 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         ),
         input_model=DateRangeInput,
         output_type=PortfolioAnalyticsResponseDTO,
-        invoke=lambda h, p: h.portfolio.get_analytics(
-            date_from=p.date_from, date_to=p.date_to
-        ),
+        invoke=lambda h, p: h.portfolio.get_analytics(date_from=p.date_from, date_to=p.date_to),
     ),
     OperationSpec(
         name="portfolio.snapshots",
@@ -400,9 +407,7 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         description="Série histórica de snapshots diários de patrimônio e resultado da carteira.",
         input_model=DateRangeInput,
         output_type=list[SnapshotPointDTO],
-        invoke=lambda h, p: h.portfolio.list_snapshots(
-            date_from=p.date_from, date_to=p.date_to
-        ),
+        invoke=lambda h, p: h.portfolio.list_snapshots(date_from=p.date_from, date_to=p.date_to),
     ),
     # 2. Assets & Checklist
     OperationSpec(
@@ -871,6 +876,37 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=list[JobRunDTO],
         invoke=lambda h, _p: h.market.job_runs(),
+    ),
+    OperationSpec(
+        name="market.worker_errors",
+        kind="query",
+        description=(
+            "Lista o log detalhado de erros de requisição dos provedores externos ocorridos nas "
+            "buscas do worker e a quantidade de notificações pendentes."
+        ),
+        input_model=WorkerErrorsListInput,
+        output_type=WorkerErrorsResponseDTO,
+        invoke=lambda h, p: h.market.worker_errors(
+            include_resolved=p.include_resolved, limit=p.limit
+        ),
+    ),
+    OperationSpec(
+        name="market.resolve_worker_error",
+        kind="command",
+        description="Marca um erro de requisição do worker como resolvido pelo ID.",
+        input_model=WorkerErrorIdInput,
+        output_type=OperationStatusDTO,
+        invoke=lambda h, p: (h.market.resolve_worker_error(p.error_id), OperationStatusDTO())[1],
+    ),
+    OperationSpec(
+        name="market.resolve_all_worker_errors",
+        kind="command",
+        description=(
+            "Limpa/resolve todas as notificações pendentes de erro de requisição do worker."
+        ),
+        input_model=EmptyInput,
+        output_type=OperationStatusDTO,
+        invoke=lambda h, _p: (h.market.resolve_all_worker_errors(), OperationStatusDTO())[1],
     ),
 )
 

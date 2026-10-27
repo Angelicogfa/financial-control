@@ -15,6 +15,7 @@ from domain.market.entities import (
     financial_volume,
 )
 from domain.shared.enums import Market
+from infra.providers.error_tracker import report_provider_error
 
 # Units of the yfinance `Ticker.info` fields consumed here (ADR 0006): returnOnEquity,
 # profitMargins, revenueGrowth, earningsGrowth and trailingAnnualDividendYield are
@@ -119,7 +120,14 @@ class YFinanceProvider:
                 provider=self.PROVIDER_NAME,
                 freshness=QuoteFreshness.LIVE,
             )
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="quote",
+                target=yf_sym,
+                request_url=f"yfinance://Ticker({yf_sym})/quote",
+                exc=exc,
+            )
             return None
 
     def get_history(
@@ -154,18 +162,31 @@ class YFinanceProvider:
                 )
             points.sort(key=lambda p: p.date)
             return points
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="history",
+                target=f"{yf_sym} ({range_period})",
+                request_url=f"yfinance://Ticker({yf_sym})/history?period={range_period}&interval=1d",
+                exc=exc,
+            )
             return []
 
     def get_annual_statements(
         self, symbol: str, market: Market | None = None
     ) -> list[FundamentalSnapshot]:
         """Yearly statement history from Yahoo Finance (empty when unavailable)."""
+        yf_sym = resolve_yahoo_symbol(symbol, market)
         try:
-            return parse_yfinance_statements(
-                symbol, self._get_ticker(resolve_yahoo_symbol(symbol, market))
+            return parse_yfinance_statements(symbol, self._get_ticker(yf_sym))
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="statements",
+                target=yf_sym,
+                request_url=f"yfinance://Ticker({yf_sym})/statements",
+                exc=exc,
             )
-        except Exception:
             return []
 
     def get_fundamentals(self, symbol: str, market: Market | None = None) -> Fundamentals | None:
@@ -215,7 +236,14 @@ class YFinanceProvider:
                 market_cap=_safe_float(info.get("marketCap")),
                 avg_daily_volume=financial_volume(_safe_float(info.get("averageVolume")), price),
             )
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="fundamentals",
+                target=yf_sym,
+                request_url=f"yfinance://Ticker({yf_sym})/info",
+                exc=exc,
+            )
             return None
 
 
