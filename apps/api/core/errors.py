@@ -38,3 +38,10 @@ class ConflictError(DomainError):
     """The request conflicts with existing state (HTTP 409)."""
 
     code = "CONFLICT"
+
+
+class ForbiddenError(DomainError, PermissionError):
+    """The authenticated caller lacks permission for the requested operation (HTTP 403)."""
+
+    code = "FORBIDDEN"
+

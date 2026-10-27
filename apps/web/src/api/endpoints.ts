@@ -4,6 +4,10 @@ import { request } from "./http";
 import type {
   AccountDTO,
   AccountRequest,
+  AgentKeyCreatedDTO,
+  AgentKeyCreateRequest,
+  AgentKeyDTO,
+  AgentKeyUpdateRequest,
   AlertDismissRequest,
   AlertsResponseDTO,
   ArcaClass,
@@ -22,9 +26,11 @@ import type {
   EarningCreateRequest,
   EarningResponseDTO,
   EarningUpdateRequest,
+  GrantOptionsDTO,
   ImportCommitDTO,
   ImportPreviewDTO,
   JobRunDTO,
+  KeyExpiryDays,
   PaginatedResponse_AssetResponseDTO_,
   PaginatedResponse_EarningResponseDTO_,
   PaginatedResponse_TransactionResponseDTO_,
@@ -194,5 +200,20 @@ export const api = {
   market: {
     series: () => request<SeriesStatusDTO[]>("/market/series-status"),
     jobs: () => request<JobRunDTO[]>("/market/job-runs"),
+  },
+  agents: {
+    options: () => request<GrantOptionsDTO>("/agents/keys/options"),
+    list: () => request<AgentKeyDTO[]>("/agents/keys"),
+    get: (id: number) => request<AgentKeyDTO>(`/agents/keys/${id}`),
+    create: (body: AgentKeyCreateRequest) =>
+      request<AgentKeyCreatedDTO>("/agents/keys", { method: "POST", body }),
+    update: (id: number, body: AgentKeyUpdateRequest) =>
+      request<AgentKeyDTO>(`/agents/keys/${id}`, { method: "PUT", body }),
+    renew: (id: number, expiresInDays: KeyExpiryDays) =>
+      request<AgentKeyDTO>(`/agents/keys/${id}/renew`, {
+        method: "POST",
+        body: { expires_in_days: expiresInDays },
+      }),
+    revoke: (id: number) => request<void>(`/agents/keys/${id}`, { method: "DELETE" }),
   },
 };

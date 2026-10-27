@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from infra.data.repositories.accounts import SqlAlchemyAccountRepository
+from infra.data.repositories.agent_keys import SqlAlchemyAgentKeyRepository
 from infra.data.repositories.alerts import SqlAlchemyAlertDismissalRepository
 from infra.data.repositories.assets import (
     SqlAlchemyAssetRepository,
@@ -28,6 +29,7 @@ from infra.data.repositories.portfolio import (
 
 __all__ = [
     "SqlAlchemyAccountRepository",
+    "SqlAlchemyAgentKeyRepository",
     "SqlAlchemyAlertDismissalRepository",
     "SqlAlchemyAssetRepository",
     "SqlAlchemyCatalogRepository",

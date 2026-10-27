@@ -3,6 +3,7 @@
 import type { IconProps } from "./icons";
 import {
   BankIcon,
+  BotIcon,
   BriefcaseIcon,
   DatabaseIcon,
   HomeIcon,
@@ -50,6 +51,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: "/settings/strategy", label: "Estratégia", icon: SlidersIcon },
       { to: "/settings/accounts", label: "Contas", icon: BankIcon },
       { to: "/settings/market-data", label: "Dados de mercado", icon: DatabaseIcon },
+      { to: "/settings/agentic", label: "Acesso agêntico", icon: BotIcon },
     ],
   },
 ];
@@ -67,6 +69,8 @@ const PAGE_TITLES: Array<{ test: (path: string) => boolean; title: string }> = [
   { test: (p) => p.startsWith("/settings/strategy"), title: "Estratégia" },
   { test: (p) => p.startsWith("/settings/accounts"), title: "Contas" },
   { test: (p) => p.startsWith("/settings/market-data"), title: "Dados de mercado" },
+  { test: (p) => p === "/settings/agentic/new", title: "Nova chave MCP" },
+  { test: (p) => p.startsWith("/settings/agentic"), title: "Acesso agêntico" },
 ];
 
 export function pageTitleFor(pathname: string): string {
