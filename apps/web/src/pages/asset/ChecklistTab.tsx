@@ -9,6 +9,7 @@ import type {
   EvaluatedAnswerDTO,
 } from "../../api/types";
 import { Badge } from "../../components/Badge";
+import { Spinner } from "../../components/States";
 import { dateTime, points } from "../../utils/format";
 import { ANSWER_LABELS, PROFILE_LABELS, PROFILES, RECOMMENDATION_LABELS } from "../../utils/labels";
 import { Sparkline } from "../../viz/Sparkline";
@@ -85,6 +86,7 @@ export function ChecklistTab({
             <select
               id="checklist-profile"
               value={profile}
+              disabled={saving}
               onChange={(e) => setProfile(e.target.value as ChecklistProfile)}
             >
               {PROFILES.map((p) => (
@@ -95,7 +97,7 @@ export function ChecklistTab({
             </select>
           </div>
           <label className="app-check">
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+            <input type="checkbox" checked={enabled} disabled={saving} onChange={(e) => setEnabled(e.target.checked)} />
             Usar o checklist na elegibilidade e nos pesos
           </label>
           <div>
@@ -138,6 +140,7 @@ export function ChecklistTab({
                   <button
                     key={value}
                     type="button"
+                    disabled={saving}
                     aria-pressed={effective === value}
                     onClick={() => setAnswer(answer.question_id, draft.value === value ? null : value)}
                     title={draft.value === value ? "Clique de novo para limpar" : undefined}
@@ -153,6 +156,7 @@ export function ChecklistTab({
                   aria-label={`Evidência: ${answer.text}`}
                   placeholder="Evidência (fonte, número, data) — opcional"
                   value={draft.evidence}
+                  disabled={saving}
                   onChange={(e) => setEvidence(answer.question_id, e.target.value)}
                 />
               )}
@@ -164,6 +168,7 @@ export function ChecklistTab({
       {message && <p className={message.ok ? "app-success-banner" : "app-error-banner"}>{message.text}</p>}
       <div className="app-button-row">
         <button type="button" className="app-primary-button" onClick={() => void save()} disabled={saving}>
+          {saving && <Spinner size="sm" />}
           {saving ? "Salvando…" : "Salvar checklist"}
         </button>
       </div>

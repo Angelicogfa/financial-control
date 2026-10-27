@@ -6,7 +6,7 @@ import { errorMessage } from "../../api/http";
 import type { TransactionKind, TransactionResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
-import { Async } from "../../components/States";
+import { Async, Spinner } from "../../components/States";
 import { parseDecimal, today } from "../../utils/format";
 import { TRADE_LABELS } from "../../utils/labels";
 import { AccountSelect, AssetSelect } from "./AssetSelect";
@@ -57,7 +57,7 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
   };
 
   return (
-    <form className="app-card app-card-padded" onSubmit={submit}>
+    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving}>
       {error && <p className="app-error-banner" role="alert">{error}</p>}
       <div className="app-field-grid">
         <div className="app-field">
@@ -65,7 +65,7 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
           <AssetSelect
             id="trade-asset"
             value={assetId}
-            disabled={trade !== null}
+            disabled={saving || trade !== null}
             onChange={(a) => {
               setAssetId(a?.id ?? "");
               setCurrency(a?.currency ?? "BRL");
@@ -74,7 +74,7 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
         </div>
         <div className="app-field">
           <label htmlFor="trade-kind">Operação</label>
-          <select id="trade-kind" value={kind} onChange={(e) => setKind(e.target.value as TransactionKind)}>
+          <select id="trade-kind" value={kind} onChange={(e) => setKind(e.target.value as TransactionKind)} disabled={saving}>
             {(Object.keys(TRADE_LABELS) as TransactionKind[]).map((k) => (
               <option key={k} value={k}>
                 {TRADE_LABELS[k]}
@@ -84,40 +84,41 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
         </div>
         <div className="app-field">
           <label htmlFor="trade-date">Data</label>
-          <input id="trade-date" type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} required />
+          <input id="trade-date" type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} required disabled={saving} />
         </div>
         <div className="app-field">
           <label htmlFor="trade-qty">Quantidade</label>
-          <input id="trade-qty" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} required />
+          <input id="trade-qty" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} required disabled={saving} />
         </div>
         <div className="app-field">
           <label htmlFor="trade-price">Preço unitário ({currency})</label>
-          <input id="trade-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} required />
+          <input id="trade-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} required disabled={saving} />
         </div>
         <div className="app-field">
           <label htmlFor="trade-fees">Taxas</label>
-          <input id="trade-fees" inputMode="decimal" value={fees} onChange={(e) => setFees(e.target.value)} />
+          <input id="trade-fees" inputMode="decimal" value={fees} onChange={(e) => setFees(e.target.value)} disabled={saving} />
         </div>
         {currency !== "BRL" && (
           <div className="app-field">
             <label htmlFor="trade-fx">Câmbio {currency}/BRL do dia</label>
-            <input id="trade-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required />
+            <input id="trade-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required disabled={saving} />
           </div>
         )}
         <div className="app-field">
           <label htmlFor="trade-account">Conta</label>
-          <AccountSelect id="trade-account" value={accountId} onChange={setAccountId} />
+          <AccountSelect id="trade-account" value={accountId} onChange={setAccountId} disabled={saving} />
         </div>
       </div>
       <div className="app-field" style={{ marginTop: "var(--space-3)" }}>
         <label htmlFor="trade-notes">Observação</label>
-        <input id="trade-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <input id="trade-notes" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={saving} />
       </div>
       <div className="app-form-actions">
         <button type="submit" className="app-primary-button" disabled={saving}>
-          {saving ? "Salvando…" : "Salvar"}
+          {saving && <Spinner size="sm" />}
+          <span>{saving ? "Salvando…" : "Salvar"}</span>
         </button>
-        <button type="button" className="app-secondary-button" onClick={() => navigate(-1)}>
+        <button type="button" className="app-secondary-button" onClick={() => navigate(-1)} disabled={saving}>
           Cancelar
         </button>
       </div>

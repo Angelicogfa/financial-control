@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { KeyExpiryDays } from "../../../api/types";
+import { Spinner } from "../../../components/States";
 import { daysLeft, DEFAULT_EXPIRY, EXPIRY_OPTIONS, expiryState } from "./expiry";
 
 const BADGE_CLASS = {
@@ -100,7 +101,8 @@ export function RenewPanel({
           ))}
         </select>
         <button type="button" className="app-secondary-button" disabled={renewing} onClick={() => void handleRenew()}>
-          {renewing ? "Renovando…" : "Renovar validade"}
+          {renewing && <Spinner size="sm" />}
+          <span>{renewing ? "Renovando…" : "Renovar validade"}</span>
         </button>
       </div>
     </section>

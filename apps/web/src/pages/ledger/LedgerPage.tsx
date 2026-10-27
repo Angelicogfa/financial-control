@@ -5,7 +5,7 @@ import { api, type LedgerFilters } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import { useApi } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
-import { Async, Empty } from "../../components/States";
+import { Async, Empty, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, day, num, quantity } from "../../utils/format";
 import { EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
@@ -79,22 +79,27 @@ function Filters({
 
 function useRemove(reload: () => void) {
   const [error, setError] = useState<string | null>(null);
-  const remove = async (label: string, action: () => Promise<void>) => {
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  const remove = async (id: number, label: string, action: () => Promise<void>) => {
     if (!window.confirm(`Excluir ${label}?`)) return;
     setError(null);
+    setRemovingId(id);
     try {
       await action();
       reload();
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setRemovingId(null);
     }
   };
-  return { error, remove };
+  return { error, remove, removingId };
 }
 
 function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
   const trades = useApi(`trades-${JSON.stringify(filters)}`, () => api.ledger.trades(filters));
-  const { error, remove } = useRemove(trades.reload);
+  const { error, remove, removingId } = useRemove(trades.reload);
   return (
     <>
       {error && <p className="app-error-banner">{error}</p>}
@@ -140,11 +145,13 @@ function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
                         <button
                           type="button"
                           className="app-link-button"
+                          disabled={removingId === t.id}
                           onClick={() =>
-                            void remove(`a operação de ${t.ticker ?? ""} em ${day(t.trade_date)}`, () => api.ledger.deleteTrade(t.id))
+                            void remove(t.id, `a operação de ${t.ticker ?? ""} em ${day(t.trade_date)}`, () => api.ledger.deleteTrade(t.id))
                           }
                         >
-                          Excluir
+                          {removingId === t.id && <Spinner size="sm" />}
+                          <span>{removingId === t.id ? "Excluindo…" : "Excluir"}</span>
                         </button>
                       </td>
                     </tr>
@@ -166,7 +173,7 @@ function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
 
 function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
   const earnings = useApi(`earnings-${JSON.stringify(filters)}`, () => api.ledger.earnings(filters));
-  const { error, remove } = useRemove(earnings.reload);
+  const { error, remove, removingId } = useRemove(earnings.reload);
   return (
     <>
       {error && <p className="app-error-banner">{error}</p>}
@@ -208,9 +215,11 @@ function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
                         <button
                           type="button"
                           className="app-link-button"
-                          onClick={() => void remove(`o provento de ${e.ticker ?? ""}`, () => api.ledger.deleteEarning(e.id))}
+                          disabled={removingId === e.id}
+                          onClick={() => void remove(e.id, `o provento de ${e.ticker ?? ""}`, () => api.ledger.deleteEarning(e.id))}
                         >
-                          Excluir
+                          {removingId === e.id && <Spinner size="sm" />}
+                          <span>{removingId === e.id ? "Excluindo…" : "Excluir"}</span>
                         </button>
                       </td>
                     </tr>
@@ -227,7 +236,7 @@ function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
 
 function Events({ filters }: Readonly<{ filters: LedgerFilters }>) {
   const events = useApi(`events-${filters.asset_id ?? "all"}`, () => api.ledger.events(filters.asset_id));
-  const { error, remove } = useRemove(events.reload);
+  const { error, remove, removingId } = useRemove(events.reload);
   return (
     <>
       {error && <p className="app-error-banner">{error}</p>}
@@ -262,9 +271,11 @@ function Events({ filters }: Readonly<{ filters: LedgerFilters }>) {
                         <button
                           type="button"
                           className="app-link-button"
-                          onClick={() => void remove(`o evento de ${e.ticker ?? ""}`, () => api.ledger.deleteEvent(e.id))}
+                          disabled={removingId === e.id}
+                          onClick={() => void remove(e.id, `o evento de ${e.ticker ?? ""}`, () => api.ledger.deleteEvent(e.id))}
                         >
-                          Excluir
+                          {removingId === e.id && <Spinner size="sm" />}
+                          <span>{removingId === e.id ? "Excluindo…" : "Excluir"}</span>
                         </button>
                       </td>
                     </tr>

@@ -7,6 +7,7 @@ import type { ArcaClass, AssetType, ImportCommitDTO, ImportPreviewDTO } from "..
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { Spinner } from "../../components/States";
 import { day, num, quantity } from "../../utils/format";
 import { ASSET_TYPES, ASSET_TYPE_LABELS, EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
 import { AccountSelect } from "./AssetSelect";
@@ -62,10 +63,11 @@ export function ImportPage() {
   const [accountId, setAccountId] = useState<number | null>(null);
   const [result, setResult] = useState<ImportCommitDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const runPreview = async (chosen: File) => {
-    setBusy(true);
+    setPreviewing(true);
     setError(null);
     setResult(null);
     try {
@@ -76,7 +78,7 @@ export function ImportPage() {
       setPreview(null);
       setError(errorMessage(err));
     } finally {
-      setBusy(false);
+      setPreviewing(false);
     }
   };
 
@@ -142,6 +144,7 @@ export function ImportPage() {
                 id="import-file"
                 type="file"
                 accept=".xlsx,.csv"
+                disabled={busy || previewing}
                 onChange={(e) => {
                   const chosen = e.target.files?.[0] ?? null;
                   setFile(chosen);
@@ -151,10 +154,17 @@ export function ImportPage() {
             </div>
             <div className="app-field">
               <label htmlFor="import-account">Conta dos lançamentos</label>
-              <AccountSelect id="import-account" value={accountId} onChange={setAccountId} />
+              <AccountSelect id="import-account" value={accountId} onChange={setAccountId} disabled={busy || previewing} />
             </div>
           </div>
         </section>
+
+        {previewing && (
+          <div className="app-busy-overlay" role="status" aria-live="polite">
+            <Spinner size="sm" />
+            <span>Analisando extrato da B3…</span>
+          </div>
+        )}
 
         {error && <p className="app-error-banner" role="alert">{error}</p>}
         {result && (
@@ -203,7 +213,7 @@ export function ImportPage() {
                                 <input
                                   type="checkbox"
                                   checked={choice.selected}
-                                  disabled={!choice.asset_type}
+                                  disabled={busy || previewing || !choice.asset_type}
                                   onChange={(e) => choose(u.ticker, { selected: e.target.checked })}
                                 />
                                 {u.ticker}
@@ -214,6 +224,7 @@ export function ImportPage() {
                               <select
                                 aria-label={`Tipo de ${u.ticker}`}
                                 value={choice.asset_type}
+                                disabled={busy || previewing}
                                 onChange={(e) => void chooseType(u.ticker, e.target.value as AssetType | "")}
                               >
                                 <option value="">Escolha o tipo</option>
@@ -230,7 +241,7 @@ export function ImportPage() {
                                 value={choice.arca_class}
                                 suggested={choice.suggested}
                                 emptyLabel="Sugerida pelo tipo"
-                                disabled={!choice.asset_type}
+                                disabled={busy || previewing || !choice.asset_type}
                                 onChange={(value) => choose(u.ticker, { arca_class: value })}
                               />
                             </td>
@@ -247,10 +258,11 @@ export function ImportPage() {
               <button
                 type="button"
                 className="app-primary-button"
-                disabled={busy || newLines + fromUnknown === 0}
+                disabled={busy || previewing || newLines + fromUnknown === 0}
                 onClick={() => void commit()}
               >
-                {busy ? "Importando…" : `Importar ${newLines + fromUnknown} linha(s)`}
+                {busy && <Spinner size="sm" />}
+                <span>{busy ? "Importando…" : `Importar ${newLines + fromUnknown} linha(s)`}</span>
               </button>
               <span className="app-muted">Tudo ou nada: se uma venda ficar sem posição, nada é gravado.</span>
             </div>

@@ -12,7 +12,7 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
-import { Async, Empty } from "../../components/States";
+import { Async, Empty, Spinner } from "../../components/States";
 import { brl, dateTime, num, parseDecimal, points, quantity, today } from "../../utils/format";
 import { ARCA_LABELS, PLAN_STATUS_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
@@ -66,7 +66,7 @@ function AmountStep() {
   return (
     <div className="app-page-stack">
       <Steps current={0} />
-      <form className="app-card app-card-padded" onSubmit={submit}>
+      <form className="app-card app-card-padded" onSubmit={submit} aria-busy={busy}>
         {error && <p className="app-error-banner">{error}</p>}
         <div className="app-field-grid">
           <div className="app-field">
@@ -75,6 +75,7 @@ function AmountStep() {
               id="contribution-amount"
               inputMode="decimal"
               value={amount}
+              disabled={busy}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="2.000,00"
               required
@@ -85,6 +86,7 @@ function AmountStep() {
             <select
               id="contribution-strategy"
               value={strategy}
+              disabled={busy}
               onChange={(e) => setStrategy(e.target.value as IntraClassStrategy | "")}
             >
               <option value="">Como definido na estratégia</option>
@@ -96,7 +98,8 @@ function AmountStep() {
             </select>
           </div>
           <button type="submit" className="app-primary-button" disabled={busy}>
-            {busy ? "Calculando…" : "Sugerir distribuição"}
+            {busy && <Spinner size="sm" />}
+            <span>{busy ? "Calculando…" : "Sugerir distribuição"}</span>
           </button>
         </div>
         <p className="app-card-hint" style={{ margin: "var(--space-3) 0 0" }}>
@@ -214,6 +217,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
   const [accountId, setAccountId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const orders = saved.plan.orders;
   const update = (id: number, change: Partial<ExecutionDraft>) =>
     setExecutions((all) => ({ ...all, [id]: { ...all[id], ...change } }));
@@ -252,11 +256,14 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
 
   const discard = async () => {
     if (!window.confirm("Descartar este plano?")) return;
+    setDiscarding(true);
     try {
       await api.contributions.discard(saved.id);
       navigate("/contribute");
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setDiscarding(false);
     }
   };
 
@@ -297,6 +304,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           type="checkbox"
                           aria-label={`Comprar ${o.ticker}`}
                           checked={e.include}
+                          disabled={busy || discarding}
                           onChange={(ev) => update(o.asset_id, { include: ev.target.checked })}
                         />
                       </td>
@@ -316,7 +324,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           inputMode="decimal"
                           value={e.quantity}
                           size={8}
-                          disabled={!e.include}
+                          disabled={busy || discarding || !e.include}
                           onChange={(ev) => update(o.asset_id, { quantity: ev.target.value })}
                         />
                       </td>
@@ -326,7 +334,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           inputMode="decimal"
                           value={e.price}
                           size={8}
-                          disabled={!e.include}
+                          disabled={busy || discarding || !e.include}
                           onChange={(ev) => update(o.asset_id, { price: ev.target.value })}
                         />
                       </td>
@@ -336,7 +344,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           inputMode="decimal"
                           value={e.fees}
                           size={6}
-                          disabled={!e.include}
+                          disabled={busy || discarding || !e.include}
                           onChange={(ev) => update(o.asset_id, { fees: ev.target.value })}
                         />
                       </td>
@@ -355,13 +363,20 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
         <div className="app-field-grid">
           <div className="app-field">
             <label htmlFor="contribution-date">Data das compras</label>
-            <input id="contribution-date" type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} />
+            <input
+              id="contribution-date"
+              type="date"
+              value={tradeDate}
+              disabled={busy || discarding}
+              onChange={(e) => setTradeDate(e.target.value)}
+            />
           </div>
           <div className="app-field">
             <label htmlFor="contribution-account">Conta</label>
             <select
               id="contribution-account"
               value={accountId ?? ""}
+              disabled={busy || discarding}
               onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)}
             >
               <option value="">Conta padrão</option>
@@ -380,11 +395,13 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
           </div>
         </div>
         <div className="app-form-actions">
-          <button type="button" className="app-primary-button" onClick={() => void confirm()} disabled={busy}>
-            {busy ? "Registrando…" : `Confirmar ${chosen.length} compra(s)`}
+          <button type="button" className="app-primary-button" onClick={() => void confirm()} disabled={busy || discarding}>
+            {busy && <Spinner size="sm" />}
+            <span>{busy ? "Registrando…" : `Confirmar ${chosen.length} compra(s)`}</span>
           </button>
-          <button type="button" className="app-danger-button" onClick={() => void discard()}>
-            Descartar plano
+          <button type="button" className="app-danger-button" onClick={() => void discard()} disabled={busy || discarding}>
+            {discarding && <Spinner size="sm" />}
+            <span>{discarding ? "Descartando…" : "Descartar plano"}</span>
           </button>
         </div>
       </section>

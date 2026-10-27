@@ -16,6 +16,27 @@ export function Loading({ lines = 3, label = "Carregando" }: Readonly<{ lines?: 
   );
 }
 
+/**
+ * Animated inline spinner indicating an active asynchronous API call or heavy background operation.
+ * Used inside buttons, field labels, or action rows during in-flight requests.
+ */
+export function Spinner({
+  size = "md",
+  label = "Aguardando resposta…",
+  className = "",
+}: Readonly<{
+  size?: "sm" | "md" | "lg";
+  label?: string;
+  className?: string;
+}>) {
+  const sizeClass = size === "sm" ? "app-spinner-sm" : size === "lg" ? "app-spinner-lg" : "";
+  return (
+    <span className={`app-spinner ${sizeClass} ${className}`.trim()} role="status" aria-label={label}>
+      <span className="app-sr-only">{label}</span>
+    </span>
+  );
+}
+
 export function ErrorBanner({ error, onRetry }: Readonly<{ error: unknown; onRetry?: () => void }>) {
   if (!error) return null;
   return (

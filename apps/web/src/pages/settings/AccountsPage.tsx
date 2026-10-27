@@ -6,7 +6,7 @@ import type { AccountDTO, AccountKind } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
-import { Async } from "../../components/States";
+import { Async, Spinner } from "../../components/States";
 import { ACCOUNT_KIND_LABELS } from "../../utils/labels";
 
 interface Draft {
@@ -66,13 +66,13 @@ export function AccountsPage() {
     <div className="app-page">
       <PageHeader title="Contas" subtitle="Corretoras, bancos e exchanges onde ficam seus ativos. Todo lançamento pertence a uma." />
       <div className="app-page-stack">
-        <form className="app-card app-card-padded" onSubmit={submit}>
+        <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving}>
           <h2 className="app-card-heading">{editing ? `Editar ${editing.name}` : "Nova conta"}</h2>
           {error && <p className="app-error-banner">{error}</p>}
           <div className="app-field-grid">
             <div className="app-field">
               <label htmlFor="account-name">Nome</label>
-              <input id="account-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
+              <input id="account-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required disabled={saving} />
             </div>
             <div className="app-field">
               <label htmlFor="account-institution">Instituição</label>
@@ -80,6 +80,7 @@ export function AccountsPage() {
                 id="account-institution"
                 value={draft.institution}
                 onChange={(e) => setDraft({ ...draft, institution: e.target.value })}
+                disabled={saving}
               />
             </div>
             <div className="app-field">
@@ -88,6 +89,7 @@ export function AccountsPage() {
                 id="account-kind"
                 value={draft.kind}
                 onChange={(e) => setDraft({ ...draft, kind: e.target.value as AccountKind })}
+                disabled={saving}
               >
                 {(Object.keys(ACCOUNT_KIND_LABELS) as AccountKind[]).map((k) => (
                   <option key={k} value={k}>
@@ -97,16 +99,17 @@ export function AccountsPage() {
               </select>
             </div>
             <label className="app-check">
-              <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
+              <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} disabled={saving} />
               Ativa
             </label>
           </div>
           <div className="app-form-actions">
             <button type="submit" className="app-primary-button" disabled={saving}>
-              {editing ? "Salvar" : "Adicionar conta"}
+              {saving && <Spinner size="sm" />}
+              <span>{saving ? "Salvando…" : editing ? "Salvar" : "Adicionar conta"}</span>
             </button>
             {editing && (
-              <button type="button" className="app-secondary-button" onClick={reset}>
+              <button type="button" className="app-secondary-button" onClick={reset} disabled={saving}>
                 Cancelar
               </button>
             )}

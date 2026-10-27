@@ -4,7 +4,7 @@ import { api } from "../../api/endpoints";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
-import { Async, Empty } from "../../components/States";
+import { Async, Empty, Spinner } from "../../components/States";
 import { dateTime, day, num } from "../../utils/format";
 
 const UNIT_LABELS: Record<string, string> = {
@@ -42,22 +42,36 @@ function notifyWorkerErrorsChanged() {
 
 export function MarketDataPage() {
   const [includeResolved, setIncludeResolved] = useState(false);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [resolvingAll, setResolvingAll] = useState(false);
   const series = useApi("series-status", () => api.market.series());
   const jobs = useApi("job-runs", () => api.market.jobs());
   const workerErrors = useApi(`worker-errors:${includeResolved}`, () =>
     api.market.workerErrors(includeResolved),
   );
 
+  const reloading = series.loading || jobs.loading || workerErrors.loading;
+
   const handleResolveOne = async (errorId: number) => {
-    await api.market.resolveWorkerError(errorId);
-    workerErrors.reload();
-    notifyWorkerErrorsChanged();
+    setResolvingId(errorId);
+    try {
+      await api.market.resolveWorkerError(errorId);
+      workerErrors.reload();
+      notifyWorkerErrorsChanged();
+    } finally {
+      setResolvingId(null);
+    }
   };
 
   const handleResolveAll = async () => {
-    await api.market.resolveAllWorkerErrors();
-    workerErrors.reload();
-    notifyWorkerErrorsChanged();
+    setResolvingAll(true);
+    try {
+      await api.market.resolveAllWorkerErrors();
+      workerErrors.reload();
+      notifyWorkerErrorsChanged();
+    } finally {
+      setResolvingAll(false);
+    }
   };
 
   return (
@@ -69,6 +83,7 @@ export function MarketDataPage() {
           <button
             type="button"
             className="app-secondary-button"
+            disabled={reloading}
             onClick={() => {
               series.reload();
               jobs.reload();
@@ -76,7 +91,8 @@ export function MarketDataPage() {
               notifyWorkerErrorsChanged();
             }}
           >
-            Atualizar
+            {reloading && <Spinner size="sm" />}
+            <span>{reloading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         }
       />
@@ -101,8 +117,9 @@ export function MarketDataPage() {
                 <span>Mostrar resolvidos</span>
               </label>
               {workerErrors.data && workerErrors.data.unresolved_count > 0 && (
-                <button type="button" className="app-secondary-button" onClick={handleResolveAll}>
-                  Limpar notificações
+                <button type="button" className="app-secondary-button" disabled={resolvingAll} onClick={handleResolveAll}>
+                  {resolvingAll && <Spinner size="sm" />}
+                  <span>{resolvingAll ? "Limpando…" : "Limpar notificações"}</span>
                 </button>
               )}
             </div>
@@ -144,14 +161,20 @@ export function MarketDataPage() {
                             </div>
                           </td>
                           <td className="app-cell-wrap">
-                            <code>{err.request_url}</code>
+                            <div className="app-cell-url">
+                              <code title={err.request_url}>{err.request_url}</code>
+                            </div>
                           </td>
-                          <td>
+                          <td className="app-cell-status">
                             <Badge tone={err.resolved_at ? "neutral" : "danger"}>
                               {err.status_code ? `HTTP ${err.status_code}` : err.error_type}
                             </Badge>
                           </td>
-                          <td className="app-cell-wrap app-muted">{err.error_detail}</td>
+                          <td className="app-cell-wrap app-muted">
+                            <div className="app-cell-error" title={err.error_detail}>
+                              {err.error_detail}
+                            </div>
+                          </td>
                           <td className="app-numeric">
                             {err.resolved_at ? (
                               <span className="app-muted">Resolvido</span>
@@ -159,9 +182,11 @@ export function MarketDataPage() {
                               <button
                                 type="button"
                                 className="app-link-button"
-                                onClick={() => handleResolveOne(err.id)}
+                                disabled={resolvingId === err.id}
+                                onClick={() => void handleResolveOne(err.id)}
                               >
-                                Dispensar
+                                {resolvingId === err.id && <Spinner size="sm" />}
+                                <span>{resolvingId === err.id ? "Dispensando…" : "Dispensar"}</span>
                               </button>
                             )}
                           </td>

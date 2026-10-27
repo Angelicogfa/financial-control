@@ -18,7 +18,7 @@ import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Hint } from "../../components/Hint";
-import { Async, Empty, ErrorBanner, Loading } from "../../components/States";
+import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points, today } from "../../utils/format";
 import {
@@ -94,7 +94,8 @@ function FollowAction({ item, onFollow, busy }: Readonly<{ item: ScreenerItemDTO
   if (arcaClass === null) {
     return (
       <button type="button" className="app-secondary-button" disabled={busy} onClick={() => setArcaClass(item.arca_class)}>
-        Observar
+        {busy && <Spinner size="sm" />}
+        <span>{busy ? "Observando…" : "Observar"}</span>
       </button>
     );
   }
@@ -104,12 +105,14 @@ function FollowAction({ item, onFollow, busy }: Readonly<{ item: ScreenerItemDTO
         label={`Classe ARCA de ${item.ticker}`}
         value={arcaClass}
         suggested={item.arca_class}
+        disabled={busy}
         onChange={(value) => value && setArcaClass(value)}
       />
       <button type="button" className="app-primary-button" disabled={busy} onClick={() => onFollow(item, arcaClass)}>
-        Confirmar
+        {busy && <Spinner size="sm" />}
+        <span>{busy ? "Salvando…" : "Confirmar"}</span>
       </button>
-      <button type="button" className="app-link-button" onClick={() => setArcaClass(null)}>
+      <button type="button" className="app-link-button" disabled={busy} onClick={() => setArcaClass(null)}>
         Cancelar
       </button>
     </span>
@@ -234,46 +237,46 @@ function Screener() {
 
   return (
     <div className="app-page-stack">
-      <form className="app-card app-card-padded" onSubmit={run}>
+      <form className="app-card app-card-padded" onSubmit={run} aria-busy={loading}>
         <div className="app-field-grid">
           <div className="app-field">
             <label htmlFor="screen-q">Nome ou código</label>
-            <input id="screen-q" value={form.q} onChange={(e) => set("q", e.target.value)} placeholder="Ex.: banco, ITUB" />
+            <input id="screen-q" value={form.q} onChange={(e) => set("q", e.target.value)} placeholder="Ex.: banco, ITUB" disabled={loading} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="screen-volume">Volume diário mínimo (R$)</label>
               <Hint about="Volume diário mínimo">Média diária negociada para filtrar liquidez.</Hint>
             </span>
-            <input id="screen-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set("minVolume", e.target.value)} placeholder="1000000" />
+            <input id="screen-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set("minVolume", e.target.value)} placeholder="1000000" disabled={loading} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="screen-pe">P/L máximo</label>
               <Hint about="P/L máximo">Preço sobre Lucro. Relação entre o valor de mercado e o lucro anual.</Hint>
             </span>
-            <input id="screen-pe" inputMode="decimal" value={form.maxPe} onChange={(e) => set("maxPe", e.target.value)} />
+            <input id="screen-pe" inputMode="decimal" value={form.maxPe} onChange={(e) => set("maxPe", e.target.value)} disabled={loading} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="screen-pb">P/VP máximo</label>
               <Hint about="P/VP máximo">Preço sobre Valor Patrimonial por ação.</Hint>
             </span>
-            <input id="screen-pb" inputMode="decimal" value={form.maxPb} onChange={(e) => set("maxPb", e.target.value)} />
+            <input id="screen-pb" inputMode="decimal" value={form.maxPb} onChange={(e) => set("maxPb", e.target.value)} disabled={loading} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="screen-dy">DY mínimo (%)</label>
               <Hint about="DY mínimo">Dividend Yield anual distribuído nos últimos 12 meses.</Hint>
             </span>
-            <input id="screen-dy" inputMode="decimal" value={form.minDy} onChange={(e) => set("minDy", e.target.value)} />
+            <input id="screen-dy" inputMode="decimal" value={form.minDy} onChange={(e) => set("minDy", e.target.value)} disabled={loading} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="screen-roe">ROE mínimo (%)</label>
               <Hint about="ROE mínimo">Retorno sobre o patrimônio líquido.</Hint>
             </span>
-            <input id="screen-roe" inputMode="decimal" value={form.minRoe} onChange={(e) => set("minRoe", e.target.value)} />
+            <input id="screen-roe" inputMode="decimal" value={form.minRoe} onChange={(e) => set("minRoe", e.target.value)} disabled={loading} />
           </div>
         </div>
         <div className="app-filter-bar" style={{ marginTop: "var(--space-3)", marginBottom: 0 }}>
@@ -284,6 +287,7 @@ function Screener() {
                 type="button"
                 className="app-chip"
                 aria-pressed={form.types.includes(type)}
+                disabled={loading}
                 onClick={() => toggleType(type)}
               >
                 {ASSET_TYPE_LABELS[type]}
@@ -291,25 +295,33 @@ function Screener() {
             ))}
           </div>
           <label className="app-check">
-            <input type="checkbox" checked={form.belowBand} onChange={(e) => set("belowBand", e.target.checked)} />
+            <input type="checkbox" checked={form.belowBand} disabled={loading} onChange={(e) => set("belowBand", e.target.checked)} />
             Só classes abaixo da banda
           </label>
           <label className="app-check">
             <input
               type="checkbox"
               checked={form.excludeRegistered}
+              disabled={loading}
               onChange={(e) => set("excludeRegistered", e.target.checked)}
             />
             Esconder já cadastrados
           </label>
           <button type="submit" className="app-primary-button" disabled={loading} style={{ marginLeft: "auto" }}>
-            {loading ? "Buscando…" : "Buscar"}
+            {loading && <Spinner size="sm" />}
+            <span>{loading ? "Buscando…" : "Buscar"}</span>
           </button>
         </div>
       </form>
       {notice && <p className="app-info-banner">{notice}</p>}
       <ErrorBanner error={error} onRetry={() => void run()} />
       {loading && !result && <Loading lines={5} />}
+      {loading && result && (
+        <div className="app-busy-overlay" role="status" aria-live="polite">
+          <Spinner size="sm" />
+          <span>Atualizando candidatos do screener…</span>
+        </div>
+      )}
       {result && (
         <>
           <p className="app-muted" style={{ margin: 0 }}>
@@ -342,9 +354,13 @@ function Watchlist() {
   const [ticker, setTicker] = useState("");
   const [assetType, setAssetType] = useState<AssetType | "">("");
   const [arcaClass, setArcaClass] = useState<ArcaClass | "">("");
+  const [adding, setAdding] = useState(false);
+  const [reclassifyingId, setReclassifyingId] = useState<number | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
+    setAdding(true);
     setError(null);
     try {
       await api.research.follow({ ticker: ticker.trim(), asset_type: assetType || null, arca_class: arcaClass || null });
@@ -353,40 +369,59 @@ function Watchlist() {
       watchlist.reload();
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setAdding(false);
     }
   };
 
   const reclassify = async (item: WatchlistItemDTO, value: ArcaClass) => {
+    setReclassifyingId(item.asset_id);
     setError(null);
     try {
       await api.research.classify(item.asset_id, value);
       watchlist.reload();
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setReclassifyingId(null);
     }
   };
 
   const remove = async (item: WatchlistItemDTO) => {
     if (!window.confirm(`Parar de observar ${item.ticker}?`)) return;
+    setRemovingId(item.asset_id);
     setError(null);
     try {
       await api.research.unfollow(item.asset_id);
       watchlist.reload();
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setRemovingId(null);
     }
   };
 
   return (
     <div className="app-page-stack">
-      <form className="app-filter-bar" onSubmit={add}>
+      <form className="app-filter-bar" onSubmit={add} aria-busy={adding}>
         <div className="app-field">
           <label htmlFor="watch-ticker">Observar código</label>
-          <input id="watch-ticker" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} placeholder="Ex.: BBAS3" />
+          <input
+            id="watch-ticker"
+            value={ticker}
+            disabled={adding}
+            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            placeholder="Ex.: BBAS3"
+          />
         </div>
         <div className="app-field">
           <label htmlFor="watch-type">Tipo</label>
-          <select id="watch-type" value={assetType} onChange={(e) => setAssetType(e.target.value as AssetType | "")}>
+          <select
+            id="watch-type"
+            value={assetType}
+            disabled={adding}
+            onChange={(e) => setAssetType(e.target.value as AssetType | "")}
+          >
             <option value="">Pelo catálogo da B3</option>
             {SCREEN_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -397,10 +432,11 @@ function Watchlist() {
         </div>
         <div className="app-field">
           <label htmlFor="watch-arca">Classe ARCA</label>
-          <ArcaClassSelect id="watch-arca" value={arcaClass} onChange={setArcaClass} emptyLabel="Sugerida pelo tipo" />
+          <ArcaClassSelect id="watch-arca" value={arcaClass} disabled={adding} onChange={setArcaClass} emptyLabel="Sugerida pelo tipo" />
         </div>
-        <button type="submit" className="app-primary-button" disabled={!ticker.trim()}>
-          Adicionar
+        <button type="submit" className="app-primary-button" disabled={adding || !ticker.trim()}>
+          {adding && <Spinner size="sm" />}
+          <span>{adding ? "Adicionando…" : "Adicionar"}</span>
         </button>
       </form>
       {error && <p className="app-error-banner">{error}</p>}
@@ -440,6 +476,7 @@ function Watchlist() {
                         <ArcaClassSelect
                           label={`Classe ARCA de ${item.ticker}`}
                           value={item.arca_class}
+                          disabled={reclassifyingId === item.asset_id}
                           onChange={(value) => value && void reclassify(item, value)}
                         />
                       </td>
@@ -460,8 +497,14 @@ function Watchlist() {
                       </td>
                       <td className="app-numeric">{item.margin === null || item.margin === undefined ? "—" : pct(item.margin, 1, true)}</td>
                       <td className="app-row-actions">
-                        <button type="button" className="app-link-button" onClick={() => void remove(item)}>
-                          Remover
+                        <button
+                          type="button"
+                          className="app-link-button"
+                          disabled={removingId === item.asset_id}
+                          onClick={() => void remove(item)}
+                        >
+                          {removingId === item.asset_id && <Spinner size="sm" />}
+                          <span>{removingId === item.asset_id ? "Removendo…" : "Remover"}</span>
                         </button>
                       </td>
                     </tr>
@@ -552,13 +595,14 @@ function TreasuryScreener() {
 
   return (
     <div className="app-page-stack">
-      <form className="app-card app-card-padded" onSubmit={run}>
+      <form className="app-card app-card-padded" onSubmit={run} aria-busy={loading}>
         <div className="app-filter-bar" style={{ marginBottom: 0 }}>
           <div className="app-field" style={{ flex: 1 }}>
             <label htmlFor="treasury-q">Título ou vencimento</label>
             <input
               id="treasury-q"
               value={q}
+              disabled={loading}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Ex.: Selic, IPCA, 2031"
             />
@@ -568,6 +612,7 @@ function TreasuryScreener() {
             <select
               id="treasury-indexer"
               value={indexer}
+              disabled={loading}
               onChange={(e) => setIndexer(e.target.value as FixedIncomeIndexer | "")}
             >
               <option value="">Todos</option>
@@ -581,6 +626,7 @@ function TreasuryScreener() {
             <select
               id="treasury-coupon"
               value={couponType}
+              disabled={loading}
               onChange={(e) => setCouponType(e.target.value as "" | "zero" | "semestral")}
             >
               <option value="">Todos</option>
@@ -589,18 +635,27 @@ function TreasuryScreener() {
             </select>
           </div>
           <button type="submit" className="app-primary-button" disabled={loading}>
-            {loading ? "Buscando…" : "Buscar"}
+            {loading && <Spinner size="sm" />}
+            <span>{loading ? "Buscando…" : "Buscar"}</span>
           </button>
         </div>
       </form>
       {notice && <p className="app-info-banner">{notice}</p>}
       <ErrorBanner error={error} onRetry={() => void run()} />
       {loading && !result && <Loading lines={4} />}
+      {loading && result && (
+        <div className="app-busy-overlay" role="status" aria-live="polite">
+          <Spinner size="sm" />
+          <span>Atualizando títulos do Tesouro Direto…</span>
+        </div>
+      )}
       {result?.unavailable_reason && <p className="app-info-banner">{result.unavailable_reason}</p>}
       {result && !result.unavailable_reason && (
         <>
           <p className="app-muted" style={{ margin: 0 }}>
-            {result.results.length} título(s) encontrado(s) na API de Tesouro Direto da Brapi.
+            {result.results.length} título(s) encontrado(s) no catálogo do Tesouro Transparente
+            {result.catalog_size ? ` (${result.catalog_size} títulos vigentes)` : ""}
+            {result.catalog_updated_at ? ` · atualizado em ${dateTime(result.catalog_updated_at)}` : ""}.
           </p>
           {result.results.length === 0 ? (
             <Empty title="Nenhum título encontrado" hint="Ajuste o filtro de indexador, cupom ou texto." />
@@ -655,7 +710,8 @@ function TreasuryScreener() {
                             disabled={registering === bond.symbol}
                             onClick={() => void registerBond(bond)}
                           >
-                            Cadastrar
+                            {registering === bond.symbol && <Spinner size="sm" />}
+                            <span>{registering === bond.symbol ? "Cadastrando…" : "Cadastrar"}</span>
                           </button>
                         )}
                       </td>
@@ -670,7 +726,7 @@ function TreasuryScreener() {
       {!result && !loading && !error && (
         <Empty
           title="Consulte títulos do Tesouro Direto"
-          hint="Filtre por indexador ou vencimento e clique em Buscar para consultar taxas e preços via Brapi (/api/v2/treasury/list)."
+          hint="Filtre por indexador ou vencimento e clique em Buscar para consultar taxas e preços sincronizados do Tesouro Transparente."
         />
       )}
     </div>

@@ -7,7 +7,7 @@ import type { EarningKind, EarningResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
-import { Async } from "../../components/States";
+import { Async, Spinner } from "../../components/States";
 import { parseDecimal, today } from "../../utils/format";
 import { EARNING_KINDS, EARNING_LABELS } from "../../utils/labels";
 import { AccountSelect, AssetSelect } from "./AssetSelect";
@@ -57,7 +57,7 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
   };
 
   return (
-    <form className="app-card app-card-padded" onSubmit={submit}>
+    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving}>
       {error && <p className="app-error-banner" role="alert">{error}</p>}
       <div className="app-field-grid">
         <div className="app-field">
@@ -65,7 +65,7 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
           <AssetSelect
             id="earning-asset"
             value={assetId}
-            disabled={earning !== null}
+            disabled={saving || earning !== null}
             onChange={(a) => {
               setAssetId(a?.id ?? "");
               setCurrency(a?.currency ?? "BRL");
@@ -74,7 +74,7 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
         </div>
         <div className="app-field">
           <label htmlFor="earning-kind">Tipo</label>
-          <select id="earning-kind" value={kind} onChange={(e) => setKind(e.target.value as EarningKind)}>
+          <select id="earning-kind" value={kind} onChange={(e) => setKind(e.target.value as EarningKind)} disabled={saving}>
             {EARNING_KINDS.map((k) => (
               <option key={k} value={k}>
                 {EARNING_LABELS[k]}
@@ -84,39 +84,40 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
         </div>
         <div className="app-field">
           <label htmlFor="earning-date">Pagamento</label>
-          <input id="earning-date" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required />
+          <input id="earning-date" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required disabled={saving} />
         </div>
         <div className="app-field">
           <label htmlFor="earning-gross">Valor bruto ({currency})</label>
-          <input id="earning-gross" inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} required />
+          <input id="earning-gross" inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} required disabled={saving} />
         </div>
         <div className="app-field">
           <span className="app-field-label">
             <label htmlFor="earning-tax">IR retido</label>
             {kind === "JCP" && <Hint about="IR retido">JCP tem 15% retidos na fonte.</Hint>}
           </span>
-          <input id="earning-tax" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} />
+          <input id="earning-tax" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} disabled={saving} />
         </div>
         {currency !== "BRL" && (
           <div className="app-field">
             <label htmlFor="earning-fx">Câmbio do pagamento</label>
-            <input id="earning-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required />
+            <input id="earning-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required disabled={saving} />
           </div>
         )}
         <div className="app-field">
           <label htmlFor="earning-account">Conta</label>
-          <AccountSelect id="earning-account" value={accountId} onChange={setAccountId} />
+          <AccountSelect id="earning-account" value={accountId} onChange={setAccountId} disabled={saving} />
         </div>
       </div>
       <div className="app-field" style={{ marginTop: "var(--space-3)" }}>
         <label htmlFor="earning-notes">Observação</label>
-        <input id="earning-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <input id="earning-notes" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={saving} />
       </div>
       <div className="app-form-actions">
         <button type="submit" className="app-primary-button" disabled={saving}>
-          {saving ? "Salvando…" : "Salvar"}
+          {saving && <Spinner size="sm" />}
+          <span>{saving ? "Salvando…" : "Salvar"}</span>
         </button>
-        <button type="button" className="app-secondary-button" onClick={() => navigate(-1)}>
+        <button type="button" className="app-secondary-button" onClick={() => navigate(-1)} disabled={saving}>
           Cancelar
         </button>
       </div>

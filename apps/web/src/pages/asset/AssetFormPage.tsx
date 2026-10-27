@@ -18,7 +18,7 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
-import { Async } from "../../components/States";
+import { Async, Spinner } from "../../components/States";
 import { brl, day, parseDecimal, today } from "../../utils/format";
 import {
   ARCA_CLASSES,
@@ -132,13 +132,14 @@ function TreasuryPicker({ onSelect }: Readonly<{ onSelect: (bond: TreasuryBondDT
 
   return (
     <fieldset className="app-fieldset">
-      <legend>Buscar título do Tesouro Direto (Brapi)</legend>
+      <legend>Buscar título do Tesouro Direto (Tesouro Transparente)</legend>
       <div className="app-filter-bar" style={{ marginBottom: 0 }}>
         <div className="app-field" style={{ flex: 1 }}>
           <label htmlFor="treasury-search">Título ou vencimento</label>
           <input
             id="treasury-search"
             value={query}
+            disabled={loading}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ex.: Selic, IPCA, 2031"
           />
@@ -149,6 +150,7 @@ function TreasuryPicker({ onSelect }: Readonly<{ onSelect: (bond: TreasuryBondDT
           disabled={loading}
           onClick={() => void search()}
         >
+          {loading && <Spinner size="sm" />}
           {loading ? "Buscando…" : "Buscar títulos"}
         </button>
       </div>
@@ -206,8 +208,10 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(() => (asset ? fromAsset(asset) : EMPTY));
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [classifying, setClassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const fixedIncome = FIXED_INCOME_TYPES.includes(form.assetType);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -228,15 +232,21 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
   useEffect(() => {
     if (asset || !form.ticker.trim() || CODE_GENERATED.includes(form.assetType)) {
       setSuggestion(null);
+      setClassifying(false);
       return;
     }
+    setClassifying(true);
     const timer = window.setTimeout(() => {
       api.assets
         .classify(form.ticker.trim(), form.assetType)
         .then((s) => setSuggestion(`${ARCA_LABELS[s.arca_class]} — ${s.reason}`))
-        .catch(() => setSuggestion(null));
+        .catch(() => setSuggestion(null))
+        .finally(() => setClassifying(false));
     }, 400);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      setClassifying(false);
+    };
   }, [asset, form.ticker, form.assetType]);
 
   const submit = async (event: FormEvent) => {
@@ -284,16 +294,19 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
 
   const archive = async () => {
     if (!asset || !window.confirm(`Arquivar ${asset.ticker}? Ele sai da carteira e do aporte.`)) return;
+    setArchiving(true);
+    setError(null);
     try {
       await api.assets.archive(asset.id);
       navigate("/portfolio");
     } catch (err) {
       setError(errorMessage(err));
+      setArchiving(false);
     }
   };
 
   return (
-    <form className="app-card app-card-padded" onSubmit={submit}>
+    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving || archiving}>
       {error && (
         <p className="app-error-banner" role="alert">
           {error}
@@ -305,6 +318,7 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
           <select
             id="asset-type"
             value={form.assetType}
+            disabled={saving || archiving}
             onChange={(e) => set("assetType", e.target.value as AssetType)}
           >
             {ASSET_TYPES.map((t) => (
@@ -319,6 +333,7 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
           <input
             id="asset-ticker"
             value={form.ticker}
+            disabled={saving || archiving}
             placeholder={CODE_GENERATED.includes(form.assetType) ? "Gerado automaticamente" : "Ex.: WEGE3"}
             onChange={(e) => set("ticker", e.target.value.toUpperCase())}
             required={!CODE_GENERATED.includes(form.assetType)}
@@ -326,16 +341,30 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
         </div>
         <div className="app-field">
           <label htmlFor="asset-name">Nome</label>
-          <input id="asset-name" value={form.name} onChange={(e) => set("name", e.target.value)} required />
+          <input
+            id="asset-name"
+            value={form.name}
+            disabled={saving || archiving}
+            onChange={(e) => set("name", e.target.value)}
+            required
+          />
         </div>
         <div className="app-field">
           <span className="app-field-label">
             <label htmlFor="asset-class">Classe ARCA</label>
-            {suggestion && !form.arcaClass && <Hint about="Classe ARCA">{`Sugestão: ${suggestion}`}</Hint>}
+            {classifying && (
+              <output className="app-field-busy">
+                <Spinner size="sm" label="Consultando sugestão…" />
+              </output>
+            )}
+            {suggestion && !form.arcaClass && !classifying && (
+              <Hint about="Classe ARCA">{`Sugestão: ${suggestion}`}</Hint>
+            )}
           </span>
           <select
             id="asset-class"
             value={form.arcaClass}
+            disabled={saving || archiving}
             onChange={(e) => set("arcaClass", e.target.value as ArcaClass | "")}
           >
             <option value="">Automática</option>
@@ -501,15 +530,27 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
       )}
 
       <div className="app-form-actions">
-        <button type="submit" className="app-primary-button" disabled={saving}>
+        <button type="submit" className="app-primary-button" disabled={saving || archiving}>
+          {saving && <Spinner size="sm" />}
           {saving ? "Salvando…" : asset ? "Salvar alterações" : "Cadastrar ativo"}
         </button>
-        <button type="button" className="app-secondary-button" onClick={() => navigate(-1)}>
+        <button
+          type="button"
+          className="app-secondary-button"
+          disabled={saving || archiving}
+          onClick={() => navigate(-1)}
+        >
           Cancelar
         </button>
         {asset?.is_active && (
-          <button type="button" className="app-danger-button" onClick={() => void archive()}>
-            Arquivar
+          <button
+            type="button"
+            className="app-danger-button"
+            disabled={saving || archiving}
+            onClick={() => void archive()}
+          >
+            {archiving && <Spinner size="sm" />}
+            {archiving ? "Arquivando…" : "Arquivar"}
           </button>
         )}
       </div>

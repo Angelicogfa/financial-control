@@ -5,6 +5,7 @@ import { api } from "../../../api/endpoints";
 import { errorMessage } from "../../../api/http";
 import type { AgentKeyDTO, GrantOptionsDTO, KeyExpiryDays } from "../../../api/types";
 import { PageHeader } from "../../../components/PageHeader";
+import { Spinner } from "../../../components/States";
 import { ChevronDownIcon, ChevronRightIcon } from "../../../layout/icons";
 import { DEFAULT_EXPIRY } from "./expiry";
 import { ExpirySelect, RenewPanel } from "./KeyExpiry";
@@ -158,7 +159,7 @@ export function AgentKeyFormPage() {
       {detail && <RenewPanel expiresAt={detail.expires_at} onRenew={handleRenew} />}
 
       <div className="app-card app-card-padded">
-        <form onSubmit={(e) => void handleSubmit(e)} className="app-page-stack">
+        <form onSubmit={(e) => void handleSubmit(e)} className="app-page-stack" aria-busy={saving}>
           <div className="app-field-grid">
             <div className="app-field">
               <label htmlFor="key-name">Nome da chave</label>
@@ -167,6 +168,7 @@ export function AgentKeyFormPage() {
                 required
                 autoFocus
                 maxLength={128}
+                disabled={saving}
                 placeholder="Ex.: Claude Desktop, Cursor, Antigravity"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -184,6 +186,7 @@ export function AgentKeyFormPage() {
               className="app-collapsible-head"
               aria-expanded={scopeOpen}
               aria-controls="key-scope"
+              disabled={saving}
               onClick={() => setScopeOpen((current) => !current)}
             >
               {scopeOpen ? (
@@ -219,11 +222,13 @@ export function AgentKeyFormPage() {
               className="app-primary-button"
               disabled={saving || !isLoaded}
             >
-              {saving ? "Salvando…" : isEditing ? "Salvar alterações" : "Criar chave MCP"}
+              {saving && <Spinner size="sm" />}
+              <span>{saving ? "Salvando…" : isEditing ? "Salvar alterações" : "Criar chave MCP"}</span>
             </button>
             <button
               type="button"
               className="app-secondary-button"
+              disabled={saving}
               onClick={() => navigate("/settings/agentic")}
             >
               Cancelar

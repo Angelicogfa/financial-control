@@ -6,7 +6,7 @@ import type { ArcaClass, IntraClassStrategy, PolicyDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
-import { Async } from "../../components/States";
+import { Async, Spinner } from "../../components/States";
 import { dateTime, parseDecimal } from "../../utils/format";
 import { ARCA_CLASSES, ARCA_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 
@@ -116,7 +116,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
   };
 
   return (
-    <form className="app-page-stack" onSubmit={submit}>
+    <form className="app-page-stack" onSubmit={submit} aria-busy={saving}>
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Alocação ARCA</h2>
         <p className="app-card-hint">
@@ -142,6 +142,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                       inputMode="decimal"
                       size={6}
                       value={classes[c].target}
+                      disabled={saving}
                       onChange={(e) => setClass(c, { target: e.target.value })}
                     />
                   </td>
@@ -151,6 +152,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                       inputMode="decimal"
                       size={6}
                       value={classes[c].band}
+                      disabled={saving}
                       onChange={(e) => setClass(c, { band: e.target.value })}
                     />
                   </td>
@@ -158,6 +160,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                     <select
                       aria-label={`Divisão interna de ${ARCA_LABELS[c]}`}
                       value={classes[c].strategy}
+                      disabled={saving}
                       onChange={(e) => setClass(c, { strategy: e.target.value as IntraClassStrategy })}
                     >
                       {(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[]).map((s) => (
@@ -191,17 +194,17 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
               <label htmlFor="policy-min-score">Nota mínima do checklist</label>
               <Hint about="Nota mínima do checklist">Sim = +1, Não = −1.</Hint>
             </span>
-            <input id="policy-min-score" inputMode="numeric" value={minScore} onChange={(e) => setMinScore(e.target.value)} />
+            <input id="policy-min-score" inputMode="numeric" value={minScore} disabled={saving} onChange={(e) => setMinScore(e.target.value)} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="policy-coverage">Cobertura mínima (%)</label>
               <Hint about="Cobertura mínima">Parte das perguntas aplicáveis respondida.</Hint>
             </span>
-            <input id="policy-coverage" inputMode="decimal" value={minCoverage} onChange={(e) => setMinCoverage(e.target.value)} />
+            <input id="policy-coverage" inputMode="decimal" value={minCoverage} disabled={saving} onChange={(e) => setMinCoverage(e.target.value)} />
           </div>
           <label className="app-check">
-            <input type="checkbox" checked={requireEvaluation} onChange={(e) => setRequireEvaluation(e.target.checked)} />
+            <input type="checkbox" checked={requireEvaluation} disabled={saving} onChange={(e) => setRequireEvaluation(e.target.checked)} />
             Exigir checklist respondido para aportar
           </label>
         </div>
@@ -223,6 +226,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                 id={`valuation-${f.key}`}
                 inputMode="decimal"
                 value={valuationText[f.key]}
+                disabled={saving}
                 onChange={(e) => setValuationText((all) => ({ ...all, [f.key]: e.target.value }))}
               />
             </div>
@@ -240,6 +244,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                 id={`projection-${f.key}`}
                 inputMode="decimal"
                 value={projectionText[f.key]}
+                disabled={saving}
                 onChange={(e) => setProjectionText((all) => ({ ...all, [f.key]: e.target.value }))}
               />
             </div>
@@ -250,7 +255,8 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
       {message && <p className={message.ok ? "app-success-banner" : "app-error-banner"}>{message.text}</p>}
       <div className="app-button-row">
         <button type="submit" className="app-primary-button" disabled={saving}>
-          {saving ? "Salvando…" : "Salvar nova versão"}
+          {saving && <Spinner size="sm" />}
+          <span>{saving ? "Salvando…" : "Salvar nova versão"}</span>
         </button>
         <span className="app-muted">
           Versão atual: {policy.version ?? "padrão"}

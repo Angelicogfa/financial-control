@@ -805,6 +805,8 @@ export interface TreasuryBondDTO {
 export interface TreasurySearchResponseDTO {
   results: TreasuryBondDTO[];
   total: number;
+  catalog_size?: number;
+  catalog_updated_at?: string | null;
   unavailable_reason?: string | null;
 }
 

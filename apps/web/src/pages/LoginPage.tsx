@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { login } from "../api/auth";
 import { errorMessage } from "../api/http";
+import { Spinner } from "../components/States";
 
 export function LoginPage({
   notice,
@@ -53,6 +54,7 @@ export function LoginPage({
             id="login-username"
             autoComplete="username"
             required
+            disabled={submitting}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
@@ -64,11 +66,13 @@ export function LoginPage({
             type="password"
             autoComplete="current-password"
             required
+            disabled={submitting}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
         <button type="submit" className="app-primary-button" disabled={submitting}>
+          {submitting && <Spinner size="sm" />}
           {submitting ? "Entrando…" : "Entrar"}
         </button>
       </form>

@@ -39,11 +39,12 @@ export function AssetSelect({
 export function AccountSelect({
   id,
   value,
+  disabled,
   onChange,
-}: Readonly<{ id: string; value: number | null; onChange: (id: number | null) => void }>) {
+}: Readonly<{ id: string; value: number | null; disabled?: boolean; onChange: (id: number | null) => void }>) {
   const accounts = useApi("accounts", () => api.accounts.list());
   return (
-    <select id={id} value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+    <select id={id} value={value ?? ""} disabled={disabled} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
       <option value="">Conta padrão</option>
       {(accounts.data ?? []).filter((a: AccountDTO) => a.is_active !== false || a.id === value).map((a) => (
         <option key={a.id} value={a.id}>

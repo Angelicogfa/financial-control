@@ -6,6 +6,7 @@ import { errorMessage } from "../../api/http";
 import type { CorporateEventKind } from "../../api/types";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
+import { Spinner } from "../../components/States";
 import { parseDecimal, today } from "../../utils/format";
 import { EVENT_KINDS, EVENT_LABELS, FIXED_INCOME_TYPES } from "../../utils/labels";
 import { AssetSelect } from "./AssetSelect";
@@ -59,7 +60,7 @@ export function EventFormPage() {
         title="Novo evento corporativo"
         subtitle="A quantidade muda a partir da data ex; o custo total só muda na bonificação."
       />
-      <form className="app-card app-card-padded" onSubmit={submit}>
+      <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving}>
         {error && <p className="app-error-banner" role="alert">{error}</p>}
         <div className="app-field-grid">
           <div className="app-field">
@@ -67,13 +68,14 @@ export function EventFormPage() {
             <AssetSelect
               id="event-asset"
               value={assetId}
+              disabled={saving}
               onChange={(a) => setAssetId(a?.id ?? "")}
               filter={(a) => !FIXED_INCOME_TYPES.includes(a.asset_type) && a.asset_type !== "CASH"}
             />
           </div>
           <div className="app-field">
             <label htmlFor="event-kind">Evento</label>
-            <select id="event-kind" value={kind} onChange={(e) => setKind(e.target.value as CorporateEventKind)}>
+            <select id="event-kind" value={kind} onChange={(e) => setKind(e.target.value as CorporateEventKind)} disabled={saving}>
               {EVENT_KINDS.map((k) => (
                 <option key={k} value={k}>
                   {EVENT_LABELS[k]}
@@ -83,14 +85,14 @@ export function EventFormPage() {
           </div>
           <div className="app-field">
             <label htmlFor="event-date">Data ex</label>
-            <input id="event-date" type="date" value={exDate} onChange={(e) => setExDate(e.target.value)} required />
+            <input id="event-date" type="date" value={exDate} onChange={(e) => setExDate(e.target.value)} required disabled={saving} />
           </div>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="event-factor">Fator</label>
               <Hint about="Fator">{FACTOR_HINTS[kind]}</Hint>
             </span>
-            <input id="event-factor" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} required />
+            <input id="event-factor" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} required disabled={saving} />
           </div>
           {kind === "BONUS" && (
             <div className="app-field">
@@ -98,19 +100,20 @@ export function EventFormPage() {
                 <label htmlFor="event-cost">Custo atribuído por ação (R$)</label>
                 <Hint about="Custo atribuído por ação">Informado pela empresa no fato relevante.</Hint>
               </span>
-              <input id="event-cost" inputMode="decimal" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+              <input id="event-cost" inputMode="decimal" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} disabled={saving} />
             </div>
           )}
         </div>
         <div className="app-field" style={{ marginTop: "var(--space-3)" }}>
           <label htmlFor="event-notes">Observação</label>
-          <input id="event-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <input id="event-notes" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={saving} />
         </div>
         <div className="app-form-actions">
           <button type="submit" className="app-primary-button" disabled={saving}>
-            {saving ? "Salvando…" : "Salvar evento"}
+            {saving && <Spinner size="sm" />}
+            <span>{saving ? "Salvando…" : "Salvar evento"}</span>
           </button>
-          <button type="button" className="app-secondary-button" onClick={() => navigate(-1)}>
+          <button type="button" className="app-secondary-button" onClick={() => navigate(-1)} disabled={saving}>
             Cancelar
           </button>
         </div>
