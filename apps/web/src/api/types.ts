@@ -508,6 +508,17 @@ export interface ImportCommitDTO {
   created_assets?: string[];
 }
 
+export interface ImportFixedIncomeTermDTO {
+  instrument_kind: FixedIncomeInstrumentKind;
+  indexer: FixedIncomeIndexer;
+  contracted_rate?: string | null;
+  issue_date?: string | null;
+  maturity_date?: string | null;
+  tax_exempt?: boolean;
+  liquidity?: FixedIncomeLiquidity;
+  issuer?: string | null;
+}
+
 export interface ImportLineDTO {
   line_no: number;
   action: string;
@@ -815,6 +826,7 @@ export interface UnknownTickerDTO {
   name?: string | null;
   asset_type?: AssetType | null;
   arca_class?: ArcaClass | null;
+  fixed_income_term?: ImportFixedIncomeTermDTO | null;
 }
 
 export interface ValuationPolicyDTO {
