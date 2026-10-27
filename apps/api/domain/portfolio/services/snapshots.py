@@ -9,8 +9,21 @@ from datetime import date, timedelta
 from domain.portfolio.services.consolidation import LEDGER_VALID, ConsolidatedPortfolioReport
 from domain.shared.entities import AssetEntity, PortfolioSnapshotEntity, TransactionEntity
 from domain.shared.enums import TransactionKind
+from domain.shared.unit_of_work import AbstractUnitOfWork
 
 MAX_HISTORY_YEARS = 10
+
+
+def invalidate_snapshots_from(uow: AbstractUnitOfWork, *changed: date | None) -> int:
+    """Drop every snapshot dated on or after the earliest changed ledger date.
+
+    Snapshots are derived from the ledger, so a backdated (or edited/removed) entry makes
+    the stored ones stale; the worker backfill recreates the deleted days.
+    """
+    dates = [d for d in changed if d is not None]
+    if not dates:
+        return 0
+    return uow.snapshots.delete_range(date_from=min(dates))
 
 
 def external_flow_brl(tx: TransactionEntity) -> float:

@@ -91,15 +91,12 @@
    "earningsPerShare": 3.76,
    "defaultKeyStatistics": {
     "priceToBook": 1.6,
-    "bookValue": 20.0
+    "bookValue": 20.0,
+    "dividendYield": 0.07
    },
    "financialData": {
     "returnOnEquity": 0.21,
     "profitMargins": 0.3
-   },
-   "summaryDetail": {
-    "dividendYield": 0.07,
-    "trailingAnnualDividendRate": 2.24
    },
    "summaryProfile": {
     "sector": "Finance",
@@ -188,15 +185,12 @@
    "earningsPerShare": 1.62,
    "defaultKeyStatistics": {
     "priceToBook": 9.5,
-    "bookValue": 5.5
+    "bookValue": 5.5,
+    "dividendYield": 0.015
    },
    "financialData": {
     "returnOnEquity": 0.31,
     "profitMargins": 0.17
-   },
-   "summaryDetail": {
-    "dividendYield": 0.015,
-    "trailingAnnualDividendRate": 0.8
    },
    "summaryProfile": {
     "sector": "Producer Manufacturing",
@@ -212,13 +206,11 @@
    "earningsPerShare": 6.4,
    "defaultKeyStatistics": {
     "priceToBook": 0.8,
-    "bookValue": 34.0
+    "bookValue": 34.0,
+    "dividendYield": 0.09
    },
    "financialData": {
     "returnOnEquity": 0.2
-   },
-   "summaryDetail": {
-    "dividendYield": 0.09
    },
    "summaryProfile": {
     "sector": "Finance"
@@ -230,9 +222,7 @@
    "regularMarketVolume": 40000,
    "defaultKeyStatistics": {
     "priceToBook": 0.98,
-    "bookValue": 158.0
-   },
-   "summaryDetail": {
+    "bookValue": 158.0,
     "dividendYield": 0.085
    }
   }

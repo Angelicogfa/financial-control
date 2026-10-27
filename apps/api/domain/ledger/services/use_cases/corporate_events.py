@@ -7,6 +7,7 @@ from controllers.ledger.responses import CorporateEventDTO
 from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError, ValidationError
 from domain.ledger.services.ledger import validate_ledger_change
+from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.shared.entities import AssetEntity, CorporateEventEntity
 from domain.shared.unit_of_work import AbstractUnitOfWork
 
@@ -54,6 +55,7 @@ class CorporateEventHandler:
                 asset, asset.transactions, events=[*asset.corporate_events, event]
             )
             saved = uow.corporate_events.add(event)
+            invalidate_snapshots_from(uow, saved.ex_date)
             uow.commit()
             return to_event_dto(saved, asset.ticker)
 
@@ -66,6 +68,7 @@ class CorporateEventHandler:
             remaining = [e for e in asset.corporate_events if e.id != event_id]
             validate_ledger_change(asset, asset.transactions, events=remaining)
             uow.corporate_events.delete(event_id)
+            invalidate_snapshots_from(uow, event.ex_date)
             uow.commit()
 
 

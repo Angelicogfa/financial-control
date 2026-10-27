@@ -25,6 +25,7 @@ from domain.contributions.services.contribution_plans import (
 )
 from domain.ledger.services.ledger import require_fx_rate, validate_ledger
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.shared.entities import TransactionEntity
 from domain.shared.enums import ContributionPlanStatus, TransactionKind
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -149,6 +150,8 @@ class ContributionHandler:
                     curves=self.portfolio_service.ledger_curves(uow, asset, req.trade_date),
                 )
                 transaction_ids.append(uow.transactions.add(trade).id or 0)
+            if transaction_ids:
+                invalidate_snapshots_from(uow, req.trade_date)
 
             confirmed = uow.contribution_plans.update(
                 confirm_plan(

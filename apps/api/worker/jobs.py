@@ -427,3 +427,15 @@ def backfill_snapshots_job(
         uow.commit()
     logger.info("Backfilled %d snapshots between %s and %s", written, start, end)
     return written
+
+
+def backfill_and_record_snapshot_job(
+    uow_factory: UoWFactory, gateway: CachedMarketGateway
+) -> PortfolioSnapshotEntity | None:
+    """Recreate the days a ledger change invalidated, then record today's snapshot.
+
+    Backfilling first keeps today's net flow limited to the trades since yesterday instead
+    of also counting the flows of the days still missing.
+    """
+    backfill_snapshots_job(uow_factory, gateway)
+    return record_daily_snapshot_job(uow_factory, gateway)

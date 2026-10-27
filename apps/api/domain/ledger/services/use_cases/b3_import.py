@@ -30,6 +30,7 @@ from domain.ledger.services.b3_import import (
 )
 from domain.ledger.services.ledger import LedgerConflictError, validate_ledger
 from domain.portfolio.services.positions import InsufficientQuantityError, build_position
+from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.research.services.service import (
     register_researched_asset,
     suggested_arca_class,
@@ -200,6 +201,7 @@ class ImportHandler:
                 ),
             )
             created = self._apply(uow, preview.new_lines, assets, account)
+            invalidate_snapshots_from(uow, *(line.when for line in preview.new_lines))
             uow.commit()
         return ImportCommitDTO(
             kind=preview.kind.value,

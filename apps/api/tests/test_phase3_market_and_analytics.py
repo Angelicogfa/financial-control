@@ -68,6 +68,8 @@ def test_brapi_provider_quote_history_and_fundamentals() -> None:
                         "defaultKeyStatistics": {
                             "priceToBook": {"raw": 8.4},
                             "bookValue": {"raw": 6.23},
+                            "trailingPE": {"raw": 33.0},
+                            "dividendYield": {"raw": 0.018},
                         },
                         "financialData": {
                             "returnOnEquity": {"raw": 0.29},
@@ -76,10 +78,6 @@ def test_brapi_provider_quote_history_and_fundamentals() -> None:
                             "totalDebt": {"raw": 3_000_000_000},
                             "totalCash": {"raw": 5_000_000_000},
                             "ebitda": {"raw": 8_000_000_000},
-                        },
-                        "summaryDetail": {
-                            "dividendYield": {"raw": 0.018},
-                            "trailingAnnualDividendRate": {"raw": 0.94},
                         },
                         "summaryProfile": {"sector": "Industrials", "industry": "Electrical"},
                     }
@@ -107,6 +105,37 @@ def test_brapi_provider_quote_history_and_fundamentals() -> None:
     assert fund.return_on_equity == 0.29
     assert fund.price_to_book == 8.4
     assert fund.net_debt_to_ebitda is not None and fund.net_debt_to_ebitda < 0
+    assert fund.price_to_earnings == 32.5
+    assert fund.dividend_yield == 0.018
+    assert fund.dividends_per_share_ttm == pytest.approx(0.018 * 52.4)
+
+
+def test_brapi_fundamentals_skip_removed_summary_detail_module() -> None:
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request.url.params.get("modules", ""))
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "symbol": "XPML11",
+                        "regularMarketPrice": 100.0,
+                        "defaultKeyStatistics": {"trailingPE": 9.0, "yield": 0.1},
+                    }
+                ]
+            },
+        )
+
+    provider = BrapiProvider(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    fund = provider.get_fundamentals("XPML11")
+
+    assert requested and "summaryDetail" not in requested[0]
+    assert fund is not None
+    assert fund.price_to_earnings == 9.0
+    assert fund.dividend_yield == 0.1
+    assert fund.dividends_per_share_ttm == pytest.approx(10.0)
 
 
 # ---------------------------------------------------------------------------

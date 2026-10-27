@@ -510,3 +510,9 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 
 
+
+## Fase 20 — Correções do Worker: brapi e Snapshots Retroativos (`[x]` Implementado)
+
+- `[x]` **20.1** `BrapiProvider.get_fundamentals` deixa de pedir o módulo `summaryDetail` (removido pela brapi, causava HTTP 400 `INVALID_MODULES` em todo ciclo de `warm_portfolio_quotes`); P/L, DY e DPS passam a vir de `priceEarnings`/`defaultKeyStatistics` (`trailingPE`, `dividendYield`/`yield`, DPS = DY × preço).
+- `[x]` **20.2** Invalidação de snapshots por mudança no ledger: `invalidate_snapshots_from` (`domain/portfolio/services/snapshots.py`) apaga, via UoW, os snapshots com data ≥ à menor data afetada ao criar/editar/excluir transação, provento (`payment_date`) ou evento corporativo (`ex_date`), na importação B3 e na confirmação de aportes. O worker agenda `backfill_snapshots` a cada `quote_refresh_minutes` e o snapshot diário roda o backfill antes (`backfill_and_record_snapshot_job`) para não duplicar `net_flow`.
+- `[x]` **20.3** Testes: `test_snapshot_invalidation.py`, `test_worker_runner.py` e testes de provider brapi atualizados.
