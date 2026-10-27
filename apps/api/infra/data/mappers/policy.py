@@ -32,8 +32,7 @@ def policy_payload(policy: InvestmentPolicy) -> dict[str, dict]:
         },
         "eligibility": asdict(policy.eligibility),
         "valuation": {
-            "bazin_required_yield": policy.valuation.bazin_required_yield,
-            "graham_multiplier": policy.valuation.graham_multiplier,
+            **policy.valuation.as_dict(),
             "projections": policy.valuation.projections.as_dict(),
         },
     }
