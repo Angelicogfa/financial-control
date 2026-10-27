@@ -113,7 +113,7 @@ def test_rate_curves_read_daily_and_monthly_series_as_fractions() -> None:
     assert curves.cdi_daily[date(2025, 3, 10)] == pytest.approx(0.0005)
     assert curves.selic_daily[date(2025, 3, 10)] == pytest.approx(0.00051)
     assert list(curves.ipca_monthly.values()) == [pytest.approx(0.004)]
-    assert ("IPCA", date(2025, 3, 1)) in series.asked  # IPCA from the start of the month
+    assert ("IPCA", date(2000, 7, 1)) in series.asked  # IPCA since the VNA base (July 2000)
 
     empty = load_rate_curves(
         series,

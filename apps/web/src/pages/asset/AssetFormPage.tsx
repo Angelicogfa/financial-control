@@ -86,10 +86,8 @@ const EMPTY: FormState = {
 
 const TREASURY_KINDS: FixedIncomeInstrumentKind[] = ["TESOURO_SELIC", "TESOURO_IPCA", "TESOURO_PRE"];
 
-/** Zero-coupon Tesouro Prefixado: each purchase accrues at the rate implied by the price paid. */
-function ratesFromPurchasePrice(kind: FixedIncomeInstrumentKind, semiannualCoupons: boolean): boolean {
-  return kind === "TESOURO_PRE" && !semiannualCoupons;
-}
+/** Tesouro Prefixado and IPCA+: each purchase accrues at the rate implied by the price paid. */
+const PRICE_IMPLIED_KINDS: FixedIncomeInstrumentKind[] = ["TESOURO_PRE", "TESOURO_IPCA"];
 
 function fromAsset(asset: AssetResponseDTO): FormState {
   const term = asset.fixed_income_term;
@@ -480,7 +478,7 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
                 onChange={(e) => set("ratePercent", e.target.value)}
                 required
               />
-              {ratesFromPurchasePrice(form.instrumentKind, form.semiannualCoupons) && (
+              {PRICE_IMPLIED_KINDS.includes(form.instrumentKind) && (
                 <span className="app-muted">
                   Referência: cada compra rende pela taxa implícita no preço (PU) pago.
                 </span>

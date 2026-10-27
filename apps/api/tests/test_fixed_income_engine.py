@@ -220,7 +220,6 @@ def test_implied_purchase_rate_recovers_the_ltn_rate_from_the_price() -> None:
 @pytest.mark.parametrize(
     ("term_kwargs", "unit_price", "on"),
     [
-        ({"semiannual_coupons": True}, 700.0, date(2026, 3, 17)),
         ({"instrument_kind": FixedIncomeInstrumentKind.TESOURO_IPCA}, 700.0, date(2026, 3, 17)),
         ({"maturity_date": None}, 700.0, date(2026, 3, 17)),
         ({}, 700.0, date(2029, 1, 1)),
@@ -295,12 +294,59 @@ def test_partial_redemption_keeps_the_lot_purchase_rate() -> None:
     assert realized > 0
 
 
-def test_semiannual_prefixado_falls_back_to_the_contracted_rate() -> None:
-    on = date(2026, 3, 17)
+def test_semiannual_prefixado_accrues_at_its_implied_rate() -> None:
+    on, today = date(2026, 3, 17), date(2026, 10, 27)
     txs = [_ltn_buy(on, "1", "950")]
-    term = _treasury_term(rate="0.13", semiannual_coupons=True)
 
-    valuation = value_fixed_income_position(txs, term, date(2026, 10, 27))
-    business_days = len(business_days_between(on, date(2026, 10, 27)))
+    contracted_low = value_fixed_income_position(
+        txs, _treasury_term(rate="0.10", semiannual_coupons=True), today
+    )
+    contracted_high = value_fixed_income_position(
+        txs, _treasury_term(rate="0.20", semiannual_coupons=True), today
+    )
 
-    assert valuation.gross_value == pytest.approx(950.0 * 1.13 ** (business_days / 252.0), abs=0.01)
+    assert contracted_low == contracted_high
+    assert contracted_low.gross_yield > 0
+
+
+def _ipca_term(rate: str) -> FixedIncomeTermEntity:
+    return FixedIncomeTermEntity(
+        instrument_kind=FixedIncomeInstrumentKind.TESOURO_IPCA,
+        indexer=FixedIncomeIndexer.IPCA,
+        contracted_rate=Decimal(rate),
+        maturity_date=date(2032, 8, 15),
+    )
+
+
+def _monthly_ipca(rate: float = 0.004) -> dict[tuple[int, int], float]:
+    return {
+        (year, month): rate
+        for year in range(2000, 2027)
+        for month in range(1, 13)
+        if (2000, 7) <= (year, month) <= (2026, 9)
+    }
+
+
+def test_ipca_lot_accrues_at_the_rate_implied_through_the_vna() -> None:
+    on, today = date(2026, 6, 16), date(2026, 10, 27)
+    txs = [_ltn_buy(on, "0.67", "2944.70")]
+    curves = RateCurves(ipca_monthly=_monthly_ipca(), annual_ipca_rate=0.045)
+
+    lots, _ = replay_lots(txs, _ipca_term("0.078"), today, curves=curves)
+    low = value_fixed_income_position(txs, _ipca_term("0.05"), today, curves=curves)
+    high = value_fixed_income_position(txs, _ipca_term("0.10"), today, curves=curves)
+
+    assert lots[0].rate is not None and 0.0 < lots[0].rate < 0.5
+    assert low == high
+
+
+def test_ipca_lot_without_ipca_history_uses_the_contracted_rate() -> None:
+    on, today = date(2026, 6, 16), date(2026, 10, 27)
+    txs = [_ltn_buy(on, "0.67", "2944.70")]
+
+    lots, _ = replay_lots(txs, _ipca_term("0.078"), today)
+    low = value_fixed_income_position(txs, _ipca_term("0.05"), today)
+    high = value_fixed_income_position(txs, _ipca_term("0.10"), today)
+
+    assert lots[0].rate is None
+    assert low.gross_value < high.gross_value

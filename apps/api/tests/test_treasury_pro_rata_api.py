@@ -11,6 +11,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
 from core.helpers.calendar import business_days_between
+from domain.shared.enums import SeriesUnit
 
 API_DIR = Path(__file__).resolve().parents[1]
 PURCHASE = date(2026, 3, 17)
@@ -95,17 +96,61 @@ def test_issue_date_after_the_purchase_does_not_change_the_valuation(
     )
 
 
-def test_semiannual_prefixado_uses_the_contracted_rate(api: SimpleNamespace) -> None:
-    asset_id = _create_prefixado(
-        api, "Tesouro Prefixado com Juros Semestrais 2029", semiannual_coupons=True
+def _create_ipca(api: SimpleNamespace, name: str, rate: str) -> int:
+    resp = api.client.post(
+        "/api/v1/assets",
+        json={
+            "name": name,
+            "asset_type": "TREASURY",
+            "arca_class": "CAIXA",
+            "fixed_income_term": {
+                "instrument_kind": "TESOURO_IPCA",
+                "indexer": "IPCA",
+                "contracted_rate": rate,
+                "maturity_date": "2032-08-15",
+            },
+        },
     )
-    _buy(api, asset_id, 950.0)
-    details = _position(api, asset_id)["fixed_income_details"]
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
 
-    business_days = len(business_days_between(PURCHASE, AS_OF))
-    principal = round(2.45 * 950.0, 2)
-    expected = principal * (1.1526 ** (business_days / 252.0) - 1.0)
-    assert abs(details["gross_yield"] - expected) < 0.05
+
+def _seed_ipca_since_2000(api: SimpleNamespace) -> None:
+    points = [
+        (date(year, month, 1), 0.4)
+        for year in range(2000, 2027)
+        for month in range(1, 13)
+        if (2000, 7) <= (year, month) <= (2026, 9)
+    ]
+    with api.uow_factory() as uow:
+        uow.market_series.upsert_points("IPCA", points, unit=SeriesUnit.PERCENT_PER_MONTH)
+        uow.commit()
+
+
+def _ipca_details(api: SimpleNamespace) -> tuple[dict, dict]:
+    low = _create_ipca(api, "Tesouro IPCA+ 2032", "0.05")
+    high = _create_ipca(api, "Tesouro IPCA+ 2032 B", "0.10")
+    for asset_id in (low, high):
+        _buy(api, asset_id, 2944.70)
+    return (
+        _position(api, low)["fixed_income_details"],
+        _position(api, high)["fixed_income_details"],
+    )
+
+
+def test_ipca_bond_accrues_at_the_rate_implied_by_the_vna(api: SimpleNamespace) -> None:
+    _seed_ipca_since_2000(api)
+
+    low, high = _ipca_details(api)
+
+    assert low == high
+    assert low["gross_yield"] > 0
+
+
+def test_ipca_bond_without_ipca_history_uses_the_contracted_rate(api: SimpleNamespace) -> None:
+    low, high = _ipca_details(api)
+
+    assert low["gross_value"] < high["gross_value"]
 
 
 def test_script_00020_makes_issue_date_optional_and_flags_semiannual_bonds(
