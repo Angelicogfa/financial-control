@@ -187,17 +187,25 @@ export const api = {
     createEvent: (body: CorporateEventRequest) =>
       request<CorporateEventDTO>("/corporate-events", { method: "POST", body }),
     deleteEvent: (id: number) => request<void>(`/corporate-events/${id}`, { method: "DELETE" }),
-    previewImport: (file: File) => {
+    /** `skipLines`: statement line numbers left out of the import. */
+    previewImport: (file: File, skipLines: number[] = []) => {
       const form = new FormData();
       form.append("file", file);
+      if (skipLines.length > 0) form.append("skip_lines", skipLines.join(","));
       return request<ImportPreviewDTO>("/imports/b3/preview", { method: "POST", form });
     },
     /** `newAssets`: unknown tickers to register, with the type and ARCA quadrant chosen. */
-    commitImport: (file: File, accountId: number | null, newAssets: ImportNewAssetRequest[]) => {
+    commitImport: (
+      file: File,
+      accountId: number | null,
+      newAssets: ImportNewAssetRequest[],
+      skipLines: number[] = [],
+    ) => {
       const form = new FormData();
       form.append("file", file);
       if (accountId !== null) form.append("account_id", String(accountId));
       form.append("new_assets", JSON.stringify(newAssets));
+      if (skipLines.length > 0) form.append("skip_lines", skipLines.join(","));
       return request<ImportCommitDTO>("/imports/b3/commit", { method: "POST", form });
     },
   },

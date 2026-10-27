@@ -38,6 +38,9 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   INVALID: { label: "Inválido", tone: "danger" },
 };
 
+/** Lines that would be imported, and so can be left out by the user. */
+const SKIPPABLE = new Set(["NEW", "UNKNOWN_ASSET"]);
+
 function describe(line: ImportPreviewDTO["lines"][number]): string {
   if (line.trade_kind) return TRADE_LABELS[line.trade_kind as "BUY" | "SELL"];
   if (line.earning_kind) return EARNING_LABELS[line.earning_kind as keyof typeof EARNING_LABELS] ?? line.description;
@@ -130,20 +133,27 @@ export function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreviewDTO | null>(null);
   const [choices, setChoices] = useState<Record<string, NewAssetChoice>>({});
+  const [skipped, setSkipped] = useState<number[]>([]);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [result, setResult] = useState<ImportCommitDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const runPreview = async (chosen: File) => {
+  /** `keepChoices` keeps what was typed for the tickers still unknown (when only the skipped lines changed). */
+  const runPreview = async (chosen: File, skip: number[] = [], keepChoices = false) => {
     setPreviewing(true);
     setError(null);
     setResult(null);
     try {
-      const data = await api.ledger.previewImport(chosen);
+      const data = await api.ledger.previewImport(chosen, skip);
       setPreview(data);
-      setChoices(initialChoices(data));
+      setSkipped(skip);
+      setChoices((current) => {
+        const fresh = initialChoices(data);
+        if (!keepChoices) return fresh;
+        return Object.fromEntries(Object.entries(fresh).map(([ticker, choice]) => [ticker, current[ticker] ?? choice]));
+      });
     } catch (err) {
       setPreview(null);
       setError(errorMessage(err));
@@ -157,13 +167,20 @@ export function ImportPage() {
     setBusy(true);
     setError(null);
     try {
-      setResult(await api.ledger.commitImport(file, accountId, toNewAssets(choices)));
-      setPreview(await api.ledger.previewImport(file));
+      setResult(await api.ledger.commitImport(file, accountId, toNewAssets(choices), skipped));
+      setPreview(await api.ledger.previewImport(file, skipped));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Skipping a purchase can leave a later sell without position, so the preview is asked again. */
+  const toggleLine = (lineNo: number, include: boolean) => {
+    if (!file) return;
+    const next = include ? skipped.filter((n) => n !== lineNo) : [...skipped, lineNo].sort((a, b) => a - b);
+    void runPreview(file, next, true);
   };
 
   const choose = (ticker: string, change: Partial<NewAssetChoice>) =>
@@ -426,13 +443,17 @@ export function ImportPage() {
                 {busy && <Spinner size="sm" />}
                 <span>{busy ? "Importando…" : `Importar ${newLines + fromUnknown} linha(s)`}</span>
               </button>
-              <span className="app-muted">Tudo ou nada: se uma venda ficar sem posição, nada é gravado.</span>
+              <span className="app-muted">
+                Desmarque as linhas que não quer importar. Vendas sem a compra correspondente aparecem como inválidas e
+                ficam de fora.
+              </span>
             </div>
 
             <div className="app-table-wrap">
               <table className="app-table">
                 <thead>
                   <tr>
+                    <th>Importar</th>
                     <th>Linha</th>
                     <th>Data</th>
                     <th>Ativo</th>
@@ -446,6 +467,17 @@ export function ImportPage() {
                 <tbody>
                   {preview.lines.map((line) => (
                     <tr key={line.line_no}>
+                      <td>
+                        {(SKIPPABLE.has(line.status) || skipped.includes(line.line_no)) && (
+                          <input
+                            type="checkbox"
+                            aria-label={`Importar linha ${line.line_no}`}
+                            checked={!skipped.includes(line.line_no)}
+                            disabled={busy || previewing}
+                            onChange={(e) => toggleLine(line.line_no, e.target.checked)}
+                          />
+                        )}
+                      </td>
                       <td>{line.line_no}</td>
                       <td>{day(line.entry_date)}</td>
                       <td>{line.ticker ?? "—"}</td>

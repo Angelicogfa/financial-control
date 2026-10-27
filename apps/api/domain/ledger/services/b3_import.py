@@ -425,6 +425,25 @@ def parse_statement(rows: list[Mapping[str, object]]) -> ImportPreview:
     return ImportPreview(kind, _with_hashes(lines))
 
 
+SKIPPED_NOTE = "Ignorada por você"
+
+
+def mark_skipped(preview: ImportPreview, line_nos: Iterable[int]) -> ImportPreview:
+    """Leave out the lines the user chose not to import; already imported ones stay as they are."""
+    skipped = set(line_nos)
+    if not skipped:
+        return preview
+    return ImportPreview(
+        preview.kind,
+        [
+            replace(line, status=LineStatus.IGNORED, note=SKIPPED_NOTE)
+            if line.line_no in skipped and line.status != LineStatus.DUPLICATE
+            else line
+            for line in preview.lines
+        ],
+    )
+
+
 def _issuer_slug(text: str | None) -> str:
     # "ITAU UNIBANCO S.A." and "Itaú Unibanco" name the same issuer.
     return re.sub(r"[^a-z0-9]", "", _norm(text)).removesuffix("sa")

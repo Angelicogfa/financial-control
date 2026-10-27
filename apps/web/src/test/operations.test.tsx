@@ -561,6 +561,48 @@ describe("ledger", () => {
     expect(JSON.parse(body.new_assets)).toEqual([{ ticker: "ITSA4", asset_type: "STOCK_BR", arca_class: "CAIXA" }]);
   });
 
+  it("leaves unchecked lines out of the preview and the commit", async () => {
+    const buy = { line_no: 2, action: "TRADE", entry_date: "2021-05-10", ticker: "AESB3", description: "compra", quantity: 2, unit_price: 14, amount: 28, trade_kind: "BUY" };
+    const sell = { line_no: 3, action: "TRADE", entry_date: "2021-05-14", ticker: "AESB3", description: "venda", quantity: 2, unit_price: 15, amount: 30, trade_kind: "SELL" };
+    const preview = (call: Call) => {
+      const skipped = (call.body as Record<string, string>).skip_lines === "2";
+      return {
+        kind: "NEGOTIATION",
+        counts: skipped ? { IGNORED: 1, INVALID: 1 } : { NEW: 2 },
+        unknown_tickers: [],
+        lines: skipped
+          ? [
+              { ...buy, status: "IGNORED", note: "Ignorada por você" },
+              { ...sell, status: "INVALID", note: "Venda maior que o saldo" },
+            ]
+          : [
+              { ...buy, status: "NEW", note: "" },
+              { ...sell, status: "NEW", note: "" },
+            ],
+      };
+    };
+    const { calls } = mockApi([
+      { path: "/accounts", reply: accounts },
+      { method: "POST", path: "/imports/b3/preview", reply: preview },
+      {
+        method: "POST",
+        path: "/imports/b3/commit",
+        reply: { kind: "NEGOTIATION", created: { TRADE: 0, EARNING: 0, EVENT: 0 }, skipped: { IGNORED: 1, INVALID: 1 }, created_assets: [] },
+      },
+    ]);
+    renderAt("/ledger/import");
+    fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [new File(["x"], "negociacao.xlsx")] } });
+    expect(await screen.findByRole("button", { name: "Importar 2 linha(s)" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Importar linha 2" }));
+    expect(await screen.findByText("Venda maior que o saldo")).toBeInTheDocument();
+    expect(last(calls, "POST", "/imports/b3/preview")?.body).toMatchObject({ skip_lines: "2" });
+    // The skipped line can be checked again; the invalid sell has nothing to toggle.
+    expect(screen.getByRole("checkbox", { name: "Importar linha 2" })).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Importar linha 3" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Importar 0 linha(s)" })).toBeDisabled();
+  });
+
   it("registers a bank security from the movement statement once its rate is typed", async () => {
     const term = {
       instrument_kind: "CDB",

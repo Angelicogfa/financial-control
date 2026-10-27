@@ -15,6 +15,7 @@ from domain.ledger.services.b3_import import (
     detect_kind,
     event_factor,
     guess_asset_type,
+    mark_skipped,
     parse_statement,
     resolve_fixed_income,
 )
@@ -177,6 +178,20 @@ def test_classify_marks_duplicates_unknown_and_events_without_position() -> None
         "IGNORED": 1,
     }
     assert [line.ticker for line in classified.new_lines] == ["ITSA4"]
+
+
+def test_mark_skipped_ignores_chosen_lines_but_keeps_duplicates() -> None:
+    preview = parse_statement(TRADES)
+    classified = classify(preview, known_tickers={"ITSA4"}, existing_hashes={preview.lines[0].hash})
+    skipped = mark_skipped(classified, [2, 3, 99])
+
+    assert [(line.line_no, line.status) for line in skipped.lines[:3]] == [
+        (2, LineStatus.DUPLICATE),
+        (3, LineStatus.IGNORED),
+        (4, LineStatus.NEW),
+    ]
+    assert skipped.lines[1].note == "Ignorada por você"
+    assert mark_skipped(classified, []) is classified
 
 
 def test_event_factor_and_type_guess() -> None:
