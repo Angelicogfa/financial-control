@@ -1,4 +1,4 @@
-"""Tax status of a position: current bracket, next drop and the value of waiting (item 22.2).
+"""Tax status of a position: current bracket, next drop and the value of waiting (item 24.2).
 
 For fixed income each open FIFO lot is taxed on its own holding period: the status shows the
 rate in force today, the IOF still due, the date and days until the next (lower) bracket and

@@ -1,4 +1,4 @@
-"""Unit tests for the taxed vs. exempt fixed income comparator (item 22.3)."""
+"""Unit tests for the taxed vs. exempt fixed income comparator (item 24.3)."""
 
 from __future__ import annotations
 

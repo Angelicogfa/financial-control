@@ -18,7 +18,7 @@ class ProjectionAssumptions:
     real_estate_default_yield_rate: float = 0.085
     cash_cdi_multiplier: float = 1.0
     cash_income_tax_rate: float = 0.175
-    # Fixed income comparator (item 22.3): None uses the current market rate (BCB).
+    # Fixed income comparator (item 24.3): None uses the current market rate (BCB).
     projected_cdi_rate: float | None = None
     projected_ipca_rate: float | None = None
     # Low/high scenarios move CDI by this many points and IPCA by half of it.

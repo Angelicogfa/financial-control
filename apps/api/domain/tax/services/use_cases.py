@@ -1,7 +1,7 @@
 """Use cases (query handlers) for the tax module.
 
-Scope: tax rule registry, per-asset tax status (item 22.2) and the taxed vs. exempt fixed
-income comparator (item 22.3).
+Scope: tax rule registry, per-asset tax status (item 24.2) and the taxed vs. exempt fixed
+income comparator (item 24.3).
 """
 
 from __future__ import annotations

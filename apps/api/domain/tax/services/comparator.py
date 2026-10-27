@@ -1,4 +1,4 @@
-"""Taxed vs. exempt fixed income comparator (item 22.3).
+"""Taxed vs. exempt fixed income comparator (item 24.3).
 
 Conventions (ADR 0006):
 - `rate` is a multiplier for `CDI_PERCENT` (1.10 = 110% of CDI) and an annual fraction for

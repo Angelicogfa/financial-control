@@ -1,4 +1,4 @@
-"""Unit tests for the tax rule registry with validity periods (item 22.1)."""
+"""Unit tests for the tax rule registry with validity periods (item 24.1)."""
 
 from __future__ import annotations
 

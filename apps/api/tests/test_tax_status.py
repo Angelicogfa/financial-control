@@ -1,4 +1,4 @@
-"""Unit tests for the per-lot tax status (item 22.2)."""
+"""Unit tests for the per-lot tax status (item 24.2)."""
 
 from __future__ import annotations
 
