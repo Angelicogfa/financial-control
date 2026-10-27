@@ -24,6 +24,7 @@ from domain.shared.enums import (
     FixedIncomeInstrumentKind,
     FixedIncomeLiquidity,
 )
+from infra.providers.error_tracker import report_provider_error
 
 # Units of the quoteSummary fields consumed from brapi (ADR 0006): returnOnEquity,
 # profitMargins, revenueGrowth, earningsGrowth and dividendYield are fractions;
@@ -70,7 +71,14 @@ class BrapiProvider:
             resp = self._client.get(url, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="quote",
+                target=clean,
+                request_url=url,
+                exc=exc,
+            )
             return None
 
         results = payload.get("results") or []
@@ -119,7 +127,14 @@ class BrapiProvider:
             resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="history",
+                target=f"{clean} ({range_period})",
+                request_url=f"{url}?range={range_period}&interval=1d",
+                exc=exc,
+            )
             return []
 
         results = payload.get("results") or []
@@ -159,15 +174,23 @@ class BrapiProvider:
         fetched_at = datetime.now(UTC)
         instruments: dict[str, CatalogInstrument] = {}
         for page in range(1, max_pages + 1):
+            url = f"{self.base_url}/quote/list"
             try:
                 resp = self._client.get(
-                    f"{self.base_url}/quote/list",
+                    url,
                     params={"page": page, "limit": page_size, "sortBy": "volume"},
                     headers=self._headers(),
                 )
                 resp.raise_for_status()
                 payload = resp.json()
-            except Exception:
+            except Exception as exc:
+                report_provider_error(
+                    provider=self.PROVIDER_NAME,
+                    operation="catalog",
+                    target=f"B3 (page {page})",
+                    request_url=f"{url}?page={page}&limit={page_size}&sortBy=volume",
+                    exc=exc,
+                )
                 break
             for item in payload.get("stocks") or []:
                 instrument = parse_brapi_list_item(item, fetched_at)
@@ -212,12 +235,15 @@ class BrapiProvider:
             except Exception:
                 return TreasuryCatalogResult(
                     results=list(bonds.values()),
-                    unavailable_reason="Não foi possível conectar à API de Tesouro Direto da Brapi.",
+                    unavailable_reason=(
+                        "Não foi possível conectar à API de Tesouro Direto da Brapi."
+                    ),
                 )
 
             if resp.status_code in (401, 403):
                 message = _extract_error_message(resp) or (
-                    "A consulta de Tesouro Direto na Brapi (/api/v2/treasury/list) requer token autenticado no plano Pro."
+                    "A consulta de Tesouro Direto na Brapi (/api/v2/treasury/list) "
+                    "requer token autenticado no plano Pro."
                 )
                 return TreasuryCatalogResult(results=[], unavailable_reason=message)
 
@@ -227,7 +253,9 @@ class BrapiProvider:
             except Exception:
                 return TreasuryCatalogResult(
                     results=list(bonds.values()),
-                    unavailable_reason="A API de Tesouro Direto da Brapi retornou uma resposta inválida.",
+                    unavailable_reason=(
+                        "A API de Tesouro Direto da Brapi retornou uma resposta inválida."
+                    ),
                 )
 
             for item in payload.get("results") or []:
@@ -245,14 +273,21 @@ class BrapiProvider:
     def get_annual_statements(self, symbol: str) -> list[FundamentalSnapshot]:
         """Yearly statement history for a B3 symbol (empty when unavailable)."""
         clean = symbol.strip().upper().removesuffix(".SA")
-        params = {"modules": "incomeStatementHistory,balanceSheetHistory,cashflowHistory"}
+        url = f"{self.base_url}/quote/{clean}"
+        modules = "incomeStatementHistory,balanceSheetHistory,cashflowHistory"
+        params = {"modules": modules}
         try:
-            resp = self._client.get(
-                f"{self.base_url}/quote/{clean}", params=params, headers=self._headers()
-            )
+            resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             results = resp.json().get("results") or []
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="statements",
+                target=clean,
+                request_url=f"{url}?modules={modules}",
+                exc=exc,
+            )
             return []
         return parse_brapi_statements(clean, results[0]) if results else []
 
@@ -260,15 +295,23 @@ class BrapiProvider:
         """Fetch fundamental indicators for B3 stocks/FIIs from brapi.dev."""
         clean = symbol.strip().upper().removesuffix(".SA")
         url = f"{self.base_url}/quote/{clean}"
+        modules = "defaultKeyStatistics,financialData,summaryDetail,summaryProfile"
         params = {
             "fundamental": "true",
-            "modules": "defaultKeyStatistics,financialData,summaryDetail,summaryProfile",
+            "modules": modules,
         }
         try:
             resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="fundamentals",
+                target=clean,
+                request_url=f"{url}?fundamental=true&modules={modules}",
+                exc=exc,
+            )
             return None
 
         results = payload.get("results") or []
@@ -444,7 +487,7 @@ def _extract_error_message(resp: httpx.Response) -> str | None:
 def classify_brapi_treasury_indexer(
     raw_indexer: str | None,
 ) -> tuple[FixedIncomeInstrumentKind, FixedIncomeIndexer, FixedIncomeLiquidity]:
-    """Map brapi's treasury `indexer` (selic, prefixado, ipca, igpm) to domain fixed income enums."""
+    """Map brapi's treasury `indexer` (selic, prefixado, ipca, igpm) to fixed income enums."""
     kind = (raw_indexer or "").strip().lower()
     if kind == "selic":
         return (
@@ -527,4 +570,3 @@ def parse_brapi_treasury_item(item: dict[str, Any]) -> TreasuryBond | None:
         contracted_rate_percent=contracted_rate_percent,
         liquidity=liquidity,
     )
-

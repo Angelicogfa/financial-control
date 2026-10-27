@@ -61,4 +61,3 @@ def to_treasury_bond_dto(bond: TreasuryBond, *, asset_id: int | None = None) -> 
         liquidity=bond.liquidity,
         asset_id=asset_id,
     )
-

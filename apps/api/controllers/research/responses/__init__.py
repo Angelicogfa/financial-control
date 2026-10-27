@@ -113,4 +113,3 @@ class TreasurySearchResponseDTO(BaseModel):
     results: list[TreasuryBondDTO]
     total: int
     unavailable_reason: str | None = None
-

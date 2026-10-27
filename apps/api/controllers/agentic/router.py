@@ -40,9 +40,7 @@ def list_agent_keys(
     return handler.list_keys(user_id=user)
 
 
-@agentic_router.post(
-    "", response_model=AgentKeyCreatedDTO, status_code=status.HTTP_201_CREATED
-)
+@agentic_router.post("", response_model=AgentKeyCreatedDTO, status_code=status.HTTP_201_CREATED)
 def create_agent_key(
     payload: AgentKeyCreateRequest,
     user: str = Depends(require_user),

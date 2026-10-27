@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class AgentKeyDTO(BaseModel):
@@ -18,8 +18,8 @@ class AgentKeyDTO(BaseModel):
     name: str
     prefix: str
     user_id: str
-    contexts: list[str] = Field(default_factory=list)
-    operations: list[str] = Field(default_factory=list)
+    contexts: list[str]
+    operations: list[str]
     expires_at: datetime
     last_used_at: datetime | None = None
     created_at: datetime | None = None

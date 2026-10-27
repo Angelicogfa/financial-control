@@ -44,4 +44,3 @@ class ForbiddenError(DomainError, PermissionError):
     """The authenticated caller lacks permission for the requested operation (HTTP 403)."""
 
     code = "FORBIDDEN"
-

@@ -15,7 +15,10 @@ from infra.data.repositories.assets import (
     SqlAlchemyAssetRepository,
     SqlAlchemyChecklistRepository,
 )
-from infra.data.repositories.jobs import SqlAlchemyJobRunRepository
+from infra.data.repositories.jobs import (
+    SqlAlchemyJobRunRepository,
+    SqlAlchemyWorkerErrorRepository,
+)
 from infra.data.repositories.ledger import (
     SqlAlchemyCorporateEventRepository,
     SqlAlchemyEarningRepository,
@@ -51,6 +54,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.market_series = SqlAlchemyMarketSeriesRepository(self.session)
         self.snapshots = SqlAlchemyPortfolioSnapshotRepository(self.session)
         self.job_runs = SqlAlchemyJobRunRepository(self.session)
+        self.worker_errors = SqlAlchemyWorkerErrorRepository(self.session)
         self.fundamentals = SqlAlchemyFundamentalsRepository(self.session)
         self.checklists = SqlAlchemyChecklistRepository(self.session)
         self.catalog = SqlAlchemyCatalogRepository(self.session)

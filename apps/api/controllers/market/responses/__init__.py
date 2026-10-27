@@ -37,3 +37,27 @@ class SeriesStatusDTO(BaseModel):
     last_date: date | None = None
     stale: bool
     missing_business_days: int
+
+
+class WorkerRequestErrorDTO(BaseModel):
+    """Detailed log entry for a failed upstream request made during a background worker job."""
+
+    id: int
+    job_run_id: int | None = None
+    job_name: str
+    provider: str
+    operation: str
+    target: str
+    request_url: str
+    status_code: int | None = None
+    error_type: str
+    error_detail: str
+    occurred_at: datetime
+    resolved_at: datetime | None = None
+
+
+class WorkerErrorsResponseDTO(BaseModel):
+    """Worker request error log and unresolved notification count."""
+
+    unresolved_count: int
+    errors: list[WorkerRequestErrorDTO]

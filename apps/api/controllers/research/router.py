@@ -69,7 +69,6 @@ def list_treasury_bonds(
     return handler.treasury(query=q, indexer=indexer, coupon_type=coupon_type)
 
 
-
 @research_router.get("/watchlist", response_model=list[WatchlistItemDTO])
 def list_watchlist(
     handler: ResearchHandler = Depends(get_research_handler),

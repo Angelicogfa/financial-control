@@ -188,4 +188,3 @@ class TreasuryCatalogResult:
 
     results: list[TreasuryBond] = field(default_factory=list)
     unavailable_reason: str | None = None
-

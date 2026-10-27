@@ -30,6 +30,8 @@
 | **Fase 15** | Refatoração Estrutural por Módulos (`apps/packages/*`, `apps/worker`, `fincontrol_api`) | `[x]` Concluída | 100% |
 | **Fase 16** | Pesquisa e Importação Integradas (Cadastro Único de Ativos) | `[x]` Concluída | 100% |
 | **Fase 17** | Arquitetura Unificada de Backend em Camadas por Domínio em `apps/api` (ADR 0009) | `[x]` Concluída | 100% |
+| **Fase 18** | Configuração Agêntica e Servidor MCP Pessoal (`/settings/agentic`, `/api/v1/mcp`) | `[x]` Concluída | 100% |
+| **Fase 19** | Notificações de Erros de Requisição do Worker (Badge no menu e Log detalhado em Dados de Mercado) | `[x]` Concluída | 100% |
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
 
@@ -493,5 +495,18 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **18.4** Servidor MCP ASGI (`infra/mcp/server.py`): `McpPort` montado em `/api/v1/mcp` com `StreamableHTTPSessionManager`, verificação de `Origin` contra DNS rebinding, autenticação Bearer `fck_...`, `tools/list` filtrado pelo escopo da chave, `tools/call` com validação Pydantic, `idempotency_key` em comandos e saída estruturada.
 - `[x]` **18.5** Interface Web (`apps/web/src/pages/settings/agentic/`): `AgenticPage`, `AgentKeyFormPage`, `ScopePicker`, `KeyExpiry`, `McpConnection` e rotas `/settings/agentic`, `/settings/agentic/new`, `/settings/agentic/:keyId` no menu Configuração.
 - `[x]` **18.6** Testes e Validação: `apps/api/tests/test_agentic_mcp.py` (migrations, catálogo, CRUD REST, protocolo MCP `tools/list`, `tools/call` e `idempotency_key`), testes unitários e de página no frontend (`apps/web/src/test/settings.test.tsx`), build Vite e `docker compose build`.
+
+---
+
+## Fase 19 — Notificações de Erros de Requisição do Worker (`[x]` Implementado)
+
+**Objetivo:** sinalizar falhas de requisição aos provedores externos (`brapi`, `yfinance`, `BCB SGS`) ocorridas durante a execução das rotinas em segundo plano do worker, exibindo uma badge com contagem de erros pendentes no menu **"Dados de mercado"** (`/settings/market-data`) e um log detalhado em tabela com os dados da requisição e da falha obtida.
+
+- `[x]` **19.1** Domínio e Persistência: entidade imutável `WorkerRequestErrorEntity` (`domain/shared/entities.py`), contrato `AbstractWorkerErrorRepository` (`domain/shared/repositories.py`) exposto como `uow.worker_errors` em `AbstractUnitOfWork`, modelo `WorkerRequestErrorModel` (`worker_request_errors`), repositório `SqlAlchemyWorkerErrorRepository` (`infra/data/repositories/jobs.py`) e migration Alembic `script_00017_worker_request_errors.py`.
+- `[x]` **19.2** Rastreamento de Erros de Requisição nos Provedores e Worker: `WorkerErrorRecorder` com `ContextVar` (`infra/providers/error_tracker.py`) propagado inclusive para pools de threads (`infra/providers/batch.py`), instrumentação de falhas HTTP/exceções em `BrapiProvider`, `YFinanceProvider` e `BcbSgsProvider` (preservando os fallbacks resilientes da aplicação) e persistência automática das falhas capturadas em `worker/runner.py` (`run_job`).
+- `[x]` **19.3** Casos de Uso, Rotas REST e Catálogo MCP: `MarketDataHandler` (`domain/market/services/use_cases.py`) e rotas `GET /api/v1/market/worker-errors`, `DELETE /api/v1/market/worker-errors/{error_id}` e `DELETE /api/v1/market/worker-errors` (`controllers/market/router.py`), além das operações correspondentes no catálogo MCP (`domain/agentic/services/catalog.py`).
+- `[x]` **19.4** Interface Web (`apps/web`): flag `showsWorkerErrorCount` no item "Dados de mercado" (`src/layout/navigation.ts`), badge de notificações não resolvidas na sidebar (`src/layout/AppShell.tsx`) sincronizada por evento customizado (`fincontrol:worker-errors-changed`), e tabela detalhada na tela `MarketDataPage.tsx` exibindo horário, rotina, provedor, operação/alvo, URL requisitada, status HTTP, tipo/detalhe do erro e ações para dispensar individualmente ou limpar todas as notificações.
+- `[x]` **19.5** Testes e Validação: testes unitários e de integração no backend (`test_worker_runner.py`, `test_market_api.py`), testes de UI no frontend (`overview.test.tsx`, `settings.test.tsx`), regeneração de tipos OpenAPI (`scripts/gen_web_types.py`), lint/typecheck limpos e build Docker validado.
+
 
 

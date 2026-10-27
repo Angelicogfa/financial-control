@@ -8,6 +8,7 @@ import httpx
 
 from core.helpers.units import BCB_SERIES_UNITS, rate_fraction
 from domain.shared.entities import MarketSeriesPoint
+from infra.providers.error_tracker import report_provider_error
 
 BCB_SERIES_CDI_DAILY = 12
 BCB_SERIES_SELIC_DAILY = 11
@@ -66,16 +67,25 @@ class BcbSgsProvider:
         self, symbol: str, series_code: int, start: date, end: date
     ) -> list[MarketSeriesPoint]:
         url = f"{self.base_url}/bcdata.sgs.{series_code}/dados"
+        start_fmt = start.strftime("%d/%m/%Y")
+        end_fmt = end.strftime("%d/%m/%Y")
         params = {
             "formato": "json",
-            "dataInicial": start.strftime("%d/%m/%Y"),
-            "dataFinal": end.strftime("%d/%m/%Y"),
+            "dataInicial": start_fmt,
+            "dataFinal": end_fmt,
         }
         try:
             resp = self._client.get(url, params=params)
             resp.raise_for_status()
             rows = resp.json()
-        except Exception:
+        except Exception as exc:
+            report_provider_error(
+                provider="bcb",
+                operation="series",
+                target=f"{symbol} ({start.isoformat()}..{end.isoformat()})",
+                request_url=f"{url}?formato=json&dataInicial={start_fmt}&dataFinal={end_fmt}",
+                exc=exc,
+            )
             return []
 
         if not isinstance(rows, list):

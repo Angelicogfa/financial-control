@@ -27,6 +27,8 @@ def ts_type(schema: dict[str, Any]) -> str:
     if "$ref" in schema:
         return _name(schema["$ref"])
     if "enum" in schema:
+        if schema.get("type") in ("integer", "number"):
+            return " | ".join(str(v) for v in schema["enum"])
         return " | ".join(f'"{v}"' for v in schema["enum"])
     if "const" in schema:
         return f'"{schema["const"]}"'

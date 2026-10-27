@@ -95,6 +95,68 @@ def test_permanent_failure_is_recorded_and_not_raised(uow_factory: UoWFactory) -
     assert run.status == JobRunStatus.FAILED
     assert run.attempts == 3
     assert run.error == "ValueError: bad payload"
+    with uow_factory() as uow:
+        assert uow.worker_errors.count_unresolved() == 1
+        (err,) = uow.worker_errors.list_recent()
+        assert err.job_name == "sync"
+        assert err.job_run_id == run.id
+        assert err.provider == "worker"
+        assert err.error_type == "ValueError"
+        assert "bad payload" in err.error_detail
+
+
+def test_provider_errors_during_job_are_persisted_with_request_details(
+    uow_factory: UoWFactory,
+) -> None:
+    import httpx
+
+    from infra.cache.redis_cache import InMemoryCache
+    from infra.providers.bcb import BcbSgsProvider
+    from infra.providers.brapi import BrapiProvider
+    from infra.providers.gateway import CachedMarketGateway
+    from infra.providers.yfinance_provider import YFinanceProvider
+
+    def brapi_503(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, text="Service Unavailable")
+
+    def yf_down(_symbol: str) -> object:
+        raise RuntimeError("Yahoo upstream connection reset")
+
+    def bcb_timeout(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("BCB SGS timed out", request=request)
+
+    gateway = CachedMarketGateway(
+        brapi=BrapiProvider(client=httpx.Client(transport=httpx.MockTransport(brapi_503))),
+        yfinance=YFinanceProvider(ticker_factory=yf_down),
+        bcb=BcbSgsProvider(client=httpx.Client(transport=httpx.MockTransport(bcb_timeout))),
+        cache=InMemoryCache(),
+    )
+
+    def failing_requests_job() -> int:
+        gateway.get_quote("WEGE3", bypass_cache=True)
+        gateway.fetch_bcb_series("CDI")
+        return 0
+
+    run = run_job(
+        "warm_portfolio_quotes",
+        failing_requests_job,
+        uow_factory=uow_factory,
+        lock=LocalJobLock(),
+        policy=POLICY,
+    )
+
+    assert run.status == JobRunStatus.SUCCESS
+    with uow_factory() as uow:
+        assert uow.worker_errors.count_unresolved() == 3
+        errors = uow.worker_errors.list_recent()
+        by_provider = {e.provider: e for e in errors}
+        assert set(by_provider) == {"brapi", "yfinance", "bcb"}
+        assert by_provider["brapi"].status_code == 503
+        assert "/quote/WEGE3" in by_provider["brapi"].request_url
+        assert by_provider["yfinance"].target == "WEGE3.SA"
+        assert "Yahoo upstream connection reset" in by_provider["yfinance"].error_detail
+        assert by_provider["bcb"].error_type == "ConnectTimeout"
+        assert "bcdata.sgs.12" in by_provider["bcb"].request_url
 
 
 def test_concurrent_run_is_skipped_and_lock_released_after(uow_factory: UoWFactory) -> None:

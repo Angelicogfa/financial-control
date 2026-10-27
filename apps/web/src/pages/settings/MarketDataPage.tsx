@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { api } from "../../api/endpoints";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
@@ -23,11 +25,41 @@ const JOB_LABELS: Record<string, string> = {
   sync_instrument_catalog: "Catálogo de ativos B3",
 };
 
+const OPERATION_LABELS: Record<string, string> = {
+  quote: "Cotação",
+  history: "Histórico",
+  fundamentals: "Fundamentos",
+  statements: "Demonstrativos",
+  series: "Série macro",
+  catalog: "Catálogo B3",
+};
+
 const JOB_TONES: Record<string, string> = { SUCCESS: "success", FAILED: "danger", RUNNING: "info", SKIPPED: "neutral" };
 
+function notifyWorkerErrorsChanged() {
+  window.dispatchEvent(new CustomEvent("fincontrol:worker-errors-changed"));
+}
+
 export function MarketDataPage() {
+  const [includeResolved, setIncludeResolved] = useState(false);
   const series = useApi("series-status", () => api.market.series());
   const jobs = useApi("job-runs", () => api.market.jobs());
+  const workerErrors = useApi(`worker-errors:${includeResolved}`, () =>
+    api.market.workerErrors(includeResolved),
+  );
+
+  const handleResolveOne = async (errorId: number) => {
+    await api.market.resolveWorkerError(errorId);
+    workerErrors.reload();
+    notifyWorkerErrorsChanged();
+  };
+
+  const handleResolveAll = async () => {
+    await api.market.resolveAllWorkerErrors();
+    workerErrors.reload();
+    notifyWorkerErrorsChanged();
+  };
+
   return (
     <div className="app-page">
       <PageHeader
@@ -40,6 +72,8 @@ export function MarketDataPage() {
             onClick={() => {
               series.reload();
               jobs.reload();
+              workerErrors.reload();
+              notifyWorkerErrorsChanged();
             }}
           >
             Atualizar
@@ -47,6 +81,99 @@ export function MarketDataPage() {
         }
       />
       <div className="app-page-stack">
+        <section>
+          <div className="app-button-row" style={{ justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+            <div className="app-button-row" style={{ gap: "var(--space-2)" }}>
+              <h2 className="app-card-heading" style={{ margin: 0 }}>
+                Notificações de erros do worker
+              </h2>
+              {workerErrors.data && workerErrors.data.unresolved_count > 0 && (
+                <Badge tone="danger">{`${workerErrors.data.unresolved_count} pendente(s)`}</Badge>
+              )}
+            </div>
+            <div className="app-button-row">
+              <label className="app-check">
+                <input
+                  type="checkbox"
+                  checked={includeResolved}
+                  onChange={(event) => setIncludeResolved(event.target.checked)}
+                />
+                <span>Mostrar resolvidos</span>
+              </label>
+              {workerErrors.data && workerErrors.data.unresolved_count > 0 && (
+                <button type="button" className="app-secondary-button" onClick={handleResolveAll}>
+                  Limpar notificações
+                </button>
+              )}
+            </div>
+          </div>
+          <Async state={workerErrors}>
+            {(report) =>
+              report.errors.length === 0 ? (
+                <Empty
+                  title="Nenhum erro de requisição pendente"
+                  hint="Falhas de comunicação do worker com provedores externos (Brapi, Yahoo Finance, BCB) aparecem aqui com o log detalhado."
+                />
+              ) : (
+                <div className="app-table-wrap">
+                  <table className="app-table">
+                    <thead>
+                      <tr>
+                        <th>Quando</th>
+                        <th>Rotina</th>
+                        <th>Provedor</th>
+                        <th>Operação / Alvo</th>
+                        <th>Requisição feita</th>
+                        <th>Status</th>
+                        <th>Resultado do erro</th>
+                        <th className="app-numeric">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.errors.map((err) => (
+                        <tr key={err.id}>
+                          <td>{dateTime(err.occurred_at)}</td>
+                          <td>{JOB_LABELS[err.job_name] ?? err.job_name}</td>
+                          <td>
+                            <Badge tone="neutral">{err.provider}</Badge>
+                          </td>
+                          <td>
+                            <div className="app-cell-main">
+                              <span>{err.target}</span>
+                              <small>{OPERATION_LABELS[err.operation] ?? err.operation}</small>
+                            </div>
+                          </td>
+                          <td className="app-cell-wrap">
+                            <code>{err.request_url}</code>
+                          </td>
+                          <td>
+                            <Badge tone={err.resolved_at ? "neutral" : "danger"}>
+                              {err.status_code ? `HTTP ${err.status_code}` : err.error_type}
+                            </Badge>
+                          </td>
+                          <td className="app-cell-wrap app-muted">{err.error_detail}</td>
+                          <td className="app-numeric">
+                            {err.resolved_at ? (
+                              <span className="app-muted">Resolvido</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="app-link-button"
+                                onClick={() => handleResolveOne(err.id)}
+                              >
+                                Dispensar
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </Async>
+        </section>
         <section>
           <h2 className="app-card-heading">Séries</h2>
           <Async state={series}>

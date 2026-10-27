@@ -330,9 +330,7 @@ class McpPort:
         key_handler = AgentKeyHandler(uow_factory=uow_factory)
         auth_header = request.headers.get("authorization", "")
         try:
-            agent_key = await anyio.to_thread.run_sync(
-                key_handler.authenticate_bearer, auth_header
-            )
+            agent_key = await anyio.to_thread.run_sync(key_handler.authenticate_bearer, auth_header)
         except AuthenticationError:
             return _unauthenticated_response()
         except DomainError as exc:
@@ -355,9 +353,7 @@ class McpPort:
         agent_key = self._agent_key(ctx)
         return types.ListToolsResult(
             tools=[
-                entry.tool
-                for name, entry in self.entries.items()
-                if reaches(agent_key.grant, name)
+                entry.tool for name, entry in self.entries.items() if reaches(agent_key.grant, name)
             ]
         )
 

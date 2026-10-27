@@ -141,7 +141,9 @@ def test_brapi_provider_list_treasury_bonds_happy_path_and_403() -> None:
             },
         )
 
-    provider = BrapiProvider(token="pro-token", client=httpx.Client(transport=httpx.MockTransport(ok_handler)))
+    provider = BrapiProvider(
+        token="pro-token", client=httpx.Client(transport=httpx.MockTransport(ok_handler))
+    )
     outcome = provider.list_treasury_bonds()
     assert outcome.unavailable_reason is None
     assert [b.symbol for b in outcome.results] == [

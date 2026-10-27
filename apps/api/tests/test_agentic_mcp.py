@@ -254,9 +254,7 @@ def test_agent_key_repository_and_handler_lifecycle() -> None:
     assert forbidden_exc.value.code == "PERSONAL_KEY_OWNER_ONLY"
 
     # Renew key
-    renewed = handler.renew_key(
-        created.id, "owner", AgentKeyRenewRequest(expires_in_days=180)
-    )
+    renewed = handler.renew_key(created.id, "owner", AgentKeyRenewRequest(expires_in_days=180))
     assert renewed.revision == 3
     assert renewed.expires_at > created.expires_at
 
@@ -446,9 +444,7 @@ async def test_mcp_tools_list_call_scoping_and_idempotency(api: SimpleNamespace)
 
         # Command tools advertise idempotency_key; query tools set read_only_hint
         assert "idempotency_key" in tool_map["accounts.create"].input_schema["properties"]
-        assert "idempotency_key" not in tool_map["accounts.list"].input_schema.get(
-            "properties", {}
-        )
+        assert "idempotency_key" not in tool_map["accounts.list"].input_schema.get("properties", {})
         assert tool_map["accounts.list"].annotations.read_only_hint is True
 
         # 2. Calling an operation outside the key's grant returns GRANT_NOT_ALLOWED

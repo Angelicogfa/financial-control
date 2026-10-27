@@ -22,6 +22,14 @@ export function AppShell({
   const [menuOpen, setMenuOpen] = useState(matchesDesktop);
   const [theme, setTheme] = useState<Theme>(currentTheme);
   const [alertCount, setAlertCount] = useState(0);
+  const [workerErrorCount, setWorkerErrorCount] = useState(0);
+
+  const refreshWorkerErrorCount = useCallback(() => {
+    api.market
+      .workerErrors()
+      .then((result) => setWorkerErrorCount(result.unresolved_count))
+      .catch(() => setWorkerErrorCount(0));
+  }, []);
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
@@ -34,13 +42,20 @@ export function AppShell({
     return () => query.removeEventListener("change", onChange);
   }, []);
 
-  // The alert count refreshes on navigation; failing just hides the number.
+  // The alert and worker error counts refresh on navigation; failing just hides the number.
   useEffect(() => {
     api.alerts
       .list()
       .then((result) => setAlertCount(result.alerts.length))
       .catch(() => setAlertCount(0));
-  }, [location.pathname]);
+    refreshWorkerErrorCount();
+  }, [location.pathname, refreshWorkerErrorCount]);
+
+  useEffect(() => {
+    const onChanged = () => refreshWorkerErrorCount();
+    window.addEventListener("fincontrol:worker-errors-changed", onChanged);
+    return () => window.removeEventListener("fincontrol:worker-errors-changed", onChanged);
+  }, [refreshWorkerErrorCount]);
 
   const overlay = !desktop && menuOpen;
   useEffect(() => {
@@ -105,6 +120,14 @@ export function AppShell({
                   {item.showsAlertCount && alertCount > 0 && (
                     <span className="app-nav-count" aria-label={`${alertCount} alertas`}>
                       {alertCount}
+                    </span>
+                  )}
+                  {item.showsWorkerErrorCount && workerErrorCount > 0 && (
+                    <span
+                      className="app-nav-count"
+                      aria-label={`${workerErrorCount} erros do worker`}
+                    >
+                      {workerErrorCount}
                     </span>
                   )}
                 </NavLink>

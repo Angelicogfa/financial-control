@@ -1,7 +1,3 @@
-// @ts-nocheck
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 /**
@@ -11,13 +7,11 @@ import { describe, expect, it } from "vitest";
  * The proper placement is beside the label in `<span className="app-field-label">`.
  */
 
-function filesIn(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return filesIn(path);
-    return path.endsWith(".tsx") ? [path] : [];
-  });
-}
+const tsxSources = import.meta.glob<string>("../**/*.tsx", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
 
 /** Lines where a `<Hint` opens while a `<label` is still open before it. */
 function hintsInsideLabel(source: string): number[] {
@@ -38,8 +32,8 @@ describe("Hint is always placed outside <label>", () => {
   });
 
   it("ensures all TSX files in src keep Hint outside <label>", () => {
-    const findings = filesIn(join(__dirname, "..")).flatMap((path) =>
-      hintsInsideLabel(readFileSync(path, "utf-8")).map((line) => `${path}:${line}`),
+    const findings = Object.entries(tsxSources).flatMap(([path, source]) =>
+      hintsInsideLabel(source).map((line) => `${path}:${line}`),
     );
     expect(findings).toEqual([]);
   });

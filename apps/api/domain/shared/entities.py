@@ -319,6 +319,24 @@ class JobRunEntity:
 
 
 @dataclass(frozen=True)
+class WorkerRequestErrorEntity:
+    """Detailed log entry for a failed upstream request made during a background worker job."""
+
+    job_name: str
+    provider: str
+    operation: str
+    target: str
+    request_url: str
+    error_type: str
+    error_detail: str
+    occurred_at: datetime
+    job_run_id: int | None = None
+    status_code: int | None = None
+    resolved_at: datetime | None = None
+    id: int | None = None
+
+
+@dataclass(frozen=True)
 class AccountEntity:
     """A custody account (broker, bank, exchange) where trades and earnings happen."""
 
@@ -449,4 +467,3 @@ class AgentApiKeyEntity:
     def is_active(self, now: datetime) -> bool:
         """Whether the key is neither revoked nor expired at `now`."""
         return self.revoked_at is None and self.expires_at > now
-

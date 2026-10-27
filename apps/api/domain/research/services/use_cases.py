@@ -262,4 +262,3 @@ def _matching_treasury_asset_id(bond: TreasuryBond, assets: list[AssetEntity]) -
         if asset.name.strip().casefold() == bond.name.strip().casefold():
             return asset.id
     return None
-

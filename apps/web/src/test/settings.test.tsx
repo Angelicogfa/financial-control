@@ -94,8 +94,9 @@ describe("accounts", () => {
 });
 
 describe("market data", () => {
-  it("shows series freshness and worker runs", async () => {
-    mockApi([
+  it("shows series freshness, worker runs and detailed worker request error notifications", async () => {
+    let cleared = false;
+    const { calls } = mockApi([
       {
         path: "/market/series-status",
         reply: [
@@ -107,12 +108,79 @@ describe("market data", () => {
         path: "/market/job-runs",
         reply: [{ job_name: "sync_instrument_catalog", status: "FAILED", attempts: 3, started_at: "2026-03-09T19:00:00Z", error: "timeout" }],
       },
+      {
+        path: "/market/worker-errors",
+        reply: () =>
+          cleared
+            ? { unresolved_count: 0, errors: [] }
+            : {
+                unresolved_count: 2,
+                errors: [
+                  {
+                    id: 10,
+                    job_run_id: 1,
+                    job_name: "warm_portfolio_quotes",
+                    provider: "brapi",
+                    operation: "quote",
+                    target: "PETR4",
+                    request_url: "https://brapi.dev/api/quote/PETR4",
+                    status_code: 503,
+                    error_type: "HTTP 503",
+                    error_detail: "HTTP 503 from brapi: Service Unavailable",
+                    occurred_at: "2026-03-09T19:05:00Z",
+                    resolved_at: null,
+                  },
+                  {
+                    id: 11,
+                    job_run_id: 2,
+                    job_name: "sync_bcb_and_benchmarks",
+                    provider: "bcb",
+                    operation: "series",
+                    target: "CDI (2026-01-01..2026-03-09)",
+                    request_url: "https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados",
+                    status_code: null,
+                    error_type: "ConnectTimeout",
+                    error_detail: "BCB SGS timed out after 10s",
+                    occurred_at: "2026-03-09T19:06:00Z",
+                    resolved_at: null,
+                  },
+                ],
+              },
+      },
+      {
+        method: "DELETE",
+        path: "/market/worker-errors/10",
+        reply: { status: 204 },
+      },
+      {
+        method: "DELETE",
+        path: "/market/worker-errors",
+        reply: () => {
+          cleared = true;
+          return { status: 204 };
+        },
+      },
     ]);
     renderAt("/settings/market-data");
     expect(await screen.findByText("Desatualizada")).toBeInTheDocument();
     expect(screen.getByText("Em dia")).toBeInTheDocument();
     expect(await screen.findByText("Catálogo de ativos B3")).toBeInTheDocument();
     expect(screen.getByText("timeout")).toBeInTheDocument();
+
+    // Detailed worker request error table
+    expect(await screen.findByText("2 pendente(s)")).toBeInTheDocument();
+    expect(screen.getByText("https://brapi.dev/api/quote/PETR4")).toBeInTheDocument();
+    expect(screen.getByText("HTTP 503 from brapi: Service Unavailable")).toBeInTheDocument();
+    expect(screen.getByText("ConnectTimeout")).toBeInTheDocument();
+
+    // Dismiss one error
+    fireEvent.click(screen.getAllByRole("button", { name: "Dispensar" })[0]);
+    await waitFor(() => expect(last(calls, "DELETE", "/market/worker-errors/10")).toBeDefined());
+
+    // Clear all notifications
+    fireEvent.click(screen.getByRole("button", { name: "Limpar notificações" }));
+    expect(await screen.findByText("Nenhum erro de requisição pendente")).toBeInTheDocument();
+    expect(last(calls, "DELETE", "/market/worker-errors")).toBeDefined();
   });
 });
 

@@ -11,9 +11,10 @@ from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
-from domain.shared.entities import JobRunEntity
+from domain.shared.entities import JobRunEntity, WorkerRequestErrorEntity
 from domain.shared.enums import JobRunStatus
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from infra.providers.error_tracker import capture_worker_request_errors, report_provider_error
 
 logger = logging.getLogger("fincontrol_worker.runner")
 
@@ -104,9 +105,15 @@ def _details(result: Any) -> dict[str, Any]:
     return {"result": str(result)}
 
 
-def _record(uow_factory: UoWFactory, run: JobRunEntity) -> JobRunEntity:
+def _record(
+    uow_factory: UoWFactory,
+    run: JobRunEntity,
+    errors: list[WorkerRequestErrorEntity] | None = None,
+) -> JobRunEntity:
     with uow_factory() as uow:
         saved = uow.job_runs.update(run) if run.id else uow.job_runs.add(run)
+        if errors:
+            uow.worker_errors.add_many(errors)
         uow.commit()
         return saved
 
@@ -138,30 +145,43 @@ def run_job(
     run = _record(uow_factory, JobRunEntity(job_name=name, started_at=now))
     try:
         for attempt in range(1, policy.max_retries + 2):
-            try:
-                result = job()
-            except Exception as exc:
-                logger.warning(
-                    "Job %s attempt %d failed: %s",
-                    name,
-                    attempt,
-                    exc,
-                    extra={"job": name, "attempt": attempt},
-                )
-                if attempt > policy.max_retries:
-                    logger.exception("Job %s failed after %d attempts", name, attempt)
-                    return _record(
-                        uow_factory,
-                        replace(
-                            run,
-                            status=JobRunStatus.FAILED,
-                            attempts=attempt,
-                            finished_at=datetime.now(UTC),
-                            error=f"{type(exc).__name__}: {exc}",
-                        ),
+            with capture_worker_request_errors(job_name=name, job_run_id=run.id) as recorder:
+                try:
+                    result = job()
+                except Exception as exc:
+                    logger.warning(
+                        "Job %s attempt %d failed: %s",
+                        name,
+                        attempt,
+                        exc,
+                        extra={"job": name, "attempt": attempt},
                     )
-                sleep(policy.backoff_seconds * 2 ** (attempt - 1))
-                continue
+                    if attempt > policy.max_retries:
+                        logger.exception("Job %s failed after %d attempts", name, attempt)
+                        captured = recorder.drain()
+                        if not captured:
+                            report_provider_error(
+                                provider="worker",
+                                operation=name,
+                                target=name,
+                                request_url=f"job://{name}",
+                                exc=exc,
+                            )
+                            captured = recorder.drain()
+                        return _record(
+                            uow_factory,
+                            replace(
+                                run,
+                                status=JobRunStatus.FAILED,
+                                attempts=attempt,
+                                finished_at=datetime.now(UTC),
+                                error=f"{type(exc).__name__}: {exc}",
+                            ),
+                            errors=captured,
+                        )
+                    sleep(policy.backoff_seconds * 2 ** (attempt - 1))
+                    continue
+                captured = recorder.drain()
             logger.info("Job %s succeeded", name, extra={"job": name, "attempt": attempt})
             return _record(
                 uow_factory,
@@ -172,6 +192,7 @@ def run_job(
                     finished_at=datetime.now(UTC),
                     details=_details(result),
                 ),
+                errors=captured,
             )
         raise AssertionError("unreachable")
     finally:

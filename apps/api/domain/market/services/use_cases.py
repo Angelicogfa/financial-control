@@ -5,10 +5,16 @@ Scope: market data jobs and series freshness.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
-from controllers.market.responses import JobRunDTO, SeriesStatusDTO
+from controllers.market.responses import (
+    JobRunDTO,
+    SeriesStatusDTO,
+    WorkerErrorsResponseDTO,
+    WorkerRequestErrorDTO,
+)
 from controllers.shared.dependencies import UoWFactory
+from core.errors import NotFoundError
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
 
 
@@ -47,3 +53,47 @@ class MarketDataHandler:
                 )
                 for run in uow.job_runs.latest_per_job()
             ]
+
+    def worker_errors(
+        self, *, include_resolved: bool = False, limit: int = 100
+    ) -> WorkerErrorsResponseDTO:
+        """List recent worker request errors and the count of unresolved notifications."""
+        with self.uow_factory() as uow:
+            items = uow.worker_errors.list_recent(include_resolved=include_resolved, limit=limit)
+            unresolved_count = uow.worker_errors.count_unresolved()
+            return WorkerErrorsResponseDTO(
+                unresolved_count=unresolved_count,
+                errors=[
+                    WorkerRequestErrorDTO(
+                        id=item.id or 0,
+                        job_run_id=item.job_run_id,
+                        job_name=item.job_name,
+                        provider=item.provider,
+                        operation=item.operation,
+                        target=item.target,
+                        request_url=item.request_url,
+                        status_code=item.status_code,
+                        error_type=item.error_type,
+                        error_detail=item.error_detail,
+                        occurred_at=item.occurred_at,
+                        resolved_at=item.resolved_at,
+                    )
+                    for item in items
+                ],
+            )
+
+    def resolve_worker_error(self, error_id: int) -> None:
+        """Mark a single worker request error notification as resolved."""
+        now = datetime.now(UTC)
+        with self.uow_factory() as uow:
+            if not uow.worker_errors.resolve(error_id, now):
+                raise NotFoundError(f"Worker request error id={error_id} not found")
+            uow.commit()
+
+    def resolve_all_worker_errors(self) -> int:
+        """Mark all unresolved worker request error notifications as resolved."""
+        now = datetime.now(UTC)
+        with self.uow_factory() as uow:
+            count = uow.worker_errors.resolve_all(now)
+            uow.commit()
+            return count

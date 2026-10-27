@@ -10,11 +10,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, wait
+from contextvars import copy_context
 from dataclasses import dataclass, field
 
 from domain.market.entities import Fundamentals, Quote
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import Market
+from infra.providers.error_tracker import report_provider_error
 from infra.providers.gateway import CachedMarketGateway
 
 logger = logging.getLogger("fincontrol_core.market.batch")
@@ -49,12 +51,14 @@ def fetch_market_data(
     for asset in tradable:
         if include_quotes:
             quote_future = executor.submit(
-                gateway.get_quote, asset.ticker, asset_type=asset.asset_type
+                copy_context().run,
+                lambda a=asset: gateway.get_quote(a.ticker, asset_type=a.asset_type),
             )
             futures[quote_future] = ("quote", asset.ticker)
         if include_fundamentals:
             future = executor.submit(
-                gateway.get_fundamentals, asset.ticker, asset_type=asset.asset_type
+                copy_context().run,
+                lambda a=asset: gateway.get_fundamentals(a.ticker, asset_type=a.asset_type),
             )
             futures[future] = ("fundamentals", asset.ticker)
 
@@ -76,6 +80,16 @@ def fetch_market_data(
             result.fundamentals[ticker] = value
 
     result.timed_out = sorted({futures[f][1] for f in pending})
+    for future in pending:
+        kind, ticker = futures[future]
+        report_provider_error(
+            provider="gateway",
+            operation=kind,
+            target=ticker,
+            request_url=f"batch://{kind}/{ticker}",
+            error_type="TimeoutError",
+            error_detail=f"Batch market fetch timed out after {timeout_seconds:.1f}s",
+        )
     if result.timed_out:
         logger.warning(
             "Market data timed out after %.1fs for: %s",
