@@ -15,6 +15,9 @@ from domain.shared.enums import (
     AssetType,
     CorporateEventKind,
     EarningKind,
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
+    FixedIncomeLiquidity,
     TransactionKind,
 )
 
@@ -128,6 +131,31 @@ class ImportLineDTO(BaseModel):
     note: str = ""
 
 
+class ImportFixedIncomeTermDTO(BaseModel):
+    """Contract terms of a Treasury bond or bank security registered with the import.
+
+    The preview suggests what the statement tells (kind, issuer, first date, and the
+    maturity from the Treasury catalog); the contracted rate is never in a B3 statement.
+    """
+
+    instrument_kind: FixedIncomeInstrumentKind
+    indexer: FixedIncomeIndexer
+    contracted_rate: Decimal | None = Field(
+        default=None,
+        description=(
+            "ADR 0006: multiplier for CDI/SELIC (1.10 = 110% of CDI); "
+            "annual fraction for PRE/IPCA (0.065 = 6.5% a.a.). Required to register."
+        ),
+    )
+    issue_date: date | None = Field(
+        default=None, description="Defaults to the first date of the security in the statement"
+    )
+    maturity_date: date | None = None
+    tax_exempt: bool = False
+    liquidity: FixedIncomeLiquidity = FixedIncomeLiquidity.AT_MATURITY
+    issuer: str | None = None
+
+
 class UnknownTickerDTO(BaseModel):
     ticker: str
     name: str | None = None
@@ -135,14 +163,23 @@ class UnknownTickerDTO(BaseModel):
     arca_class: ArcaClass | None = Field(
         default=None, description="Suggested ARCA quadrant (known once the type is known)"
     )
+    fixed_income_term: ImportFixedIncomeTermDTO | None = Field(
+        default=None,
+        description="Treasury bond or bank security: terms to confirm (rate still missing)",
+    )
 
 
 class ImportNewAssetRequest(BaseModel):
-    """An unknown ticker to register with the import, as the research flow would."""
+    """An unknown ticker to register with the import, as the research flow would.
+
+    Treasury bonds and bank securities carry `fixed_income_term` with the contracted rate.
+    """
 
     ticker: str = Field(..., min_length=1, max_length=32)
     asset_type: AssetType | None = None
     arca_class: ArcaClass | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    fixed_income_term: ImportFixedIncomeTermDTO | None = None
 
 
 class ImportPreviewDTO(BaseModel):

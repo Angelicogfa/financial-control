@@ -29,6 +29,7 @@ import type {
   FixedIncomeIndexer,
   GrantOptionsDTO,
   ImportCommitDTO,
+  ImportFixedIncomeTermDTO,
   ImportPreviewDTO,
   JobRunDTO,
   KeyExpiryDays,
@@ -60,6 +61,9 @@ export interface ImportNewAssetRequest {
   ticker: string;
   asset_type?: AssetType | null;
   arca_class?: ArcaClass | null;
+  /** Treasury bonds and bank securities: name and terms, with the contracted rate (ADR 0006). */
+  name?: string | null;
+  fixed_income_term?: (Omit<ImportFixedIncomeTermDTO, "contracted_rate"> & { contracted_rate: number }) | null;
 }
 
 export interface LedgerFilters {

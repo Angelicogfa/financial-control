@@ -1,15 +1,33 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type ImportNewAssetRequest } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
-import type { ArcaClass, AssetType, ImportCommitDTO, ImportPreviewDTO } from "../../api/types";
+import type {
+  ArcaClass,
+  AssetType,
+  FixedIncomeIndexer,
+  FixedIncomeLiquidity,
+  ImportCommitDTO,
+  ImportFixedIncomeTermDTO,
+  ImportPreviewDTO,
+} from "../../api/types";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/States";
-import { day, num, quantity } from "../../utils/format";
-import { ASSET_TYPES, ASSET_TYPE_LABELS, EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
+import { day, num, parseDecimal, quantity } from "../../utils/format";
+import {
+  ASSET_TYPES,
+  ASSET_TYPE_LABELS,
+  EARNING_LABELS,
+  EVENT_LABELS,
+  INDEXERS,
+  INDEXER_HINTS,
+  LIQUIDITY_LABELS,
+  TRADE_LABELS,
+} from "../../utils/labels";
+import { percentToContractedRate } from "../../utils/rates";
 import { AccountSelect } from "./AssetSelect";
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -27,32 +45,84 @@ function describe(line: ImportPreviewDTO["lines"][number]): string {
   return line.description;
 }
 
+/**
+ * Terms of a Treasury bond or bank security: B3 statements never carry the contracted rate,
+ * so it is typed here (the rest comes suggested by the preview).
+ */
+interface TermChoice {
+  base: ImportFixedIncomeTermDTO;
+  name: string;
+  indexer: FixedIncomeIndexer;
+  ratePercent: string;
+  issueDate: string;
+  maturityDate: string;
+  liquidity: FixedIncomeLiquidity;
+}
+
 /** How an unknown ticker is registered with the import (the same registration as the research flow). */
 interface NewAssetChoice {
   selected: boolean;
   asset_type: AssetType | "";
   arca_class: ArcaClass | "";
   suggested: ArcaClass | null;
+  term: TermChoice | null;
 }
 
 function initialChoices(preview: ImportPreviewDTO): Record<string, NewAssetChoice> {
   return Object.fromEntries(
-    preview.unknown_tickers.map((u) => [
-      u.ticker,
-      {
-        selected: Boolean(u.asset_type),
-        asset_type: u.asset_type ?? "",
-        arca_class: u.arca_class ?? "",
-        suggested: u.arca_class ?? null,
-      },
-    ]),
+    preview.unknown_tickers.map((u) => {
+      const base = u.fixed_income_term ?? null;
+      return [
+        u.ticker,
+        {
+          selected: Boolean(u.asset_type) && !base,
+          asset_type: u.asset_type ?? "",
+          arca_class: u.arca_class ?? "",
+          suggested: u.arca_class ?? null,
+          term: base && {
+            base,
+            name: u.name ?? u.ticker,
+            indexer: base.indexer,
+            ratePercent: "",
+            issueDate: base.issue_date ?? "",
+            maturityDate: base.maturity_date ?? "",
+            liquidity: base.liquidity ?? "AT_MATURITY",
+          },
+        },
+      ];
+    }),
   );
+}
+
+/** A choice can be registered once its type (and, for fixed income, rate and issue date) is known. */
+function ready(choice: NewAssetChoice): boolean {
+  if (!choice.asset_type) return false;
+  if (!choice.term) return true;
+  return parseDecimal(choice.term.ratePercent) !== null && Boolean(choice.term.issueDate) && Boolean(choice.term.name.trim());
 }
 
 function toNewAssets(choices: Record<string, NewAssetChoice>): ImportNewAssetRequest[] {
   return Object.entries(choices)
-    .filter(([, c]) => c.selected && c.asset_type)
-    .map(([ticker, c]) => ({ ticker, asset_type: c.asset_type || null, arca_class: c.arca_class || null }));
+    .filter(([, c]) => c.selected && ready(c))
+    .map(([ticker, c]) => {
+      const request: ImportNewAssetRequest = { ticker, asset_type: c.asset_type || null, arca_class: c.arca_class || null };
+      if (!c.term) return request;
+      const { base, name, indexer, ratePercent, issueDate, maturityDate, liquidity } = c.term;
+      return {
+        ...request,
+        name: name.trim(),
+        fixed_income_term: {
+          instrument_kind: base.instrument_kind,
+          indexer,
+          contracted_rate: percentToContractedRate(parseDecimal(ratePercent) as number),
+          issue_date: issueDate,
+          maturity_date: maturityDate || null,
+          tax_exempt: base.tax_exempt ?? false,
+          liquidity,
+          issuer: base.issuer ?? null,
+        },
+      };
+    });
 }
 
 /** B3 statement import: preview what each line becomes, then apply the new lines at once. */
@@ -99,6 +169,15 @@ export function ImportPage() {
   const choose = (ticker: string, change: Partial<NewAssetChoice>) =>
     setChoices((current) => ({ ...current, [ticker]: { ...current[ticker], ...change } }));
 
+  /** Typing the terms selects the security as soon as they are complete. */
+  const chooseTerm = (ticker: string, change: Partial<TermChoice>) =>
+    setChoices((current) => {
+      const previous = current[ticker];
+      if (!previous.term) return current;
+      const next = { ...previous, term: { ...previous.term, ...change } };
+      return { ...current, [ticker]: { ...next, selected: ready(next) && (previous.selected || !ready(previous)) } };
+    });
+
   /** A new type changes the suggested quadrant: ask the API, as the asset form does. */
   const chooseType = async (ticker: string, assetType: AssetType | "") => {
     choose(ticker, { asset_type: assetType, selected: Boolean(assetType) });
@@ -112,7 +191,7 @@ export function ImportPage() {
   };
 
   const create = Object.entries(choices)
-    .filter(([, c]) => c.selected && c.asset_type)
+    .filter(([, c]) => c.selected && ready(c))
     .map(([ticker]) => ticker);
   const newLines = preview?.counts.NEW ?? 0;
   const fromUnknown = preview
@@ -126,7 +205,8 @@ export function ImportPage() {
         subtitle={
           <>
             Na Área do Investidor da B3, exporte <strong>Extratos › Negociação</strong> (compras e vendas) e{" "}
-            <strong>Extratos › Movimentação</strong> (proventos e eventos). Importar o mesmo arquivo de novo não duplica nada.
+            <strong>Extratos › Movimentação</strong> (proventos, eventos, Tesouro Direto e CDB/LCI/LCA). Importar o mesmo
+            arquivo de novo não duplica nada.
           </>
         }
         actions={
@@ -191,7 +271,8 @@ export function ImportPage() {
                 <h2 className="app-card-heading">Ativos que ainda não estão cadastrados</h2>
                 <p className="app-card-hint">
                   Marque os que devem ser cadastrados junto com a importação. Cada um entra como um ativo pesquisado:
-                  confira o tipo e o quadrante ARCA; os demonstrativos são buscados logo depois.
+                  confira o tipo e o quadrante ARCA; os demonstrativos são buscados logo depois. Títulos do Tesouro e
+                  CDBs (um ativo por emissor) precisam da taxa contratada, que a B3 não informa.
                 </p>
                 <div className="app-table-wrap">
                   <table className="app-table">
@@ -206,46 +287,127 @@ export function ImportPage() {
                       {preview.unknown_tickers.map((u) => {
                         const choice = choices[u.ticker];
                         if (!choice) return null;
+                        const term = choice.term;
                         return (
-                          <tr key={u.ticker}>
-                            <td>
-                              <label className="app-check">
-                                <input
-                                  type="checkbox"
-                                  checked={choice.selected}
+                          <Fragment key={u.ticker}>
+                            <tr>
+                              <td>
+                                <label className="app-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={choice.selected}
+                                    disabled={busy || previewing || !ready(choice)}
+                                    onChange={(e) => choose(u.ticker, { selected: e.target.checked })}
+                                  />
+                                  {u.ticker}
+                                  {u.name && <span className="app-muted"> {u.name}</span>}
+                                </label>
+                              </td>
+                              <td>
+                                <select
+                                  aria-label={`Tipo de ${u.ticker}`}
+                                  value={choice.asset_type}
+                                  disabled={busy || previewing || Boolean(term)}
+                                  onChange={(e) => void chooseType(u.ticker, e.target.value as AssetType | "")}
+                                >
+                                  <option value="">Escolha o tipo</option>
+                                  {ASSET_TYPES.map((type) => (
+                                    <option key={type} value={type}>
+                                      {ASSET_TYPE_LABELS[type]}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td>
+                                <ArcaClassSelect
+                                  label={`Classe ARCA de ${u.ticker}`}
+                                  value={choice.arca_class}
+                                  suggested={choice.suggested}
+                                  emptyLabel="Sugerida pelo tipo"
                                   disabled={busy || previewing || !choice.asset_type}
-                                  onChange={(e) => choose(u.ticker, { selected: e.target.checked })}
+                                  onChange={(value) => choose(u.ticker, { arca_class: value })}
                                 />
-                                {u.ticker}
-                                {u.name && <span className="app-muted"> {u.name}</span>}
-                              </label>
-                            </td>
-                            <td>
-                              <select
-                                aria-label={`Tipo de ${u.ticker}`}
-                                value={choice.asset_type}
-                                disabled={busy || previewing}
-                                onChange={(e) => void chooseType(u.ticker, e.target.value as AssetType | "")}
-                              >
-                                <option value="">Escolha o tipo</option>
-                                {ASSET_TYPES.map((type) => (
-                                  <option key={type} value={type}>
-                                    {ASSET_TYPE_LABELS[type]}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <ArcaClassSelect
-                                label={`Classe ARCA de ${u.ticker}`}
-                                value={choice.arca_class}
-                                suggested={choice.suggested}
-                                emptyLabel="Sugerida pelo tipo"
-                                disabled={busy || previewing || !choice.asset_type}
-                                onChange={(value) => choose(u.ticker, { arca_class: value })}
-                              />
-                            </td>
-                          </tr>
+                              </td>
+                            </tr>
+                            {term && (
+                              <tr>
+                                <td colSpan={3}>
+                                  <div className="app-field-grid">
+                                    <div className="app-field">
+                                      <label htmlFor={`name-${u.ticker}`}>Nome</label>
+                                      <input
+                                        id={`name-${u.ticker}`}
+                                        value={term.name}
+                                        disabled={busy || previewing}
+                                        onChange={(e) => chooseTerm(u.ticker, { name: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="app-field">
+                                      <label htmlFor={`indexer-${u.ticker}`}>Indexador</label>
+                                      <select
+                                        id={`indexer-${u.ticker}`}
+                                        value={term.indexer}
+                                        disabled={busy || previewing}
+                                        onChange={(e) => chooseTerm(u.ticker, { indexer: e.target.value as FixedIncomeIndexer })}
+                                      >
+                                        {INDEXERS.map((indexer) => (
+                                          <option key={indexer} value={indexer}>
+                                            {indexer}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="app-field">
+                                      <label htmlFor={`rate-${u.ticker}`}>Taxa contratada</label>
+                                      <input
+                                        id={`rate-${u.ticker}`}
+                                        inputMode="decimal"
+                                        placeholder={INDEXER_HINTS[term.indexer]}
+                                        value={term.ratePercent}
+                                        disabled={busy || previewing}
+                                        onChange={(e) => chooseTerm(u.ticker, { ratePercent: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="app-field">
+                                      <label htmlFor={`issue-${u.ticker}`}>Data de emissão</label>
+                                      <input
+                                        id={`issue-${u.ticker}`}
+                                        type="date"
+                                        value={term.issueDate}
+                                        disabled={busy || previewing}
+                                        onChange={(e) => chooseTerm(u.ticker, { issueDate: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="app-field">
+                                      <label htmlFor={`maturity-${u.ticker}`}>Vencimento</label>
+                                      <input
+                                        id={`maturity-${u.ticker}`}
+                                        type="date"
+                                        value={term.maturityDate}
+                                        disabled={busy || previewing}
+                                        onChange={(e) => chooseTerm(u.ticker, { maturityDate: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="app-field">
+                                      <label htmlFor={`liquidity-${u.ticker}`}>Liquidez</label>
+                                      <select
+                                        id={`liquidity-${u.ticker}`}
+                                        value={term.liquidity}
+                                        disabled={busy || previewing}
+                                        onChange={(e) => chooseTerm(u.ticker, { liquidity: e.target.value as FixedIncomeLiquidity })}
+                                      >
+                                        {(Object.keys(LIQUIDITY_LABELS) as FixedIncomeLiquidity[]).map((liquidity) => (
+                                          <option key={liquidity} value={liquidity}>
+                                            {LIQUIDITY_LABELS[liquidity]}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         );
                       })}
                     </tbody>

@@ -5,12 +5,14 @@ from __future__ import annotations
 import csv
 import io
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 from datetime import date, timedelta
 from decimal import Decimal
 
 from controllers.ledger.requests import ImportNewAssetRequest
 from controllers.ledger.responses import (
     ImportCommitDTO,
+    ImportFixedIncomeTermDTO,
     ImportLineDTO,
     ImportPreviewDTO,
     UnknownTickerDTO,
@@ -18,7 +20,9 @@ from controllers.ledger.responses import (
 from controllers.shared.dependencies import UoWFactory
 from core.errors import ValidationError
 from domain.accounts.services.use_cases import resolve_account_id
+from domain.assets.services.codes import generated_asset_code
 from domain.ledger.services.b3_import import (
+    FixedIncomeRef,
     ImportLine,
     ImportPreview,
     LineAction,
@@ -27,6 +31,7 @@ from domain.ledger.services.b3_import import (
     event_factor,
     guess_asset_type,
     parse_statement,
+    resolve_fixed_income,
 )
 from domain.ledger.services.ledger import LedgerConflictError, validate_ledger
 from domain.portfolio.services.positions import InsufficientQuantityError, build_position
@@ -39,8 +44,10 @@ from domain.shared.entities import (
     AssetEntity,
     CorporateEventEntity,
     EarningEntity,
+    FixedIncomeTermEntity,
     TransactionEntity,
 )
+from domain.shared.enums import TransactionKind
 from domain.shared.unit_of_work import AbstractUnitOfWork
 
 MAX_STATEMENT_BYTES = 5 * 1024 * 1024
@@ -117,6 +124,154 @@ def _held_before(assets: dict[str, AssetEntity]) -> Callable[[str, date], Decima
     return held
 
 
+def _fixed_income_refs(preview: ImportPreview) -> dict[str, tuple[FixedIncomeRef, date | None]]:
+    """Group key -> (security, first date in the statement) of the lines with no asset."""
+    refs: dict[str, tuple[FixedIncomeRef, date | None]] = {}
+    for line in preview.lines:
+        ref = line.fixed_income
+        if ref is None or line.ticker != ref.key:
+            continue
+        _, first = refs.get(ref.key, (ref, line.when))
+        refs[ref.key] = (ref, min((d for d in (first, line.when) if d), default=None))
+    return refs
+
+
+def _suggested_term(
+    uow: AbstractUnitOfWork, ref: FixedIncomeRef, first: date | None
+) -> ImportFixedIncomeTermDTO:
+    maturity = None
+    if ref.maturity_year is not None:
+        maturity = next(
+            (
+                bond.maturity_date
+                for bond in uow.treasury_catalog.list_all()
+                if bond.instrument_kind == ref.instrument_kind
+                and bond.maturity_date.year == ref.maturity_year
+                and ("juros semestrais" in bond.bond_type.lower()) == ref.semiannual
+            ),
+            None,
+        )
+    return ImportFixedIncomeTermDTO(
+        instrument_kind=ref.instrument_kind,
+        indexer=ref.indexer,
+        issue_date=first,
+        maturity_date=maturity,
+        issuer=ref.issuer,
+    )
+
+
+def _register_fixed_income(
+    uow: AbstractUnitOfWork,
+    ref: FixedIncomeRef,
+    first: date | None,
+    wanted: ImportNewAssetRequest,
+) -> AssetEntity:
+    """Register the Treasury bond or bank security with the terms chosen in the preview."""
+    term = wanted.fixed_income_term
+    if term is None or term.contracted_rate is None:
+        raise ValidationError(
+            f"{ref.name}: inform the contracted rate to register it",
+            code="FIXED_INCOME_TERM_REQUIRED",
+        )
+    issue_date = term.issue_date or first
+    if issue_date is None:
+        raise ValidationError(
+            f"{ref.name}: inform the issue date", code="FIXED_INCOME_TERM_REQUIRED"
+        )
+    entity_term = FixedIncomeTermEntity(
+        instrument_kind=term.instrument_kind,
+        indexer=term.indexer,
+        contracted_rate=term.contracted_rate,
+        issue_date=issue_date,
+        maturity_date=term.maturity_date,
+        tax_exempt=term.tax_exempt,
+        liquidity=term.liquidity,
+        issuer=term.issuer or ref.issuer,
+    )
+    name = wanted.name or ref.name
+    ticker = generated_asset_code(
+        ref.asset_type,
+        name,
+        entity_term,
+        is_taken=lambda code: uow.assets.get_by_ticker(code) is not None,
+    )
+    return uow.assets.add(
+        AssetEntity(
+            ticker=ticker,
+            name=name,
+            asset_type=ref.asset_type,
+            arca_class=wanted.arca_class or suggested_arca_class(ticker, ref.asset_type),
+            fixed_income_term=entity_term,
+        )
+    )
+
+
+def _reject_unbacked_redemptions(
+    preview: ImportPreview, assets: dict[str, AssetEntity]
+) -> ImportPreview:
+    """Mark INVALID the Treasury/bank redemptions larger than what the ledger holds.
+
+    A statement covers a period: redeeming an application made before it has no position
+    to come from. Rejecting the line keeps the rest of the statement importable.
+    """
+    pending: dict[str, list[ImportLine]] = {}
+    for line in preview.new_lines:
+        if line.fixed_income is not None and line.action == LineAction.TRADE:
+            pending.setdefault(line.ticker or "", []).append(line)
+    rejected: set[int] = set()
+    for ticker, items in pending.items():
+        asset = assets.get(ticker)
+        if asset is None:
+            continue
+        accepted = list(asset.transactions)
+        for line in sorted(
+            items, key=lambda i: (i.when, i.trade_kind != TransactionKind.BUY, i.line_no)
+        ):
+            trade = TransactionEntity(
+                asset_id=asset.id or 0,
+                kind=line.trade_kind,  # type: ignore[arg-type]
+                trade_date=line.when,  # type: ignore[arg-type]
+                quantity=line.quantity or Decimal("0"),
+                unit_price=line.unit_price or Decimal("0"),
+            )
+            try:
+                validate_ledger(asset, [*accepted, trade])
+            except InsufficientQuantityError:
+                rejected.add(line.line_no)
+                continue
+            accepted.append(trade)
+    if not rejected:
+        return preview
+    note = "Resgate maior que o saldo: a aplicação é anterior a este extrato"
+    return ImportPreview(
+        preview.kind,
+        [
+            replace(line, status=LineStatus.INVALID, note=note)
+            if line.line_no in rejected
+            else line
+            for line in preview.lines
+        ],
+    )
+
+
+def _classified(
+    uow: AbstractUnitOfWork,
+    parsed: ImportPreview,
+    assets: dict[str, AssetEntity],
+    *,
+    chosen: dict[str, str] | None = None,
+    with_events: bool = False,
+) -> ImportPreview:
+    resolved = resolve_fixed_income(parsed, assets.values(), chosen=chosen)
+    preview = classify(
+        resolved,
+        known_tickers=set(assets),
+        existing_hashes=uow.ledger_imports.existing_hashes([line.hash for line in parsed.lines]),
+        held_before=_held_before(assets) if with_events else None,
+    )
+    return _reject_unbacked_redemptions(preview, assets)
+
+
 class ImportHandler:
     """Preview shows what would happen; commit applies only NEW lines, all or nothing."""
 
@@ -127,16 +282,22 @@ class ImportHandler:
         parsed = _parse(filename, content)
         with self.uow_factory() as uow:
             assets = {a.ticker: a for a in uow.assets.list_all(active_only=False)}
-            preview = classify(
-                parsed,
-                known_tickers=set(assets),
-                existing_hashes=uow.ledger_imports.existing_hashes(
-                    [line.hash for line in parsed.lines]
-                ),
-                held_before=_held_before(assets),
-            )
+            preview = _classified(uow, parsed, assets, with_events=True)
+            refs = _fixed_income_refs(preview)
             unknown = []
             for ticker in preview.unknown_tickers:
+                if ticker in refs:
+                    ref, first = refs[ticker]
+                    unknown.append(
+                        UnknownTickerDTO(
+                            ticker=ticker,
+                            name=ref.name,
+                            asset_type=ref.asset_type,
+                            arca_class=suggested_arca_class(ticker, ref.asset_type),
+                            fixed_income_term=_suggested_term(uow, ref, first),
+                        )
+                    )
+                    continue
                 listed = uow.catalog.get(ticker)
                 asset_type = (listed.asset_type if listed else None) or guess_asset_type(ticker)
                 unknown.append(
@@ -171,11 +332,20 @@ class ImportHandler:
         }
         chosen |= {a.ticker.strip().upper(): a for a in new_assets}
         registered: list[str] = []
+        fixed_income: dict[str, str] = {}
         with self.uow_factory() as uow:
             account = resolve_account_id(uow, account_id)
+            existing = uow.assets.list_all(active_only=False)
+            refs = _fixed_income_refs(resolve_fixed_income(parsed, existing))
+            keys = {line.fixed_income.key for line in parsed.lines if line.fixed_income}
             for ticker, wanted in sorted(chosen.items()):
-                if uow.assets.get_by_ticker(ticker) is not None:
+                if ticker in refs:
+                    asset = _register_fixed_income(uow, *refs[ticker], wanted)
+                    fixed_income[ticker] = asset.ticker
+                    registered.append(asset.ticker)
                     continue
+                if ticker in keys or uow.assets.get_by_ticker(ticker) is not None:
+                    continue  # already registered (a security is matched, not looked up)
                 listed = uow.catalog.get(ticker)
                 asset_type = (
                     wanted.asset_type
@@ -193,13 +363,7 @@ class ImportHandler:
                 registered.append(ticker)
 
             assets = {a.ticker: a for a in uow.assets.list_all(active_only=False)}
-            preview = classify(
-                parsed,
-                known_tickers=set(assets),
-                existing_hashes=uow.ledger_imports.existing_hashes(
-                    [line.hash for line in parsed.lines]
-                ),
-            )
+            preview = _classified(uow, parsed, assets, chosen=fixed_income)
             created = self._apply(uow, preview.new_lines, assets, account)
             invalidate_snapshots_from(uow, *(line.when for line in preview.new_lines))
             uow.commit()
