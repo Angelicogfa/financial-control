@@ -12,9 +12,9 @@ from domain.shared.repositories import AbstractMarketSeriesRepository
 
 
 def earliest_fixed_income_start(assets: Iterable[AssetEntity]) -> date | None:
-    """Earliest date any fixed income lot starts accruing (issue or first purchase)."""
+    """Earliest date any fixed income lot starts accruing (its first purchase)."""
     starts = [
-        max(tx.trade_date, asset.fixed_income_term.issue_date)
+        tx.trade_date
         for asset in assets
         if asset.fixed_income_term is not None
         for tx in asset.transactions

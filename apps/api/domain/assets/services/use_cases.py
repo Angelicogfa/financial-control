@@ -101,6 +101,7 @@ class AssetHandler:
                     tax_exempt=t.tax_exempt,
                     liquidity=t.liquidity,
                     issuer=t.issuer,
+                    semiannual_coupons=t.semiannual_coupons,
                 )
 
             ticker = req.ticker or generated_asset_code(
@@ -146,6 +147,7 @@ class AssetHandler:
                     tax_exempt=t.tax_exempt,
                     liquidity=t.liquidity,
                     issuer=t.issuer,
+                    semiannual_coupons=t.semiannual_coupons,
                 )
 
             updated_entity = replace(

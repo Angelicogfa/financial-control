@@ -125,21 +125,17 @@ def _held_before(assets: dict[str, AssetEntity]) -> Callable[[str, date], Decima
     return held
 
 
-def _fixed_income_refs(preview: ImportPreview) -> dict[str, tuple[FixedIncomeRef, date | None]]:
-    """Group key -> (security, first date in the statement) of the lines with no asset."""
-    refs: dict[str, tuple[FixedIncomeRef, date | None]] = {}
+def _fixed_income_refs(preview: ImportPreview) -> dict[str, FixedIncomeRef]:
+    """Group key -> security of the statement lines with no registered asset."""
+    refs: dict[str, FixedIncomeRef] = {}
     for line in preview.lines:
         ref = line.fixed_income
-        if ref is None or line.ticker != ref.key:
-            continue
-        _, first = refs.get(ref.key, (ref, line.when))
-        refs[ref.key] = (ref, min((d for d in (first, line.when) if d), default=None))
+        if ref is not None and line.ticker == ref.key:
+            refs.setdefault(ref.key, ref)
     return refs
 
 
-def _suggested_term(
-    uow: AbstractUnitOfWork, ref: FixedIncomeRef, first: date | None
-) -> ImportFixedIncomeTermDTO:
+def _suggested_term(uow: AbstractUnitOfWork, ref: FixedIncomeRef) -> ImportFixedIncomeTermDTO:
     maturity = None
     if ref.maturity_year is not None:
         maturity = next(
@@ -155,16 +151,15 @@ def _suggested_term(
     return ImportFixedIncomeTermDTO(
         instrument_kind=ref.instrument_kind,
         indexer=ref.indexer,
-        issue_date=first,
         maturity_date=maturity,
         issuer=ref.issuer,
+        semiannual_coupons=ref.semiannual,
     )
 
 
 def _register_fixed_income(
     uow: AbstractUnitOfWork,
     ref: FixedIncomeRef,
-    first: date | None,
     wanted: ImportNewAssetRequest,
 ) -> AssetEntity:
     """Register the Treasury bond or bank security with the terms chosen in the preview."""
@@ -174,20 +169,16 @@ def _register_fixed_income(
             f"{ref.name}: inform the contracted rate to register it",
             code="FIXED_INCOME_TERM_REQUIRED",
         )
-    issue_date = term.issue_date or first
-    if issue_date is None:
-        raise ValidationError(
-            f"{ref.name}: inform the issue date", code="FIXED_INCOME_TERM_REQUIRED"
-        )
     entity_term = FixedIncomeTermEntity(
         instrument_kind=term.instrument_kind,
         indexer=term.indexer,
         contracted_rate=term.contracted_rate,
-        issue_date=issue_date,
+        issue_date=term.issue_date,
         maturity_date=term.maturity_date,
         tax_exempt=term.tax_exempt,
         liquidity=term.liquidity,
         issuer=term.issuer or ref.issuer,
+        semiannual_coupons=term.semiannual_coupons or ref.semiannual,
     )
     name = wanted.name or ref.name
     ticker = generated_asset_code(
@@ -308,14 +299,14 @@ class ImportHandler:
             unknown = []
             for ticker in preview.unknown_tickers:
                 if ticker in refs:
-                    ref, first = refs[ticker]
+                    ref = refs[ticker]
                     unknown.append(
                         UnknownTickerDTO(
                             ticker=ticker,
                             name=ref.name,
                             asset_type=ref.asset_type,
                             arca_class=suggested_arca_class(ticker, ref.asset_type),
-                            fixed_income_term=_suggested_term(uow, ref, first),
+                            fixed_income_term=_suggested_term(uow, ref),
                         )
                     )
                     continue
@@ -371,7 +362,7 @@ class ImportHandler:
                 if ticker not in needed:
                     continue  # already registered, or nothing of it left to import
                 if ticker in refs:
-                    asset = _register_fixed_income(uow, *refs[ticker], wanted)
+                    asset = _register_fixed_income(uow, refs[ticker], wanted)
                     fixed_income[ticker] = asset.ticker
                     registered.append(asset.ticker)
                     continue

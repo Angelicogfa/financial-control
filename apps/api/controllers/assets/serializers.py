@@ -43,6 +43,7 @@ def to_asset_dto(entity: AssetEntity) -> AssetResponseDTO:
             tax_exempt=t.tax_exempt,
             liquidity=t.liquidity,
             issuer=t.issuer,
+            semiannual_coupons=t.semiannual_coupons,
         )
     return AssetResponseDTO(
         id=entity.id or 0,

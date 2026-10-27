@@ -148,12 +148,14 @@ class ImportFixedIncomeTermDTO(BaseModel):
         ),
     )
     issue_date: date | None = Field(
-        default=None, description="Defaults to the first date of the security in the statement"
+        default=None,
+        description="Informational only: every purchase accrues from its own trade date",
     )
     maturity_date: date | None = None
     tax_exempt: bool = False
     liquidity: FixedIncomeLiquidity = FixedIncomeLiquidity.AT_MATURITY
     issuer: str | None = None
+    semiannual_coupons: bool = False
 
 
 class UnknownTickerDTO(BaseModel):

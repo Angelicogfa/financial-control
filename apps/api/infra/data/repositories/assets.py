@@ -150,6 +150,7 @@ class SqlAlchemyAssetRepository(AbstractAssetRepository):
                 model.fixed_income_term.tax_exempt = term.tax_exempt
                 model.fixed_income_term.liquidity = term.liquidity.value
                 model.fixed_income_term.issuer = term.issuer
+                model.fixed_income_term.semiannual_coupons = term.semiannual_coupons
         elif model.fixed_income_term is not None:
             model.fixed_income_term = None
 

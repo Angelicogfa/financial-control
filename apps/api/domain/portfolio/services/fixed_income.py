@@ -9,6 +9,11 @@ Conventions (ADR 0006):
 - IPCA+ accrues each month's IPCA pro-rata by business days inside the month, compounded
   with the real rate over 252 business days per year.
 - Business days follow the national holiday calendar (`fincontrol_core.calendar`).
+- Every lot accrues from its own purchase (trade) date; the issue date of the terms is
+  informational only and never changes the valuation.
+- Zero-coupon Tesouro Prefixado (LTN) lots accrue at the rate implied by the unit price paid
+  (PU = 1000 / (1 + r) ^ (business days to maturity / 252)), so each purchase keeps the rate
+  it was actually bought at; `contracted_rate` is only the fallback when it cannot be implied.
 - Redemptions (SELL) are gross amounts taken from the curve: they consume lots FIFO,
   reducing each lot's principal proportionally to the share of its gross value redeemed.
   Realized P/L is net of the regressive IOF/IR due on the redeemed yield and of fees.
@@ -27,10 +32,15 @@ from datetime import date, timedelta
 from core.helpers.calendar import business_days_between
 from domain.portfolio.services.positions import InsufficientQuantityError
 from domain.shared.entities import FixedIncomeTermEntity, TransactionEntity
-from domain.shared.enums import FixedIncomeIndexer, TransactionKind
+from domain.shared.enums import (
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
+    TransactionKind,
+)
 from domain.tax.entities import TaxRegime, TaxRuleBook
 from domain.tax.services.rules import DEFAULT_RULE_BOOK, income_tax_regime
 
+LTN_FACE_VALUE = 1000.0
 BUSINESS_DAYS_PER_YEAR = 252.0
 PROJECTION_CALENDAR_DAYS = 365
 DEFAULT_OVERSELL_TOLERANCE = 0.05
@@ -79,6 +89,7 @@ class FixedIncomeLot:
 
     start: date
     principal: float
+    rate: float | None = None
 
 
 @dataclass(frozen=True)
@@ -112,6 +123,28 @@ def regressive_iof_rate(
         return 0.0
     book = rules or DEFAULT_RULE_BOOK
     return book.rate(TaxRegime.IOF_REGRESSIVE, calendar_days, on or date.today())
+
+
+def implied_purchase_rate(
+    term: FixedIncomeTermEntity, trade_date: date, unit_price: float
+) -> float | None:
+    """Annual rate implied by the price paid for a zero-coupon Tesouro Prefixado (LTN).
+
+    Returns `None` for any other bond, or when the price cannot imply a sane rate.
+    """
+    if (
+        term.instrument_kind != FixedIncomeInstrumentKind.TESOURO_PRE
+        or term.semiannual_coupons
+        or term.maturity_date is None
+        or term.maturity_date <= trade_date
+        or not 0.0 < unit_price < LTN_FACE_VALUE
+    ):
+        return None
+    business_days = count_business_days(trade_date, term.maturity_date)
+    if business_days <= 0:
+        return None
+    rate = (LTN_FACE_VALUE / unit_price) ** (BUSINESS_DAYS_PER_YEAR / business_days) - 1.0
+    return round(rate, 8) if 0.0 < rate <= 1.0 else None
 
 
 def count_business_days(start_date: date, end_date: date) -> int:
@@ -168,13 +201,21 @@ def _accrue_ipca(days: list[date], curves: RateCurves) -> _Accrual:
 
 
 def accrual_factor(
-    term: FixedIncomeTermEntity, start: date, end: date, curves: RateCurves
+    term: FixedIncomeTermEntity,
+    start: date,
+    end: date,
+    curves: RateCurves,
+    *,
+    rate: float | None = None,
 ) -> _Accrual:
-    """Gross accrual factor of the contracted curve over business days in (start, end]."""
+    """Gross accrual factor of the contracted curve over business days in (start, end].
+
+    `rate` overrides the contracted rate (a lot bought at its own rate).
+    """
     if end <= start:
         return _Accrual(1.0, 0, 0)
     days = business_days_between(start, end)
-    rate = float(term.contracted_rate)
+    rate = float(term.contracted_rate) if rate is None else rate
 
     if term.indexer == FixedIncomeIndexer.CDI:
         return _accrue_daily_index(days, curves.cdi_daily, {}, curves.annual_cdi_rate, rate)
@@ -192,9 +233,12 @@ def accrual_factor(
 
 
 def _projection_factor(
-    term: FixedIncomeTermEntity, business_days: int, curves: RateCurves
+    term: FixedIncomeTermEntity,
+    business_days: int,
+    curves: RateCurves,
+    rate: float | None = None,
 ) -> float:
-    rate = float(term.contracted_rate)
+    rate = float(term.contracted_rate) if rate is None else rate
     years = business_days / BUSINESS_DAYS_PER_YEAR
     if term.indexer == FixedIncomeIndexer.CDI:
         return (1.0 + _daily_fallback(curves.annual_cdi_rate) * rate) ** business_days
@@ -241,7 +285,8 @@ def _redeem(
     on = tx.trade_date
     gross_redeemed = float(tx.quantity * tx.unit_price)
     lot_values = [
-        lot.principal * accrual_factor(term, lot.start, on, curves).factor for lot in lots
+        lot.principal * accrual_factor(term, lot.start, on, curves, rate=lot.rate).factor
+        for lot in lots
     ]
     position_value = sum(lot_values)
     if gross_redeemed > position_value * (1.0 + tolerance) + 0.01:
@@ -268,7 +313,7 @@ def _redeem(
         remaining -= take
         leftover = lot.principal - consumed_principal
         if leftover > 0.005:
-            kept.append(FixedIncomeLot(lot.start, leftover))
+            kept.append(FixedIncomeLot(lot.start, leftover, lot.rate))
     return kept, realized
 
 
@@ -295,8 +340,9 @@ def replay_lots(
         if tx.kind == TransactionKind.BUY:
             lots.append(
                 FixedIncomeLot(
-                    max(tx.trade_date, term.issue_date),
+                    tx.trade_date,
                     float(tx.quantity * tx.unit_price + tx.fees),
+                    implied_purchase_rate(term, tx.trade_date, float(tx.unit_price)),
                 )
             )
         else:
@@ -312,9 +358,15 @@ def valuation_end(term: FixedIncomeTermEntity, as_of_date: date) -> date:
     return as_of_date
 
 
-def projection_factor(term: FixedIncomeTermEntity, business_days: int, curves: RateCurves) -> float:
+def projection_factor(
+    term: FixedIncomeTermEntity,
+    business_days: int,
+    curves: RateCurves,
+    *,
+    rate: float | None = None,
+) -> float:
     """Forward gross factor over `business_days` using the annual rates of `curves`."""
-    return _projection_factor(term, business_days, curves)
+    return _projection_factor(term, business_days, curves, rate)
 
 
 def value_fixed_income_position(
@@ -357,13 +409,12 @@ def value_fixed_income_position(
     if horizon_end <= effective_end:
         horizon_bd = 0
     horizon_cal_days = max(0, (horizon_end - effective_end).days)
-    horizon_factor = _projection_factor(term, horizon_bd, rates)
 
     invested_principal = gross_value = total_iof = total_ir = weighted_ir = 0.0
     net_at_horizon = 0.0
     covered_days = business_days = 0
     for lot in lots:
-        accrual = accrual_factor(term, lot.start, effective_end, rates)
+        accrual = accrual_factor(term, lot.start, effective_end, rates, rate=lot.rate)
         lot_gross = lot.principal * accrual.factor
         cal_days = max(0, (effective_end - lot.start).days)
         iof, ir = _taxes(lot_gross - lot.principal, cal_days, term.tax_exempt, effective_end, rules)
@@ -378,7 +429,7 @@ def value_fixed_income_position(
         covered_days += accrual.covered_days
         business_days += accrual.business_days
 
-        lot_gross_h = lot_gross * horizon_factor
+        lot_gross_h = lot_gross * _projection_factor(term, horizon_bd, rates, lot.rate)
         iof_h, ir_h = _taxes(
             lot_gross_h - lot.principal,
             cal_days + horizon_cal_days,

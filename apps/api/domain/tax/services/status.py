@@ -121,7 +121,7 @@ def lot_tax_status(
 ) -> LotTaxStatus:
     """Taxes of `lot` redeemed on `as_of_date` (capped at maturity) and at its next bracket."""
     end = valuation_end(term, as_of_date)
-    gross = lot.principal * accrual_factor(term, lot.start, end, curves).factor
+    gross = lot.principal * accrual_factor(term, lot.start, end, curves, rate=lot.rate).factor
     days = max(0, (end - lot.start).days)
     exempt = term.tax_exempt
     iof, ir = redemption_taxes(gross - lot.principal, days, tax_exempt=exempt, on=end, rules=rules)
@@ -151,7 +151,9 @@ def lot_tax_status(
     if term.maturity_date is not None and next_date > term.maturity_date:
         return base
 
-    gross_next = gross * projection_factor(term, count_business_days(end, next_date), curves)
+    gross_next = gross * projection_factor(
+        term, count_business_days(end, next_date), curves, rate=lot.rate
+    )
     yield_next = gross_next - lot.principal
     iof_next, ir_next = redemption_taxes(
         yield_next, upcoming.from_days, tax_exempt=exempt, on=next_date, rules=rules

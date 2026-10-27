@@ -20,7 +20,7 @@ import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Hint } from "../../components/Hint";
 import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points, today } from "../../utils/format";
+import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points } from "../../utils/format";
 import {
   ARCA_LABELS,
   ASSET_TYPE_LABELS,
@@ -577,11 +577,11 @@ function TreasuryScreener() {
           instrument_kind: bond.instrument_kind,
           indexer: bond.indexer,
           contracted_rate: percentToContractedRate(bond.contracted_rate_percent),
-          issue_date: today(),
           maturity_date: bond.maturity_date,
           tax_exempt: false,
           liquidity: bond.liquidity,
           issuer: "Tesouro Nacional",
+          semiannual_coupons: bond.coupon_type === "semestral",
         },
       });
       setNotice(`${created.name} (${created.ticker}) cadastrado com sucesso.`);
