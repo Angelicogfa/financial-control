@@ -220,6 +220,7 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "ensure_series_coverage",
         "sync_bcb_and_benchmarks",
         "record_daily_snapshot",
+        "backfill_snapshots",
         "refresh_fundamentals",
         "record_checklist_evaluations",
         "sync_instrument_catalog",
@@ -227,6 +228,7 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
     }
     assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"
+    assert str(jobs["backfill_snapshots"].trigger) == "interval[0:07:00]"
     snapshot_trigger = str(jobs["record_daily_snapshot"].trigger)
     assert "hour='20'" in snapshot_trigger and "minute='5'" in snapshot_trigger
     assert "day_of_week='mon-fri'" in snapshot_trigger

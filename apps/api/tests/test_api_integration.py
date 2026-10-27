@@ -70,14 +70,11 @@ def _build_test_gateway() -> CachedMarketGateway:
                         "defaultKeyStatistics": {
                             "priceToBook": {"raw": 7.5},
                             "bookValue": {"raw": 7.2},
+                            "dividendYield": {"raw": 0.025},
                         },
                         "financialData": {
                             "returnOnEquity": {"raw": 0.28},
                             "profitMargins": {"raw": 0.18},
-                        },
-                        "summaryDetail": {
-                            "dividendYield": {"raw": 0.025},
-                            "trailingAnnualDividendRate": {"raw": 1.35},
                         },
                     }
                 ]

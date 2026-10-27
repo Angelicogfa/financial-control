@@ -17,6 +17,7 @@ from domain.ledger.services.ledger import (
     require_fx_rate,
 )
 from domain.ledger.services.use_cases.common import require_asset
+from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.shared.entities import (
     EarningEntity,
 )
@@ -74,6 +75,7 @@ class EarningHandler:
                 account_id=resolve_account_id(uow, req.account_id),
             )
             saved = uow.earnings.add(entity)
+            invalidate_snapshots_from(uow, saved.payment_date)
             uow.commit()
             return to_earning_dto(saved, ticker=asset.ticker)
 
@@ -106,12 +108,14 @@ class EarningHandler:
                 created_at=current.created_at,
             )
             saved = uow.earnings.update(edited)
+            invalidate_snapshots_from(uow, current.payment_date, saved.payment_date)
             uow.commit()
             return to_earning_dto(saved, ticker=asset.ticker)
 
     def delete(self, earning_id: int) -> None:
         with self.uow_factory() as uow:
-            deleted = uow.earnings.delete(earning_id)
-            if not deleted:
+            current = uow.earnings.get_by_id(earning_id)
+            if current is None or not uow.earnings.delete(earning_id):
                 raise NotFoundError(f"Earning id={earning_id} not found")
+            invalidate_snapshots_from(uow, current.payment_date)
             uow.commit()

@@ -21,6 +21,7 @@ from domain.ledger.services.ledger import (
 from domain.ledger.services.use_cases.common import require_asset, require_transaction
 from domain.portfolio.services.fixed_income import RateCurves
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.shared.entities import (
     AssetEntity,
     TransactionEntity,
@@ -97,6 +98,7 @@ class TransactionHandler:
             validate_ledger(asset, entries, curves=self._curves(uow, asset, entries))
 
             saved = uow.transactions.add(candidate)
+            invalidate_snapshots_from(uow, saved.trade_date)
             uow.commit()
             return to_transaction_dto(saved, ticker=asset.ticker)
 
@@ -120,6 +122,7 @@ class TransactionHandler:
             validate_ledger_change(asset, entries, curves=self._curves(uow, asset, entries))
 
             saved = uow.transactions.update(edited)
+            invalidate_snapshots_from(uow, current.trade_date, saved.trade_date)
             uow.commit()
             return to_transaction_dto(saved, ticker=asset.ticker)
 
@@ -131,4 +134,5 @@ class TransactionHandler:
             validate_ledger_change(asset, entries, curves=self._curves(uow, asset, entries))
 
             uow.transactions.delete(tx_id)
+            invalidate_snapshots_from(uow, current.trade_date)
             uow.commit()

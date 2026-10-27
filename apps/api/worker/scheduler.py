@@ -16,6 +16,7 @@ from infra.providers.factory import build_market_gateway
 from infra.providers.gateway import CachedMarketGateway
 from worker.jobs import (
     UoWFactory,
+    backfill_and_record_snapshot_job,
     backfill_snapshots_job,
     ensure_series_coverage_job,
     record_checklist_evaluations_job,
@@ -99,8 +100,17 @@ def create_scheduler(
         replace_existing=True,
         **defaults,
     )
+    # Ledger changes delete the snapshots from their date on; refill them between runs.
     scheduler.add_job(
-        guard("record_daily_snapshot", record_daily_snapshot_job),
+        guard("backfill_snapshots", backfill_snapshots_job),
+        trigger="interval",
+        minutes=cfg.quote_refresh_minutes,
+        id="backfill_snapshots",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("record_daily_snapshot", backfill_and_record_snapshot_job),
         trigger="cron",
         day_of_week="mon-fri",
         hour=cfg.snapshot_cron_hour,

@@ -295,7 +295,8 @@ class BrapiProvider:
         """Fetch fundamental indicators for B3 stocks/FIIs from brapi.dev."""
         clean = symbol.strip().upper().removesuffix(".SA")
         url = f"{self.base_url}/quote/{clean}"
-        modules = "defaultKeyStatistics,financialData,summaryDetail,summaryProfile"
+        # brapi dropped the Yahoo `summaryDetail` module; requesting it fails the whole call.
+        modules = "defaultKeyStatistics,financialData,summaryProfile"
         params = {
             "fundamental": "true",
             "modules": modules,
@@ -320,21 +321,19 @@ class BrapiProvider:
         item = results[0]
         stats = item.get("defaultKeyStatistics") or {}
         fin = item.get("financialData") or {}
-        summary = item.get("summaryDetail") or {}
         profile = item.get("summaryProfile") or {}
 
-        pe = _float_or_none(item.get("priceEarnings")) or _float_or_none(summary.get("trailingPE"))
+        pe = _float_or_none(item.get("priceEarnings")) or _float_or_none(stats.get("trailingPE"))
         pb = _float_or_none(stats.get("priceToBook"))
         eps = _float_or_none(item.get("earningsPerShare")) or _float_or_none(
             stats.get("trailingEps")
         )
         bvps = _float_or_none(stats.get("bookValue"))
-        dy = _float_or_none(summary.get("dividendYield")) or _float_or_none(
-            stats.get("dividendYield")
-        )
-        dps = _float_or_none(summary.get("trailingAnnualDividendRate"))
-        debt_to_eq_pct = _float_or_none(fin.get("debtToEquity"))
+        dy = _float_or_none(stats.get("dividendYield")) or _float_or_none(stats.get("yield"))
         price = _float_or_none(item.get("regularMarketPrice"))
+        # No trailing dividend rate without `summaryDetail`: derive it from the yield.
+        dps = dy * price if dy is not None and price is not None and price > 0 else None
+        debt_to_eq_pct = _float_or_none(fin.get("debtToEquity"))
         volume_shares = _float_or_none(item.get("averageDailyVolume10Day")) or _float_or_none(
             item.get("regularMarketVolume")
         )
