@@ -68,6 +68,8 @@ from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import ScreenerResponseDTO, WatchlistItemDTO
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
+from controllers.tax.requests import FixedIncomeCompareRequest
+from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from core.errors import ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.accounts.services.use_cases import AccountHandler
@@ -86,6 +88,7 @@ from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
+from domain.tax.services.use_cases import TaxHandler
 
 OperationKind = Literal["query", "command"]
 
@@ -102,6 +105,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "accounts": "Contas & Custódia",
     "alerts": "Alertas",
     "market": "Dados de Mercado",
+    "tools": "Ferramentas · Tributação",
 }
 
 
@@ -133,6 +137,11 @@ class AssetListInput(BaseModel):
 
 class AssetIdInput(BaseModel):
     asset_id: int
+
+
+class AssetTaxStatusInput(BaseModel):
+    asset_id: int
+    as_of_date: date | None = None
 
 
 class AssetUpdateToolInput(BaseModel):
@@ -357,6 +366,10 @@ class AgenticRuntimeHandlers:
         )
 
     @property
+    def tax(self) -> TaxHandler:
+        return TaxHandler(uow_factory=self.uow_factory, portfolio_service=self.portfolio_service)
+
+    @property
     def research(self) -> ResearchHandler:
         return ResearchHandler(
             uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
@@ -451,6 +464,19 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AssetIdInput,
         output_type=AssetAnalysisResponseDTO,
         invoke=lambda h, p: h.assets.get_analysis(p.asset_id),
+    ),
+    OperationSpec(
+        name="assets.tax_status",
+        kind="query",
+        description=(
+            "Situação tributária de um ativo: para renda fixa, por lote, a alíquota de IR "
+            "atual, o IOF ainda devido, a data e os dias até a próxima faixa regressiva e o "
+            "IR estimado resgatando hoje × na próxima faixa (ganho de esperar); para renda "
+            "variável, o regime informativo do tipo de ativo (ações, FII, JCP, exterior)."
+        ),
+        input_model=AssetTaxStatusInput,
+        output_type=AssetTaxStatusDTO,
+        invoke=lambda h, p: h.tax.asset_tax_status(p.asset_id, as_of_date=p.as_of_date),
     ),
     OperationSpec(
         name="assets.create",
@@ -914,6 +940,33 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=OperationStatusDTO,
         invoke=lambda h, _p: (h.market.resolve_all_worker_errors(), OperationStatusDTO())[1],
+    ),
+    # 13. Tools
+    OperationSpec(
+        name="tools.fixed_income_compare",
+        kind="query",
+        description=(
+            "Compara dois ou mais títulos de renda fixa tributados e isentos (% do CDI, "
+            "CDI + spread, IPCA+ ou prefixado), informados à mão ou pelo asset_id da "
+            "carteira: valor e taxa líquidos no vencimento e na janela comum, IR sobre o "
+            "ganho acumulado, taxas equivalentes por faixa e ponto de empate em dias, nos "
+            "cenários das premissas da política. `rate`: multiplicador para CDI_PERCENT "
+            "(1.10 = 110%) e fração anual para os demais (0.065 = 6,5% a.a.)."
+        ),
+        input_model=FixedIncomeCompareRequest,
+        output_type=FixedIncomeComparisonDTO,
+        invoke=lambda h, p: h.tax.compare_fixed_income(p),
+    ),
+    OperationSpec(
+        name="tools.tax_rules",
+        kind="query",
+        description=(
+            "Tabela de alíquotas de IR e IOF com vigência (renda fixa regressiva, isentos, "
+            "ações, ETFs/BDRs, FIIs, dividendos, JCP, exterior e cripto) e base legal."
+        ),
+        input_model=EmptyInput,
+        output_type=list[TaxRuleDTO],
+        invoke=lambda h, _p: h.tax.list_rules(),
     ),
 )
 

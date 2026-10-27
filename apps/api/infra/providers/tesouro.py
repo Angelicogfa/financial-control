@@ -247,9 +247,7 @@ def _parse_ckan_historical_csv(
 
         buy_rate = _parse_br_float(row.get(col_buy_rate) if col_buy_rate else None)
         sell_rate = _parse_br_float(row.get(col_sell_rate) if col_sell_rate else None)
-        buy_price = _parse_br_float(
-            row.get(col_buy_pu) if col_buy_pu else None, positive_only=True
-        )
+        buy_price = _parse_br_float(row.get(col_buy_pu) if col_buy_pu else None, positive_only=True)
         sell_price = _parse_br_float(
             row.get(col_sell_pu) if col_sell_pu else None, positive_only=True
         )
@@ -342,9 +340,7 @@ def _parse_direct_daily_csv(
         rate_val = _parse_rate_expression(row.get(col_rate) if col_rate else None)
         buy_rate = None if is_redeem_feed else rate_val
         sell_rate = rate_val if is_redeem_feed else None
-        buy_price = _parse_br_float(
-            row.get(col_buy_pu) if col_buy_pu else None, positive_only=True
-        )
+        buy_price = _parse_br_float(row.get(col_buy_pu) if col_buy_pu else None, positive_only=True)
         sell_price = _parse_br_float(
             row.get(col_sell_pu) if col_sell_pu else None, positive_only=True
         )
@@ -396,9 +392,7 @@ def merge_invest_and_redeem_bonds(
             by_symbol[redeem.symbol] = redeem
         else:
             sell_rate = redeem.sell_rate if redeem.sell_rate is not None else existing.sell_rate
-            sell_price = (
-                redeem.sell_price if redeem.sell_price is not None else existing.sell_price
-            )
+            sell_price = redeem.sell_price if redeem.sell_price is not None else existing.sell_price
             by_symbol[redeem.symbol] = replace(
                 existing,
                 sell_rate=sell_rate,

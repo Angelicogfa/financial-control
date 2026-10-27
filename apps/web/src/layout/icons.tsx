@@ -76,6 +76,13 @@ export const SlidersIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const ScaleIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3v18M7 21h10M5 7h14M12 5l-7 2M12 5l7 2" />
+    <path d="M2 14l3-7 3 7a3 3 0 0 1-6 0zM16 14l3-7 3 7a3 3 0 0 1-6 0z" />
+  </Icon>
+);
+
 export const BankIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 10 12 4l9 6" />

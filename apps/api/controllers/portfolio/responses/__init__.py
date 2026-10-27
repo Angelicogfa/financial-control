@@ -113,7 +113,7 @@ class PortfolioReportResponseDTO(BaseModel):
     positions: list[ValuedPositionDTO]
     earnings_by_month: dict[str, float]
     total_fx_pnl_brl: float = 0.0
-    projection_assumptions: dict[str, float] = Field(default_factory=dict)
+    projection_assumptions: dict[str, float | None] = Field(default_factory=dict)
     value_by_purpose_brl: dict[str, float] = Field(default_factory=dict)
 
 

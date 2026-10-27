@@ -101,6 +101,12 @@ Pesquisa B3, Estratégia, Contas e Alertas:
 - Contas de custódia e alertas: `accounts.list`, `accounts.create`, `accounts.update`, \
 `alerts.list`, `alerts.dismiss`, `alerts.restore`.
 
+Tributação:
+- `assets.tax_status` mostra a faixa de IR de cada lote de renda fixa, a data da próxima queda \
+e o IR estimado resgatando hoje × na próxima faixa; para renda variável, o regime do tipo.
+- `tools.fixed_income_compare` compara títulos tributados e isentos (valor e taxa líquidos, \
+taxas equivalentes por faixa, ponto de empate); `tools.tax_rules` lista as alíquotas com vigência.
+
 Repetição segura (Idempotência):
 - Ferramentas de comando aceitam `idempotency_key` opcional. Após um timeout de rede, repita \
 com a mesma `idempotency_key` e a mesma entrada para receber o resultado já gravado sem \

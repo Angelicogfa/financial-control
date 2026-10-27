@@ -9,6 +9,7 @@ import {
   HomeIcon,
   ListIcon,
   PlusCircleIcon,
+  ScaleIcon,
   SearchIcon,
   SlidersIcon,
   TrendIcon,
@@ -48,6 +49,10 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: "Ferramentas",
+    items: [{ to: "/tools/fixed-income", label: "Comparar renda fixa", icon: ScaleIcon }],
+  },
+  {
     label: "Configuração",
     items: [
       { to: "/settings/strategy", label: "Estratégia", icon: SlidersIcon },
@@ -73,6 +78,7 @@ const PAGE_TITLES: Array<{ test: (path: string) => boolean; title: string }> = [
   { test: (p) => p.startsWith("/contribute"), title: "Aportar" },
   { test: (p) => p === "/ledger/import", title: "Importar extrato B3" },
   { test: (p) => p.startsWith("/ledger"), title: "Lançamentos" },
+  { test: (p) => p.startsWith("/tools/fixed-income"), title: "Comparar renda fixa" },
   { test: (p) => p.startsWith("/settings/strategy"), title: "Estratégia" },
   { test: (p) => p.startsWith("/settings/accounts"), title: "Contas" },
   { test: (p) => p.startsWith("/settings/market-data"), title: "Dados de mercado" },

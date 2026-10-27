@@ -182,6 +182,24 @@ export interface AssetResponseDTO {
   updated_at?: string | null;
 }
 
+export interface AssetTaxStatusDTO {
+  asset_id: number | null;
+  ticker: string;
+  asset_type: AssetType;
+  as_of_date: string;
+  is_fixed_income: boolean;
+  tax_exempt: boolean;
+  regimes: TaxRegimeInfoDTO[];
+  lots: LotTaxStatusDTO[];
+  invested_principal: number;
+  gross_value: number;
+  iof_due: number;
+  income_tax_due: number;
+  net_value: number;
+  next_bracket_date?: string | null;
+  tax_saving_by_waiting: number;
+}
+
 export type AssetType = "STOCK_BR" | "ETF_BR" | "FII" | "BDR" | "STOCK_INTL" | "ETF_INTL" | "REIT" | "CRYPTO" | "FIXED_INCOME" | "TREASURY" | "CASH";
 
 export interface AssetUpdateRequest {
@@ -219,6 +237,15 @@ export interface BenchmarkComparisonDTO {
   beta?: number | null;
   alpha_annual?: number | null;
   correlation?: number | null;
+}
+
+export interface BreakEvenDTO {
+  scenario: string;
+  first: string;
+  second: string;
+  winner?: string | null;
+  break_even_days?: number | null;
+  always_ahead: boolean;
 }
 
 export interface CerradoEvaluationDTO {
@@ -397,6 +424,13 @@ export interface EligibilityPolicyDTO {
   min_coverage_pct?: number;
 }
 
+export interface EquivalentRateDTO {
+  up_to_days: number | null;
+  income_tax_rate: number;
+  exempt_equivalent_rate: number;
+  taxed_equivalent_rate: number;
+}
+
 export interface EvaluatedAnswerDTO {
   question_id: string;
   text: string;
@@ -418,11 +452,39 @@ export interface ExecutionDTO {
   fx_rate?: number | string;
 }
 
+export interface FixedIncomeCompareRequest {
+  offers: FixedIncomeOfferRequest[];
+  principal?: number;
+  start_date?: string | null;
+  scenarios?: RateScenarioRequest[] | null;
+}
+
+export interface FixedIncomeComparisonDTO {
+  as_of_date: string;
+  principal: number;
+  common_window_days: number;
+  offers: ResolvedOfferDTO[];
+  scenarios: RateScenarioDTO[];
+  projections: OfferProjectionDTO[];
+  break_evens: BreakEvenDTO[];
+  best_by_scenario: Record<string, string>;
+}
+
 export type FixedIncomeIndexer = "CDI" | "IPCA" | "PRE" | "SELIC";
 
 export type FixedIncomeInstrumentKind = "CDB" | "LCI" | "LCA" | "CRI" | "CRA" | "DEBENTURE" | "TESOURO_SELIC" | "TESOURO_IPCA" | "TESOURO_PRE" | "SAVINGS_BOX";
 
 export type FixedIncomeLiquidity = "DAILY" | "AT_MATURITY";
+
+export interface FixedIncomeOfferRequest {
+  label?: string | null;
+  asset_id?: number | null;
+  indexer?: OfferIndexer | null;
+  rate?: number | null;
+  term_days?: number | null;
+  tax_exempt?: boolean | null;
+  grace_days?: number | null;
+}
 
 export interface FixedIncomeTermPayload_Input {
   instrument_kind: FixedIncomeInstrumentKind;
@@ -561,6 +623,27 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface LotTaxStatusDTO {
+  start_date: string;
+  principal: number;
+  gross_value: number;
+  gross_yield: number;
+  holding_days: number;
+  income_tax_rate: number;
+  iof_rate: number;
+  iof_due: number;
+  iof_free_date?: string | null;
+  income_tax_due: number;
+  net_value: number;
+  next_bracket_date?: string | null;
+  days_to_next_bracket?: number | null;
+  next_income_tax_rate?: number | null;
+  projected_gross_at_next_bracket?: number | null;
+  tax_at_next_bracket?: number | null;
+  tax_saving_by_waiting?: number | null;
+  net_gain_by_waiting?: number | null;
+}
+
 export interface MethodResultDTO {
   method: string;
   label: string;
@@ -570,6 +653,33 @@ export interface MethodResultDTO {
   passes?: boolean | null;
   margin?: number | null;
   note?: string;
+}
+
+export type OfferIndexer = "CDI_PERCENT" | "CDI_SPREAD" | "IPCA_SPREAD" | "PRE";
+
+export interface OfferOutcomeDTO {
+  days: number;
+  redemption_date: string;
+  business_days: number;
+  redeemable: boolean;
+  gross_value: number;
+  gross_yield: number;
+  iof: number;
+  income_tax_rate: number;
+  income_tax: number;
+  net_value: number;
+  net_yield: number;
+  gross_annual_rate: number;
+  net_annual_rate: number;
+}
+
+export interface OfferProjectionDTO {
+  label: string;
+  scenario: string;
+  gross_annual_rate: number;
+  at_maturity: OfferOutcomeDTO;
+  at_common_window: OfferOutcomeDTO;
+  equivalent_rates: EquivalentRateDTO[];
 }
 
 export interface PageMetaDTO {
@@ -641,7 +751,7 @@ export interface PortfolioReportResponseDTO {
   positions: ValuedPositionDTO[];
   earnings_by_month: Record<string, number>;
   total_fx_pnl_brl?: number;
-  projection_assumptions?: Record<string, number>;
+  projection_assumptions?: Record<string, number | null>;
   value_by_purpose_brl?: Record<string, number>;
 }
 
@@ -651,9 +761,24 @@ export interface ProjectionAssumptionsDTO {
   real_estate_default_yield_rate?: number;
   cash_cdi_multiplier?: number;
   cash_income_tax_rate?: number;
+  projected_cdi_rate?: number | null;
+  projected_ipca_rate?: number | null;
+  scenario_rate_shift?: number;
 }
 
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
+
+export interface RateScenarioDTO {
+  name: string;
+  annual_cdi_rate: number;
+  annual_ipca_rate: number;
+}
+
+export interface RateScenarioRequest {
+  name: string;
+  annual_cdi_rate: number;
+  annual_ipca_rate: number;
+}
 
 export interface ReadinessCheckDTO {
   ok: boolean;
@@ -663,6 +788,16 @@ export interface ReadinessCheckDTO {
 export interface ReadinessDTO {
   status: string;
   checks: Record<string, ReadinessCheckDTO>;
+}
+
+export interface ResolvedOfferDTO {
+  label: string;
+  asset_id?: number | null;
+  indexer: OfferIndexer;
+  rate: number;
+  term_days: number;
+  tax_exempt: boolean;
+  grace_days: number;
 }
 
 export interface RiskReturnSummaryDTO {
@@ -746,6 +881,37 @@ export interface SnapshotPointDTO {
   consolidated_pnl: number;
   earnings_cum: number;
   net_flow: number;
+}
+
+export interface TaxBracketDTO {
+  up_to_days: number | null;
+  rate: number;
+}
+
+export type TaxKind = "INCOME_TAX" | "IOF";
+
+export type TaxRegime = "FIXED_INCOME_REGRESSIVE" | "FIXED_INCOME_EXEMPT" | "IOF_REGRESSIVE" | "STOCK_SWING_TRADE" | "ETF_BDR_SWING_TRADE" | "FII_CAPITAL_GAIN" | "FII_DISTRIBUTION" | "DIVIDEND_WITHHOLDING" | "JCP_WITHHOLDING" | "FOREIGN_ANNUAL" | "CRYPTO_CAPITAL_GAIN";
+
+export interface TaxRegimeInfoDTO {
+  regime: TaxRegime;
+  tax_kind: TaxKind;
+  current_rate: number;
+  brackets: TaxBracketDTO[];
+  valid_from: string;
+  valid_to?: string | null;
+  legal_basis: string;
+  description: string;
+}
+
+export interface TaxRuleDTO {
+  id?: number | null;
+  regime: TaxRegime;
+  tax_kind: TaxKind;
+  brackets: TaxBracketDTO[];
+  valid_from: string;
+  valid_to?: string | null;
+  legal_basis: string;
+  description: string;
 }
 
 export interface TransactionCreateRequest {

@@ -15,6 +15,7 @@ import type {
   AssetAnalysisResponseDTO,
   AssetCreateRequest,
   AssetResponseDTO,
+  AssetTaxStatusDTO,
   AssetType,
   AssetUpdateRequest,
   CerradoUpdateRequest,
@@ -26,6 +27,8 @@ import type {
   EarningCreateRequest,
   EarningResponseDTO,
   EarningUpdateRequest,
+  FixedIncomeCompareRequest,
+  FixedIncomeComparisonDTO,
   FixedIncomeIndexer,
   GrantOptionsDTO,
   ImportCommitDTO,
@@ -44,6 +47,7 @@ import type {
   ScreenerResponseDTO,
   SeriesStatusDTO,
   SnapshotPointDTO,
+  TaxRuleDTO,
   TransactionCreateRequest,
   TransactionResponseDTO,
   TransactionUpdateRequest,
@@ -133,6 +137,12 @@ export const api = {
       request<ArcaSuggestionDTO>("/assets/classification", {
         query: { ticker, asset_type: assetType },
       }),
+  },
+  tax: {
+    rules: () => request<TaxRuleDTO[]>("/tax/rules"),
+    assetStatus: (id: number) => request<AssetTaxStatusDTO>(`/tax/assets/${id}/status`),
+    compare: (body: FixedIncomeCompareRequest) =>
+      request<FixedIncomeComparisonDTO>("/tax/fixed-income/compare", { method: "POST", body }),
   },
   research: {
     screener: (filters: ScreenerFilters) =>

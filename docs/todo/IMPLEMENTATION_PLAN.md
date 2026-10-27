@@ -34,7 +34,7 @@
 | **Fase 19** | Notificações de Erros de Requisição do Worker (Badge no menu e Log detalhado em Dados de Mercado) | `[x]` Concluída | 100% |
 | **Fase 22** | Importação B3: Tesouro Direto, CDB e Fracionário com Dígito | `[x]` Implementado | 100% |
 | **Fase 23** | Importação B3: Ignorar Linhas e Vendas sem Saldo | `[x]` Implementado | 100% |
-| **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[ ]` Pendente | 0% |
+| **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[x]` Implementado | 100% |
 | **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[ ]` Pendente | 0% |
 | **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[ ]` Pendente | 0% |
 | **Fase 27** | Comparador de Ativos | `[ ]` Pendente | 0% |
@@ -563,16 +563,20 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 24 — Tributação Regressiva por Ativo e Comparador Tributado × Isento (`[ ]` Pendente)
+## Fase 24 — Tributação Regressiva por Ativo e Comparador Tributado × Isento (`[x]` Implementado)
 
-**Objetivo:** mostrar, para cada ativo e lote, o regime de IR aplicável, a faixa atual da tabela regressiva e quando ela cai; e comparar a rentabilidade teórica líquida de um título tributado com a de um isento. Regras vigentes em [MARKET_ANALYSIS.md §6.1](../research/MARKET_ANALYSIS.md) (MP 1.303/2025 caducou; tabela 22,5/20/17,5/15% e isenção de LCI/LCA mantidas).
+**Objetivo:** mostrar, por ativo e por aplicação, quanto imposto sai no resgate hoje e quanto se economiza esperando a próxima faixa, e comparar títulos tributados e isentos pelo valor líquido — com as alíquotas guardadas como dados com vigência, sem custo novo (só legislação pública). Regras verificadas em out/2026: a MP 1.303/2025 caducou em 08/10/2025 (sem alíquota única de 17,5%; LCI/LCA/CRI/CRA/debêntures incentivadas seguem isentas); JCP com 17,5% retidos desde 01/01/2026 pela LC 224/2025 (não pela Lei 15.270/2025, que trata dos dividendos acima de R$ 50 mil/mês).
 
-- `[ ]` **24.1** Tabela de alíquotas com vigência: regras de IR e IOF como dados com início/fim (renda fixa regressiva, isentos, ações, FII, JCP, exterior), lidas por `regressive_ir_rate`/`regressive_iof_rate`, para que uma mudança legal vire um novo registro. Migration Alembic sequencial.
-- `[ ]` **24.2** Situação tributária por lote (domínio puro): alíquota atual, data e dias até a próxima faixa, IOF ainda devido, IR estimado se resgatar hoje × na próxima faixa e ganho de esperar. Para renda variável, o regime informativo do tipo de ativo.
-- `[ ]` **24.3** Comparador tributado × isento (domínio puro): projeção do valor bruto no vencimento por indexador (% CDI, CDI + spread, IPCA+, prefixado) com as premissas de projeção da política e cenários; IR sobre o ganho acumulado; valor e taxa líquidos; taxa equivalente por faixa; ponto de empate em dias; janela comum quando prazos ou carências diferem.
-- `[ ]` **24.4** Casos de uso, rotas REST e operações MCP (`assets.tax_status`, `tools.fixed_income_compare`).
-- `[ ]` **24.5** Interface: bloco "Tributação" no detalhe do ativo (faixa, próxima queda, IR estimado); ferramenta "Comparar renda fixa" com dois ou mais títulos, informados à mão ou escolhidos da carteira.
-- `[ ]` **24.6** Testes de unidade (fronteiras 180/181, 360/361, 720/721 dias, IOF dia 29/30, isentos, cenários de indexador), integração da API e UI.
+- `[x]` **24.1** Tabela de alíquotas com vigência: `domain/tax` (`TaxRule`, `TaxBracket`, `TaxRuleBook` — sem sobreposição por regime; datas anteriores ao primeiro registro usam o primeiro) com regimes de renda fixa regressiva, isentos, IOF, ações, ETFs/BDRs, FII (ganho e rendimentos), dividendos, JCP, exterior e cripto; registro embutido `DEFAULT_TAX_RULES` e tabela `tax_rules` (migration `script_00019_tax_rules.py`, semeada com os mesmos registros) exposta como `uow.tax_rules`. `regressive_ir_rate`/`regressive_iof_rate` e o motor de renda fixa (`value_fixed_income_position`, `consolidate_portfolio`) leem a regra vigente na data do resgate/avaliação; o relatório da carteira usa os registros do banco. Resultados atuais inalterados (golden e caracterização passam).
+- `[x]` **24.2** Situação tributária por lote (`domain/tax/services/status.py`): `replay_lots` exposto pelo motor; por aplicação, alíquota atual, IOF devido e data em que zera, data e dias até a próxima faixa (descartada quando cai depois do vencimento), IR estimado hoje × na próxima faixa (projeção pelas taxas anuais), IR economizado e ganho líquido de esperar; para renda variável, os regimes informativos do tipo com alíquota vigente e base legal.
+- `[x]` **24.3** Comparador (`domain/tax/services/comparator.py`): indexadores `CDI_PERCENT`, `CDI_SPREAD`, `IPCA_SPREAD` e `PRE`; cenários `LOW`/`BASE`/`HIGH` das premissas da política (`ProjectionAssumptions.projected_cdi_rate`, `projected_ipca_rate`, `scenario_rate_shift`; vazio usa o CDI/IPCA de mercado) ou informados; IR/IOF sobre o ganho acumulado; valor e taxa líquidos anualizados em 252 dias úteis no vencimento e na janela comum (menor prazo, resgate bloqueado por carência sinalizado); taxa equivalente por faixa; ponto de empate em dias (a partir de quando o vencedor fica à frente até o fim da janela).
+- `[x]` **24.4** `TaxHandler` (`domain/tax/services/use_cases.py`) e rotas `GET /api/v1/tax/rules`, `GET /api/v1/tax/assets/{asset_id}/status` e `POST /api/v1/tax/fixed-income/compare` (ofertas à mão ou por `asset_id`, completadas pelo cadastro); operações MCP `assets.tax_status`, `tools.fixed_income_compare` e `tools.tax_rules` (contexto `tools`) e instruções do servidor MCP.
+- `[x]` **24.5** Interface web: aba **Tributação** no detalhe do ativo (`TaxTab.tsx`: faixa, próxima queda, IR estimado por aplicação, tabela regressiva ou regimes da renda variável) com atalho para o comparador; página **Comparar renda fixa** (`/tools/fixed-income`, seção "Ferramentas" do menu) com títulos à mão ou da carteira, cenários, janela comum, taxas equivalentes e empate; premissas do comparador na tela Estratégia; tipos regenerados (`scripts/gen_web_types.py`).
+- `[x]` **24.6** Testes: `test_tax_rules.py` (fronteiras 180/181, 360/361, 720/721; IOF 29/30; isentos; vigência do JCP e dos dividendos; mudança legal como novo registro), `test_tax_status.py`, `test_fixed_income_comparator.py` (fórmulas por indexador, IR sobre o ganho acumulado, equivalências, janela/carência, empate em 721 dias, cenários), `test_tax_api.py` (migration e semente, rotas, novo registro mudando a avaliação, MCP) e `tax.test.tsx` (aba e comparador).
+
+**Validação (2026-10-27):** `scripts/check.sh` → ruff e formatação limpos; suíte de backend com cobertura de 97,0%; 71 testes do frontend, lint, typecheck e build Vite; `docker compose build` das imagens `migrate`, `api`, `worker` e `web`.
+
+---
 
 ## Fase 25 — Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas (`[ ]` Pendente)
 
