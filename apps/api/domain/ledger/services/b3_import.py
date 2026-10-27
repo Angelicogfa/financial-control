@@ -10,6 +10,10 @@ Movements map to:
 - Desdobro / Bonificação em Ativos -> SPLIT / BONUS (shares credited are added to the
   quantity held the day before); Grupamento -> REVERSE_SPLIT (the line shows the new total);
 - Transferência - Liquidação -> ignored, the trade itself comes from the Negociação file;
+- Tesouro Direto Compra/Venda and bank securities (CDB, LCI, LCA, CRI, CRA) Aplicação/Resgate
+  -> trades, since they never reach the Negociação file. B3 gives them no ticker:
+  `resolve_fixed_income` points them at the registered Treasury bond, or at the one asset
+  of that kind and issuer (all applications of one bank share an asset);
 - anything else -> ignored with the reason.
 """
 
@@ -25,15 +29,19 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 
+from domain.shared.entities import AssetEntity
 from domain.shared.enums import (
     AssetType,
     CorporateEventKind,
     EarningKind,
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
     TransactionKind,
 )
 
 JCP_WITHHOLDING = Decimal("0.15")
-FRACTIONAL_SUFFIX = re.compile(r"^([A-Z]{4}\d{1,2})F$")
+# The issuer code may carry digits (B3SA3F), so only the trailing class number is fixed.
+FRACTIONAL_SUFFIX = re.compile(r"^([A-Z0-9]{4}\d{1,2})F$")
 TICKER = re.compile(r"^([A-Z0-9]{4,6}\d{0,2})\b")
 
 
@@ -58,6 +66,26 @@ class LineStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class FixedIncomeRef:
+    """A Treasury bond or bank-issued security named by a movement line.
+
+    B3 has no ticker for them, so `key` groups the lines meant for one asset: one per
+    Treasury bond, and one per instrument kind and issuer for bank securities (every
+    application gets its own B3 code, kept in `code`).
+    """
+
+    key: str
+    name: str
+    asset_type: AssetType
+    instrument_kind: FixedIncomeInstrumentKind
+    indexer: FixedIncomeIndexer
+    issuer: str
+    maturity_year: int | None = None
+    semiannual: bool = False
+    code: str | None = None
+
+
+@dataclass(frozen=True)
 class ImportLine:
     line_no: int
     source: StatementKind
@@ -74,6 +102,7 @@ class ImportLine:
     withholding_tax: Decimal | None = None
     event_kind: CorporateEventKind | None = None
     institution: str | None = None
+    fixed_income: FixedIncomeRef | None = None
     hash: str = ""
     status: LineStatus = LineStatus.NEW
     note: str = ""
@@ -233,6 +262,103 @@ EVENTS = {
 }
 
 
+TREASURY_PRODUCT = re.compile(r"^(tesouro .+?) (\d{4})$")
+BANK_PRODUCT = re.compile(r"^(CDB|LCI|LCA|CRI|CRA)\s*-\s*([A-Z0-9]+)(?:\s*-\s*(.+))?$")
+TREASURY_ISSUER = "Tesouro Nacional"
+TREASURY_KINDS = (
+    ("selic", FixedIncomeInstrumentKind.TESOURO_SELIC, FixedIncomeIndexer.SELIC),
+    ("prefixado", FixedIncomeInstrumentKind.TESOURO_PRE, FixedIncomeIndexer.PRE),
+    ("ipca", FixedIncomeInstrumentKind.TESOURO_IPCA, FixedIncomeIndexer.IPCA),
+    ("renda+", FixedIncomeInstrumentKind.TESOURO_IPCA, FixedIncomeIndexer.IPCA),
+    ("educa+", FixedIncomeInstrumentKind.TESOURO_IPCA, FixedIncomeIndexer.IPCA),
+)
+# Movement -> trade side, per family. Tesouro Direto shows Compra/Venda; bank securities
+# show Aplicação and Resgate (early or at maturity).
+FIXED_INCOME_TRADES = {
+    AssetType.TREASURY: {
+        "compra": TransactionKind.BUY,
+        "venda": TransactionKind.SELL,
+        "vencimento": TransactionKind.SELL,
+    },
+    AssetType.FIXED_INCOME: {
+        "aplicacao": TransactionKind.BUY,
+        "resgate antecipado": TransactionKind.SELL,
+        "resgate": TransactionKind.SELL,
+        "vencimento": TransactionKind.SELL,
+    },
+}
+FIXED_INCOME_COUPONS = {"juros", "rendimento", "amortizacao"}
+
+
+def _code_slug(text: str, limit: int) -> str:
+    return re.sub(r"[^A-Z0-9]", "", _norm(text).upper())[:limit] or "X"
+
+
+def _fixed_income_ref(product: object, institution: object) -> FixedIncomeRef | None:
+    """The Treasury bond or bank security a movement names, or None for exchange codes."""
+    raw = " ".join(str(product or "").split())
+    treasury = TREASURY_PRODUCT.match(_norm(raw))
+    if treasury:
+        title, year = treasury.groups()
+        kind, indexer = next(
+            ((k, i) for word, k, i in TREASURY_KINDS if word in title),
+            (None, None),
+        )
+        if kind is None or indexer is None:
+            return None
+        semiannual = "juros semestrais" in title
+        key = f"{kind.value}{'-JS' if semiannual else ''}-{year}"
+        return FixedIncomeRef(
+            key=key,
+            name=raw,
+            asset_type=AssetType.TREASURY,
+            instrument_kind=kind,
+            indexer=indexer,
+            issuer=TREASURY_ISSUER,
+            maturity_year=int(year),
+            semiannual=semiannual,
+        )
+    bank = BANK_PRODUCT.match(raw.upper())
+    if bank:
+        kind_name, code, product_issuer = bank.groups()
+        issuer = " ".join(str(product_issuer or institution or "").split()) or kind_name
+        return FixedIncomeRef(
+            key=f"{kind_name}-{_code_slug(issuer, 12)}",
+            name=f"{kind_name} {issuer}",
+            asset_type=AssetType.FIXED_INCOME,
+            instrument_kind=FixedIncomeInstrumentKind(kind_name),
+            indexer=FixedIncomeIndexer.CDI,
+            issuer=issuer,
+            code=code,
+        )
+    return None
+
+
+def _fixed_income_line(base: ImportLine, movement: str, ref: FixedIncomeRef) -> ImportLine:
+    # Before matching an asset, the line is keyed by the bond, or by the B3 code of the
+    # bank security, so its hash never depends on how the user registered the asset.
+    base = replace(base, ticker=ref.code or ref.key, fixed_income=ref)
+    if base.when is None:
+        return replace(base, note="Sem data")
+    side = FIXED_INCOME_TRADES[ref.asset_type].get(movement)
+    if side is not None:
+        if not base.quantity or base.quantity <= 0 or not base.unit_price:
+            return replace(base, status=LineStatus.INVALID, note="Linha sem quantidade ou preço")
+        return replace(base, action=LineAction.TRADE, status=LineStatus.NEW, trade_kind=side)
+    if ref.asset_type == AssetType.TREASURY and movement in FIXED_INCOME_COUPONS:
+        if not base.amount or base.amount <= 0:
+            return replace(base, status=LineStatus.INVALID, note="Provento sem valor")
+        return replace(
+            base,
+            action=LineAction.EARNING,
+            status=LineStatus.NEW,
+            earning_kind=EarningKind.FIXED_INCOME_COUPON,
+            gross_amount=base.amount,
+            withholding_tax=Decimal("0"),
+        )
+    return replace(base, note="Movimentação não suportada")
+
+
 def _movement_line(n: int, row: Mapping[str, object]) -> ImportLine:
     movement = _norm(_cell(row, "movimentacao"))
     when = _date(_cell(row, "data"))
@@ -253,6 +379,9 @@ def _movement_line(n: int, row: Mapping[str, object]) -> ImportLine:
         institution=str(_cell(row, "instituicao") or "") or None,
         status=LineStatus.IGNORED,
     )
+    ref = _fixed_income_ref(_cell(row, "produto"), base.institution)
+    if ref is not None:
+        return _fixed_income_line(base, movement, ref)
     if when is None or not ticker:
         return replace(base, note="Sem data ou ativo")
     if movement in EARNINGS:
@@ -294,6 +423,93 @@ def parse_statement(rows: list[Mapping[str, object]]) -> ImportPreview:
         if any(v not in (None, "") for v in row.values())
     ]
     return ImportPreview(kind, _with_hashes(lines))
+
+
+SKIPPED_NOTE = "Ignorada por você"
+
+
+def mark_skipped(preview: ImportPreview, line_nos: Iterable[int]) -> ImportPreview:
+    """Leave out the lines the user chose not to import; already imported ones stay as they are."""
+    skipped = set(line_nos)
+    if not skipped:
+        return preview
+    return ImportPreview(
+        preview.kind,
+        [
+            replace(line, status=LineStatus.IGNORED, note=SKIPPED_NOTE)
+            if line.line_no in skipped and line.status != LineStatus.DUPLICATE
+            else line
+            for line in preview.lines
+        ],
+    )
+
+
+def _issuer_slug(text: str | None) -> str:
+    # "ITAU UNIBANCO S.A." and "Itaú Unibanco" name the same issuer.
+    return re.sub(r"[^a-z0-9]", "", _norm(text)).removesuffix("sa")
+
+
+def _matches_fixed_income(ref: FixedIncomeRef, asset: AssetEntity) -> bool:
+    term = asset.fixed_income_term
+    if asset.asset_type != ref.asset_type:
+        return False
+    if ref.asset_type == AssetType.TREASURY:
+        if _norm(asset.name) == _norm(ref.name):
+            return True
+        return (
+            term is not None
+            and term.instrument_kind == ref.instrument_kind
+            and term.maturity_date is not None
+            and term.maturity_date.year == ref.maturity_year
+            and ("juros semestrais" in _norm(asset.name)) == ref.semiannual
+        )
+    if term is None or term.instrument_kind != ref.instrument_kind:
+        return False
+    wanted, held = _issuer_slug(ref.issuer), _issuer_slug(term.issuer)
+    return bool(wanted and held) and (wanted.startswith(held) or held.startswith(wanted))
+
+
+def resolve_fixed_income(
+    preview: ImportPreview,
+    assets: Iterable[AssetEntity],
+    *,
+    chosen: Mapping[str, str] | None = None,
+) -> ImportPreview:
+    """Point each Treasury/bank line at its registered asset.
+
+    An asset whose ticker is the B3 code of the security wins; otherwise the Treasury bond
+    (same name, or kind and maturity year) or the asset of the same kind and issuer. Lines
+    with no asset take the group key, which `classify` reports as an unknown asset;
+    `chosen` maps a group key to the asset just registered for it.
+    """
+    candidates = [a for a in assets if a.asset_type in FIXED_INCOME_TRADES]
+    by_ticker = {a.ticker: a for a in candidates}
+    resolved = []
+    for line in preview.lines:
+        ref = line.fixed_income
+        if ref is None:
+            resolved.append(line)
+            continue
+        if chosen and ref.key in chosen:
+            resolved.append(replace(line, ticker=chosen[ref.key]))
+            continue
+        if ref.code and ref.code in by_ticker:
+            resolved.append(replace(line, ticker=ref.code))
+            continue
+        matches = sorted(a.ticker for a in candidates if _matches_fixed_income(ref, a))
+        if len(matches) == 1:
+            resolved.append(replace(line, ticker=matches[0]))
+        elif matches and line.status == LineStatus.NEW:
+            resolved.append(
+                replace(
+                    line,
+                    status=LineStatus.INVALID,
+                    note=f"Mais de um ativo combina: {', '.join(matches)}",
+                )
+            )
+        else:
+            resolved.append(replace(line, ticker=ref.key))
+    return ImportPreview(preview.kind, resolved)
 
 
 def event_factor(

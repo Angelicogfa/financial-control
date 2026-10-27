@@ -15,12 +15,17 @@ from domain.ledger.services.b3_import import (
     detect_kind,
     event_factor,
     guess_asset_type,
+    mark_skipped,
     parse_statement,
+    resolve_fixed_income,
 )
+from domain.shared.entities import AssetEntity, FixedIncomeTermEntity
 from domain.shared.enums import (
     AssetType,
     CorporateEventKind,
     EarningKind,
+    FixedIncomeIndexer,
+    FixedIncomeInstrumentKind,
     TransactionKind,
 )
 
@@ -133,7 +138,10 @@ def test_movement_lines_map_to_earnings_events_and_ignored() -> None:
     assert lines[6].action == LineAction.IGNORED
     assert "Negociação" in lines[6].note
     assert lines[7].note == "Movimentação não suportada"
-    assert lines[8].note == "Sem data ou ativo"
+    assert (lines[8].earning_kind, lines[8].ticker) == (
+        EarningKind.FIXED_INCOME_COUPON,
+        "TESOURO_SELIC-2029",
+    )
     assert [line.status for line in lines[9:]] == [LineStatus.INVALID, LineStatus.INVALID]
 
 
@@ -172,6 +180,20 @@ def test_classify_marks_duplicates_unknown_and_events_without_position() -> None
     assert [line.ticker for line in classified.new_lines] == ["ITSA4"]
 
 
+def test_mark_skipped_ignores_chosen_lines_but_keeps_duplicates() -> None:
+    preview = parse_statement(TRADES)
+    classified = classify(preview, known_tickers={"ITSA4"}, existing_hashes={preview.lines[0].hash})
+    skipped = mark_skipped(classified, [2, 3, 99])
+
+    assert [(line.line_no, line.status) for line in skipped.lines[:3]] == [
+        (2, LineStatus.DUPLICATE),
+        (3, LineStatus.IGNORED),
+        (4, LineStatus.NEW),
+    ]
+    assert skipped.lines[1].note == "Ignorada por você"
+    assert mark_skipped(classified, []) is classified
+
+
 def test_event_factor_and_type_guess() -> None:
     assert event_factor(CorporateEventKind.SPLIT, Decimal("20"), Decimal("20")) == Decimal("2")
     assert event_factor(CorporateEventKind.BONUS, Decimal("10"), Decimal("100")) == Decimal("1.1")
@@ -184,3 +206,209 @@ def test_event_factor_and_type_guess() -> None:
     assert guess_asset_type("AAPL34") == AssetType.BDR
     assert guess_asset_type("TESOURO") is None
     assert guess_asset_type("ITSA1") is None
+
+
+def test_fractional_suffix_is_dropped_from_issuer_codes_with_digits() -> None:
+    rows = [{**TRADES[0], "Código de Negociação": code} for code in ("B3SA3F", "BBAS3F", "B3SA3")]
+    assert [line.ticker for line in parse_statement(rows).lines] == ["B3SA3", "BBAS3", "B3SA3"]
+
+
+ITAU = "ITAU UNIBANCO S.A."
+
+
+def _fixed_income(
+    kind: str,
+    product: str,
+    qty: object,
+    price: object,
+    value: object,
+    when: str = "17/03/2026",
+    institution: str = "NU INVESTIMENTOS S.A. - CTVM",
+) -> dict[str, object]:
+    return {
+        **_movement(kind, product, qty, value, when),
+        "Instituição": institution,
+        "Preço unitário": price,
+    }
+
+
+def test_treasury_movements_become_trades_and_coupons_keyed_by_bond() -> None:
+    lines = parse_statement(
+        [
+            _fixed_income("Compra", "Tesouro IPCA+ 2032", 0.67, 2944.7, 1972.95),
+            _fixed_income(
+                "Compra", "Tesouro IPCA+ com Juros Semestrais 2037", 0.01, 4351.27, 43.51
+            ),
+            _fixed_income("Venda", "Tesouro Prefixado 2028", 0.13, 780.25, 101.43),
+            _fixed_income("Juros", "Tesouro IPCA+ com Juros Semestrais 2037", 1, "-", "12,30"),
+            _fixed_income("Compra", "Tesouro Selic 2029", "-", "-", "-"),
+            _fixed_income("Atualização", "Tesouro Selic 2029", 1, "-", "-"),
+        ]
+    ).lines
+    buy, semiannual, sell, coupon, broken, other = lines
+    assert (buy.action, buy.trade_kind, buy.ticker) == (
+        LineAction.TRADE,
+        TransactionKind.BUY,
+        "TESOURO_IPCA-2032",
+    )
+    assert (buy.quantity, buy.unit_price) == (Decimal("0.67"), Decimal("2944.7"))
+    ref = buy.fixed_income
+    assert ref is not None
+    assert (ref.asset_type, ref.instrument_kind, ref.indexer, ref.maturity_year) == (
+        AssetType.TREASURY,
+        FixedIncomeInstrumentKind.TESOURO_IPCA,
+        FixedIncomeIndexer.IPCA,
+        2032,
+    )
+    assert (ref.name, ref.issuer, ref.semiannual) == (
+        "Tesouro IPCA+ 2032",
+        "Tesouro Nacional",
+        False,
+    )
+    assert semiannual.ticker == "TESOURO_IPCA-JS-2037"
+    assert semiannual.fixed_income is not None and semiannual.fixed_income.semiannual
+    assert (sell.trade_kind, sell.ticker) == (TransactionKind.SELL, "TESOURO_PRE-2028")
+    assert (coupon.action, coupon.earning_kind, coupon.gross_amount) == (
+        LineAction.EARNING,
+        EarningKind.FIXED_INCOME_COUPON,
+        Decimal("12.30"),
+    )
+    assert broken.status == LineStatus.INVALID
+    assert (other.status, other.note) == (LineStatus.IGNORED, "Movimentação não suportada")
+
+
+def test_bank_security_movements_share_one_key_per_issuer() -> None:
+    application, redemption, lca = parse_statement(
+        [
+            _fixed_income(
+                "APLICAÇÃO", "CDB - CDB3268K63R", 857575, 0.01, 8575.75, institution=ITAU
+            ),
+            _fixed_income(
+                "RESGATE ANTECIPADO",
+                "CDB - CDB3268K63R - ITAU UNIBANCO S.A.",
+                822955,
+                0.0100001,
+                8229.63,
+                when="18/03/2026",
+                institution=ITAU,
+            ),
+            _fixed_income(
+                "APLICAÇÃO", "LCA - LCA24001ABC", 1000, 1, 1000, institution="BANCO INTER S.A."
+            ),
+        ]
+    ).lines
+    assert (application.trade_kind, redemption.trade_kind) == (
+        TransactionKind.BUY,
+        TransactionKind.SELL,
+    )
+    assert application.ticker == redemption.ticker == "CDB3268K63R"  # B3 code before matching
+    assert application.fixed_income is not None and redemption.fixed_income is not None
+    assert application.fixed_income.key == redemption.fixed_income.key == "CDB-ITAUUNIBANCO"
+    assert application.fixed_income.issuer == redemption.fixed_income.issuer == ITAU
+    assert application.fixed_income.asset_type == AssetType.FIXED_INCOME
+    assert application.fixed_income.indexer == FixedIncomeIndexer.CDI
+    assert lca.fixed_income is not None
+    assert (lca.fixed_income.instrument_kind, lca.fixed_income.key) == (
+        FixedIncomeInstrumentKind.LCA,
+        "LCA-BANCOINTERSA",
+    )
+
+
+def _treasury_asset(
+    ticker: str, name: str, kind: FixedIncomeInstrumentKind, maturity: date
+) -> AssetEntity:
+    return AssetEntity(
+        ticker=ticker,
+        name=name,
+        asset_type=AssetType.TREASURY,
+        fixed_income_term=FixedIncomeTermEntity(
+            instrument_kind=kind,
+            indexer=FixedIncomeIndexer.IPCA,
+            contracted_rate=Decimal("0.07"),
+            issue_date=date(2026, 1, 1),
+            maturity_date=maturity,
+        ),
+    )
+
+
+def _cdb_asset(ticker: str, issuer: str | None) -> AssetEntity:
+    return AssetEntity(
+        ticker=ticker,
+        name=f"CDB {issuer}",
+        asset_type=AssetType.FIXED_INCOME,
+        fixed_income_term=FixedIncomeTermEntity(
+            instrument_kind=FixedIncomeInstrumentKind.CDB,
+            indexer=FixedIncomeIndexer.CDI,
+            contracted_rate=Decimal("1.00"),
+            issue_date=date(2026, 1, 1),
+            issuer=issuer,
+        ),
+    )
+
+
+def test_resolve_points_fixed_income_lines_at_registered_assets() -> None:
+    parsed = parse_statement(
+        [
+            _fixed_income("Compra", "Tesouro IPCA+ 2032", 0.67, 2944.7, 1972.95),
+            _fixed_income(
+                "Compra", "Tesouro IPCA+ com Juros Semestrais 2037", 0.01, 4351.27, 43.51
+            ),
+            _fixed_income("Venda", "Tesouro Prefixado 2028", 0.13, 780.25, 101.43),
+            _fixed_income(
+                "APLICAÇÃO", "CDB - CDB3268K63R", 857575, 0.01, 8575.75, institution=ITAU
+            ),
+            _fixed_income(
+                "APLICAÇÃO", "CDB - CDBA261298C", 812624, 0.01, 8126.24, institution=ITAU
+            ),
+            _movement("Dividendo", "ITSA4 - ITAUSA", 110, "2,20"),
+        ]
+    )
+    assets = [
+        # Named as the Treasury catalog names it: matched by name.
+        _treasury_asset(
+            "TESOURO_IPCA-TESOURONAC-2032",
+            "Tesouro IPCA+ 2032",
+            FixedIncomeInstrumentKind.TESOURO_IPCA,
+            date(2032, 8, 15),
+        ),
+        # Renamed: matched by kind and maturity year, the coupon flag telling it apart.
+        _treasury_asset(
+            "MEU-IPCA-JS",
+            "Tesouro IPCA+ com Juros Semestrais (aposentadoria)",
+            FixedIncomeInstrumentKind.TESOURO_IPCA,
+            date(2037, 5, 15),
+        ),
+        _cdb_asset("CDB-ITAU-LIQ", "Itaú Unibanco"),
+        _cdb_asset("CDBA261298C", None),  # registered under its own B3 code
+    ]
+    resolved = resolve_fixed_income(parsed, assets).lines
+    assert [line.ticker for line in resolved] == [
+        "TESOURO_IPCA-TESOURONAC-2032",
+        "MEU-IPCA-JS",
+        "TESOURO_PRE-2028",  # not registered: the group key
+        "CDB-ITAU-LIQ",
+        "CDBA261298C",
+        "ITSA4",
+    ]
+    assert [line.hash for line in resolved] == [line.hash for line in parsed.lines]
+
+    chosen = resolve_fixed_income(parsed, [], chosen={"TESOURO_PRE-2028": "NEW-PRE"}).lines
+    assert chosen[2].ticker == "NEW-PRE"
+
+    classified = classify(
+        resolve_fixed_income(parsed, assets),
+        known_tickers={a.ticker for a in assets} | {"ITSA4"},
+        existing_hashes=set(),
+    )
+    assert classified.unknown_tickers == ["TESOURO_PRE-2028"]
+
+
+def test_resolve_rejects_a_security_matching_two_assets() -> None:
+    parsed = parse_statement(
+        [_fixed_income("APLICAÇÃO", "CDB - CDB3268K63R", 100, 0.01, 1, institution=ITAU)]
+    )
+    resolved = resolve_fixed_income(
+        parsed, [_cdb_asset("CDB-A", "Itaú Unibanco S/A"), _cdb_asset("CDB-B", ITAU)]
+    ).lines
+    assert resolved[0].status == LineStatus.INVALID
+    assert "CDB-A, CDB-B" in resolved[0].note

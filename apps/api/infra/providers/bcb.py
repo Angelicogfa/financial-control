@@ -35,7 +35,8 @@ class BcbSgsProvider:
         client: httpx.Client | None = None,
         timeout: float = 10.0,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
+        # Older configs pointed at `.../serie/bcdata.sgs`; series URLs already add that prefix.
+        self.base_url = base_url.rstrip("/").removesuffix("/bcdata.sgs")
         self.default_cdi_annual = default_cdi_annual
         self.default_ipca_annual = default_ipca_annual
         self._client = client or httpx.Client(timeout=timeout)

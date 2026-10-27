@@ -200,12 +200,18 @@ def delete_corporate_event(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+_SKIP_LINES_HELP = "Comma-separated statement line numbers to leave out of the import"
+
+
 @imports_router.post("/b3/preview", response_model=ImportPreviewDTO)
 async def preview_b3_import(
     file: UploadFile = File(...),
+    skip_lines: str = Form(default="", description=_SKIP_LINES_HELP),
     handler: ImportHandler = Depends(get_import_handler),
 ) -> ImportPreviewDTO:
-    return handler.preview(file.filename or "", await file.read())
+    return handler.preview(
+        file.filename or "", await file.read(), skip_lines=parse_skip_lines(skip_lines)
+    )
 
 
 @imports_router.post("/b3/commit", response_model=ImportCommitDTO)
@@ -223,6 +229,7 @@ async def commit_b3_import(
             "type and ARCA quadrant chosen in the preview"
         ),
     ),
+    skip_lines: str = Form(default="", description=_SKIP_LINES_HELP),
     handler: ImportHandler = Depends(get_import_handler),
     statements: StatementRefresher = Depends(get_statement_refresher),
 ) -> ImportCommitDTO:
@@ -232,6 +239,7 @@ async def commit_b3_import(
         account_id=account_id,
         create_tickers=[t for t in create_tickers.split(",") if t.strip()],
         new_assets=parse_new_assets(new_assets),
+        skip_lines=parse_skip_lines(skip_lines),
     )
     background.add_task(statements.refresh, result.created_assets)
     return result
@@ -245,6 +253,16 @@ def parse_new_assets(raw: str) -> list[ImportNewAssetRequest]:
         return _NEW_ASSETS.validate_json(raw)
     except PydanticValidationError as exc:
         raise ValidationError("new_assets must be a JSON list", code="INVALID_NEW_ASSETS") from exc
+
+
+def parse_skip_lines(raw: str) -> list[int]:
+    """Parse the `skip_lines` form field: statement line numbers, comma-separated."""
+    try:
+        return [int(part) for part in raw.split(",") if part.strip()]
+    except ValueError as exc:
+        raise ValidationError(
+            "skip_lines must be comma-separated line numbers", code="INVALID_SKIP_LINES"
+        ) from exc
 
 
 _NEW_ASSETS = TypeAdapter(list[ImportNewAssetRequest])

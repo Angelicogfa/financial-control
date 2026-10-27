@@ -560,4 +560,114 @@ describe("ledger", () => {
     const body = last(calls, "POST", "/imports/b3/commit")?.body as Record<string, string>;
     expect(JSON.parse(body.new_assets)).toEqual([{ ticker: "ITSA4", asset_type: "STOCK_BR", arca_class: "CAIXA" }]);
   });
+
+  it("leaves unchecked lines out of the preview and the commit", async () => {
+    const buy = { line_no: 2, action: "TRADE", entry_date: "2021-05-10", ticker: "AESB3", description: "compra", quantity: 2, unit_price: 14, amount: 28, trade_kind: "BUY" };
+    const sell = { line_no: 3, action: "TRADE", entry_date: "2021-05-14", ticker: "AESB3", description: "venda", quantity: 2, unit_price: 15, amount: 30, trade_kind: "SELL" };
+    const preview = (call: Call) => {
+      const skipped = (call.body as Record<string, string>).skip_lines === "2";
+      return {
+        kind: "NEGOTIATION",
+        counts: skipped ? { IGNORED: 1, INVALID: 1 } : { NEW: 2 },
+        unknown_tickers: [],
+        lines: skipped
+          ? [
+              { ...buy, status: "IGNORED", note: "Ignorada por você" },
+              { ...sell, status: "INVALID", note: "Venda maior que o saldo" },
+            ]
+          : [
+              { ...buy, status: "NEW", note: "" },
+              { ...sell, status: "NEW", note: "" },
+            ],
+      };
+    };
+    const { calls } = mockApi([
+      { path: "/accounts", reply: accounts },
+      { method: "POST", path: "/imports/b3/preview", reply: preview },
+      {
+        method: "POST",
+        path: "/imports/b3/commit",
+        reply: { kind: "NEGOTIATION", created: { TRADE: 0, EARNING: 0, EVENT: 0 }, skipped: { IGNORED: 1, INVALID: 1 }, created_assets: [] },
+      },
+    ]);
+    renderAt("/ledger/import");
+    fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [new File(["x"], "negociacao.xlsx")] } });
+    expect(await screen.findByRole("button", { name: "Importar 2 linha(s)" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Importar linha 2" }));
+    expect(await screen.findByText("Venda maior que o saldo")).toBeInTheDocument();
+    expect(last(calls, "POST", "/imports/b3/preview")?.body).toMatchObject({ skip_lines: "2" });
+    // The skipped line can be checked again; the invalid sell has nothing to toggle.
+    expect(screen.getByRole("checkbox", { name: "Importar linha 2" })).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Importar linha 3" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Importar 0 linha(s)" })).toBeDisabled();
+  });
+
+  it("registers a bank security from the movement statement once its rate is typed", async () => {
+    const term = {
+      instrument_kind: "CDB",
+      indexer: "CDI",
+      contracted_rate: null,
+      issue_date: "2026-02-20",
+      maturity_date: null,
+      tax_exempt: false,
+      liquidity: "AT_MATURITY",
+      issuer: "ITAU UNIBANCO S.A.",
+    };
+    const preview = {
+      kind: "MOVEMENT",
+      counts: { UNKNOWN_ASSET: 1 },
+      unknown_tickers: [
+        { ticker: "CDB-ITAUUNIBANCO", name: "CDB ITAU UNIBANCO S.A.", asset_type: "FIXED_INCOME", arca_class: "CAIXA", fixed_income_term: term },
+      ],
+      lines: [
+        { line_no: 2, action: "TRADE", status: "UNKNOWN_ASSET", entry_date: "2026-03-17", ticker: "CDB-ITAUUNIBANCO", description: "aplicacao", quantity: 857575, unit_price: 0.01, amount: 8575.75, trade_kind: "BUY", note: "Ativo não cadastrado" },
+      ],
+    };
+    const { calls } = mockApi([
+      { path: "/accounts", reply: accounts },
+      { method: "POST", path: "/imports/b3/preview", reply: preview },
+      {
+        method: "POST",
+        path: "/imports/b3/commit",
+        reply: { kind: "MOVEMENT", created: { TRADE: 1, EARNING: 0, EVENT: 0 }, skipped: {}, created_assets: ["CDB-ITAUUNIBAN-LIQ"] },
+      },
+    ]);
+    renderAt("/ledger/import");
+    fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [new File(["x"], "movimentacao.xlsx")] } });
+
+    const security = await screen.findByRole("checkbox", { name: /CDB-ITAUUNIBANCO/ });
+    expect(security).not.toBeChecked();
+    expect(security).toBeDisabled(); // the rate is never in a B3 statement
+    expect(screen.getByRole("combobox", { name: "Tipo de CDB-ITAUUNIBANCO" })).toBeDisabled();
+    expect(screen.getByLabelText("Data de emissão")).toHaveValue("2026-02-20");
+    expect(screen.getByRole("button", { name: "Importar 0 linha(s)" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "CDB Itaú liquidez diária" } });
+    fireEvent.change(screen.getByLabelText("Taxa contratada"), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText("Liquidez"), { target: { value: "DAILY" } });
+    expect(security).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Importar 1 linha(s)" }));
+    expect(await screen.findByText(/ativos cadastrados: CDB-ITAUUNIBAN-LIQ/)).toBeInTheDocument();
+    const body = last(calls, "POST", "/imports/b3/commit")?.body as Record<string, string>;
+    expect(JSON.parse(body.new_assets)).toEqual([
+      {
+        ticker: "CDB-ITAUUNIBANCO",
+        asset_type: "FIXED_INCOME",
+        arca_class: "CAIXA",
+        name: "CDB Itaú liquidez diária",
+        fixed_income_term: {
+          instrument_kind: "CDB",
+          indexer: "CDI",
+          contracted_rate: 1,
+          issue_date: "2026-02-20",
+          maturity_date: null,
+          tax_exempt: false,
+          liquidity: "DAILY",
+          issuer: "ITAU UNIBANCO S.A.",
+        },
+      },
+    ]);
+  });
 });

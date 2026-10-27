@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -42,6 +43,17 @@ def _float_or_none(val: Any) -> float | None:
         return None
 
 
+# brapi range keywords from shortest to longest; `ytd` never spans more than a year.
+_RANGE_ORDER = ("1d", "5d", "1mo", "3mo", "6mo", "ytd", "1y", "2y", "5y", "10y", "max")
+
+
+def range_within(range_period: str, max_range: str | None) -> bool:
+    """Whether `range_period` fits the plan limit `max_range` (unknown keywords pass)."""
+    if not max_range or range_period not in _RANGE_ORDER or max_range not in _RANGE_ORDER:
+        return True
+    return _RANGE_ORDER.index(range_period) <= _RANGE_ORDER.index(max_range)
+
+
 class BrapiProvider:
     """HTTP client for https://brapi.dev/api."""
 
@@ -53,10 +65,20 @@ class BrapiProvider:
         base_url: str = "https://brapi.dev/api",
         client: httpx.Client | None = None,
         timeout: float = 10.0,
+        max_history_range: str | None = None,
+        max_concurrency: int = 1,
     ) -> None:
         self.token = token.strip() if token else None
         self.base_url = base_url.rstrip("/")
         self._client = client or httpx.Client(timeout=timeout)
+        # The free plan rejects longer ranges and parallel calls (HTTP 400/429); longer
+        # histories are left to the gateway's Yahoo fallback.
+        self.max_history_range = max_history_range or None
+        self._slots = threading.BoundedSemaphore(max(1, max_concurrency))
+
+    def _get(self, url: str, **kwargs: Any) -> httpx.Response:
+        with self._slots:
+            return self._client.get(url, **kwargs)
 
     def _headers(self) -> dict[str, str]:
         if self.token:
@@ -68,7 +90,7 @@ class BrapiProvider:
         clean = symbol.strip().upper().removesuffix(".SA")
         url = f"{self.base_url}/quote/{clean}"
         try:
-            resp = self._client.get(url, headers=self._headers())
+            resp = self._get(url, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
         except Exception as exc:
@@ -120,11 +142,13 @@ class BrapiProvider:
 
     def get_history(self, symbol: str, range_period: str = "1y") -> list[PricePoint]:
         """Fetch daily historical OHLCV points from brapi.dev."""
+        if not range_within(range_period, self.max_history_range):
+            return []
         clean = symbol.strip().upper().removesuffix(".SA")
         url = f"{self.base_url}/quote/{clean}"
         params = {"range": range_period, "interval": "1d"}
         try:
-            resp = self._client.get(url, params=params, headers=self._headers())
+            resp = self._get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
         except Exception as exc:
@@ -176,7 +200,7 @@ class BrapiProvider:
         for page in range(1, max_pages + 1):
             url = f"{self.base_url}/quote/list"
             try:
-                resp = self._client.get(
+                resp = self._get(
                     url,
                     params={"page": page, "limit": page_size, "sortBy": "volume"},
                     headers=self._headers(),
@@ -227,7 +251,7 @@ class BrapiProvider:
             if search:
                 params["search"] = search.strip()
             try:
-                resp = self._client.get(
+                resp = self._get(
                     f"{self.base_url}/v2/treasury/list",
                     params=params,
                     headers=self._headers(),
@@ -277,7 +301,7 @@ class BrapiProvider:
         modules = "incomeStatementHistory,balanceSheetHistory,cashflowHistory"
         params = {"modules": modules}
         try:
-            resp = self._client.get(url, params=params, headers=self._headers())
+            resp = self._get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             results = resp.json().get("results") or []
         except Exception as exc:
@@ -302,7 +326,7 @@ class BrapiProvider:
             "modules": modules,
         }
         try:
-            resp = self._client.get(url, params=params, headers=self._headers())
+            resp = self._get(url, params=params, headers=self._headers())
             resp.raise_for_status()
             payload = resp.json()
         except Exception as exc:

@@ -32,6 +32,8 @@
 | **Fase 17** | Arquitetura Unificada de Backend em Camadas por Domínio em `apps/api` (ADR 0009) | `[x]` Concluída | 100% |
 | **Fase 18** | Configuração Agêntica e Servidor MCP Pessoal (`/settings/agentic`, `/api/v1/mcp`) | `[x]` Concluída | 100% |
 | **Fase 19** | Notificações de Erros de Requisição do Worker (Badge no menu e Log detalhado em Dados de Mercado) | `[x]` Concluída | 100% |
+| **Fase 22** | Importação B3: Tesouro Direto, CDB e Fracionário com Dígito | `[x]` Implementado | 100% |
+| **Fase 23** | Importação B3: Ignorar Linhas e Vendas sem Saldo | `[x]` Implementado | 100% |
 | **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[ ]` Pendente | 0% |
 | **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[ ]` Pendente | 0% |
 | **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[ ]` Pendente | 0% |
@@ -532,6 +534,32 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **21.1** `AssetSelect` ganha `onResolve`, chamado sempre que o valor selecionado ou a lista de ativos carregada muda; os formulários de negociação e de provento derivam a moeda do ativo daí, então o campo de câmbio aparece logo na abertura para ativos em USD (edição e `?asset=` pré-selecionado), preservando o `fx_rate` gravado.
 - `[x]` **21.2** Prévia em reais ao lado do câmbio: total `(quantidade × preço + taxas) × câmbio` na negociação e líquido `(bruto − IR) × câmbio` no provento, com a mesma regra de `total_brl`/`net_amount_brl` da API.
 - `[x]` **21.3** Testes de UI em `operations.test.tsx`: criação com ativo USD pré-selecionado, edição de negociação e de provento USD (valor salvo e envio do `fx_rate`) e ativo BRL sem o campo.
+- `[x]` **20.4** Notificações do worker: `BcbSgsProvider` tolera `BCB_SGS_BASE_URL` com o sufixo legado `/bcdata.sgs` (gerava `.../bcdata.sgs/bcdata.sgs.N` e HTTP 404); `BrapiProvider` respeita o plano com `BRAPI_MAX_HISTORY_RANGE` (padrão `3mo`, ranges maiores vão direto ao Yahoo sem HTTP 400) e `BRAPI_MAX_CONCURRENCY` (padrão `1`, semáforo que evita HTTP 429). Testes em `test_provider_limits.py`.
+
+---
+
+## Fase 22 — Importação B3: Tesouro Direto, CDB e Fracionário com Dígito (`[x]` Implementado)
+
+**Objetivo:** a Movimentação da B3 é o único extrato com Tesouro Direto e títulos bancários (eles nunca chegam à Negociação); trazê-los para o livro sem lançamento manual e corrigir tickers fracionários cujo código do emissor tem dígito.
+
+- `[x]` **22.1** `FRACTIONAL_SUFFIX` aceita dígitos no código do emissor: `B3SA3F` → `B3SA3` (antes as compras fracionárias de B3 ficavam num ativo `B3SA3F`).
+- `[x]` **22.2** Movimentação: `Compra`/`Venda`/`Vencimento` de "Tesouro …" e `APLICAÇÃO`/`RESGATE ANTECIPADO`/`Resgate`/`Vencimento` de CDB, LCI, LCA, CRI e CRA viram negociações; `Juros`/`Rendimento`/`Amortização` do Tesouro viram `FIXED_INCOME_COUPON`. `FixedIncomeRef` identifica o título (tipo, indexador, ano de vencimento, juros semestrais) ou o emissor e o código B3 da aplicação; o hash continua independente do ativo escolhido.
+- `[x]` **22.3** `resolve_fixed_income` (`domain/ledger/services/b3_import.py`) aponta cada linha para o ativo cadastrado: ticker igual ao código B3; título do Tesouro pelo nome ou por tipo + ano de vencimento + juros semestrais; título bancário por tipo + emissor (**um ativo por emissor**, todas as aplicações juntas). Dois ativos candidatos → linha `INVALID`; nenhum → chave do grupo (`TESOURO_IPCA-2032`, `CDB-ITAUUNIBANCO`) reportada como ativo não cadastrado.
+- `[x]` **22.4** Cadastro na importação: `UnknownTickerDTO.fixed_income_term` sugere tipo, indexador, emissor, primeira data do extrato e vencimento do catálogo do Tesouro; `ImportNewAssetRequest` aceita `name` e `fixed_income_term` com a taxa contratada (obrigatória, `FIXED_INCOME_TERM_REQUIRED`), o código do ativo segue `generated_asset_code`.
+- `[x]` **22.5** Resgates maiores que o saldo (aplicação anterior ao período do extrato) ficam `INVALID` na pré-visualização e no commit, sem bloquear o restante do arquivo.
+- `[x]` **22.6** Tela de importação: taxa, indexador, emissão, vencimento, liquidez e nome por título/emissor; o item só fica marcável com a taxa preenchida.
+- `[x]` **22.7** Testes: `test_b3_import.py` (fracionário, Tesouro, CDB/LCA, resolução, ambiguidade), `test_b3_import_api.py` (pré-visualização, cadastro com termos, resgate sem saldo, reimportação sem duplicar, B3SA3F) e `operations.test.tsx` (termos do CDB e envio no commit).
+
+---
+
+## Fase 23 — Importação B3: Ignorar Linhas e Vendas sem Saldo (`[x]` Implementado)
+
+**Objetivo:** um extrato que cobre só um período (ou um ativo que mudou de código, como TIET11 → AESB3) traz vendas sem a compra correspondente; antes uma única linha assim abortava a importação inteira com `LEDGER_CONFLICT`.
+
+- `[x]` **23.1** Vendas de qualquer ativo maiores que o saldo (livro + compras do próprio extrato) ficam `INVALID` na pré-visualização e no commit, com o motivo, sem bloquear o restante do arquivo (generaliza o 22.5).
+- `[x]` **23.2** `skip_lines` (números das linhas do extrato) em `POST /imports/b3/preview`, `POST /imports/b3/commit` e nas ferramentas MCP `ledger.imports.preview`/`ledger.imports.commit`: as linhas ficam `IGNORED` ("Ignorada por você") e a validação de saldo é refeita sem elas; entrada inválida → 400 `INVALID_SKIP_LINES`. Ticker sem nenhuma linha restante não é cadastrado no commit.
+- `[x]` **23.3** Tela de importação: coluna "Importar" com caixa por linha nova ou de ativo não cadastrado; desmarcar refaz a pré-visualização mantendo as escolhas de cadastro.
+- `[x]` **23.4** Testes: `test_b3_import.py` (`mark_skipped`), `test_b3_import_api.py` (venda sem saldo inválida e sem cadastro do ativo, linhas ignoradas na pré-visualização e no commit, `INVALID_SKIP_LINES`) e `operations.test.tsx` (desmarcar linha reenvia `skip_lines`).
 
 ---
 

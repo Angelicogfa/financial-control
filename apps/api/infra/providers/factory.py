@@ -31,7 +31,11 @@ def build_market_gateway(settings: MarketSettings) -> CachedMarketGateway:
     """Gateway wired with brapi, Yahoo Finance, BCB SGS, Tesouro Transparente and cache."""
     csv_url = getattr(settings, "tesouro_transparente_csv_url", DEFAULT_TESOURO_CSV_URL)
     return CachedMarketGateway(
-        brapi=BrapiProvider(token=settings.brapi_token),
+        brapi=BrapiProvider(
+            token=settings.brapi_token,
+            max_history_range=getattr(settings, "brapi_max_history_range", "3mo"),
+            max_concurrency=getattr(settings, "brapi_max_concurrency", 1),
+        ),
         yfinance=YFinanceProvider(),
         bcb=BcbSgsProvider(
             base_url=settings.bcb_sgs_base_url,

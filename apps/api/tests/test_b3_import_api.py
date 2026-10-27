@@ -7,11 +7,17 @@ import io
 import json
 import re
 import zipfile
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from openpyxl import Workbook
+
+from domain.market.entities import TreasuryBond
+from domain.shared.entities import AssetEntity, FixedIncomeTermEntity
+from domain.shared.enums import AssetType, FixedIncomeIndexer, FixedIncomeInstrumentKind
 
 FIXTURES = Path(__file__).parent / "fixtures"
 TRADES = (FIXTURES / "b3_negociacao.csv").read_bytes()
@@ -77,8 +83,8 @@ def test_import_trades_then_movements_without_manual_entries(api: SimpleNamespac
 
     movements = _upload(client, "preview", "movimentacao.csv", MOVEMENTS).json()
     assert movements["kind"] == "MOVEMENT"
-    assert movements["counts"] == {"IGNORED": 3, "NEW": 5, "UNKNOWN_ASSET": 1}
-    assert [u["ticker"] for u in movements["unknown_tickers"]] == ["MXRF11"]
+    assert movements["counts"] == {"IGNORED": 2, "NEW": 5, "UNKNOWN_ASSET": 2}
+    assert [u["ticker"] for u in movements["unknown_tickers"]] == ["MXRF11", "TESOURO_SELIC-2029"]
 
     applied = _upload(client, "commit", "movimentacao.csv", MOVEMENTS)
     assert applied.status_code == 200, applied.text
@@ -131,17 +137,60 @@ def test_import_rejects_bad_files_and_oversold_ledgers(api: SimpleNamespace) -> 
         "Data do Negócio;Tipo de Movimentação;Código de Negociação;Quantidade;Preço;Valor\n"
         "10/04/2024;Venda;PETR4;10;R$ 38,00;R$ 380,00\n"
     ).encode()
+    # A sell with no purchase behind it is flagged in the preview and never blocks the import.
+    previewed = _upload(client, "preview", "venda.csv", sell_only).json()
+    assert previewed["counts"] == {"INVALID": 1}
+    assert previewed["lines"][0]["note"].startswith("Venda maior que o saldo")
+    assert previewed["unknown_tickers"] == []
     oversold = _upload(client, "commit", "venda.csv", sell_only, create_tickers="PETR4")
-    assert oversold.status_code == 409
-    assert oversold.json()["code"] == "LEDGER_CONFLICT"
-    # Atomic: neither the trade nor the asset created for it was kept.
+    assert oversold.status_code == 200, oversold.text
+    assert oversold.json()["created"]["TRADE"] == 0
+    assert oversold.json()["skipped"] == {"INVALID": 1}
+    # The ticker had nothing left to import, so it was not registered either.
     assert client.get("/api/v1/assets", params={"page_size": 50}).json()["items"] == []
 
-    unknown = _upload(
-        client, "commit", "x.csv", sell_only.replace(b"PETR4", b"ABCD1"), create_tickers="ABCD1"
-    )
+    buy_only = sell_only.replace(b"Venda;PETR4", b"Compra;ABCD1")
+    unknown = _upload(client, "commit", "x.csv", buy_only, create_tickers="ABCD1")
     assert unknown.status_code == 400
     assert unknown.json()["code"] == "UNKNOWN_INSTRUMENT"
+
+
+def test_skipped_lines_are_left_out_of_preview_and_commit(api: SimpleNamespace) -> None:
+    client = api.client
+    statement = (
+        "Data do Negócio;Tipo de Movimentação;Código de Negociação;Quantidade;Preço;Valor\n"
+        "10/04/2024;Compra;PETR4;10;R$ 38,00;R$ 380,00\n"
+        "11/04/2024;Venda;PETR4;4;R$ 39,00;R$ 156,00\n"
+        "12/04/2024;Compra;VALE3;5;R$ 60,00;R$ 300,00\n"
+    ).encode()
+
+    # Skipping the purchase leaves the sell after it without a position.
+    no_buy = _upload(client, "preview", "n.csv", statement, skip_lines="2").json()
+    by_line = {line["line_no"]: line for line in no_buy["lines"]}
+    assert by_line[2]["status"] == "IGNORED"
+    assert by_line[2]["note"] == "Ignorada por você"
+    assert by_line[3]["status"] == "INVALID"
+    assert [u["ticker"] for u in no_buy["unknown_tickers"]] == ["VALE3"]
+
+    committed = _upload(
+        client, "commit", "n.csv", statement, create_tickers="PETR4,VALE3", skip_lines="4"
+    )
+    assert committed.status_code == 200, committed.text
+    assert committed.json()["created"]["TRADE"] == 2
+    assert committed.json()["created_assets"] == ["PETR4"]
+    assert committed.json()["skipped"] == {"IGNORED": 1}
+
+    # The skipped line is still there to import later.
+    again = _upload(client, "preview", "n.csv", statement).json()
+    assert {line["line_no"]: line["status"] for line in again["lines"]} == {
+        2: "DUPLICATE",
+        3: "DUPLICATE",
+        4: "UNKNOWN_ASSET",
+    }
+
+    bad = _upload(client, "preview", "n.csv", statement, skip_lines="2,x")
+    assert bad.status_code == 400
+    assert bad.json()["code"] == "INVALID_SKIP_LINES"
 
 
 def _arca_classes(api: SimpleNamespace) -> dict[str, tuple[str, str]]:
@@ -197,7 +246,13 @@ def test_a_ticker_of_unknown_type_needs_the_type_chosen_in_the_preview(
     ).encode()
     preview = _upload(client, "preview", "negociacao.csv", statement).json()
     assert preview["unknown_tickers"] == [
-        {"ticker": "XPTO1", "name": None, "asset_type": None, "arca_class": None}
+        {
+            "ticker": "XPTO1",
+            "name": None,
+            "asset_type": None,
+            "arca_class": None,
+            "fixed_income_term": None,
+        }
     ]
 
     untyped = _upload(client, "commit", "negociacao.csv", statement, create_tickers="XPTO1")
@@ -214,6 +269,171 @@ def test_a_ticker_of_unknown_type_needs_the_type_chosen_in_the_preview(
     assert typed.status_code == 200, typed.text
     assert typed.json()["created"]["TRADE"] == 1
     assert _arca_classes(api)["XPTO1"] == ("STOCK_BR", "ACOES")
+
+
+FIXED_INCOME_MOVEMENTS = (
+    "Entrada/Saída;Data;Movimentação;Produto;Instituição;Quantidade;Preço unitário;"
+    "Valor da Operação\n"
+    "Credito;17/03/2026;Compra;Tesouro IPCA+ 2032;NU INVESTIMENTOS S.A. - CTVM;"
+    "0,67;2.944,70;1.972,95\n"
+    "Debito;15/12/2025;Venda;Tesouro Prefixado 2028;NU INVESTIMENTOS S.A. - CTVM;"
+    "0,13;780,25;101,43\n"
+    "Credito;17/03/2026;APLICAÇÃO;CDB - CDB3268K63R;ITAU UNIBANCO S.A.;"
+    "857575;0,01;8.575,75\n"
+    "Debito;18/03/2026;RESGATE ANTECIPADO;CDB - CDB3268K63R - ITAU UNIBANCO S.A.;"
+    "ITAU UNIBANCO S.A.;822955;0,0100001;8.229,63\n"
+    "Debito;20/02/2026;RESGATE ANTECIPADO;CDB - CDB2260MD3I - ITAU UNIBANCO S.A.;"
+    "ITAU UNIBANCO S.A.;29793;0,01000121;297,97\n"
+).encode()
+
+
+def _register_treasury_ipca_2032(api: SimpleNamespace) -> None:
+    with api.uow_factory() as uow:
+        uow.assets.add(
+            AssetEntity(
+                ticker="TESOURO_IPCA-TESOURONAC-2032",
+                name="Tesouro IPCA+ 2032",
+                asset_type=AssetType.TREASURY,
+                fixed_income_term=FixedIncomeTermEntity(
+                    instrument_kind=FixedIncomeInstrumentKind.TESOURO_IPCA,
+                    indexer=FixedIncomeIndexer.IPCA,
+                    contracted_rate=Decimal("0.078"),
+                    issue_date=date(2026, 1, 1),
+                    maturity_date=date(2032, 8, 15),
+                ),
+            )
+        )
+        uow.treasury_catalog.upsert(
+            [
+                TreasuryBond(
+                    symbol="tesouro-prefixado-01012028",
+                    name="Tesouro Prefixado 2028",
+                    bond_type="Tesouro Prefixado",
+                    instrument_kind=FixedIncomeInstrumentKind.TESOURO_PRE,
+                    indexer=FixedIncomeIndexer.PRE,
+                    raw_indexer="PRE",
+                    coupon_type="zero",
+                    maturity_date=date(2028, 1, 1),
+                )
+            ]
+        )
+        uow.commit()
+
+
+def test_treasury_and_bank_securities_import_from_the_movement_statement(
+    api: SimpleNamespace,
+) -> None:
+    client = api.client
+    _register_treasury_ipca_2032(api)
+
+    preview = _upload(client, "preview", "movimentacao.csv", FIXED_INCOME_MOVEMENTS).json()
+    assert preview["counts"] == {"NEW": 1, "UNKNOWN_ASSET": 4}
+    assert [line["ticker"] for line in preview["lines"]] == [
+        "TESOURO_IPCA-TESOURONAC-2032",  # matched by name
+        "TESOURO_PRE-2028",
+        "CDB-ITAUUNIBANCO",  # every application of one issuer in one asset
+        "CDB-ITAUUNIBANCO",
+        "CDB-ITAUUNIBANCO",
+    ]
+    unknown = {u["ticker"]: u for u in preview["unknown_tickers"]}
+    cdb = unknown["CDB-ITAUUNIBANCO"]
+    assert (cdb["name"], cdb["asset_type"], cdb["arca_class"]) == (
+        "CDB ITAU UNIBANCO S.A.",
+        "FIXED_INCOME",
+        "CAIXA",
+    )
+    assert cdb["fixed_income_term"] == {
+        "instrument_kind": "CDB",
+        "indexer": "CDI",
+        "contracted_rate": None,
+        "issue_date": "2026-02-20",  # first date of the issuer in the statement
+        "maturity_date": None,
+        "tax_exempt": False,
+        "liquidity": "AT_MATURITY",
+        "issuer": "ITAU UNIBANCO S.A.",
+    }
+    treasury = unknown["TESOURO_PRE-2028"]["fixed_income_term"]
+    assert (treasury["instrument_kind"], treasury["maturity_date"]) == (
+        "TESOURO_PRE",
+        "2028-01-01",  # from the Treasury catalog
+    )
+
+    no_rate = _upload(
+        client,
+        "commit",
+        "movimentacao.csv",
+        FIXED_INCOME_MOVEMENTS,
+        create_tickers="CDB-ITAUUNIBANCO",
+    )
+    assert no_rate.status_code == 400
+    assert no_rate.json()["code"] == "FIXED_INCOME_TERM_REQUIRED"
+
+    new_assets = [
+        {
+            "ticker": "CDB-ITAUUNIBANCO",
+            "name": "CDB Itaú liquidez diária",
+            "fixed_income_term": {
+                "instrument_kind": "CDB",
+                "indexer": "CDI",
+                "contracted_rate": "1.00",
+                "issue_date": "2026-01-01",
+                "liquidity": "DAILY",
+            },
+        }
+    ]
+    committed = _upload(
+        client,
+        "commit",
+        "movimentacao.csv",
+        FIXED_INCOME_MOVEMENTS,
+        new_assets=json.dumps(new_assets),
+    )
+    assert committed.status_code == 200, committed.text
+    body = committed.json()
+    assert body["created"] == {"TRADE": 3, "EARNING": 0, "EVENT": 0}
+    # The redemption of an application made before the statement has nothing to redeem.
+    assert body["skipped"] == {"INVALID": 1, "UNKNOWN_ASSET": 1}
+    assert body["created_assets"] == ["CDB-ITAUUNIBAN-LIQ"]
+
+    with api.uow_factory() as uow:
+        cdb_asset = uow.assets.get_by_ticker("CDB-ITAUUNIBAN-LIQ")
+    assert cdb_asset is not None and cdb_asset.fixed_income_term is not None
+    assert (cdb_asset.name, cdb_asset.asset_type.value, cdb_asset.arca_class.value) == (
+        "CDB Itaú liquidez diária",
+        "FIXED_INCOME",
+        "CAIXA",
+    )
+    assert cdb_asset.fixed_income_term.issuer == "ITAU UNIBANCO S.A."
+
+    positions = _positions(client)
+    assert positions["CDB-ITAUUNIBAN-LIQ"]["quantity"] == pytest.approx(857575 - 822955)
+    assert positions["TESOURO_IPCA-TESOURONAC-2032"]["quantity"] == pytest.approx(0.67)
+
+    again = _upload(client, "preview", "movimentacao.csv", FIXED_INCOME_MOVEMENTS).json()
+    assert again["counts"] == {"DUPLICATE": 3, "INVALID": 1, "UNKNOWN_ASSET": 1}
+    assert next(line for line in again["lines"] if line["status"] == "INVALID")["note"].startswith(
+        "Resgate maior que o saldo"
+    )
+    # Choosing the security again does not register a second asset.
+    repeated = _upload(
+        client,
+        "commit",
+        "movimentacao.csv",
+        FIXED_INCOME_MOVEMENTS,
+        new_assets=json.dumps(new_assets),
+    )
+    assert repeated.json()["created_assets"] == []
+    assert repeated.json()["created"]["TRADE"] == 0
+
+
+def test_fractional_trades_of_b3sa3_land_on_b3sa3(api: SimpleNamespace) -> None:
+    statement = (
+        "Data do Negócio;Tipo de Movimentação;Mercado;Prazo/Vencimento;Instituição;"
+        "Código de Negociação;Quantidade;Preço;Valor\n"
+        "13/04/2026;Compra;Mercado Fracionário;-;NU;B3SA3F;10;19,30;193,00\n"
+    ).encode()
+    preview = _upload(api.client, "preview", "negociacao.csv", statement).json()
+    assert [u["ticker"] for u in preview["unknown_tickers"]] == ["B3SA3"]
 
 
 def test_new_assets_must_be_a_json_list(api: SimpleNamespace) -> None:
