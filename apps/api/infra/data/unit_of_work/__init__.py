@@ -36,6 +36,7 @@ from infra.data.repositories.portfolio import (
     SqlAlchemyContributionPlanRepository,
     SqlAlchemyPortfolioSnapshotRepository,
 )
+from infra.data.repositories.tax import SqlAlchemyTaxRuleRepository
 
 
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
@@ -65,6 +66,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.ledger_imports = SqlAlchemyLedgerImportRepository(self.session)
         self.alert_dismissals = SqlAlchemyAlertDismissalRepository(self.session)
         self.agent_keys = SqlAlchemyAgentKeyRepository(self.session)
+        self.tax_rules = SqlAlchemyTaxRuleRepository(self.session)
         return self
 
     def __exit__(

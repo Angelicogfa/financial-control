@@ -23,6 +23,7 @@ import {
 import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart } from "../../viz/TrendChart";
 import { ChecklistTab } from "./ChecklistTab";
+import { TaxTab } from "./TaxTab";
 
 const BENCHMARK_LABELS: Record<string, string> = {
   IBOV: "Ibovespa",
@@ -32,12 +33,13 @@ const BENCHMARK_LABELS: Record<string, string> = {
   IPCA: "IPCA",
 };
 
-type TabKey = "summary" | "fundamentals" | "valuation" | "checklist" | "earnings" | "ledger";
+type TabKey = "summary" | "fundamentals" | "valuation" | "checklist" | "tax" | "earnings" | "ledger";
 const TABS: TabSpec<TabKey>[] = [
   { key: "summary", label: "Resumo" },
   { key: "fundamentals", label: "Fundamentos" },
   { key: "valuation", label: "Valuation" },
   { key: "checklist", label: "Checklist" },
+  { key: "tax", label: "Tributação" },
   { key: "earnings", label: "Proventos" },
   { key: "ledger", label: "Lançamentos" },
 ];
@@ -509,6 +511,7 @@ export function AssetDetailPage() {
                   />
                 </>
               )}
+              {tab === "tax" && <TaxTab assetId={assetId} />}
               {tab === "earnings" && <Earnings assetId={assetId} />}
               {tab === "ledger" && <Ledger assetId={assetId} />}
             </>

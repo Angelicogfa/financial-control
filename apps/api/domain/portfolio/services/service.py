@@ -50,6 +50,8 @@ from domain.shared.enums import (
     IntraClassStrategy,
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.tax.entities import TaxRuleBook
+from domain.tax.services.rules import rule_book
 from infra.providers.batch import fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 
@@ -162,6 +164,10 @@ class PortfolioApplicationService:
             result[asset.id or 0] = asset_lifecycle(asset, evaluation, policy)
         return result
 
+    def tax_rules(self, uow: AbstractUnitOfWork) -> TaxRuleBook:
+        """Registered tax rules (the built-in registry completes missing regimes)."""
+        return rule_book(uow.tax_rules.list_all())
+
     def ledger_curves(
         self, uow: AbstractUnitOfWork, asset: AssetEntity, as_of: date
     ) -> RateCurves | None:
@@ -228,6 +234,7 @@ class PortfolioApplicationService:
             assumptions=policy.valuation.projections,
             as_of_date=ref_date,
             date_from=date_from,
+            tax_rules=self.tax_rules(uow),
         )
 
     def simulate_contribution(

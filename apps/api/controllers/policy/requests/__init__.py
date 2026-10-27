@@ -44,6 +44,9 @@ class ProjectionAssumptionsDTO(BaseModel):
     real_estate_default_yield_rate: float = 0.085
     cash_cdi_multiplier: float = 1.0
     cash_income_tax_rate: float = 0.175
+    projected_cdi_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+    projected_ipca_rate: float | None = Field(default=None, ge=-0.5, le=1.0)
+    scenario_rate_shift: float = Field(default=0.02, ge=0.0, le=0.5)
 
 
 class ValuationPolicyDTO(BaseModel):

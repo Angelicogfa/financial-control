@@ -30,6 +30,9 @@ const PROJECTION_FIELDS: Array<{ key: string; label: string; percent: boolean }>
   { key: "real_estate_default_yield_rate", label: "Yield padrão de FIIs", percent: true },
   { key: "cash_cdi_multiplier", label: "Caixa rende (% do CDI)", percent: true },
   { key: "cash_income_tax_rate", label: "IR do caixa", percent: true },
+  { key: "projected_cdi_rate", label: "CDI projetado no comparador (vazio = mercado)", percent: true },
+  { key: "projected_ipca_rate", label: "IPCA projetado no comparador (vazio = mercado)", percent: true },
+  { key: "scenario_rate_shift", label: "Variação dos cenários de juros", percent: true },
 ];
 
 interface ClassRow {

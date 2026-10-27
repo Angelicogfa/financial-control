@@ -15,7 +15,9 @@ import type {
   FixedIncomeInstrumentKind,
   FixedIncomeLiquidity,
   IntraClassStrategy,
+  OfferIndexer,
   QuoteFreshness,
+  TaxRegime,
   TransactionKind,
 } from "../api/types";
 
@@ -218,4 +220,38 @@ export const SEVERITY_TONES: Record<string, string> = {
   CRITICAL: "danger",
   WARNING: "warning",
   INFO: "info",
+};
+
+export const TAX_REGIME_LABELS: Record<TaxRegime, string> = {
+  FIXED_INCOME_REGRESSIVE: "IR regressivo da renda fixa",
+  FIXED_INCOME_EXEMPT: "Renda fixa isenta",
+  IOF_REGRESSIVE: "IOF regressivo",
+  STOCK_SWING_TRADE: "Ganho na venda de ações",
+  ETF_BDR_SWING_TRADE: "Ganho na venda de ETFs e BDRs",
+  FII_CAPITAL_GAIN: "Ganho na venda de cotas de FII",
+  FII_DISTRIBUTION: "Rendimentos de FII",
+  DIVIDEND_WITHHOLDING: "Dividendos",
+  JCP_WITHHOLDING: "Juros sobre capital próprio",
+  FOREIGN_ANNUAL: "Aplicações no exterior",
+  CRYPTO_CAPITAL_GAIN: "Ganho com criptoativos",
+};
+
+export const OFFER_INDEXER_LABELS: Record<OfferIndexer, string> = {
+  CDI_PERCENT: "% do CDI",
+  CDI_SPREAD: "CDI + taxa",
+  IPCA_SPREAD: "IPCA + taxa",
+  PRE: "Prefixado",
+};
+
+export const OFFER_INDEXER_HINTS: Record<OfferIndexer, string> = {
+  CDI_PERCENT: "% do CDI (ex.: 110)",
+  CDI_SPREAD: "Taxa acima do CDI ao ano (ex.: 1,5)",
+  IPCA_SPREAD: "Taxa real ao ano (ex.: 6,5)",
+  PRE: "Taxa ao ano (ex.: 12,5)",
+};
+
+export const SCENARIO_LABELS: Record<string, string> = {
+  LOW: "Juros em queda",
+  BASE: "Base",
+  HIGH: "Juros em alta",
 };

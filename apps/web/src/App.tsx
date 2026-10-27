@@ -22,6 +22,7 @@ import { AccountsPage } from "./pages/settings/AccountsPage";
 import { AgenticPage } from "./pages/settings/agentic/AgenticPage";
 import { AgentKeyFormPage } from "./pages/settings/agentic/AgentKeyFormPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
+import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
 import { StrategyPage } from "./pages/settings/StrategyPage";
 
 export function AppRoutes() {
@@ -44,6 +45,7 @@ export function AppRoutes() {
       <Route path="/ledger/earnings/new" element={<EarningFormPage />} />
       <Route path="/ledger/earnings/:id/edit" element={<EarningFormPage />} />
       <Route path="/ledger/events/new" element={<EventFormPage />} />
+      <Route path="/tools/fixed-income" element={<FixedIncomeComparePage />} />
       <Route path="/settings/strategy" element={<StrategyPage />} />
       <Route path="/settings/accounts" element={<AccountsPage />} />
       <Route path="/settings/market-data" element={<MarketDataPage />} />

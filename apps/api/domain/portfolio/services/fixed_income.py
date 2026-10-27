@@ -12,6 +12,8 @@ Conventions (ADR 0006):
 - Redemptions (SELL) are gross amounts taken from the curve: they consume lots FIFO,
   reducing each lot's principal proportionally to the share of its gross value redeemed.
   Realized P/L is net of the regressive IOF/IR due on the redeemed yield and of fees.
+- IR and IOF rates come from the tax rule registry (`domain.tax`), resolved by the date of
+  the redemption (or of the valuation), so a legal change is a new rule record.
 - The 12-month projection is the change in net value over the next 252 business days (or
   until maturity), including the drop of the regressive income tax bracket.
 """
@@ -26,17 +28,12 @@ from core.helpers.calendar import business_days_between
 from domain.portfolio.services.positions import InsufficientQuantityError
 from domain.shared.entities import FixedIncomeTermEntity, TransactionEntity
 from domain.shared.enums import FixedIncomeIndexer, TransactionKind
+from domain.tax.entities import TaxRegime, TaxRuleBook
+from domain.tax.services.rules import DEFAULT_RULE_BOOK, income_tax_regime
 
 BUSINESS_DAYS_PER_YEAR = 252.0
 PROJECTION_CALENDAR_DAYS = 365
 DEFAULT_OVERSELL_TOLERANCE = 0.05
-
-# Official Brazilian IOF regressive table for redemptions between 1 and 29 calendar days
-IOF_TABLE: tuple[float, ...] = (
-    0.96, 0.93, 0.90, 0.86, 0.83, 0.80, 0.76, 0.73, 0.70, 0.66,
-    0.63, 0.60, 0.56, 0.53, 0.50, 0.46, 0.43, 0.40, 0.36, 0.33,
-    0.30, 0.26, 0.23, 0.20, 0.16, 0.13, 0.10, 0.06, 0.03,
-)  # fmt: skip
 
 
 @dataclass(frozen=True)
@@ -77,7 +74,9 @@ class FixedIncomeValuation:
 
 
 @dataclass
-class _Lot:
+class FixedIncomeLot:
+    """Open purchase lot: principal still invested and the date it started accruing."""
+
     start: date
     principal: float
 
@@ -89,24 +88,30 @@ class _Accrual:
     covered_days: int
 
 
-def regressive_ir_rate(calendar_days: int, *, tax_exempt: bool = False) -> float:
-    """Return the Brazilian regressive income tax rate based on holding calendar days."""
-    if tax_exempt:
-        return 0.0
-    if calendar_days <= 180:
-        return 0.225
-    if calendar_days <= 360:
-        return 0.200
-    if calendar_days <= 720:
-        return 0.175
-    return 0.150
+def regressive_ir_rate(
+    calendar_days: int,
+    *,
+    tax_exempt: bool = False,
+    on: date | None = None,
+    rules: TaxRuleBook | None = None,
+) -> float:
+    """Regressive income tax rate for a holding period, in force on `on` (default today)."""
+    book = rules or DEFAULT_RULE_BOOK
+    return book.rate(income_tax_regime(tax_exempt=tax_exempt), calendar_days, on or date.today())
 
 
-def regressive_iof_rate(calendar_days: int, *, tax_exempt: bool = False) -> float:
-    """Return the regressive IOF rate (applied before IR if redeemed in < 30 days)."""
-    if tax_exempt or calendar_days <= 0 or calendar_days >= 30:
+def regressive_iof_rate(
+    calendar_days: int,
+    *,
+    tax_exempt: bool = False,
+    on: date | None = None,
+    rules: TaxRuleBook | None = None,
+) -> float:
+    """Regressive IOF rate (applied before IR if redeemed in < 30 days)."""
+    if tax_exempt or calendar_days <= 0:
         return 0.0
-    return IOF_TABLE[calendar_days - 1]
+    book = rules or DEFAULT_RULE_BOOK
+    return book.rate(TaxRegime.IOF_REGRESSIVE, calendar_days, on or date.today())
 
 
 def count_business_days(start_date: date, end_date: date) -> int:
@@ -200,20 +205,39 @@ def _projection_factor(
     return ((1.0 + curves.annual_ipca_rate) * (1.0 + rate)) ** years
 
 
-def _taxes(yield_brl: float, calendar_days: int, tax_exempt: bool) -> tuple[float, float]:
+def _taxes(
+    yield_brl: float,
+    calendar_days: int,
+    tax_exempt: bool,
+    on: date,
+    rules: TaxRuleBook,
+) -> tuple[float, float]:
     taxable = max(0.0, yield_brl)
-    iof = taxable * regressive_iof_rate(calendar_days, tax_exempt=tax_exempt)
-    ir = max(0.0, taxable - iof) * regressive_ir_rate(calendar_days, tax_exempt=tax_exempt)
-    return iof, ir
+    iof = taxable * regressive_iof_rate(calendar_days, tax_exempt=tax_exempt, on=on, rules=rules)
+    ir_rate = regressive_ir_rate(calendar_days, tax_exempt=tax_exempt, on=on, rules=rules)
+    return iof, max(0.0, taxable - iof) * ir_rate
+
+
+def redemption_taxes(
+    yield_brl: float,
+    calendar_days: int,
+    *,
+    tax_exempt: bool,
+    on: date,
+    rules: TaxRuleBook | None = None,
+) -> tuple[float, float]:
+    """IOF and IR due when a lot with `yield_brl` of gain is redeemed on `on`."""
+    return _taxes(yield_brl, calendar_days, tax_exempt, on, rules or DEFAULT_RULE_BOOK)
 
 
 def _redeem(
-    lots: list[_Lot],
+    lots: list[FixedIncomeLot],
     tx: TransactionEntity,
     term: FixedIncomeTermEntity,
     curves: RateCurves,
     tolerance: float,
-) -> tuple[list[_Lot], float]:
+    rules: TaxRuleBook,
+) -> tuple[list[FixedIncomeLot], float]:
     on = tx.trade_date
     gross_redeemed = float(tx.quantity * tx.unit_price)
     lot_values = [
@@ -228,7 +252,7 @@ def _redeem(
 
     remaining = gross_redeemed
     realized = -float(tx.fees)
-    kept: list[_Lot] = []
+    kept: list[FixedIncomeLot] = []
     for index, (lot, lot_gross) in enumerate(zip(lots, lot_values, strict=True)):
         is_last = index == len(lots) - 1
         if remaining <= 0 or lot_gross <= 0:
@@ -237,13 +261,60 @@ def _redeem(
         take = remaining if is_last and remaining > lot_gross else min(remaining, lot_gross)
         share = min(take / lot_gross, 1.0)
         consumed_principal = lot.principal * share
-        iof, ir = _taxes(take - consumed_principal, (on - lot.start).days, term.tax_exempt)
+        iof, ir = _taxes(
+            take - consumed_principal, (on - lot.start).days, term.tax_exempt, on, rules
+        )
         realized += take - consumed_principal - iof - ir
         remaining -= take
         leftover = lot.principal - consumed_principal
         if leftover > 0.005:
-            kept.append(_Lot(lot.start, leftover))
+            kept.append(FixedIncomeLot(lot.start, leftover))
     return kept, realized
+
+
+def replay_lots(
+    transactions: Iterable[TransactionEntity],
+    term: FixedIncomeTermEntity,
+    as_of_date: date,
+    *,
+    curves: RateCurves | None = None,
+    oversell_tolerance: float = DEFAULT_OVERSELL_TOLERANCE,
+    tax_rules: TaxRuleBook | None = None,
+) -> tuple[list[FixedIncomeLot], float]:
+    """Open FIFO lots on `as_of_date` and the realized P/L of the redemptions until then."""
+    rates = curves or RateCurves()
+    rules = tax_rules or DEFAULT_RULE_BOOK
+    ordered = sorted(
+        (t for t in transactions if t.trade_date <= as_of_date),
+        key=lambda t: (t.trade_date, t.kind != TransactionKind.BUY, t.id or 0),
+    )
+
+    lots: list[FixedIncomeLot] = []
+    realized = 0.0
+    for tx in ordered:
+        if tx.kind == TransactionKind.BUY:
+            lots.append(
+                FixedIncomeLot(
+                    max(tx.trade_date, term.issue_date),
+                    float(tx.quantity * tx.unit_price + tx.fees),
+                )
+            )
+        else:
+            lots, trade_realized = _redeem(lots, tx, term, rates, oversell_tolerance, rules)
+            realized += trade_realized
+    return lots, realized
+
+
+def valuation_end(term: FixedIncomeTermEntity, as_of_date: date) -> date:
+    """Last accrual date: the valuation date, capped at maturity."""
+    if term.maturity_date is not None:
+        return min(as_of_date, term.maturity_date)
+    return as_of_date
+
+
+def projection_factor(term: FixedIncomeTermEntity, business_days: int, curves: RateCurves) -> float:
+    """Forward gross factor over `business_days` using the annual rates of `curves`."""
+    return _projection_factor(term, business_days, curves)
 
 
 def value_fixed_income_position(
@@ -253,6 +324,7 @@ def value_fixed_income_position(
     *,
     curves: RateCurves | None = None,
     oversell_tolerance: float = DEFAULT_OVERSELL_TOLERANCE,
+    tax_rules: TaxRuleBook | None = None,
 ) -> FixedIncomeValuation:
     """Compute accrued gross/net value, realized P/L and 12m projection of a fixed income asset.
 
@@ -260,33 +332,22 @@ def value_fixed_income_position(
     than `oversell_tolerance` (relative), which callers treat as an invalid ledger.
     """
     rates = curves or RateCurves()
-    ordered = sorted(
-        (t for t in transactions if t.trade_date <= as_of_date),
-        key=lambda t: (t.trade_date, t.kind != TransactionKind.BUY, t.id or 0),
+    rules = tax_rules or DEFAULT_RULE_BOOK
+    lots, realized = replay_lots(
+        transactions,
+        term,
+        as_of_date,
+        curves=rates,
+        oversell_tolerance=oversell_tolerance,
+        tax_rules=rules,
     )
-
-    lots: list[_Lot] = []
-    realized = 0.0
-    for tx in ordered:
-        if tx.kind == TransactionKind.BUY:
-            lots.append(
-                _Lot(
-                    max(tx.trade_date, term.issue_date),
-                    float(tx.quantity * tx.unit_price + tx.fees),
-                )
-            )
-        else:
-            lots, trade_realized = _redeem(lots, tx, term, rates, oversell_tolerance)
-            realized += trade_realized
 
     if not lots:
         return FixedIncomeValuation(
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, round(realized, 2), 1.0
         )
 
-    effective_end = (
-        min(as_of_date, term.maturity_date) if term.maturity_date is not None else as_of_date
-    )
+    effective_end = valuation_end(term, as_of_date)
     # One standard year (252 business days) ahead, or less when the bond matures earlier.
     horizon_end = as_of_date + timedelta(days=PROJECTION_CALENDAR_DAYS)
     horizon_bd = int(BUSINESS_DAYS_PER_YEAR)
@@ -296,7 +357,7 @@ def value_fixed_income_position(
     if horizon_end <= effective_end:
         horizon_bd = 0
     horizon_cal_days = max(0, (horizon_end - effective_end).days)
-    projection_factor = _projection_factor(term, horizon_bd, rates)
+    horizon_factor = _projection_factor(term, horizon_bd, rates)
 
     invested_principal = gross_value = total_iof = total_ir = weighted_ir = 0.0
     net_at_horizon = 0.0
@@ -305,19 +366,25 @@ def value_fixed_income_position(
         accrual = accrual_factor(term, lot.start, effective_end, rates)
         lot_gross = lot.principal * accrual.factor
         cal_days = max(0, (effective_end - lot.start).days)
-        iof, ir = _taxes(lot_gross - lot.principal, cal_days, term.tax_exempt)
+        iof, ir = _taxes(lot_gross - lot.principal, cal_days, term.tax_exempt, effective_end, rules)
 
         invested_principal += lot.principal
         gross_value += lot_gross
         total_iof += iof
         total_ir += ir
-        weighted_ir += lot.principal * regressive_ir_rate(cal_days, tax_exempt=term.tax_exempt)
+        weighted_ir += lot.principal * regressive_ir_rate(
+            cal_days, tax_exempt=term.tax_exempt, on=effective_end, rules=rules
+        )
         covered_days += accrual.covered_days
         business_days += accrual.business_days
 
-        lot_gross_h = lot_gross * projection_factor
+        lot_gross_h = lot_gross * horizon_factor
         iof_h, ir_h = _taxes(
-            lot_gross_h - lot.principal, cal_days + horizon_cal_days, term.tax_exempt
+            lot_gross_h - lot.principal,
+            cal_days + horizon_cal_days,
+            term.tax_exempt,
+            horizon_end,
+            rules,
         )
         net_at_horizon += lot_gross_h - iof_h - ir_h
 

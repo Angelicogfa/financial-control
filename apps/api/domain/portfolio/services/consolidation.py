@@ -57,6 +57,7 @@ from domain.shared.enums import (
     IntraClassStrategy,
     TransactionKind,
 )
+from domain.tax.entities import TaxRuleBook
 
 LEDGER_VALID = "VALID"
 LEDGER_INVALID = "INVALID"
@@ -132,7 +133,7 @@ class ConsolidatedPortfolioReport:
     positions: list[ValuedAssetPosition]
     earnings_by_month: dict[str, float] = field(default_factory=dict)
     total_fx_pnl_brl: float = 0.0
-    projection_assumptions: dict[str, float] = field(default_factory=dict)
+    projection_assumptions: dict[str, float | None] = field(default_factory=dict)
     value_by_purpose_brl: dict[str, float] = field(default_factory=dict)
 
 
@@ -298,11 +299,13 @@ def _estimate_yield_and_projection_by_type(
     )
 
 
-def _value_fixed_income(v: _Valuation, ref_date: date, curves: RateCurves) -> None:
+def _value_fixed_income(
+    v: _Valuation, ref_date: date, curves: RateCurves, tax_rules: TaxRuleBook | None
+) -> None:
     asset = v.asset
     assert asset.fixed_income_term is not None
     v.fi_val = value_fixed_income_position(
-        asset.transactions, asset.fixed_income_term, ref_date, curves=curves
+        asset.transactions, asset.fixed_income_term, ref_date, curves=curves, tax_rules=tax_rules
     )
     open_qty = sum(
         float(t.quantity) if t.kind == TransactionKind.BUY else -float(t.quantity)
@@ -368,6 +371,7 @@ def consolidate_portfolio(
     as_of_date: date | None = None,
     date_from: date | None = None,
     split_adjust_through: date | None = None,
+    tax_rules: TaxRuleBook | None = None,
 ) -> ConsolidatedPortfolioReport:
     """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations.
 
@@ -390,7 +394,7 @@ def consolidate_portfolio(
         v = _Valuation(asset=asset)
         try:
             if asset.asset_type in FIXED_INCOME_TYPES and asset.fixed_income_term is not None:
-                _value_fixed_income(v, ref_date, rate_curves)
+                _value_fixed_income(v, ref_date, rate_curves, tax_rules)
             else:
                 _value_market_asset(
                     v,
