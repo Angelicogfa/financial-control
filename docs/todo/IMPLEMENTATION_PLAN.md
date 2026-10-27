@@ -32,6 +32,14 @@
 | **Fase 17** | Arquitetura Unificada de Backend em Camadas por Domínio em `apps/api` (ADR 0009) | `[x]` Concluída | 100% |
 | **Fase 18** | Configuração Agêntica e Servidor MCP Pessoal (`/settings/agentic`, `/api/v1/mcp`) | `[x]` Concluída | 100% |
 | **Fase 19** | Notificações de Erros de Requisição do Worker (Badge no menu e Log detalhado em Dados de Mercado) | `[x]` Concluída | 100% |
+| **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[ ]` Pendente | 0% |
+| **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[ ]` Pendente | 0% |
+| **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[ ]` Pendente | 0% |
+| **Fase 27** | Comparador de Ativos | `[ ]` Pendente | 0% |
+| **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
+| **Fase 29** | Estatísticas e Saúde da Carteira | `[ ]` Pendente | 0% |
+
+> **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
 > **Auditoria 2026-10-24:** a revisão sistêmica (seção *Registro de Achados* abaixo) mostrou que parte das fases 1–6 marcadas como concluídas contém defeitos de cálculo e divergências entre documentação e código (ex.: 6.1 descreve Dockerfiles multi-stage que não existem; 5.x e a rota de Detalhe do Ativo não foram implementadas no frontend). As fases 7–14 corrigem esses pontos; os status das fases anteriores permanecem como histórico.
 
@@ -524,3 +532,71 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **21.1** `AssetSelect` ganha `onResolve`, chamado sempre que o valor selecionado ou a lista de ativos carregada muda; os formulários de negociação e de provento derivam a moeda do ativo daí, então o campo de câmbio aparece logo na abertura para ativos em USD (edição e `?asset=` pré-selecionado), preservando o `fx_rate` gravado.
 - `[x]` **21.2** Prévia em reais ao lado do câmbio: total `(quantidade × preço + taxas) × câmbio` na negociação e líquido `(bruto − IR) × câmbio` no provento, com a mesma regra de `total_brl`/`net_amount_brl` da API.
 - `[x]` **21.3** Testes de UI em `operations.test.tsx`: criação com ativo USD pré-selecionado, edição de negociação e de provento USD (valor salvo e envio do `fx_rate`) e ativo BRL sem o campo.
+
+---
+
+## Fase 24 — Tributação Regressiva por Ativo e Comparador Tributado × Isento (`[ ]` Pendente)
+
+**Objetivo:** mostrar, para cada ativo e lote, o regime de IR aplicável, a faixa atual da tabela regressiva e quando ela cai; e comparar a rentabilidade teórica líquida de um título tributado com a de um isento. Regras vigentes em [MARKET_ANALYSIS.md §6.1](../research/MARKET_ANALYSIS.md) (MP 1.303/2025 caducou; tabela 22,5/20/17,5/15% e isenção de LCI/LCA mantidas).
+
+- `[ ]` **24.1** Tabela de alíquotas com vigência: regras de IR e IOF como dados com início/fim (renda fixa regressiva, isentos, ações, FII, JCP, exterior), lidas por `regressive_ir_rate`/`regressive_iof_rate`, para que uma mudança legal vire um novo registro. Migration Alembic sequencial.
+- `[ ]` **24.2** Situação tributária por lote (domínio puro): alíquota atual, data e dias até a próxima faixa, IOF ainda devido, IR estimado se resgatar hoje × na próxima faixa e ganho de esperar. Para renda variável, o regime informativo do tipo de ativo.
+- `[ ]` **24.3** Comparador tributado × isento (domínio puro): projeção do valor bruto no vencimento por indexador (% CDI, CDI + spread, IPCA+, prefixado) com as premissas de projeção da política e cenários; IR sobre o ganho acumulado; valor e taxa líquidos; taxa equivalente por faixa; ponto de empate em dias; janela comum quando prazos ou carências diferem.
+- `[ ]` **24.4** Casos de uso, rotas REST e operações MCP (`assets.tax_status`, `tools.fixed_income_compare`).
+- `[ ]` **24.5** Interface: bloco "Tributação" no detalhe do ativo (faixa, próxima queda, IR estimado); ferramenta "Comparar renda fixa" com dois ou mais títulos, informados à mão ou escolhidos da carteira.
+- `[ ]` **24.6** Testes de unidade (fronteiras 180/181, 360/361, 720/721 dias, IOF dia 29/30, isentos, cenários de indexador), integração da API e UI.
+
+## Fase 25 — Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas (`[ ]` Pendente)
+
+**Objetivo:** impedir que a sugestão de aporte siga uma tese vencida ou um dado de provedor errado.
+
+- `[ ]` **25.1** Validade das respostas manuais do checklist: prazo em meses na política versionada; resposta vencida marca o ativo para revisão (`ASSET_IN_REVIEW`) e, conforme opção da política, sai ou não da nota.
+- `[ ]` **25.2** Reabertura das respostas manuais quando chega demonstrativo anual novo do ativo, com o histórico da nota preservado.
+- `[ ]` **25.3** Sanidade dos indicadores no adaptador: faixas plausíveis por indicador e tipo de ativo, divergência brapi × Yahoo acima de um limite e marca `suspicious` no dado e no veredito de valuation (resolve parte do TD-06).
+- `[ ]` **25.4** DY normalizado para o Bazin: mediana de 3–5 anos de proventos, sinalizando proventos extraordinários.
+- `[ ]` **25.5** `PRICE_BELOW_CEILING` não dispara (ou cai de severidade) quando o teto vem de dado suspeito; novo alerta interno de dado suspeito.
+- `[ ]` **25.6** Testes de unidade e integração; checklist e valuation exibem selo de dado suspeito e de resposta vencida.
+
+## Fase 26 — Tesouro a Mercado, Agenda de Proventos e Alertas Internos (`[ ]` Pendente)
+
+**Objetivo:** corrigir o peso do quadrante Caixa e antecipar renda e eventos, com alertas apenas dentro do sistema (sem canal externo por ora).
+
+- `[ ]` **26.1** Marcação a mercado do Tesouro Direto (TD-02): estender `infra/providers/tesouro.py` para o preço unitário de resgate diário; o valor a mercado aparece ao lado do valor na curva.
+- `[ ]` **26.2** Opção na política: peso do quadrante pela curva ou pelo mercado no ARCA e no aporte.
+- `[ ]` **26.3** Agenda de proventos anunciados (data com, data ex, pagamento, valor por cota) para carteira e watchlist, e renda futura já declarada no Início; data ex real usada nos eventos importados (TD-08).
+- `[ ]` **26.4** Alertas internos novos: data com próxima, vencimento de renda fixa próximo, queda de faixa de IR próxima (Fase 24), checklist vencido e dado suspeito (Fase 25). Sem e-mail, Telegram ou push.
+- `[ ]` **26.5** Testes de unidade (provider com CSV de exemplo, regras de alerta), integração e UI.
+
+## Fase 27 — Comparador de Ativos (`[ ]` Pendente)
+
+**Objetivo:** comparar até 5 ativos do mesmo perfil lado a lado, usando os dados já armazenados.
+
+- `[ ]` **27.1** Caso de uso que monta a comparação a partir de demonstrativos, indicadores atuais, valuation e checklist; busca sob demanda dos demonstrativos que faltarem.
+- `[ ]` **27.2** Indicadores em cinco grupos (valuation, endividamento, eficiência, rentabilidade, crescimento), escolhidos pelo usuário, com destaque do melhor por linha e aviso ao misturar perfis diferentes (ação × FII).
+- `[ ]` **27.3** Histórico anual em gráfico (receita, lucro, ROE, DY) e veredito de valuation e nota do checklist por ativo.
+- `[ ]` **27.4** Entrada a partir de Pesquisar, watchlist, Carteira e detalhe do ativo; rota REST e operação MCP.
+- `[ ]` **27.5** Testes de unidade, integração e UI.
+
+## Fase 28 — Fatos Relevantes pelos Dados Abertos da CVM (`[ ]` Pendente)
+
+**Objetivo:** trazer fatos relevantes, comunicados e avisos aos acionistas dos ativos da carteira e da watchlist, sem custo.
+
+- `[ ]` **28.1** Provider CVM: baixar `ipe_cia_aberta_AAAA.zip` de `dados.cvm.gov.br/dados/CIA_ABERTA/DOC/IPE/DADOS/` (atualização semanal) e o cadastro de companhias para mapear ticker → CNPJ.
+- `[ ]` **28.2** Persistência dos documentos (categoria, tipo, assunto, datas de referência e entrega, link) com deduplicação; migration Alembic sequencial.
+- `[ ]` **28.3** Rotina no worker filtrando por CNPJ dos ativos acompanhados, com erros registrados no log de requisições (Fase 19).
+- `[ ]` **28.4** Interface: feed no detalhe do ativo e no Início, filtro por categoria, marcar como lido; alerta interno de fato relevante novo.
+- `[ ]` **28.5** Limitação documentada: FIIs não estão no IPE de companhias abertas; a cobertura deles fica para uma etapa futura.
+- `[ ]` **28.6** Testes de unidade (parser com ZIP de exemplo), integração e UI.
+
+## Fase 29 — Estatísticas e Saúde da Carteira (`[ ]` Pendente)
+
+**Objetivo:** transformar as métricas existentes em diagnóstico, nos sete pilares de [MARKET_ANALYSIS.md §7.3](../research/MARKET_ANALYSIS.md): cada checagem retorna ok/atenção/crítico, explicação e ação sugerida, com limites na política versionada.
+
+- `[ ]` **29.1** Concentração: peso do maior ativo e dos 5 maiores, HHI e número efetivo de ativos por ativo, setor, emissor e quadrante; exposição por instituição acima do limite do FGC.
+- `[ ]` **29.2** Diversificação de risco: índice de Choueifaty, contribuição ao risco por ativo e quadrante (decomposição de Euler) e pares com correlação alta; covariância com encolhimento de Ledoit-Wolf.
+- `[ ]` **29.3** Risco e desempenho complementares: drawdown atual e duração, Ulcer Index, tracking error, Information Ratio, Omega, retornos e Sharpe em janela móvel de 12 meses, consistência contra o CDI, estresse histórico com os pesos atuais; TWR por classe (TD-07).
+- `[ ]` **29.4** Qualidade dos ativos: nota média ponderada do checklist, % do peso com checklist vencido ou dado suspeito, Piotroski F-score e Altman Z''-score quando os demonstrativos tiverem as linhas necessárias.
+- `[ ]` **29.5** Liquidez, renda e tributos: reserva em meses, % com liquidez até D+2, vencimentos em 12 meses, renda passiva, % isento e lotes perto de mudar de faixa (Fase 24).
+- `[ ]` **29.6** Rigor estatístico: janela mínima por métrica com estado "dados insuficientes" e intervalo de confiança por bootstrap para Sharpe e retorno.
+- `[ ]` **29.7** Tela "Saúde da carteira" com o pilar em pior estado primeiro (sem média que dilua um crítico), limites configuráveis na Estratégia e operação MCP.
+- `[ ]` **29.8** Testes de unidade com séries sintéticas de resultado conhecido (pesos iguais, ativo único, ativos independentes), integração e UI.
