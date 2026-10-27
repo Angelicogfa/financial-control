@@ -30,6 +30,7 @@ from domain.ledger.services.b3_import import (
     classify,
     event_factor,
     guess_asset_type,
+    mark_skipped,
     parse_statement,
     resolve_fixed_income,
 )
@@ -206,47 +207,60 @@ def _register_fixed_income(
     )
 
 
-def _reject_unbacked_redemptions(
-    preview: ImportPreview, assets: dict[str, AssetEntity]
-) -> ImportPreview:
-    """Mark INVALID the Treasury/bank redemptions larger than what the ledger holds.
+UNBACKED_REDEMPTION = "Resgate maior que o saldo: a aplicação é anterior a este extrato"
+UNBACKED_SELL = (
+    "Venda maior que o saldo: a compra não está neste extrato nem nos lançamentos "
+    "(ignore a linha ou lance a compra antes)"
+)
 
-    A statement covers a period: redeeming an application made before it has no position
-    to come from. Rejecting the line keeps the rest of the statement importable.
+
+def _reject_unbacked_sells(preview: ImportPreview, assets: dict[str, AssetEntity]) -> ImportPreview:
+    """Mark INVALID the sells and redemptions larger than what the ledger holds.
+
+    A statement covers a period: selling what was bought before it (or under another code,
+    as after a conversion) has no position to come from. Rejecting the line keeps the rest
+    of the statement importable, and the preview shows it before anything is written.
     """
     pending: dict[str, list[ImportLine]] = {}
-    for line in preview.new_lines:
-        if line.fixed_income is not None and line.action == LineAction.TRADE:
+    for line in preview.lines:
+        if (
+            line.action == LineAction.TRADE
+            and line.status in (LineStatus.NEW, LineStatus.UNKNOWN_ASSET)
+            and line.trade_kind is not None
+            and line.when is not None
+        ):
             pending.setdefault(line.ticker or "", []).append(line)
-    rejected: set[int] = set()
+    rejected: dict[int, str] = {}
     for ticker, items in pending.items():
         asset = assets.get(ticker)
-        if asset is None:
-            continue
-        accepted = list(asset.transactions)
+        if asset is None and any(i.fixed_income for i in items):
+            continue  # a security is valued by its terms, chosen only at commit
+        accepted = list(asset.transactions) if asset else []
         for line in sorted(
             items, key=lambda i: (i.when, i.trade_kind != TransactionKind.BUY, i.line_no)
         ):
             trade = TransactionEntity(
-                asset_id=asset.id or 0,
+                asset_id=(asset.id if asset else None) or 0,
                 kind=line.trade_kind,  # type: ignore[arg-type]
                 trade_date=line.when,  # type: ignore[arg-type]
                 quantity=line.quantity or Decimal("0"),
                 unit_price=line.unit_price or Decimal("0"),
             )
             try:
-                validate_ledger(asset, [*accepted, trade])
+                if asset is None:
+                    build_position([*accepted, trade])
+                else:
+                    validate_ledger(asset, [*accepted, trade])
             except InsufficientQuantityError:
-                rejected.add(line.line_no)
+                rejected[line.line_no] = UNBACKED_REDEMPTION if line.fixed_income else UNBACKED_SELL
                 continue
             accepted.append(trade)
     if not rejected:
         return preview
-    note = "Resgate maior que o saldo: a aplicação é anterior a este extrato"
     return ImportPreview(
         preview.kind,
         [
-            replace(line, status=LineStatus.INVALID, note=note)
+            replace(line, status=LineStatus.INVALID, note=rejected[line.line_no])
             if line.line_no in rejected
             else line
             for line in preview.lines
@@ -261,6 +275,7 @@ def _classified(
     *,
     chosen: dict[str, str] | None = None,
     with_events: bool = False,
+    skipped: Iterable[int] = (),
 ) -> ImportPreview:
     resolved = resolve_fixed_income(parsed, assets.values(), chosen=chosen)
     preview = classify(
@@ -269,20 +284,26 @@ def _classified(
         existing_hashes=uow.ledger_imports.existing_hashes([line.hash for line in parsed.lines]),
         held_before=_held_before(assets) if with_events else None,
     )
-    return _reject_unbacked_redemptions(preview, assets)
+    return _reject_unbacked_sells(mark_skipped(preview, skipped), assets)
 
 
 class ImportHandler:
-    """Preview shows what would happen; commit applies only NEW lines, all or nothing."""
+    """Preview shows what would happen; commit applies only NEW lines, all or nothing.
+
+    `skip_lines` (statement line numbers) leaves lines out of both, so a sell whose purchase
+    is missing, or any line the user does not want, never blocks the rest of the statement.
+    """
 
     def __init__(self, uow_factory: UoWFactory) -> None:
         self.uow_factory = uow_factory
 
-    def preview(self, filename: str, content: bytes) -> ImportPreviewDTO:
+    def preview(
+        self, filename: str, content: bytes, *, skip_lines: Iterable[int] = ()
+    ) -> ImportPreviewDTO:
         parsed = _parse(filename, content)
         with self.uow_factory() as uow:
             assets = {a.ticker: a for a in uow.assets.list_all(active_only=False)}
-            preview = _classified(uow, parsed, assets, with_events=True)
+            preview = _classified(uow, parsed, assets, with_events=True, skipped=skip_lines)
             refs = _fixed_income_refs(preview)
             unknown = []
             for ticker in preview.unknown_tickers:
@@ -323,10 +344,13 @@ class ImportHandler:
         account_id: int | None,
         create_tickers: list[str],
         new_assets: Iterable[ImportNewAssetRequest] = (),
+        skip_lines: Iterable[int] = (),
     ) -> ImportCommitDTO:
         """Register the chosen unknown tickers through the research flow, then apply the
-        new lines. `create_tickers` takes the suggestions; `new_assets` carries choices."""
+        new lines. `create_tickers` takes the suggestions; `new_assets` carries choices.
+        A ticker left with no line to import (all skipped or invalid) is not registered."""
         parsed = _parse(filename, content)
+        skipped = list(skip_lines)
         chosen = {
             t.strip().upper(): ImportNewAssetRequest(ticker=t) for t in create_tickers if t.strip()
         }
@@ -338,7 +362,14 @@ class ImportHandler:
             existing = uow.assets.list_all(active_only=False)
             refs = _fixed_income_refs(resolve_fixed_income(parsed, existing))
             keys = {line.fixed_income.key for line in parsed.lines if line.fixed_income}
+            needed = set(
+                _classified(
+                    uow, parsed, {a.ticker: a for a in existing}, skipped=skipped
+                ).unknown_tickers
+            )
             for ticker, wanted in sorted(chosen.items()):
+                if ticker not in needed:
+                    continue  # already registered, or nothing of it left to import
                 if ticker in refs:
                     asset = _register_fixed_income(uow, *refs[ticker], wanted)
                     fixed_income[ticker] = asset.ticker
@@ -363,7 +394,7 @@ class ImportHandler:
                 registered.append(ticker)
 
             assets = {a.ticker: a for a in uow.assets.list_all(active_only=False)}
-            preview = _classified(uow, parsed, assets, chosen=fixed_income)
+            preview = _classified(uow, parsed, assets, chosen=fixed_income, skipped=skipped)
             created = self._apply(uow, preview.new_lines, assets, account)
             invalidate_snapshots_from(uow, *(line.when for line in preview.new_lines))
             uow.commit()

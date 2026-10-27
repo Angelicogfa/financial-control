@@ -137,17 +137,60 @@ def test_import_rejects_bad_files_and_oversold_ledgers(api: SimpleNamespace) -> 
         "Data do Negócio;Tipo de Movimentação;Código de Negociação;Quantidade;Preço;Valor\n"
         "10/04/2024;Venda;PETR4;10;R$ 38,00;R$ 380,00\n"
     ).encode()
+    # A sell with no purchase behind it is flagged in the preview and never blocks the import.
+    previewed = _upload(client, "preview", "venda.csv", sell_only).json()
+    assert previewed["counts"] == {"INVALID": 1}
+    assert previewed["lines"][0]["note"].startswith("Venda maior que o saldo")
+    assert previewed["unknown_tickers"] == []
     oversold = _upload(client, "commit", "venda.csv", sell_only, create_tickers="PETR4")
-    assert oversold.status_code == 409
-    assert oversold.json()["code"] == "LEDGER_CONFLICT"
-    # Atomic: neither the trade nor the asset created for it was kept.
+    assert oversold.status_code == 200, oversold.text
+    assert oversold.json()["created"]["TRADE"] == 0
+    assert oversold.json()["skipped"] == {"INVALID": 1}
+    # The ticker had nothing left to import, so it was not registered either.
     assert client.get("/api/v1/assets", params={"page_size": 50}).json()["items"] == []
 
-    unknown = _upload(
-        client, "commit", "x.csv", sell_only.replace(b"PETR4", b"ABCD1"), create_tickers="ABCD1"
-    )
+    buy_only = sell_only.replace(b"Venda;PETR4", b"Compra;ABCD1")
+    unknown = _upload(client, "commit", "x.csv", buy_only, create_tickers="ABCD1")
     assert unknown.status_code == 400
     assert unknown.json()["code"] == "UNKNOWN_INSTRUMENT"
+
+
+def test_skipped_lines_are_left_out_of_preview_and_commit(api: SimpleNamespace) -> None:
+    client = api.client
+    statement = (
+        "Data do Negócio;Tipo de Movimentação;Código de Negociação;Quantidade;Preço;Valor\n"
+        "10/04/2024;Compra;PETR4;10;R$ 38,00;R$ 380,00\n"
+        "11/04/2024;Venda;PETR4;4;R$ 39,00;R$ 156,00\n"
+        "12/04/2024;Compra;VALE3;5;R$ 60,00;R$ 300,00\n"
+    ).encode()
+
+    # Skipping the purchase leaves the sell after it without a position.
+    no_buy = _upload(client, "preview", "n.csv", statement, skip_lines="2").json()
+    by_line = {line["line_no"]: line for line in no_buy["lines"]}
+    assert by_line[2]["status"] == "IGNORED"
+    assert by_line[2]["note"] == "Ignorada por você"
+    assert by_line[3]["status"] == "INVALID"
+    assert [u["ticker"] for u in no_buy["unknown_tickers"]] == ["VALE3"]
+
+    committed = _upload(
+        client, "commit", "n.csv", statement, create_tickers="PETR4,VALE3", skip_lines="4"
+    )
+    assert committed.status_code == 200, committed.text
+    assert committed.json()["created"]["TRADE"] == 2
+    assert committed.json()["created_assets"] == ["PETR4"]
+    assert committed.json()["skipped"] == {"IGNORED": 1}
+
+    # The skipped line is still there to import later.
+    again = _upload(client, "preview", "n.csv", statement).json()
+    assert {line["line_no"]: line["status"] for line in again["lines"]} == {
+        2: "DUPLICATE",
+        3: "DUPLICATE",
+        4: "UNKNOWN_ASSET",
+    }
+
+    bad = _upload(client, "preview", "n.csv", statement, skip_lines="2,x")
+    assert bad.status_code == 400
+    assert bad.json()["code"] == "INVALID_SKIP_LINES"
 
 
 def _arca_classes(api: SimpleNamespace) -> dict[str, tuple[str, str]]:
