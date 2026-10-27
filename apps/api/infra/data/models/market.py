@@ -73,3 +73,34 @@ class InstrumentCatalogModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class TreasuryCatalogModel(Base):
+    """Brazilian Treasury bonds (Tesouro Direto) synced daily from Tesouro Transparente."""
+
+    __tablename__ = "treasury_catalog"
+
+    symbol: Mapped[str] = mapped_column(String(80), primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    bond_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    instrument_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    indexer: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    raw_indexer: Mapped[str] = mapped_column(String(32), nullable=False)
+    coupon_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    maturity_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    base_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    buy_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sell_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    buy_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sell_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    base_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rate_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rate_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    rate_description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    contracted_rate_percent: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    liquidity: Mapped[str] = mapped_column(String(32), nullable=False, default="DAILY")
+    source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )

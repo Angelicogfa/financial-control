@@ -29,6 +29,7 @@ from infra.data.repositories.market import (
     SqlAlchemyCatalogRepository,
     SqlAlchemyFundamentalsRepository,
     SqlAlchemyMarketSeriesRepository,
+    SqlAlchemyTreasuryCatalogRepository,
 )
 from infra.data.repositories.policy import SqlAlchemyPolicyRepository
 from infra.data.repositories.portfolio import (
@@ -58,6 +59,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.fundamentals = SqlAlchemyFundamentalsRepository(self.session)
         self.checklists = SqlAlchemyChecklistRepository(self.session)
         self.catalog = SqlAlchemyCatalogRepository(self.session)
+        self.treasury_catalog = SqlAlchemyTreasuryCatalogRepository(self.session)
         self.contribution_plans = SqlAlchemyContributionPlanRepository(self.session)
         self.corporate_events = SqlAlchemyCorporateEventRepository(self.session)
         self.ledger_imports = SqlAlchemyLedgerImportRepository(self.session)

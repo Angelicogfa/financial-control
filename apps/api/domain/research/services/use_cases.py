@@ -83,12 +83,24 @@ class ResearchHandler:
         indexer: FixedIncomeIndexer | None = None,
         coupon_type: str | None = None,
     ) -> TreasurySearchResponseDTO:
-        brapi_indexer = _BRAPI_INDEXER_BY_ENUM.get(indexer) if indexer is not None else None
-        catalog_result = self.portfolio_service.gateway.list_treasury_bonds(
-            indexer=brapi_indexer,
-            coupon_type=coupon_type,
-        )
-        bonds = catalog_result.results
+        unavailable_reason: str | None = None
+        with self.uow_factory() as uow:
+            catalog = uow.treasury_catalog.list_all()
+            if not catalog:
+                upstream = self.portfolio_service.gateway.list_treasury_bonds()
+                if upstream.results:
+                    uow.treasury_catalog.upsert(upstream.results)
+                    uow.commit()
+                    catalog = uow.treasury_catalog.list_all()
+                else:
+                    unavailable_reason = upstream.unavailable_reason
+            treasury_assets = [
+                a
+                for a in uow.assets.list_all(active_only=True)
+                if a.asset_type == AssetType.TREASURY
+            ]
+
+        bonds = list(catalog)
         if indexer is not None:
             bonds = [b for b in bonds if b.indexer == indexer]
         if coupon_type:
@@ -97,19 +109,15 @@ class ResearchHandler:
             needle = query.strip().casefold()
             bonds = [b for b in bonds if _matches_treasury_query(b, needle)]
 
-        with self.uow_factory() as uow:
-            treasury_assets = [
-                a
-                for a in uow.assets.list_all(active_only=True)
-                if a.asset_type == AssetType.TREASURY
-            ]
         return TreasurySearchResponseDTO(
             results=[
                 to_treasury_bond_dto(b, asset_id=_matching_treasury_asset_id(b, treasury_assets))
                 for b in bonds
             ],
             total=len(bonds),
-            unavailable_reason=catalog_result.unavailable_reason,
+            catalog_size=len(catalog),
+            catalog_updated_at=max((b.updated_at for b in catalog if b.updated_at), default=None),
+            unavailable_reason=unavailable_reason,
         )
 
     def _empty(self, uow: AbstractUnitOfWork, criteria: ScreenerCriteria) -> ScreenerResponseDTO:
@@ -231,13 +239,6 @@ class ResearchHandler:
 
 def parse_asset_types(values: list[str] | None) -> frozenset[AssetType]:
     return frozenset(AssetType(v) for v in values or [])
-
-
-_BRAPI_INDEXER_BY_ENUM: dict[FixedIncomeIndexer, str] = {
-    FixedIncomeIndexer.SELIC: "selic",
-    FixedIncomeIndexer.PRE: "prefixado",
-    FixedIncomeIndexer.IPCA: "ipca",
-}
 
 
 def _matches_treasury_query(bond: TreasuryBond, needle: str) -> bool:

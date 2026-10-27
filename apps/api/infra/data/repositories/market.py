@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
+from domain.market.entities import TreasuryBond
 from domain.shared.entities import (
     CatalogInstrument,
     MarketSeriesPoint,
@@ -20,16 +21,19 @@ from domain.shared.repositories import (
     AbstractCatalogRepository,
     AbstractFundamentalsRepository,
     AbstractMarketSeriesRepository,
+    AbstractTreasuryCatalogRepository,
 )
 from infra.data.mappers.market import (
     to_catalog_instrument,
     to_fundamental_snapshot,
     to_market_series_point,
+    to_treasury_bond,
 )
 from infra.data.models.market import (
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
     MarketSeriesModel,
+    TreasuryCatalogModel,
 )
 
 
@@ -189,3 +193,54 @@ class SqlAlchemyCatalogRepository(AbstractCatalogRepository):
             InstrumentCatalogModel.ticker.asc(),
         )
         return [to_catalog_instrument(m) for m in self.session.scalars(stmt).all()]
+
+
+class SqlAlchemyTreasuryCatalogRepository(AbstractTreasuryCatalogRepository):
+    """SQLAlchemy implementation of AbstractTreasuryCatalogRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def upsert(self, bonds: list[TreasuryBond]) -> int:
+        existing = {m.symbol: m for m in self.session.scalars(select(TreasuryCatalogModel))}
+        for item in bonds:
+            sym = item.symbol.strip().lower()
+            model = existing.get(sym)
+            if model is None:
+                model = TreasuryCatalogModel(symbol=sym)
+                self.session.add(model)
+                existing[sym] = model
+            model.name = item.name[:160]
+            model.bond_type = item.bond_type[:120]
+            model.instrument_kind = item.instrument_kind.value
+            model.indexer = item.indexer.value
+            model.raw_indexer = item.raw_indexer[:32]
+            model.coupon_type = item.coupon_type[:32]
+            model.maturity_date = item.maturity_date
+            model.duration_days = item.duration_days
+            model.base_date = item.base_date
+            model.buy_rate = item.buy_rate
+            model.sell_rate = item.sell_rate
+            model.buy_price = item.buy_price
+            model.sell_price = item.sell_price
+            model.base_price = item.base_price
+            model.rate_type = item.rate_type[:64] if item.rate_type else None
+            model.rate_unit = item.rate_unit[:32] if item.rate_unit else None
+            model.rate_description = item.rate_description[:255] if item.rate_description else None
+            model.contracted_rate_percent = item.contracted_rate_percent
+            model.liquidity = item.liquidity.value
+            model.source = item.source[:32] if item.source else None
+            model.updated_at = item.updated_at or datetime.now(UTC)
+        self.session.flush()
+        return len(bonds)
+
+    def get(self, symbol: str) -> TreasuryBond | None:
+        model = self.session.get(TreasuryCatalogModel, symbol.strip().lower())
+        return to_treasury_bond(model) if model else None
+
+    def list_all(self) -> list[TreasuryBond]:
+        stmt = select(TreasuryCatalogModel).order_by(
+            TreasuryCatalogModel.maturity_date.asc(),
+            TreasuryCatalogModel.symbol.asc(),
+        )
+        return [to_treasury_bond(m) for m in self.session.scalars(stmt).all()]

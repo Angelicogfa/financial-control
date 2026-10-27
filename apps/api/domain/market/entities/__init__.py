@@ -155,6 +155,8 @@ class TreasuryBond:
     rate_description: str | None = None
     contracted_rate_percent: float = 100.0
     liquidity: FixedIncomeLiquidity = FixedIncomeLiquidity.DAILY
+    source: str | None = None
+    updated_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -163,6 +165,7 @@ class TreasuryBond:
         data["liquidity"] = self.liquidity.value
         data["maturity_date"] = self.maturity_date.isoformat()
         data["base_date"] = self.base_date.isoformat() if self.base_date else None
+        data["updated_at"] = self.updated_at.isoformat() if self.updated_at else None
         return data
 
     @classmethod
@@ -178,6 +181,8 @@ class TreasuryBond:
             payload["maturity_date"] = date.fromisoformat(payload["maturity_date"])
         if isinstance(payload.get("base_date"), str):
             payload["base_date"] = date.fromisoformat(payload["base_date"])
+        if isinstance(payload.get("updated_at"), str):
+            payload["updated_at"] = datetime.fromisoformat(payload["updated_at"])
         valid_fields = {f.name for f in fields(cls)}
         return cls(**{k: v for k, v in payload.items() if k in valid_fields})
 

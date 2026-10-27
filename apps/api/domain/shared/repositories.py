@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from core.helpers.pagination import PaginatedResult, PaginationParams
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
+from domain.market.entities import TreasuryBond
 from domain.shared.entities import (
     AccountEntity,
     AgentApiKeyEntity,
@@ -358,6 +359,23 @@ class AbstractCatalogRepository(ABC):
     @abstractmethod
     def list_all(self) -> list[CatalogInstrument]:
         """Whole catalog, highest financial volume first."""
+        raise NotImplementedError
+
+
+class AbstractTreasuryCatalogRepository(ABC):
+    """Repository port for the daily Tesouro Direto catalog synced from Tesouro Transparente."""
+
+    @abstractmethod
+    def upsert(self, bonds: list[TreasuryBond]) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, symbol: str) -> TreasuryBond | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self) -> list[TreasuryBond]:
+        """Whole Treasury catalog, ordered by maturity date and symbol."""
         raise NotImplementedError
 
 

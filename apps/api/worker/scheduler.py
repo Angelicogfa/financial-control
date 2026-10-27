@@ -23,6 +23,7 @@ from worker.jobs import (
     refresh_fundamentals_job,
     sync_bcb_and_benchmarks_job,
     sync_instrument_catalog_job,
+    sync_treasury_catalog_job,
     warm_portfolio_quotes_job,
 )
 from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job
@@ -119,6 +120,16 @@ def create_scheduler(
         **defaults,
     )
     scheduler.add_job(
+        guard("sync_treasury_catalog", sync_treasury_catalog_job),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=cfg.catalog_sync_cron_hour,
+        minute=10,
+        id="sync_treasury_catalog",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
         guard("refresh_fundamentals", refresh_fundamentals_job),
         trigger="cron",
         day_of_week=cfg.fundamentals_cron_day_of_week,
@@ -155,6 +166,7 @@ def run_startup_jobs(
     )
     for name, job in (
         ("sync_bcb_and_benchmarks", sync_bcb_and_benchmarks_job),
+        ("sync_treasury_catalog", sync_treasury_catalog_job),
         ("backfill_snapshots", backfill_snapshots_job),
         ("record_daily_snapshot", record_daily_snapshot_job),
     ):

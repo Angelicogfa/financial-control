@@ -222,6 +222,21 @@ def sync_instrument_catalog_job(uow_factory: UoWFactory, gateway: CachedMarketGa
     return stored
 
 
+def sync_treasury_catalog_job(uow_factory: UoWFactory, gateway: CachedMarketGateway) -> int:
+    """Refresh the Tesouro Direto catalog; keeps the previous one when the source fails."""
+    outcome = gateway.list_treasury_bonds(bypass_cache=True)
+    if not outcome.results:
+        logger.warning(
+            "Treasury catalog source returned nothing (%s); keeping the stored catalog",
+            outcome.unavailable_reason or "empty",
+        )
+        return 0
+    with uow_factory() as uow:
+        stored = uow.treasury_catalog.upsert(outcome.results)
+        uow.commit()
+    return stored
+
+
 def record_checklist_evaluations_job(
     uow_factory: UoWFactory,
     gateway: CachedMarketGateway,

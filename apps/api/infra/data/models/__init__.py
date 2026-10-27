@@ -21,6 +21,7 @@ from infra.data.models.market import (
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
     MarketSeriesModel,
+    TreasuryCatalogModel,
 )
 from infra.data.models.policy import InvestmentPolicyModel
 from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshotModel
@@ -43,5 +44,6 @@ __all__ = [
     "MarketSeriesModel",
     "PortfolioSnapshotModel",
     "TransactionModel",
+    "TreasuryCatalogModel",
     "WorkerRequestErrorModel",
 ]

@@ -23,6 +23,7 @@ from domain.shared.enums import AssetType, Market, market_for
 from infra.cache.redis_cache import AbstractCacheBackend, InMemoryCache
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
+from infra.providers.tesouro import TesouroTransparenteProvider
 from infra.providers.yfinance_provider import YFinanceProvider
 
 
@@ -34,6 +35,7 @@ class CachedMarketGateway:
         brapi: BrapiProvider | None = None,
         yfinance: YFinanceProvider | None = None,
         bcb: BcbSgsProvider | None = None,
+        tesouro: TesouroTransparenteProvider | None = None,
         cache: AbstractCacheBackend | None = None,
         quote_ttl_seconds: int = 900,
         fundamentals_ttl_seconds: int = 86400,
@@ -44,6 +46,7 @@ class CachedMarketGateway:
         self.brapi = brapi or BrapiProvider()
         self.yfinance = yfinance or YFinanceProvider()
         self.bcb = bcb or BcbSgsProvider()
+        self.tesouro = tesouro or TesouroTransparenteProvider()
         self.cache = cache or InMemoryCache()
         self.quote_ttl = quote_ttl_seconds
         self.fundamentals_ttl = fundamentals_ttl_seconds
@@ -237,19 +240,10 @@ class CachedMarketGateway:
     def list_treasury_bonds(
         self,
         *,
-        indexer: str | None = None,
-        coupon_type: str | None = None,
-        search: str | None = None,
         bypass_cache: bool = False,
     ) -> TreasuryCatalogResult:
-        """Fetch Brazilian Treasury bonds from Brapi (/v2/treasury/list) with short cache."""
-        norm_idx = (indexer or "").strip().lower() or None
-        norm_coupon = (coupon_type or "").strip().lower() or None
-        norm_search = (search or "").strip() or None
-        cache_key = (
-            f"treasury:list:{norm_idx or 'all'}:{norm_coupon or 'all'}:"
-            f"{(norm_search or '').casefold()}"
-        )
+        """Fetch Brazilian Treasury bonds from Tesouro Transparente with short cache."""
+        cache_key = "treasury:catalog"
         if not bypass_cache:
             cached = self._cached(cache_key)
             if isinstance(cached, dict) and isinstance(cached.get("results"), list):
@@ -258,12 +252,8 @@ class CachedMarketGateway:
                     unavailable_reason=cached.get("unavailable_reason"),
                 )
 
-        result = self.brapi.list_treasury_bonds(
-            indexer=norm_idx,
-            coupon_type=norm_coupon,
-            search=norm_search,
-        )
-        if not result.unavailable_reason:
+        result = self.tesouro.list_treasury_bonds()
+        if not result.unavailable_reason and result.results:
             self.cache.set_json(
                 cache_key,
                 {

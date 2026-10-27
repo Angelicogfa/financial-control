@@ -1,16 +1,20 @@
-"""Unit and integration tests for Tesouro Direto search via Brapi (/api/v2/treasury/list)."""
+"""Unit and integration tests for Tesouro Direto catalog via Tesouro Transparente + Worker."""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import httpx
 import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, inspect
 
 from composition import get_market_gateway
-from domain.market.entities import TreasuryBond
+from domain.market.entities import TreasuryBond, TreasuryCatalogResult
 from domain.shared.enums import (
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -24,7 +28,24 @@ from infra.providers.brapi import (
     parse_brapi_treasury_item,
 )
 from infra.providers.gateway import CachedMarketGateway
+from infra.providers.tesouro import (
+    TesouroTransparenteProvider,
+    classify_tesouro_bond_type,
+    parse_tesouro_transparente_csv,
+    slugify_treasury_symbol,
+)
 from infra.providers.yfinance_provider import YFinanceProvider
+from worker.jobs import sync_treasury_catalog_job
+
+SAMPLE_TESOURO_CSV = (
+    "Tipo Titulo;Data Vencimento;Data Base;Taxa Compra Manha;"
+    "Taxa Venda Manha;PU Compra Manha;PU Venda Manha;PU Base Manha\n"
+    "Tesouro Selic;01/03/2031;22/10/2026;0,09;0,10;20050,00;20030,00;20030,00\n"
+    "Tesouro Selic;01/03/2031;23/10/2026;0,10;0,11;20074,43;20055,44;20055,44\n"
+    "Tesouro Prefixado;01/01/2027;23/10/2026;13,96;14,08;921,33;920,24;920,24\n"
+    "Tesouro IPCA+ com Juros Semestrais;15/08/2060;23/10/2026;7,22;7,34;4086,85;4023,39;4023,39\n"
+    "Tesouro IPCA+;15/05/2024;23/10/2026;6,00;6,10;3000,00;2990,00;2990,00\n"
+)
 
 SAMPLE_TREASURY_ITEMS: list[dict[str, Any]] = [
     {
@@ -46,128 +67,173 @@ SAMPLE_TREASURY_ITEMS: list[dict[str, Any]] = [
             "description": "Spread sobre a taxa Selic.",
         },
     },
-    {
-        "symbol": "tesouro-prefixado-01012027",
-        "bondType": "Tesouro Prefixado",
-        "indexer": "prefixado",
-        "couponType": "zero",
-        "maturityDate": "2027-01-01",
-        "durationDays": 231,
-        "baseDate": "2026-10-23",
-        "buyRate": 13.96,
-        "sellRate": 14.08,
-        "buyPrice": 921.33,
-        "sellPrice": 920.24,
-        "basePrice": 920.24,
-        "rateInfo": {
-            "rateType": "nominalAnnualRate",
-            "rateUnit": "% a.a.",
-            "description": "Taxa nominal anual contratada.",
-        },
-    },
-    {
-        "symbol": "tesouro-ipca-com-juros-semestrais-15082060",
-        "bondType": "Tesouro IPCA+ com Juros Semestrais",
-        "indexer": "ipca",
-        "couponType": "semestral",
-        "maturityDate": "2060-08-15",
-        "durationDays": 12511,
-        "baseDate": "2026-10-23",
-        "buyRate": 7.22,
-        "sellRate": 7.34,
-        "buyPrice": 4086.85,
-        "sellPrice": 4023.39,
-        "basePrice": 4023.39,
-        "rateInfo": {
-            "rateType": "realAnnualRateOverIpca",
-            "rateUnit": "% a.a.",
-            "description": "Taxa real anual acima do IPCA.",
-        },
-    },
 ]
 
 
-def test_classify_brapi_treasury_indexer_mappings() -> None:
+def test_classify_tesouro_bond_type_and_slugify() -> None:
+    assert slugify_treasury_symbol("Tesouro Selic", date(2031, 3, 1)) == "tesouro-selic-01032031"
+    assert (
+        slugify_treasury_symbol("Tesouro IPCA+ com Juros Semestrais", date(2060, 8, 15))
+        == "tesouro-ipca-com-juros-semestrais-15082060"
+    )
+
+    selic = classify_tesouro_bond_type("Tesouro Selic")
+    assert selic[:5] == (
+        FixedIncomeInstrumentKind.TESOURO_SELIC,
+        FixedIncomeIndexer.SELIC,
+        "selic",
+        "zero",
+        FixedIncomeLiquidity.DAILY,
+    )
+
+    pre_semestral = classify_tesouro_bond_type("Tesouro Prefixado com Juros Semestrais")
+    assert pre_semestral[:5] == (
+        FixedIncomeInstrumentKind.TESOURO_PRE,
+        FixedIncomeIndexer.PRE,
+        "prefixado",
+        "semestral",
+        FixedIncomeLiquidity.AT_MATURITY,
+    )
+
+    ipca = classify_tesouro_bond_type("Tesouro Renda+ Aposentadoria Extra")
+    assert ipca[:5] == (
+        FixedIncomeInstrumentKind.TESOURO_IPCA,
+        FixedIncomeIndexer.IPCA,
+        "ipca",
+        "zero",
+        FixedIncomeLiquidity.AT_MATURITY,
+    )
+
+    igpm = classify_tesouro_bond_type("Tesouro IGPM+ com Juros Semestrais")
+    assert igpm[2] == "igpm"
+    assert igpm[3] == "semestral"
+
+
+def test_parse_tesouro_transparente_csv_picks_latest_base_date_and_filters_matured() -> None:
+    now = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)
+    bonds = parse_tesouro_transparente_csv(
+        SAMPLE_TESOURO_CSV,
+        reference_date=date(2026, 10, 23),
+        fetched_at=now,
+    )
+    assert [b.symbol for b in bonds] == [
+        "tesouro-prefixado-01012027",
+        "tesouro-selic-01032031",
+        "tesouro-ipca-com-juros-semestrais-15082060",
+    ]
+    selic = next(b for b in bonds if b.symbol == "tesouro-selic-01032031")
+    assert selic.name == "Tesouro Selic 2031"
+    assert selic.base_date == date(2026, 10, 23)
+    assert selic.buy_rate == pytest.approx(0.10)
+    assert selic.buy_price == pytest.approx(20074.43)
+    assert selic.contracted_rate_percent == 100.0
+    assert selic.updated_at == now
+    assert TreasuryBond.from_dict(selic.to_dict()) == selic
+
+    pre = next(b for b in bonds if b.symbol == "tesouro-prefixado-01012027")
+    assert pre.contracted_rate_percent == pytest.approx(13.96)
+
+    # Rejects HTML WAF challenge or empty text
+    assert parse_tesouro_transparente_csv("<html><head></head><body>429</body></html>") == []
+    assert parse_tesouro_transparente_csv("") == []
+
+
+def test_tesouro_transparente_provider_happy_path_and_waf_or_http_error() -> None:
+    def csv_handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=SAMPLE_TESOURO_CSV.encode("latin-1"))
+
+    provider = TesouroTransparenteProvider(
+        client=httpx.Client(transport=httpx.MockTransport(csv_handler))
+    )
+    outcome = provider.list_treasury_bonds(reference_date=date(2026, 10, 23))
+    assert outcome.unavailable_reason is None
+    assert len(outcome.results) == 3
+
+    def html_challenge_handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<!DOCTYPE html><html><body>Challenge</body></html>")
+
+    waf_provider = TesouroTransparenteProvider(
+        client=httpx.Client(transport=httpx.MockTransport(html_challenge_handler))
+    )
+    blocked = waf_provider.list_treasury_bonds()
+    assert blocked.results == []
+    assert blocked.unavailable_reason is not None
+
+    def rate_limit_handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="Too Many Requests")
+
+    error_provider = TesouroTransparenteProvider(
+        client=httpx.Client(transport=httpx.MockTransport(rate_limit_handler))
+    )
+    failed = error_provider.list_treasury_bonds()
+    assert failed.results == []
+    assert failed.unavailable_reason is not None
+
+
+def test_classify_and_parse_brapi_treasury_helpers_preserved() -> None:
     assert classify_brapi_treasury_indexer("selic") == (
         FixedIncomeInstrumentKind.TESOURO_SELIC,
         FixedIncomeIndexer.SELIC,
         FixedIncomeLiquidity.DAILY,
     )
-    assert classify_brapi_treasury_indexer("prefixado") == (
-        FixedIncomeInstrumentKind.TESOURO_PRE,
-        FixedIncomeIndexer.PRE,
-        FixedIncomeLiquidity.AT_MATURITY,
-    )
-    assert classify_brapi_treasury_indexer("ipca") == (
-        FixedIncomeInstrumentKind.TESOURO_IPCA,
-        FixedIncomeIndexer.IPCA,
-        FixedIncomeLiquidity.AT_MATURITY,
-    )
-    assert classify_brapi_treasury_indexer("igpm") == (
-        FixedIncomeInstrumentKind.TESOURO_IPCA,
-        FixedIncomeIndexer.IPCA,
-        FixedIncomeLiquidity.AT_MATURITY,
-    )
-
-
-def test_parse_brapi_treasury_item_and_serialization_roundtrip() -> None:
     selic = parse_brapi_treasury_item(SAMPLE_TREASURY_ITEMS[0])
     assert selic is not None
-    assert selic.name == "Tesouro Selic 2031"
-    assert selic.instrument_kind == FixedIncomeInstrumentKind.TESOURO_SELIC
-    assert selic.indexer == FixedIncomeIndexer.SELIC
-    assert selic.contracted_rate_percent == 100.0
-    assert selic.liquidity == FixedIncomeLiquidity.DAILY
-    assert TreasuryBond.from_dict(selic.to_dict()) == selic
-
-    pre = parse_brapi_treasury_item(SAMPLE_TREASURY_ITEMS[1])
-    assert pre is not None
-    assert pre.name == "Tesouro Prefixado 2027"
-    assert pre.contracted_rate_percent == pytest.approx(13.96)
-    assert pre.liquidity == FixedIncomeLiquidity.AT_MATURITY
-
-    assert parse_brapi_treasury_item({"symbol": "", "maturityDate": "2031-03-01"}) is None
-    assert parse_brapi_treasury_item({"symbol": "x", "maturityDate": "invalid"}) is None
+    assert selic.symbol == "tesouro-selic-01032031"
 
 
-def test_brapi_provider_list_treasury_bonds_happy_path_and_403() -> None:
-    def ok_handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path.endswith("/v2/treasury/list")
-        return httpx.Response(
-            200,
-            json={
-                "results": SAMPLE_TREASURY_ITEMS,
-                "pagination": {"page": 1, "totalPages": 1, "hasNextPage": False},
-            },
-        )
+def test_script_00018_migration_upgrade_and_downgrade(tmp_path: Path) -> None:
+    api_dir = Path(__file__).resolve().parents[1]
+    db_url = f"sqlite:///{(tmp_path / 'treasury_mig.db').as_posix()}"
+    cfg = Config(str(api_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(api_dir / "infra" / "data" / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", db_url)
+    engine = create_engine(db_url, future=True)
+    try:
+        command.upgrade(cfg, "script_00017")
+        assert "treasury_catalog" not in inspect(engine).get_table_names()
 
-    provider = BrapiProvider(
-        token="pro-token", client=httpx.Client(transport=httpx.MockTransport(ok_handler))
+        command.upgrade(cfg, "script_00018")
+        assert "treasury_catalog" in inspect(engine).get_table_names()
+
+        command.downgrade(cfg, "script_00017")
+        assert "treasury_catalog" not in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+
+
+def test_sync_treasury_catalog_job_and_repository_roundtrip(api: SimpleNamespace) -> None:
+    def csv_handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=SAMPLE_TESOURO_CSV.encode("utf-8"))
+
+    gateway = CachedMarketGateway(
+        brapi=BrapiProvider(),
+        yfinance=YFinanceProvider(),
+        bcb=BcbSgsProvider(),
+        tesouro=TesouroTransparenteProvider(
+            client=httpx.Client(transport=httpx.MockTransport(csv_handler))
+        ),
+        cache=InMemoryCache(),
     )
-    outcome = provider.list_treasury_bonds()
-    assert outcome.unavailable_reason is None
-    assert [b.symbol for b in outcome.results] == [
-        "tesouro-selic-01032031",
-        "tesouro-prefixado-01012027",
-        "tesouro-ipca-com-juros-semestrais-15082060",
-    ]
 
-    def forbidden_handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            403,
-            json={
-                "error": True,
-                "message": "Tesouro Direto e renda fixa requer o plano Pro.",
-                "code": "FEATURE_NOT_AVAILABLE",
-            },
-        )
+    stored = sync_treasury_catalog_job(api.uow_factory, gateway)
+    assert stored == 3
 
-    free_provider = BrapiProvider(
-        token="free-token", client=httpx.Client(transport=httpx.MockTransport(forbidden_handler))
-    )
-    denied = free_provider.list_treasury_bonds()
-    assert denied.results == []
-    assert denied.unavailable_reason == "Tesouro Direto e renda fixa requer o plano Pro."
+    with api.uow_factory() as uow:
+        all_stored = uow.treasury_catalog.list_all()
+        assert len(all_stored) == 3
+        selic = uow.treasury_catalog.get("TESOURO-SELIC-01032031")
+        assert selic is not None
+        assert selic.name == "Tesouro Selic 2031"
+        assert uow.treasury_catalog.get("non-existent") is None
+
+    # When upstream fails, sync_treasury_catalog_job keeps the existing catalog in PostgreSQL
+    class _EmptyGateway:
+        def list_treasury_bonds(self, *, bypass_cache: bool = False) -> TreasuryCatalogResult:
+            return TreasuryCatalogResult(results=[], unavailable_reason="timeout")
+
+    assert sync_treasury_catalog_job(api.uow_factory, _EmptyGateway()) == 0  # type: ignore[arg-type]
+    with api.uow_factory() as uow:
+        assert len(uow.treasury_catalog.list_all()) == 3
 
 
 def test_gateway_caches_treasury_bonds() -> None:
@@ -176,23 +242,20 @@ def test_gateway_caches_treasury_bonds() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
-        return httpx.Response(
-            200,
-            json={
-                "results": SAMPLE_TREASURY_ITEMS[:1],
-                "pagination": {"page": 1, "totalPages": 1, "hasNextPage": False},
-            },
-        )
+        return httpx.Response(200, content=SAMPLE_TESOURO_CSV.encode("utf-8"))
 
     gw = CachedMarketGateway(
-        brapi=BrapiProvider(client=httpx.Client(transport=httpx.MockTransport(handler))),
+        brapi=BrapiProvider(),
         yfinance=YFinanceProvider(),
         bcb=BcbSgsProvider(),
+        tesouro=TesouroTransparenteProvider(
+            client=httpx.Client(transport=httpx.MockTransport(handler))
+        ),
         cache=InMemoryCache(),
     )
     first = gw.list_treasury_bonds()
     second = gw.list_treasury_bonds()
-    assert len(first.results) == 1
+    assert len(first.results) == 3
     assert second == first
     assert calls == 1
 
@@ -200,19 +263,20 @@ def test_gateway_caches_treasury_bonds() -> None:
 def test_research_treasury_endpoint_filters_and_matches_registered_assets(
     api: SimpleNamespace,
 ) -> None:
+    calls = 0
+
     def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "results": SAMPLE_TREASURY_ITEMS,
-                "pagination": {"page": 1, "totalPages": 1, "hasNextPage": False},
-            },
-        )
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, content=SAMPLE_TESOURO_CSV.encode("utf-8"))
 
     gateway = CachedMarketGateway(
-        brapi=BrapiProvider(client=httpx.Client(transport=httpx.MockTransport(handler))),
+        brapi=BrapiProvider(),
         yfinance=YFinanceProvider(),
         bcb=BcbSgsProvider(),
+        tesouro=TesouroTransparenteProvider(
+            client=httpx.Client(transport=httpx.MockTransport(handler))
+        ),
         cache=InMemoryCache(),
     )
     api.app.dependency_overrides[get_market_gateway] = lambda: gateway
@@ -220,10 +284,12 @@ def test_research_treasury_endpoint_filters_and_matches_registered_assets(
 
     all_bonds = client.get("/api/v1/research/treasury").json()
     assert all_bonds["total"] == 3
+    assert all_bonds["catalog_size"] == 3
     assert all_bonds["unavailable_reason"] is None
     assert all(b["asset_id"] is None for b in all_bonds["results"])
+    assert calls == 1
 
-    # Filter by indexer and coupon_type and query string
+    # Subsequent searches read directly from PostgreSQL (treasury_catalog) without upstream calls
     ipca_semestral = client.get(
         "/api/v1/research/treasury",
         params={"indexer": "IPCA", "coupon_type": "semestral", "q": "2060"},
@@ -231,6 +297,7 @@ def test_research_treasury_endpoint_filters_and_matches_registered_assets(
     assert [b["symbol"] for b in ipca_semestral["results"]] == [
         "tesouro-ipca-com-juros-semestrais-15082060"
     ]
+    assert calls == 1
 
     # Register Tesouro Selic 2031 and verify asset_id is matched in /research/treasury
     created = client.post(

@@ -112,4 +112,6 @@ class TreasuryBondDTO(BaseModel):
 class TreasurySearchResponseDTO(BaseModel):
     results: list[TreasuryBondDTO]
     total: int
+    catalog_size: int = 0
+    catalog_updated_at: datetime | None = None
     unavailable_reason: str | None = None
