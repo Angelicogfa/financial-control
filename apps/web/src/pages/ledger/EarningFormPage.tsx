@@ -8,7 +8,7 @@ import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Spinner } from "../../components/States";
-import { parseDecimal, today } from "../../utils/format";
+import { brl, parseDecimal, today } from "../../utils/format";
 import { EARNING_KINDS, EARNING_LABELS } from "../../utils/labels";
 import { AccountSelect, AssetSelect } from "./AssetSelect";
 
@@ -26,10 +26,13 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
   const [notes, setNotes] = useState(earning?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const grossValue = parseDecimal(gross);
+  const fxValue = parseDecimal(fx);
+  // Same rule as the API's `net_amount_brl`: (gross − withheld tax) × FX.
+  const netBrl = grossValue === null || fxValue === null ? null : Math.round((grossValue - (parseDecimal(tax) ?? 0)) * fxValue * 100) / 100;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const grossValue = parseDecimal(gross);
     if (assetId === "" || !grossValue) {
       setError("Preencha ativo e valor bruto.");
       return;
@@ -39,7 +42,7 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
       payment_date: paymentDate,
       gross_amount: grossValue,
       withholding_tax: parseDecimal(tax) ?? 0,
-      fx_rate: parseDecimal(fx) ?? 1,
+      fx_rate: fxValue ?? 1,
       notes: notes.trim() || null,
       account_id: accountId,
     };
@@ -70,6 +73,7 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
               setAssetId(a?.id ?? "");
               setCurrency(a?.currency ?? "BRL");
             }}
+            onResolve={(a) => setCurrency(a?.currency ?? "BRL")}
           />
         </div>
         <div className="app-field">
@@ -101,6 +105,9 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
           <div className="app-field">
             <label htmlFor="earning-fx">Câmbio do pagamento</label>
             <input id="earning-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required disabled={saving} />
+            <output htmlFor="earning-gross earning-tax earning-fx" className="app-muted">
+              Líquido em reais: {brl(netBrl)}
+            </output>
           </div>
         )}
         <div className="app-field">
