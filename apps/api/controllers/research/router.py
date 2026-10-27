@@ -13,6 +13,7 @@ from controllers.research.dependencies import (
 )
 from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
 from controllers.research.responses import (
+    AssetComparisonDTO,
     ScreenerResponseDTO,
     TreasurySearchResponseDTO,
     WatchlistItemDTO,
@@ -106,3 +107,12 @@ def remove_from_watchlist(
 ) -> Response:
     handler.remove(asset_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@research_router.get("/compare", response_model=AssetComparisonDTO)
+def compare_assets(
+    tickers: list[str] = Query(..., description="2 to 5 tickers (repeated or comma-separated)"),
+    indicators: list[str] = Query(default=[], description="Indicator keys; all when empty"),
+    handler: ResearchHandler = Depends(get_research_handler),
+) -> AssetComparisonDTO:
+    return handler.compare(tickers, indicators or None)

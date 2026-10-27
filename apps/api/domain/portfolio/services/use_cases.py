@@ -11,11 +11,13 @@ from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
     ContributionPlanResponseDTO,
     PortfolioAnalyticsResponseDTO,
+    PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
 )
 from controllers.portfolio.serializers import (
     to_contribution_plan_dto,
+    to_portfolio_health_dto,
     to_portfolio_report_dto,
     to_risk_summary_dto,
 )
@@ -94,3 +96,8 @@ class PortfolioHandler:
                 correlation_matrix=raw["correlation_matrix"],
                 curves=raw["curves"],
             )
+
+    def get_health(self, *, as_of_date: date | None = None) -> PortfolioHealthDTO:
+        with self.uow_factory() as uow:
+            report = self.portfolio_service.build_portfolio_health(uow, as_of_date=as_of_date)
+        return to_portfolio_health_dto(report)

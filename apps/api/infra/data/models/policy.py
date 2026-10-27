@@ -30,3 +30,4 @@ class InvestmentPolicyModel(Base):
     arca: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     eligibility: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     valuation: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    health: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

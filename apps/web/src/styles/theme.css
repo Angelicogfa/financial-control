@@ -1842,3 +1842,88 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* Portfolio health (Phase 29) */
+.health-pillar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.health-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.health-check {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--app-border-subtle);
+}
+
+.health-check:first-child {
+  border-top: none;
+}
+
+.health-check-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.health-check-value {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.health-check-text,
+.health-check-action,
+.health-check-meta {
+  margin: var(--space-1) 0 0;
+}
+
+.health-check-action {
+  font-weight: 600;
+}
+
+.health-check-meta:empty {
+  display: none;
+}
+
+.health-subheading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin: var(--space-3) 0 var(--space-2);
+  text-align: left;
+}
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Asset comparator (Phase 27) */
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.compare-best {
+  background: var(--app-surface-hover);
+}
+
+.compare-best-mark {
+  font-size: var(--text-sm);
+  color: var(--app-text-subtle);
+}

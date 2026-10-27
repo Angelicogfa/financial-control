@@ -13,7 +13,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from contextvars import copy_context
 from dataclasses import dataclass, field
 
-from domain.market.entities import Fundamentals, Quote
+from domain.market.entities import Fundamentals, PricePoint, Quote
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import Market
 from infra.providers.error_tracker import report_provider_error
@@ -97,3 +97,49 @@ def fetch_market_data(
             ", ".join(result.timed_out),
         )
     return result
+
+
+def fetch_histories(
+    gateway: CachedMarketGateway,
+    assets: Iterable[AssetEntity],
+    *,
+    range_period: str = "2y",
+    max_workers: int = 8,
+    timeout_seconds: float = 20.0,
+) -> dict[str, list[PricePoint]]:
+    """Daily price histories of market-traded assets, fetched concurrently with one deadline.
+
+    Assets whose history fails or does not arrive in time are left out.
+    """
+    tradable = [a for a in assets if a.market not in OFFLINE_MARKETS]
+    if not tradable:
+        return {}
+    executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="history")
+    futures: dict[Future, str] = {
+        executor.submit(
+            copy_context().run,
+            lambda a=asset: gateway.get_history(
+                a.ticker, range_period=range_period, asset_type=a.asset_type
+            ),
+        ): asset.ticker
+        for asset in tradable
+    }
+    done, pending = wait(futures, timeout=timeout_seconds)
+    executor.shutdown(wait=False, cancel_futures=True)
+    histories: dict[str, list[PricePoint]] = {}
+    for future in done:
+        ticker = futures[future]
+        try:
+            points = future.result()
+        except Exception as exc:  # a provider bug must not break the diagnosis
+            logger.warning("History for %s failed: %s", ticker, exc)
+            continue
+        if points:
+            histories[ticker] = sorted(points, key=lambda p: p.date)
+    if pending:
+        logger.warning(
+            "Price history timed out after %.1fs for: %s",
+            timeout_seconds,
+            ", ".join(sorted(futures[f] for f in pending)),
+        )
+    return histories

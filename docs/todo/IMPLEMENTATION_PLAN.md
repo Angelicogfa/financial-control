@@ -37,9 +37,9 @@
 | **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[x]` Implementado | 100% |
 | **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[ ]` Pendente | 0% |
 | **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[ ]` Pendente | 0% |
-| **Fase 27** | Comparador de Ativos | `[ ]` Pendente | 0% |
+| **Fase 27** | Comparador de Ativos | `[x]` Implementado | 100% |
 | **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
-| **Fase 29** | Estatísticas e Saúde da Carteira | `[ ]` Pendente | 0% |
+| **Fase 29** | Estatísticas e Saúde da Carteira | `[x]` Implementado | 100% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -599,15 +599,15 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **26.4** Alertas internos novos: data com próxima, vencimento de renda fixa próximo, queda de faixa de IR próxima (Fase 24), checklist vencido e dado suspeito (Fase 25). Sem e-mail, Telegram ou push.
 - `[ ]` **26.5** Testes de unidade (provider com CSV de exemplo, regras de alerta), integração e UI.
 
-## Fase 27 — Comparador de Ativos (`[ ]` Pendente)
+## Fase 27 — Comparador de Ativos (`[x]` Implementado)
 
 **Objetivo:** comparar até 5 ativos do mesmo perfil lado a lado, usando os dados já armazenados.
 
-- `[ ]` **27.1** Caso de uso que monta a comparação a partir de demonstrativos, indicadores atuais, valuation e checklist; busca sob demanda dos demonstrativos que faltarem.
-- `[ ]` **27.2** Indicadores em cinco grupos (valuation, endividamento, eficiência, rentabilidade, crescimento), escolhidos pelo usuário, com destaque do melhor por linha e aviso ao misturar perfis diferentes (ação × FII).
-- `[ ]` **27.3** Histórico anual em gráfico (receita, lucro, ROE, DY) e veredito de valuation e nota do checklist por ativo.
-- `[ ]` **27.4** Entrada a partir de Pesquisar, watchlist, Carteira e detalhe do ativo; rota REST e operação MCP.
-- `[ ]` **27.5** Testes de unidade, integração e UI.
+- `[x]` **27.1** Caso de uso `ResearchHandler.compare` (`domain/research/services/use_cases.py`) monta a comparação a partir dos demonstrativos anuais, indicadores atuais do provedor, valuation e checklist; aceita ativos cadastrados ou do catálogo B3 (`UNKNOWN_INSTRUMENT` para os demais, `INVALID_COMPARISON_SIZE` fora de 2–5) e busca sob demanda os demonstrativos de empresas que ainda não os têm (`statements_missing`, gravados pelo `AbstractFundamentalsRepository`).
+- `[x]` **27.2** Motor puro `domain/research/services/comparison.py`: 18 indicadores em cinco grupos (valuation, endividamento, eficiência, rentabilidade, crescimento), com direção (menor/maior é melhor), destaque do melhor por linha (`best`; P/L, P/VP e EV/EBITDA só competem quando positivos) e avisos ao misturar perfis (ação × FII × ETF…), moedas ou ativos sem indicadores. A tela escolhe grupos e indicadores; a API aceita `indicators`.
+- `[x]` **27.3** Histórico anual (receita, lucro, ROE e DY) em gráfico com seletor; DY anual estimado pelos proventos pagos sobre o valor de mercado no último pregão do ano (número de ações de hoje). Veredito de valuation e nota do checklist por ativo no topo da tabela.
+- `[x]` **27.4** Rota `GET /api/v1/research/compare?tickers=A,B&indicators=...`, operação MCP `research.compare` e tela `/tools/compare` (menu Ferramentas · Comparar ativos); link "Comparar" na Pesquisa (resultados e watchlist), na Carteira e no detalhe do ativo.
+- `[x]` **27.5** Testes: `tests/test_asset_comparison.py` (normalização, seleção, melhor por linha, indicadores dos demonstrativos, DY anual, avisos, rota, catálogo com busca sob demanda, MCP) e `src/test/compare.test.tsx`.
 
 ## Fase 28 — Fatos Relevantes pelos Dados Abertos da CVM (`[ ]` Pendente)
 
@@ -620,18 +620,18 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **28.5** Limitação documentada: FIIs não estão no IPE de companhias abertas; a cobertura deles fica para uma etapa futura.
 - `[ ]` **28.6** Testes de unidade (parser com ZIP de exemplo), integração e UI.
 
-## Fase 29 — Estatísticas e Saúde da Carteira (`[ ]` Pendente)
+## Fase 29 — Estatísticas e Saúde da Carteira (`[x]` Implementado)
 
 **Objetivo:** transformar as métricas existentes em diagnóstico, nos sete pilares de [MARKET_ANALYSIS.md §7.3](../research/MARKET_ANALYSIS.md): cada checagem retorna ok/atenção/crítico, explicação e ação sugerida, com limites na política versionada.
 
-- `[ ]` **29.1** Concentração: peso do maior ativo e dos 5 maiores, HHI e número efetivo de ativos por ativo, setor, emissor e quadrante; exposição por instituição acima do limite do FGC.
-- `[ ]` **29.2** Diversificação de risco: índice de Choueifaty, contribuição ao risco por ativo e quadrante (decomposição de Euler) e pares com correlação alta; covariância com encolhimento de Ledoit-Wolf.
-- `[ ]` **29.3** Risco e desempenho complementares: drawdown atual e duração, Ulcer Index, tracking error, Information Ratio, Omega, retornos e Sharpe em janela móvel de 12 meses, consistência contra o CDI, estresse histórico com os pesos atuais; TWR por classe (TD-07).
-- `[ ]` **29.4** Qualidade dos ativos: nota média ponderada do checklist, % do peso com checklist vencido ou dado suspeito, Piotroski F-score e Altman Z''-score quando os demonstrativos tiverem as linhas necessárias.
-- `[ ]` **29.5** Liquidez, renda e tributos: reserva em meses, % com liquidez até D+2, vencimentos em 12 meses, renda passiva, % isento e lotes perto de mudar de faixa (Fase 24).
-- `[ ]` **29.6** Rigor estatístico: janela mínima por métrica com estado "dados insuficientes" e intervalo de confiança por bootstrap para Sharpe e retorno.
-- `[ ]` **29.7** Tela "Saúde da carteira" com o pilar em pior estado primeiro (sem média que dilua um crítico), limites configuráveis na Estratégia e operação MCP.
-- `[ ]` **29.8** Testes de unidade com séries sintéticas de resultado conhecido (pesos iguais, ativo único, ativos independentes), integração e UI.
+- `[x]` **29.1** Concentração (`domain/portfolio/services/health.py` + `diversification.py`): maior ativo e cinco maiores (Tesouro e caixa fora), HHI e número efetivo por ativo, setor (renda variável sem ETFs), emissor (raiz do ticker ou emissor do título) e quadrante; exposição por instituição contra o limite do FGC (CDB, LCI, LCA e caixinhas), com aviso para título sem emissor.
+- `[x]` **29.2** Diversificação de risco: covariância anualizada com encolhimento de Ledoit-Wolf sobre a correlação (vols amostrais preservadas; ativos tipo CDI sem risco), índice de Choueifaty, contribuição ao risco por ativo e quadrante (Euler) e pares com correlação acima do limite. Renda fixa segue o CDI diário; ativos internacionais usam o retorno na própria moeda.
+- `[x]` **29.3** Risco e desempenho (`risk_metrics.py`): volatilidade, queda atual e duração, Ulcer Index, VaR/CVaR, estresse histórico (pior janela de 21 pregões e maior queda com os pesos atuais em 2 anos de preços), tracking error e Information Ratio contra o benchmark da política (IBOV, IFIX, S&P 500 e CDI nos pesos-alvo ARCA), Omega sobre o CDI, retorno e Sharpe em 12 meses móveis, consistência mensal contra o CDI e TWR aproximado por classe a partir dos retratos (TD-07 parcial: fluxo = variação do custo da classe; proventos por classe ficam de fora).
+- `[x]` **29.4** Qualidade: nota média ponderada do checklist (saldo sobre perguntas aplicáveis), peso com respostas manuais mais antigas que a validade da política, Piotroski F-score e Altman Z''-score (`domain/assets/services/scores.py`) quando os demonstrativos tiverem as linhas necessárias — os provedores atuais não as trazem, então a checagem fica em "dados insuficientes". O selo de dado suspeito depende da Fase 25.
+- `[x]` **29.5** Liquidez, renda e tributos: reserva em meses (custo mensal na política), % com liquidez até D+2, vencimentos em 12 meses, proventos de 12 meses, % da renda fixa isenta e lotes que mudam de faixa de IR na janela da política (Fase 24).
+- `[x]` **29.6** Rigor estatístico: janela mínima por métrica (`min_observations` na política, 20 pregões para queda, 21 para estresse, 252 para a janela móvel, 6 meses para consistência) com estado `INSUFFICIENT_DATA` e intervalo de confiança de 95% por bootstrap (semente fixa) para Sharpe e CAGR.
+- `[x]` **29.7** Tela `/health` (menu Visão geral · Saúde da carteira) com o pilar em pior estado primeiro e resumo sem média; limites em `HealthPolicy` (política versionada, coluna `health` pela migration `script_00021_policy_health_limits.py`) editáveis na Estratégia; rota `GET /api/v1/portfolio/health` e operação MCP `portfolio.health`.
+- `[x]` **29.8** Testes: `tests/test_health_metrics.py` (séries sintéticas: pesos iguais, ativo único, ativos independentes com razão √n, Ledoit-Wolf, bootstrap determinístico, F-score/Z''), `tests/test_health_engine.py` (pilares, limites, ordenação, montador de entradas), `tests/test_portfolio_health_api.py` (rota, política, MCP, migration) e `src/test/health.test.tsx` / `settings.test.tsx`.
 
 ## Fase 30 — Tesouro: Rendimento Pró-Rata por Compra (`[x]` Implementado)
 

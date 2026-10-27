@@ -14,6 +14,7 @@ from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
     ContributionPlanResponseDTO,
     PortfolioAnalyticsResponseDTO,
+    PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
 )
@@ -70,3 +71,11 @@ def get_portfolio_analytics(
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> PortfolioAnalyticsResponseDTO:
     return handler.get_analytics(date_from=date_from, date_to=date_to)
+
+
+@portfolio_router.get("/health", response_model=PortfolioHealthDTO)
+def get_portfolio_health(
+    as_of_date: date | None = Query(default=None),
+    handler: PortfolioHandler = Depends(get_portfolio_handler),
+) -> PortfolioHealthDTO:
+    return handler.get_health(as_of_date=as_of_date)

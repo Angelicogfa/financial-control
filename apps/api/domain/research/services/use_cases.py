@@ -5,20 +5,34 @@ Scope: B3 catalog screener and watchlist.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 
 from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
 from controllers.research.responses import (
+    AssetComparisonDTO,
     ScreenerResponseDTO,
     TreasurySearchResponseDTO,
     WatchlistItemDTO,
 )
-from controllers.research.serializers import to_screener_item_dto, to_treasury_bond_dto
+from controllers.research.serializers import (
+    to_asset_comparison_dto,
+    to_screener_item_dto,
+    to_treasury_bond_dto,
+)
 from controllers.shared.dependencies import UoWFactory
-from core.errors import ConflictError, NotFoundError
+from core.errors import ConflictError, NotFoundError, ValidationError
+from domain.assets.services.history import historical_metrics
 from domain.market.entities import TreasuryBond
 from domain.policy.services.lifecycle import has_position
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.research.services.comparison import (
+    ComparedAsset,
+    compare_assets,
+    normalize_tickers,
+    select_indicators,
+    statements_missing,
+)
 from domain.research.services.screener import ScreenerCriteria, screen
 from domain.research.services.service import register_researched_asset
 from domain.shared.entities import AssetEntity
@@ -30,7 +44,11 @@ from domain.shared.enums import (
     Market,
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
-from infra.providers.batch import fetch_market_data
+from infra.providers.batch import fetch_histories, fetch_market_data
+
+logger = logging.getLogger("fincontrol_api.research")
+
+COMPARISON_HISTORY_RANGE = "5y"
 
 WATCHLIST_STATUSES = frozenset({AssetLifecycle.WATCHLIST, AssetLifecycle.ELIGIBLE})
 
@@ -191,6 +209,91 @@ class ResearchHandler:
             uow.assets.delete(asset_id, hard=not asset.transactions and not asset.earnings)
             uow.commit()
 
+    def compare(
+        self, tickers: list[str], indicators: list[str] | None = None
+    ) -> AssetComparisonDTO:
+        """Up to five assets side by side, from stored statements and current indicators.
+
+        Companies without stored annual statements get them fetched on demand.
+        """
+        wanted = normalize_tickers(tickers)
+        specs = select_indicators(indicators)
+        service = self.portfolio_service
+        with self.uow_factory() as uow:
+            assets = [_comparison_asset(uow, ticker) for ticker in wanted]
+            stored = uow.fundamentals.list_for_many(wanted)
+            missing = [
+                a for a in assets if statements_missing(a.asset_type, stored.get(a.ticker, []))
+            ]
+            if self._fetch_statements(uow, missing):
+                uow.commit()
+                stored = uow.fundamentals.list_for_many(wanted)
+            market = fetch_market_data(
+                service.gateway,
+                assets,
+                max_workers=service.fetch_workers,
+                timeout_seconds=service.fetch_timeout_seconds,
+            )
+            prices = fetch_histories(
+                service.gateway,
+                assets,
+                range_period=COMPARISON_HISTORY_RANGE,
+                max_workers=service.fetch_workers,
+                timeout_seconds=service.fetch_timeout_seconds,
+            )
+            histories = service.checklist_histories(uow, assets)
+            compared: list[ComparedAsset] = []
+            for asset in assets:
+                quote = market.quotes.get(asset.ticker)
+                fund = market.fundamentals.get(asset.ticker)
+                price = (
+                    quote.price
+                    if quote
+                    else (float(asset.manual_price) if asset.manual_price is not None else None)
+                )
+                statements = stored.get(asset.ticker, [])
+                evaluation = service.evaluate_with(asset, fund, histories.get(asset.ticker))
+                valuation = service.value(uow, asset, price, fund)
+                compared.append(
+                    ComparedAsset(
+                        ticker=asset.ticker,
+                        name=asset.name,
+                        asset_type=asset.asset_type,
+                        profile=asset.profile,
+                        asset_id=asset.id,
+                        currency=quote.currency if quote else asset.currency,
+                        price=price,
+                        fundamentals=fund,
+                        statements=statements,
+                        history=historical_metrics(statements) if statements else None,
+                        prices=prices.get(asset.ticker, []),
+                        valuation_verdict=valuation.verdict.value,
+                        fair_value=valuation.fair_value,
+                        margin_of_safety=valuation.margin,
+                        checklist_score=evaluation.score,
+                        checklist_max_score=evaluation.max_score,
+                        checklist_normalized_score=evaluation.normalized_score,
+                        checklist_coverage_pct=round(evaluation.coverage_pct, 2),
+                        checklist_recommendation=evaluation.recommendation.value,
+                    )
+                )
+        return to_asset_comparison_dto(compare_assets(compared, specs))
+
+    def _fetch_statements(self, uow: AbstractUnitOfWork, assets: list[AssetEntity]) -> int:
+        """Store the annual statements of `assets` (a provider failure is logged, not raised)."""
+        stored = 0
+        for asset in assets:
+            try:
+                snapshots = self.portfolio_service.gateway.get_annual_statements(
+                    asset.ticker, asset_type=asset.asset_type
+                )
+            except Exception:
+                logger.exception("Could not fetch the statements of %s", asset.ticker)
+                continue
+            if snapshots:
+                stored += uow.fundamentals.upsert(snapshots)
+        return stored
+
     def _items(self, uow: AbstractUnitOfWork, assets: list[AssetEntity]) -> list[WatchlistItemDTO]:
         service = self.portfolio_service
         market = fetch_market_data(
@@ -235,6 +338,20 @@ class ResearchHandler:
                 )
             )
         return items
+
+
+def _comparison_asset(uow: AbstractUnitOfWork, ticker: str) -> AssetEntity:
+    """The registered asset, or a probe built from the B3 catalog."""
+    registered = uow.assets.get_by_ticker(ticker)
+    if registered is not None:
+        return registered
+    listed = uow.catalog.get(ticker)
+    if listed is None or listed.asset_type is None:
+        raise ValidationError(
+            f"{ticker} is neither registered nor in the B3 catalog",
+            code="UNKNOWN_INSTRUMENT",
+        )
+    return AssetEntity(ticker=ticker, name=listed.name, asset_type=listed.asset_type)
 
 
 def parse_asset_types(values: list[str] | None) -> frozenset[AssetType]:

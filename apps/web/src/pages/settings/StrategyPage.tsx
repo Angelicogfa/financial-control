@@ -35,6 +35,51 @@ const PROJECTION_FIELDS: Array<{ key: string; label: string; percent: boolean }>
   { key: "scenario_rate_shift", label: "Variação dos cenários de juros", percent: true },
 ];
 
+/** Limits of the portfolio health diagnosis (Phase 29); percent fields are stored as fractions. */
+const HEALTH_FIELDS: Array<{ key: string; label: string; percent: boolean; hint?: string }> = [
+  { key: "max_asset_weight_warning", label: "Maior ativo: atenção", percent: true, hint: "Tesouro e caixa não entram." },
+  { key: "max_asset_weight_critical", label: "Maior ativo: crítico", percent: true },
+  { key: "max_top5_weight_warning", label: "Cinco maiores: atenção", percent: true },
+  { key: "max_top5_weight_critical", label: "Cinco maiores: crítico", percent: true },
+  { key: "max_sector_weight_warning", label: "Maior setor: atenção", percent: true, hint: "Sobre a renda variável sem ETFs." },
+  { key: "max_sector_weight_critical", label: "Maior setor: crítico", percent: true },
+  { key: "min_effective_assets_warning", label: "Nº efetivo de ativos: atenção abaixo de", percent: false, hint: "1 / HHI." },
+  { key: "min_effective_assets_critical", label: "Nº efetivo de ativos: crítico abaixo de", percent: false },
+  { key: "fgc_limit_brl", label: "Limite do FGC por instituição (R$)", percent: false },
+  { key: "fgc_warning_ratio", label: "Atenção a partir de (% do limite do FGC)", percent: true },
+  {
+    key: "min_diversification_ratio_warning",
+    label: "Índice de diversificação: atenção abaixo de",
+    percent: false,
+    hint: "Choueifaty; 1 = sem diversificação.",
+  },
+  { key: "min_diversification_ratio_critical", label: "Índice de diversificação: crítico abaixo de", percent: false },
+  { key: "high_correlation", label: "Correlação alta a partir de", percent: false },
+  { key: "max_asset_risk_share", label: "Contribuição máxima de um ativo ao risco", percent: true },
+  { key: "max_volatility_warning", label: "Volatilidade anual: atenção", percent: true },
+  { key: "max_volatility_critical", label: "Volatilidade anual: crítico", percent: true },
+  { key: "max_drawdown_warning", label: "Queda desde o pico: atenção", percent: true },
+  { key: "max_drawdown_critical", label: "Queda desde o pico: crítico", percent: true },
+  {
+    key: "max_stress_loss_warning",
+    label: "Perda no estresse: atenção",
+    percent: true,
+    hint: "Pior mês do histórico com os pesos atuais.",
+  },
+  { key: "max_stress_loss_critical", label: "Perda no estresse: crítico", percent: true },
+  { key: "min_cdi_consistency", label: "Meses acima do CDI (mínimo)", percent: true },
+  { key: "min_checklist_quality_warning", label: "Nota média do checklist: atenção abaixo de", percent: false, hint: "De −1 a 1." },
+  { key: "min_checklist_quality_critical", label: "Nota média do checklist: crítico abaixo de", percent: false },
+  { key: "checklist_max_age_months", label: "Validade das respostas manuais (meses)", percent: false },
+  { key: "max_stale_checklist_weight", label: "Peso máximo com checklist vencido", percent: true },
+  { key: "monthly_expenses_brl", label: "Custo de vida mensal (R$)", percent: false, hint: "Mede quantos meses a reserva cobre." },
+  { key: "min_reserve_months_warning", label: "Reserva: atenção abaixo de (meses)", percent: false },
+  { key: "min_reserve_months_critical", label: "Reserva: crítico abaixo de (meses)", percent: false },
+  { key: "min_liquid_weight", label: "Liquidez mínima em até D+2", percent: true },
+  { key: "bracket_window_days", label: "Aviso de faixa de IR (dias antes)", percent: false },
+  { key: "min_observations", label: "Janela mínima das métricas (pregões)", percent: false },
+];
+
 interface ClassRow {
   target: string;
   band: string;
@@ -71,6 +116,10 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
   );
   const [projectionText, setProjectionText] = useState<Record<string, string>>(() =>
     Object.fromEntries(PROJECTION_FIELDS.map((f) => [f.key, toText(projections[f.key], f.percent)])),
+  );
+  const health = (policy.health ?? {}) as Record<string, number | null | undefined>;
+  const [healthText, setHealthText] = useState<Record<string, string>>(() =>
+    Object.fromEntries(HEALTH_FIELDS.map((f) => [f.key, toText(health[f.key] ?? undefined, f.percent)])),
   );
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -109,6 +158,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
           min_coverage_pct: parseDecimal(minCoverage) ?? 0,
         },
         valuation: { ...read(VALUATION_FIELDS, valuationText), projections: read(PROJECTION_FIELDS, projectionText) },
+        health: read(HEALTH_FIELDS, healthText),
       });
       onSaved();
     } catch (err) {
@@ -255,6 +305,31 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
         </div>
       </section>
 
+      <details className="app-card app-card-padded">
+        <summary>Limites da saúde da carteira</summary>
+        <p className="app-card-hint">Onde cada checagem da Saúde da carteira passa a ser “atenção” ou “crítico”.</p>
+        <div className="app-field-grid">
+          {HEALTH_FIELDS.map((f) => (
+            <div key={f.key} className="app-field">
+              <span className="app-field-label">
+                <label htmlFor={`health-${f.key}`}>
+                  {f.label}
+                  {f.percent ? " (%)" : ""}
+                </label>
+                {f.hint && <Hint about={f.label}>{f.hint}</Hint>}
+              </span>
+              <input
+                id={`health-${f.key}`}
+                inputMode="decimal"
+                value={healthText[f.key]}
+                disabled={saving}
+                onChange={(e) => setHealthText((all) => ({ ...all, [f.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+      </details>
+
       {message && <p className={message.ok ? "app-success-banner" : "app-error-banner"}>{message.text}</p>}
       <div className="app-button-row">
         <button type="submit" className="app-primary-button" disabled={saving}>
@@ -279,7 +354,7 @@ export function StrategyPage() {
     <div className="app-page">
       <PageHeader
         title="Estratégia"
-        subtitle="As regras que a carteira, a pesquisa e o aporte seguem: ARCA, elegibilidade e valuation."
+        subtitle="As regras que a carteira, a pesquisa e o aporte seguem: ARCA, elegibilidade, valuation e limites da saúde da carteira."
       />
       {saved && (
         <p className="app-success-banner" role="status" style={{ marginBottom: "var(--space-4)" }}>

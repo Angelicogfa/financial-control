@@ -131,12 +131,112 @@ class ValuationPolicy:
 
 
 @dataclass(frozen=True)
+class HealthPolicy:
+    """Limits of the portfolio health diagnosis (Phase 29); fractions follow ADR 0006.
+
+    Each `*_warning` / `*_critical` pair marks where a check turns "atenção" and "crítico".
+    For maximum limits the warning must not exceed the critical value; for minimums it must
+    not be below it. `monthly_expenses_brl=None` leaves the reserve check without data.
+    """
+
+    max_asset_weight_warning: float = 0.15
+    max_asset_weight_critical: float = 0.25
+    max_top5_weight_warning: float = 0.60
+    max_top5_weight_critical: float = 0.80
+    max_sector_weight_warning: float = 0.30
+    max_sector_weight_critical: float = 0.45
+    min_effective_assets_warning: float = 8.0
+    min_effective_assets_critical: float = 4.0
+    fgc_limit_brl: float = 250_000.0
+    fgc_warning_ratio: float = 0.90
+    min_diversification_ratio_warning: float = 1.20
+    min_diversification_ratio_critical: float = 1.05
+    high_correlation: float = 0.80
+    max_asset_risk_share: float = 0.25
+    max_volatility_warning: float = 0.15
+    max_volatility_critical: float = 0.25
+    max_drawdown_warning: float = 0.10
+    max_drawdown_critical: float = 0.20
+    max_stress_loss_warning: float = 0.10
+    max_stress_loss_critical: float = 0.20
+    min_cdi_consistency: float = 0.50
+    min_checklist_quality_warning: float = 0.50
+    min_checklist_quality_critical: float = 0.0
+    checklist_max_age_months: int = 12
+    max_stale_checklist_weight: float = 0.20
+    monthly_expenses_brl: float | None = None
+    min_reserve_months_warning: float = 6.0
+    min_reserve_months_critical: float = 3.0
+    min_liquid_weight: float = 0.20
+    bracket_window_days: int = 30
+    min_observations: int = 60
+
+    _MAX_PAIRS = (
+        "asset_weight",
+        "top5_weight",
+        "sector_weight",
+        "volatility",
+        "drawdown",
+        "stress_loss",
+    )
+    _MIN_PAIRS = (
+        "effective_assets",
+        "diversification_ratio",
+        "checklist_quality",
+        "reserve_months",
+    )
+
+    def __post_init__(self) -> None:
+        for name in self._MAX_PAIRS:
+            warning = getattr(self, f"max_{name}_warning")
+            critical = getattr(self, f"max_{name}_critical")
+            if not 0.0 <= warning <= critical:
+                raise ValidationError(
+                    f"max_{name}: warning must be between 0 and the critical limit",
+                    code="INVALID_HEALTH_LIMIT",
+                )
+        for name in self._MIN_PAIRS:
+            warning = getattr(self, f"min_{name}_warning")
+            critical = getattr(self, f"min_{name}_critical")
+            if warning < critical:
+                raise ValidationError(
+                    f"min_{name}: warning must not be below the critical limit",
+                    code="INVALID_HEALTH_LIMIT",
+                )
+        for name in (
+            "fgc_warning_ratio",
+            "high_correlation",
+            "max_asset_risk_share",
+            "min_cdi_consistency",
+            "max_stale_checklist_weight",
+            "min_liquid_weight",
+        ):
+            if not 0.0 <= getattr(self, name) <= 1.0:
+                raise ValidationError(
+                    f"{name} must be a fraction between 0 and 1", code="INVALID_HEALTH_LIMIT"
+                )
+        if self.fgc_limit_brl <= 0:
+            raise ValidationError("fgc_limit_brl must be positive", code="INVALID_HEALTH_LIMIT")
+        if self.monthly_expenses_brl is not None and self.monthly_expenses_brl <= 0:
+            raise ValidationError(
+                "monthly_expenses_brl must be positive", code="INVALID_HEALTH_LIMIT"
+            )
+        for name in ("checklist_max_age_months", "bracket_window_days", "min_observations"):
+            if getattr(self, name) < 1:
+                raise ValidationError(f"{name} must be at least 1", code="INVALID_HEALTH_LIMIT")
+
+    def as_dict(self) -> dict[str, float | int | None]:
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+
+@dataclass(frozen=True)
 class InvestmentPolicy:
     """Complete, versioned set of rules applied by every operational context."""
 
     arca: ArcaPolicy = field(default_factory=ArcaPolicy.default)
     eligibility: EligibilityPolicy = field(default_factory=EligibilityPolicy)
     valuation: ValuationPolicy = field(default_factory=ValuationPolicy)
+    health: HealthPolicy = field(default_factory=HealthPolicy)
     version: int | None = None
     created_at: datetime | None = None
 

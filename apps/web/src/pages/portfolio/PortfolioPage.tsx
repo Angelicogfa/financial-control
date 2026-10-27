@@ -18,6 +18,7 @@ import {
   RECOMMENDATION_LABELS,
 } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
+import { compareLink } from "../tools/AssetComparePage";
 
 type ClassTab = "ALL" | ArcaClass;
 const TABS: TabSpec<ClassTab>[] = [
@@ -50,7 +51,12 @@ function PositionRow({ p }: Readonly<{ p: ValuedPositionDTO }>) {
           <Link className="app-link" to={`/asset/${p.asset_id}`}>
             {p.ticker}
           </Link>
-          <small>{p.name}</small>
+          <small>
+            {p.name} ·{" "}
+            <Link className="app-link" to={compareLink(p.ticker)}>
+              Comparar
+            </Link>
+          </small>
         </span>
       </td>
       <td className="app-numeric">{invalid ? "—" : quantity(p.quantity)}</td>

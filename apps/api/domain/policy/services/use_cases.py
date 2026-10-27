@@ -10,6 +10,7 @@ from controllers.policy.requests import (
     ArcaTargetsUpdateRequest,
     ClassPolicyDTO,
     EligibilityPolicyDTO,
+    HealthPolicyDTO,
     PolicyUpdateRequest,
     ProjectionAssumptionsDTO,
     ValuationPolicyDTO,
@@ -21,6 +22,7 @@ from domain.policy.services.policy import (
     ArcaPolicy,
     ClassPolicy,
     EligibilityPolicy,
+    HealthPolicy,
     InvestmentPolicy,
     ValuationPolicy,
     current_policy,
@@ -50,6 +52,7 @@ def to_policy_dto(policy: InvestmentPolicy) -> PolicyDTO:
             **policy.valuation.as_dict(),
             projections=ProjectionAssumptionsDTO(**policy.valuation.projections.as_dict()),
         ),
+        health=HealthPolicyDTO(**policy.health.as_dict()),
     )
 
 
@@ -92,6 +95,7 @@ class PolicyHandler:
                 **req.valuation.model_dump(exclude={"projections"}),
                 projections=ProjectionAssumptions(**req.valuation.projections.model_dump()),
             ),
+            health=HealthPolicy(**req.health.model_dump()),
         )
         with self.uow_factory() as uow:
             saved = uow.policies.add(policy)

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, fields
 
 from domain.policy.services.assumptions import ProjectionAssumptions
 from domain.policy.services.policy import (
     ArcaPolicy,
     ClassPolicy,
     EligibilityPolicy,
+    HealthPolicy,
     InvestmentPolicy,
     ValuationPolicy,
 )
@@ -35,7 +36,14 @@ def policy_payload(policy: InvestmentPolicy) -> dict[str, dict]:
             **policy.valuation.as_dict(),
             "projections": policy.valuation.projections.as_dict(),
         },
+        "health": policy.health.as_dict(),
     }
+
+
+def _health_policy(raw: dict | None) -> HealthPolicy:
+    """Versions saved before Phase 29 have no health limits and take the defaults."""
+    known = {f.name for f in fields(HealthPolicy)}
+    return HealthPolicy(**{k: v for k, v in (raw or {}).items() if k in known})
 
 
 def to_investment_policy(model: InvestmentPolicyModel) -> InvestmentPolicy:
@@ -54,6 +62,7 @@ def to_investment_policy(model: InvestmentPolicyModel) -> InvestmentPolicy:
         ),
         eligibility=EligibilityPolicy(**model.eligibility),
         valuation=ValuationPolicy(projections=projections, **valuation),
+        health=_health_policy(model.health),
         version=model.version,
         created_at=model.created_at,
     )

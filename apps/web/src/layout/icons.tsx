@@ -33,6 +33,20 @@ export const HomeIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const PulseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 12h4l3-7 4 14 3-7h4" />
+  </Icon>
+);
+
+export const ColumnsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="5" height="16" rx="1" />
+    <rect x="10" y="4" width="5" height="16" rx="1" />
+    <rect x="17" y="4" width="4" height="16" rx="1" />
+  </Icon>
+);
+
 export const TrendIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 17l6-6 4 4 8-8" />
