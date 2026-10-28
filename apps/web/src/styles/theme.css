@@ -1059,11 +1059,81 @@ button:disabled {
   gap: var(--space-1);
 }
 
-.app-chip-group-label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--app-text-secondary);
-  margin-right: var(--space-1);
+/* Select-like trigger with a list of checkboxes (several options at once). */
+.app-multiselect {
+  position: relative;
+  min-width: 0;
+}
+
+.app-multiselect-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font: inherit;
+  font-size: var(--text-body);
+  color: var(--app-text);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  padding: var(--control-padding);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.app-multiselect-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-multiselect-trigger:focus-visible,
+.app-multiselect-trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px var(--app-focus-ring);
+}
+
+.app-multiselect-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.app-multiselect-placeholder {
+  color: var(--app-text-muted);
+}
+
+.app-multiselect-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  min-width: max-content;
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.app-multiselect-option {
+  padding: 6px var(--space-2);
+  border-radius: var(--app-radius-sm);
+}
+
+.app-multiselect-option:hover {
+  background: var(--app-surface-hover);
+}
+
+.app-multiselect-clear {
+  justify-self: start;
+  margin-top: var(--space-1);
+  padding: 4px var(--space-2);
 }
 
 .app-chip {

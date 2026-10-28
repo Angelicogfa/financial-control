@@ -20,6 +20,7 @@ import { IconButton } from "../../components/RowActions";
 import { TrashIcon } from "../../layout/icons";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Hint } from "../../components/Hint";
+import { MultiSelect } from "../../components/MultiSelect";
 import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points } from "../../utils/format";
@@ -246,7 +247,6 @@ function Screener() {
   };
 
   const sectors = useApi("research-sectors", () => api.research.sectors());
-  const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   return (
     <div className="app-page-stack">
@@ -266,6 +266,26 @@ function Screener() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="app-field">
+            <label htmlFor="screen-types">Tipo</label>
+            <MultiSelect
+              id="screen-types"
+              options={SCREEN_TYPES.map((type) => ({ value: type, label: ASSET_TYPE_LABELS[type] }))}
+              value={form.types}
+              onChange={(types) => set("types", types)}
+              disabled={loading}
+            />
+          </div>
+          <div className="app-field">
+            <label htmlFor="screen-arca">Classe ARCA</label>
+            <MultiSelect
+              id="screen-arca"
+              options={ARCA_CLASSES.map((arca) => ({ value: arca, label: ARCA_LABELS[arca] }))}
+              value={form.arcaClasses}
+              onChange={(arcaClasses) => set("arcaClasses", arcaClasses)}
+              disabled={loading}
+            />
           </div>
           <div className="app-field">
             <span className="app-field-label">
@@ -304,40 +324,6 @@ function Screener() {
           </div>
         </div>
         <div className="app-filter-bar" style={{ marginTop: "var(--space-3)", marginBottom: 0 }}>
-          <div className="app-chip-group" role="group" aria-label="Tipos">
-            <span className="app-chip-group-label" aria-hidden="true">
-              Tipo
-            </span>
-            {SCREEN_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                className="app-chip"
-                aria-pressed={form.types.includes(type)}
-                disabled={loading}
-                onClick={() => set("types", toggle(form.types, type))}
-              >
-                {ASSET_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-          <div className="app-chip-group" role="group" aria-label="Classes ARCA">
-            <span className="app-chip-group-label" aria-hidden="true">
-              Classe ARCA
-            </span>
-            {ARCA_CLASSES.map((arca) => (
-              <button
-                key={arca}
-                type="button"
-                className="app-chip"
-                aria-pressed={form.arcaClasses.includes(arca)}
-                disabled={loading}
-                onClick={() => set("arcaClasses", toggle(form.arcaClasses, arca))}
-              >
-                {ARCA_LABELS[arca]}
-              </button>
-            ))}
-          </div>
           <label className="app-check">
             <input type="checkbox" checked={form.belowBand} disabled={loading} onChange={(e) => set("belowBand", e.target.checked)} />
             Só classes abaixo da banda
