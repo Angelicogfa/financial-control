@@ -88,6 +88,8 @@ def to_valuation_dto(valuation: AssetValuation) -> AssetValuationDTO:
         margin=valuation.margin,
         verdict=valuation.verdict.value,
         reason=valuation.reason,
+        suspicious_inputs=list(valuation.suspicious_inputs),
+        extraordinary_dividends=valuation.extraordinary_dividends,
     )
 
 

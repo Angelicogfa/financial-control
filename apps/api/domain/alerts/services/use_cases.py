@@ -16,7 +16,9 @@ from domain.alerts.services.evaluator import (
     AlertDismissal,
     MaturityItem,
     agenda_alerts,
+    checklist_alerts,
     data_alerts,
+    data_quality_alerts,
     early_sale_alerts,
     maturity_alerts,
     portfolio_alerts,
@@ -54,9 +56,14 @@ class AlertHandler:
             valued = [
                 assets[t] for t, s in lifecycles.items() if s in VALUED_STATUSES and t in assets
             ]
+            reviewed = [
+                assets[t]
+                for t, s in lifecycles.items()
+                if s == AssetLifecycle.REVIEW and t in assets
+            ]
             fundamentals = fetch_market_data(
                 service.gateway,
-                valued,
+                [*valued, *reviewed],
                 include_quotes=False,
                 max_workers=service.fetch_workers,
                 timeout_seconds=service.fetch_timeout_seconds,
@@ -71,6 +78,10 @@ class AlertHandler:
                 *valuation_alerts(
                     valuations, lifecycles, {t: a.id or 0 for t, a in assets.items()}
                 ),
+                *data_quality_alerts(
+                    fundamentals, lifecycles, {t: a.id or 0 for t, a in assets.items()}
+                ),
+                *checklist_alerts(report),
                 *data_alerts(
                     [
                         evaluate_series_status(s, uow.market_series.list_series(s), reference)

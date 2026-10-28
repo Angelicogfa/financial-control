@@ -82,7 +82,6 @@ const HEALTH_FIELDS: Array<{ key: string; label: string; percent: boolean; hint?
   { key: "min_cdi_consistency", label: "Meses acima do CDI (mínimo)", percent: true },
   { key: "min_checklist_quality_warning", label: "Nota média do checklist: atenção abaixo de", percent: false, hint: "De −1 a 1." },
   { key: "min_checklist_quality_critical", label: "Nota média do checklist: crítico abaixo de", percent: false },
-  { key: "checklist_max_age_months", label: "Validade das respostas manuais (meses)", percent: false },
   { key: "max_stale_checklist_weight", label: "Peso máximo com checklist vencido", percent: true },
   { key: "monthly_expenses_brl", label: "Custo de vida mensal (R$)", percent: false, hint: "Mede quantos meses a reserva cobre." },
   { key: "min_reserve_months_warning", label: "Reserva: atenção abaixo de (meses)", percent: false },
@@ -121,6 +120,9 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
   const [requireEvaluation, setRequireEvaluation] = useState(eligibility.require_evaluation ?? false);
   const [minScore, setMinScore] = useState(String(eligibility.min_score ?? 1));
   const [minCoverage, setMinCoverage] = useState(String(eligibility.min_coverage_pct ?? 0));
+  const [validityMonths, setValidityMonths] = useState(String(eligibility.answer_validity_months ?? 12));
+  const [reviewExpired, setReviewExpired] = useState(eligibility.review_on_expired_answers ?? true);
+  const [dropExpired, setDropExpired] = useState(eligibility.drop_expired_answers ?? false);
   const valuation = (policy.valuation ?? {}) as Record<string, number | undefined>;
   const projections = (policy.valuation?.projections ?? {}) as Record<string, number | undefined>;
   const [valuationText, setValuationText] = useState<Record<string, string>>(() =>
@@ -169,6 +171,9 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
           require_evaluation: requireEvaluation,
           min_score: Math.round(parseDecimal(minScore) ?? 0),
           min_coverage_pct: parseDecimal(minCoverage) ?? 0,
+          answer_validity_months: Math.round(parseDecimal(validityMonths) ?? 12),
+          review_on_expired_answers: reviewExpired,
+          drop_expired_answers: dropExpired,
         },
         valuation: {
           ...read(VALUATION_FIELDS, valuationText),
@@ -276,6 +281,23 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
           <label className="app-check">
             <input type="checkbox" checked={requireEvaluation} disabled={saving} onChange={(e) => setRequireEvaluation(e.target.checked)} />
             Exigir checklist respondido para aportar
+          </label>
+          <div className="app-field">
+            <span className="app-field-label">
+              <label htmlFor="policy-validity">Validade das respostas manuais (meses)</label>
+              <Hint about="Validade das respostas manuais">
+                Depois desse prazo, ou quando chega um demonstrativo anual novo, a resposta precisa de revisão.
+              </Hint>
+            </span>
+            <input id="policy-validity" inputMode="numeric" value={validityMonths} disabled={saving} onChange={(e) => setValidityMonths(e.target.value)} />
+          </div>
+          <label className="app-check">
+            <input type="checkbox" checked={reviewExpired} disabled={saving} onChange={(e) => setReviewExpired(e.target.checked)} />
+            Resposta vencida coloca o ativo em revisão (sem aportes)
+          </label>
+          <label className="app-check">
+            <input type="checkbox" checked={dropExpired} disabled={saving} onChange={(e) => setDropExpired(e.target.checked)} />
+            Tirar respostas vencidas da nota
           </label>
         </div>
       </section>

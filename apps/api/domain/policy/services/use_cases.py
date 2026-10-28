@@ -5,6 +5,8 @@ Scope: versioned investment policy and ARCA targets.
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from controllers.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -43,11 +45,7 @@ def to_policy_dto(policy: InvestmentPolicy) -> PolicyDTO:
             )
             for c, p in policy.arca.classes.items()
         ],
-        eligibility=EligibilityPolicyDTO(
-            require_evaluation=policy.eligibility.require_evaluation,
-            min_score=policy.eligibility.min_score,
-            min_coverage_pct=policy.eligibility.min_coverage_pct,
-        ),
+        eligibility=EligibilityPolicyDTO(**asdict(policy.eligibility)),
         valuation=ValuationPolicyDTO(
             **policy.valuation.as_dict(),
             projections=ProjectionAssumptionsDTO(**policy.valuation.projections.as_dict()),
@@ -86,11 +84,7 @@ class PolicyHandler:
     def update(self, req: PolicyUpdateRequest) -> PolicyDTO:
         policy = InvestmentPolicy(
             arca=_arca_policy(req.arca),
-            eligibility=EligibilityPolicy(
-                require_evaluation=req.eligibility.require_evaluation,
-                min_score=req.eligibility.min_score,
-                min_coverage_pct=req.eligibility.min_coverage_pct,
-            ),
+            eligibility=EligibilityPolicy(**req.eligibility.model_dump()),
             valuation=ValuationPolicy(
                 **req.valuation.model_dump(exclude={"projections"}),
                 projections=ProjectionAssumptions(**req.valuation.projections.model_dump()),

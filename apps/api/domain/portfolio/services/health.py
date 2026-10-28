@@ -57,7 +57,6 @@ from domain.shared.enums import ARCA_LABELS, ArcaClass, AssetPurpose, AssetType
 
 MIN_DRAWDOWN_OBSERVATIONS = 20
 MIN_CONSISTENCY_MONTHS = 6
-DAYS_PER_MONTH = 30.4375
 LOW_F_SCORE = 3
 Z_DISTRESS = 1.1
 UNKNOWN_SECTOR = "Não informado"
@@ -143,6 +142,8 @@ class Holding:
     eligible: bool = True
     checklist_ratio: float | None = None
     checklist_age_days: int | None = None
+    checklist_stale: bool = False
+    suspicious_data: bool = False
     f_score: int | None = None
     z_score: float | None = None
 
@@ -1214,13 +1215,12 @@ def _quality_pillar(
     holdings: Sequence[Holding], total: float, policy: HealthPolicy
 ) -> tuple[list[HealthCheck], list[HoldingQuality]]:
     checks: list[HealthCheck] = []
-    max_age = policy.checklist_max_age_months * DAYS_PER_MONTH
     rows = [
         HoldingQuality(
             ticker=h.ticker,
             weight=round(h.value_brl / total, 4) if total > 0 else 0.0,
             checklist_ratio=h.checklist_ratio,
-            stale=h.checklist_age_days is not None and h.checklist_age_days > max_age,
+            stale=h.checklist_stale,
             f_score=h.f_score,
             z_score=h.z_score,
         )
@@ -1282,7 +1282,7 @@ def _quality_pillar(
             )
         )
     else:
-        stale = [h for h in answered if (h.checklist_age_days or 0) > max_age]
+        stale = [h for h in answered if h.checklist_stale]
         weight = sum(h.value_brl for h in stale) / total if total > 0 else 0.0
         too_much = weight > policy.max_stale_checklist_weight
         checks.append(
@@ -1293,9 +1293,9 @@ def _quality_pillar(
                 value=round(weight, 4),
                 warning_threshold=policy.max_stale_checklist_weight,
                 explanation=(
-                    f"{len(stale)} ativo(s) com respostas manuais há mais de "
-                    f"{policy.checklist_max_age_months} meses somam {_pct(weight)} da carteira"
-                    + (f": {', '.join(h.ticker for h in stale)}." if stale else ".")
+                    f"{len(stale)} ativo(s) com respostas manuais vencidas (prazo de validade da "
+                    f"elegibilidade ou demonstrativo anual mais novo) somam {_pct(weight)} da "
+                    "carteira" + (f": {', '.join(h.ticker for h in stale)}." if stale else ".")
                 ),
                 action=(
                     "Revise as respostas manuais desses ativos com o último demonstrativo."
@@ -1304,6 +1304,29 @@ def _quality_pillar(
                 ),
             )
         )
+
+    suspicious = [h for h in holdings if h.suspicious_data]
+    suspicious_weight = sum(h.value_brl for h in suspicious) / total if total > 0 else 0.0
+    checks.append(
+        HealthCheck(
+            key="suspicious_data",
+            title="Peso com dado suspeito",
+            status=HealthStatus.WARNING if suspicious else HealthStatus.OK,
+            value=round(suspicious_weight, 4),
+            explanation=(
+                f"{len(suspicious)} ativo(s) com indicadores fora da faixa plausível ou "
+                f"divergentes entre fontes somam {_pct(suspicious_weight)} da carteira: "
+                f"{', '.join(h.ticker for h in suspicious)}."
+                if suspicious
+                else "Nenhum ativo com peso tem indicador marcado como suspeito."
+            ),
+            action=(
+                "Confira os indicadores desses ativos antes de usar o valuation e o checklist."
+                if suspicious
+                else None
+            ),
+        )
+    )
 
     with_scores = [h for h in holdings if h.f_score is not None or h.z_score is not None]
     if not with_scores:

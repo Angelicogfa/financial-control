@@ -115,6 +115,8 @@ def build_holding(
         eligible=position.eligible,
         checklist_ratio=round(ratio, 4) if ratio is not None else None,
         checklist_age_days=checklist_age_days(asset, as_of),
+        checklist_stale=evaluation.stale > 0,
+        suspicious_data=bool(fundamentals and fundamentals.suspicious),
         f_score=scores.f_score if scores else None,
         z_score=scores.z_score if scores else None,
     )

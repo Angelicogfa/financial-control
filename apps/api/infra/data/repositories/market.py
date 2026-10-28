@@ -124,6 +124,7 @@ class SqlAlchemyFundamentalsRepository(AbstractFundamentalsRepository):
                     ticker=ticker,
                     reference_date=snapshot.reference_date,
                     period=snapshot.period.value,
+                    first_seen_at=datetime.now(UTC),
                 )
                 self.session.add(model)
             model.metrics = dict(snapshot.metrics)

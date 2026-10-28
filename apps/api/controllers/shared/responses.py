@@ -48,6 +48,7 @@ class EvaluatedAnswerDTO(BaseModel):
     automatable: bool
     evidence: str | None = None
     answered_at: datetime | None = None
+    stale_reason: str | None = None
 
 
 class CerradoEvaluationDTO(BaseModel):
@@ -63,4 +64,5 @@ class CerradoEvaluationDTO(BaseModel):
     not_applicable: int
     pending: int
     recommendation: str
+    stale: int = 0
     answers: list[EvaluatedAnswerDTO]

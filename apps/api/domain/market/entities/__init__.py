@@ -114,6 +114,8 @@ class Fundamentals:
     market_cap: float | None = None
     avg_daily_volume: float | None = None
     extra: dict[str, Any] = field(default_factory=dict)
+    # Indicator -> reason (pt-BR) for values out of range or diverging between sources.
+    suspicious: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

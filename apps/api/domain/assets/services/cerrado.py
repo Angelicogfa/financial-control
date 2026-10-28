@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from domain.assets.services.history import (
+    FundamentalPeriod,
     FundamentalSnapshot,
     HistoricalMetrics,
     historical_metrics,
@@ -26,6 +27,7 @@ from domain.assets.services.questions import (
     resolve_profile,
 )
 from domain.market.entities import Fundamentals
+from domain.policy.services.policy import EligibilityPolicy
 from domain.shared.entities import (
     AssetEntity,
     ChecklistAnswer,
@@ -41,6 +43,61 @@ from domain.shared.enums import (
 
 if TYPE_CHECKING:
     from domain.shared.repositories import AbstractChecklistRepository
+
+
+DAYS_PER_MONTH = 30.4375
+
+
+class StaleReason(StrEnum):
+    """Why a manual answer needs review (Phase 25)."""
+
+    EXPIRED = "EXPIRED"
+    NEW_STATEMENT = "NEW_STATEMENT"
+
+
+@dataclass(frozen=True)
+class AnswerFreshness:
+    """Validity rules of manual answers on `as_of`.
+
+    An answer older than `validity_months`, or given before the newest annual statement was
+    first stored (`statement_seen_at`), is stale. With `drop_stale` it leaves the score (the
+    history keeps it); otherwise it still counts but asks for review.
+    """
+
+    as_of: date
+    validity_months: int = 12
+    drop_stale: bool = False
+    statement_seen_at: datetime | None = None
+
+
+def _aware(moment: datetime) -> datetime:
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+def stale_reason(answer: ChecklistAnswer, freshness: AnswerFreshness | None) -> StaleReason | None:
+    """Why a stored manual answer is no longer current (None when it still holds)."""
+    if (
+        freshness is None
+        or answer.source != AnswerSource.MANUAL
+        or answer.value is None
+        or answer.answered_at is None
+    ):
+        return None
+    answered = _aware(answer.answered_at)
+    if freshness.statement_seen_at is not None and _aware(freshness.statement_seen_at) > answered:
+        return StaleReason.NEW_STATEMENT
+    limit = answered.date() + timedelta(days=round(freshness.validity_months * DAYS_PER_MONTH))
+    if freshness.as_of > limit:
+        return StaleReason.EXPIRED
+    return None
+
+
+def latest_statement_seen(snapshots: Iterable[FundamentalSnapshot]) -> datetime | None:
+    """When the newest annual statement (by fiscal year) was first stored."""
+    annual = [s for s in snapshots if s.period == FundamentalPeriod.ANNUAL]
+    if not annual:
+        return None
+    return max(annual, key=lambda s: s.reference_date).first_seen_at
 
 
 class Recommendation(StrEnum):
@@ -61,6 +118,7 @@ class EvaluatedAnswer:
     automatable: bool
     evidence: str | None = None
     answered_at: datetime | None = None
+    stale_reason: StaleReason | None = None
 
     @property
     def answer(self) -> bool | None:
@@ -82,6 +140,7 @@ class CerradoEvaluation:
     not_applicable: int
     recommendation: Recommendation
     checklist_version: int = CHECKLIST_VERSION
+    stale: int = 0
 
     @property
     def answered(self) -> int:
@@ -119,29 +178,39 @@ def evaluate(
     *,
     use_cerrado: bool = True,
     history: HistoricalMetrics | None = None,
+    freshness: AnswerFreshness | None = None,
 ) -> CerradoEvaluation:
-    """Evaluate a checklist: manual answers first, then auto rules with evidence."""
+    """Evaluate a checklist: manual answers first, then auto rules with evidence.
+
+    With `freshness`, stale manual answers are flagged (and dropped from the score when the
+    policy says so).
+    """
     profile = resolve_profile(profile_or_type)
     manual = {qid: ChecklistAnswer.coerce(qid, raw) for qid, raw in (manual_answers or {}).items()}
     context = EvidenceContext(fundamentals=fundamentals, history=history)
     evaluated: list[EvaluatedAnswer] = []
     counts = {AnswerValue.YES: 0, AnswerValue.NO: 0, AnswerValue.NA: 0}
+    stale_count = 0
 
     for q in questions_for(profile):
         value: AnswerValue | None = None
         source = AnswerSource.PENDING
         evidence: str | None = None
         answered_at: datetime | None = None
+        reason: StaleReason | None = None
         stored = manual.get(q.id)
         if stored is not None and stored.value is not None:
             value, source = stored.value, stored.source
             evidence, answered_at = stored.evidence, stored.answered_at
+            reason = stale_reason(stored, freshness)
         elif q.auto is not None:
             auto = q.auto(context)
             if auto is not None:
                 value = AnswerValue.YES if auto.value else AnswerValue.NO
                 source, evidence = AnswerSource.AUTO, auto.evidence
-        if value is not None:
+        if reason is not None:
+            stale_count += 1
+        if value is not None and not (reason is not None and freshness and freshness.drop_stale):
             counts[value] += 1
         evaluated.append(
             EvaluatedAnswer(
@@ -154,6 +223,7 @@ def evaluate(
                 q.automatable,
                 evidence,
                 answered_at,
+                reason,
             )
         )
 
@@ -175,6 +245,7 @@ def evaluate(
         no=no,
         not_applicable=counts[AnswerValue.NA],
         recommendation=recommendation,
+        stale=stale_count,
     )
 
 
@@ -274,3 +345,15 @@ def record_if_changed(
         return False
     checklists.record_evaluation(record)
     return True
+
+
+def answer_freshness(
+    policy: EligibilityPolicy, as_of: date, snapshots: Iterable[FundamentalSnapshot] = ()
+) -> AnswerFreshness:
+    """Freshness rules of the policy for an asset with these stored statements."""
+    return AnswerFreshness(
+        as_of=as_of,
+        validity_months=policy.answer_validity_months,
+        drop_stale=policy.drop_expired_answers,
+        statement_seen_at=latest_statement_seen(snapshots),
+    )

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 from domain.shared.enums import AssetType
@@ -49,6 +49,8 @@ class FundamentalSnapshot:
     metrics: Mapping[str, float | None] = field(default_factory=dict)
     source: str | None = None
     id: int | None = None
+    # When the statement was stored for the first time (newer statements reopen answers).
+    first_seen_at: datetime | None = None
 
     def value(self, key: str) -> float | None:
         return self.metrics.get(key)

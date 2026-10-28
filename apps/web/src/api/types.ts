@@ -263,6 +263,8 @@ export interface AssetValuationDTO {
   margin?: number | null;
   verdict: string;
   reason?: string;
+  suspicious_inputs?: string[];
+  extraordinary_dividends?: boolean;
 }
 
 export interface BenchmarkComparisonDTO {
@@ -308,6 +310,7 @@ export interface CerradoEvaluationDTO {
   not_applicable: number;
   pending: number;
   recommendation: string;
+  stale?: number;
   answers: EvaluatedAnswerDTO[];
 }
 
@@ -549,6 +552,9 @@ export interface EligibilityPolicyDTO {
   require_evaluation?: boolean;
   min_score?: number;
   min_coverage_pct?: number;
+  answer_validity_months?: number;
+  review_on_expired_answers?: boolean;
+  drop_expired_answers?: boolean;
 }
 
 export interface EquivalentRateDTO {
@@ -569,6 +575,7 @@ export interface EvaluatedAnswerDTO {
   automatable: boolean;
   evidence?: string | null;
   answered_at?: string | null;
+  stale_reason?: string | null;
 }
 
 export interface ExecutionDTO {
@@ -725,7 +732,6 @@ export interface HealthPolicyDTO {
   min_cdi_consistency?: number;
   min_checklist_quality_warning?: number;
   min_checklist_quality_critical?: number;
-  checklist_max_age_months?: number;
   max_stale_checklist_weight?: number;
   monthly_expenses_brl?: number | null;
   min_reserve_months_warning?: number;

@@ -36,6 +36,9 @@ class EligibilityPolicyDTO(BaseModel):
     require_evaluation: bool = False
     min_score: int = 1
     min_coverage_pct: float = Field(default=0.0, ge=0.0, le=100.0)
+    answer_validity_months: int = Field(default=12, ge=1, le=120)
+    review_on_expired_answers: bool = True
+    drop_expired_answers: bool = False
 
 
 class ProjectionAssumptionsDTO(BaseModel):
@@ -92,7 +95,6 @@ class HealthPolicyDTO(BaseModel):
     min_cdi_consistency: float = Field(default=0.50, ge=0.0, le=1.0)
     min_checklist_quality_warning: float = Field(default=0.50, ge=-1.0, le=1.0)
     min_checklist_quality_critical: float = Field(default=0.0, ge=-1.0, le=1.0)
-    checklist_max_age_months: int = Field(default=12, ge=1, le=120)
     max_stale_checklist_weight: float = Field(default=0.20, ge=0.0, le=1.0)
     monthly_expenses_brl: float | None = Field(default=None, gt=0.0)
     min_reserve_months_warning: float = Field(default=6.0, ge=0.0)

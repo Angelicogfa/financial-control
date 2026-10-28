@@ -10,7 +10,9 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from domain.assets.services.cerrado import (
+    AnswerFreshness,
     CerradoEvaluation,
+    answer_freshness,
     evaluate,
     evaluation_record,
     history_for_assets,
@@ -133,6 +135,7 @@ class PortfolioApplicationService:
         asset: AssetEntity,
         fundamentals: Fundamentals | None,
         history: HistoricalMetrics | None,
+        freshness: AnswerFreshness | None = None,
     ) -> CerradoEvaluation:
         """Checklist of an asset with data already loaded by the caller."""
         return evaluate(
@@ -141,7 +144,19 @@ class PortfolioApplicationService:
             fundamentals,
             use_cerrado=asset.use_cerrado,
             history=history,
+            freshness=freshness,
         )
+
+    def checklist_freshness(
+        self, uow: AbstractUnitOfWork, assets: list[AssetEntity], as_of: date | None = None
+    ) -> dict[str, AnswerFreshness]:
+        """Validity rules of the manual answers of each asset (policy + newest statement)."""
+        policy = self.load_policy(uow).eligibility
+        snapshots = uow.fundamentals.list_for_many([a.ticker for a in assets])
+        day = as_of or date.today()
+        return {
+            a.ticker: answer_freshness(policy, day, snapshots.get(a.ticker, [])) for a in assets
+        }
 
     def checklist_histories(
         self, uow: AbstractUnitOfWork, assets: list[AssetEntity]
@@ -159,6 +174,7 @@ class PortfolioApplicationService:
             fund,
             use_cerrado=asset.use_cerrado,
             history=self.checklist_histories(uow, [asset]).get(asset.ticker),
+            freshness=self.checklist_freshness(uow, [asset]).get(asset.ticker),
         )
 
     def record_checklist(
@@ -184,6 +200,7 @@ class PortfolioApplicationService:
             timeout_seconds=self.fetch_timeout_seconds,
         ).fundamentals
         histories = self.checklist_histories(uow, assets)
+        freshness = self.checklist_freshness(uow, assets)
         result: dict[int, tuple[AssetLifecycle, bool]] = {}
         for asset in assets:
             evaluation = evaluate(
@@ -192,6 +209,7 @@ class PortfolioApplicationService:
                 fundamentals.get(asset.ticker),
                 use_cerrado=asset.use_cerrado,
                 history=histories.get(asset.ticker),
+                freshness=freshness.get(asset.ticker),
             )
             result[asset.id or 0] = asset_lifecycle(asset, evaluation, policy)
         return result
@@ -386,6 +404,10 @@ class PortfolioApplicationService:
                 if policy.valuation.treasury_mark_to_market
                 else None
             ),
+            statement_seen_at={
+                ticker: f.statement_seen_at
+                for ticker, f in self.checklist_freshness(uow, assets, ref_date).items()
+            },
         )
 
     def simulate_contribution(
@@ -420,6 +442,7 @@ class PortfolioApplicationService:
             fund,
             use_cerrado=asset.use_cerrado,
             history=metrics if asset.profile in STATEMENT_PROFILES else None,
+            freshness=answer_freshness(self.load_policy(uow).eligibility, date.today(), snapshots),
         )
 
         current_price = (
@@ -432,7 +455,7 @@ class PortfolioApplicationService:
             current_price,
             fund,
             self.load_policy(uow).valuation,
-            latest_statement=snapshots[-1] if snapshots else None,
+            statements=snapshots,
         )
 
         history = self.gateway.get_history(
@@ -519,7 +542,7 @@ class PortfolioApplicationService:
             price,
             fundamentals,
             self.load_policy(uow).valuation,
-            latest_statement=snapshots[-1] if snapshots else None,
+            statements=snapshots,
         )
 
     def build_portfolio_analytics(

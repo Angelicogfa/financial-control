@@ -21,6 +21,7 @@ from domain.market.entities import (
     TreasuryBond,
     TreasuryCatalogResult,
 )
+from domain.market.services.fundamentals_sanity import check_fundamentals
 from domain.market.services.treasury_prices import TreasuryPricePoint
 from domain.shared.entities import CatalogInstrument, MarketSeriesPoint
 from domain.shared.enums import AssetType, Market, market_for
@@ -193,12 +194,21 @@ class CachedMarketGateway:
                 return Fundamentals.from_dict(cached)
 
         fund: Fundamentals | None = None
+        secondary: Fundamentals | None = None
         if mkt == Market.B3:
             fund = self.brapi.get_fundamentals(norm_sym)
             if fund is None:
                 fund = self.yfinance.get_fundamentals(norm_sym, market=Market.B3)
+            else:
+                # Second opinion for the divergence check (Phase 25.3); never blocks.
+                try:
+                    secondary = self.yfinance.get_fundamentals(norm_sym, market=Market.B3)
+                except Exception:
+                    secondary = None
         else:
             fund = self.yfinance.get_fundamentals(norm_sym, market=mkt)
+        if fund is not None:
+            fund = check_fundamentals(fund, asset_type, secondary)
 
         if fund is not None:
             self.cache.set_json(cache_key, fund.to_dict(), self.fundamentals_ttl)

@@ -265,6 +265,12 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
   );
 }
 
+/** Reasons the provider data was flagged (field -> pt-BR text). */
+function suspiciousReasons(analysis: AssetAnalysisResponseDTO): Record<string, string> {
+  const raw = (analysis.fundamentals ?? {}) as { suspicious?: Record<string, string> };
+  return raw.suspicious ?? {};
+}
+
 function Valuation({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
   const v = analysis.valuation;
   if (!v.applicable) {
@@ -285,6 +291,20 @@ function Valuation({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }
           Perfil {PROFILE_LABELS[v.profile]}. Os preços justos se combinam pela mediana; múltiplos passam ou não nos
           limites da estratégia.
         </p>
+        {(v.suspicious_inputs ?? []).length > 0 && (
+          <p className="app-info-banner" role="note">
+            <Badge tone="warning">Dado suspeito</Badge>{" "}
+            {(v.suspicious_inputs ?? [])
+              .map((field) => suspiciousReasons(analysis)[field] ?? field)
+              .join(" ")}{" "}
+            Confira antes de usar o veredito; o alerta de preço abaixo do teto fica suspenso.
+          </p>
+        )}
+        {v.extraordinary_dividends && (
+          <p className="app-muted">
+            Os proventos dos últimos 12 meses estão bem acima da mediana dos últimos anos; o Bazin usa a mediana.
+          </p>
+        )}
       </section>
       <div className="app-table-wrap">
         <table className="app-table">

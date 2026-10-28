@@ -318,7 +318,9 @@ def test_diversification_with_twin_assets_flags_the_pair() -> None:
 def test_quality_uses_weighted_checklist_and_stale_answers() -> None:
     holdings = [
         _holding("WEGE3", 3000.0, checklist_ratio=1.0, checklist_age_days=30),
-        _holding("OIBR3", 7000.0, checklist_ratio=-0.5, checklist_age_days=500),
+        _holding(
+            "OIBR3", 7000.0, checklist_ratio=-0.5, checklist_age_days=500, checklist_stale=True
+        ),
     ]
     report = diagnose(HealthInputs(as_of=AS_OF, holdings=holdings), POLICY)
 
