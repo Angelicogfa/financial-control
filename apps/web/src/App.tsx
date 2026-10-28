@@ -7,6 +7,7 @@ import { AppShell } from "./layout/AppShell";
 import { AssetDetailPage } from "./pages/asset/AssetDetailPage";
 import { AssetFormPage } from "./pages/asset/AssetFormPage";
 import { ContributePage } from "./pages/contribute/ContributePage";
+import { HealthPage } from "./pages/health/HealthPage";
 import { HomePage } from "./pages/home/HomePage";
 import { EarningFormPage } from "./pages/ledger/EarningFormPage";
 import { EventFormPage } from "./pages/ledger/EventFormPage";
@@ -22,6 +23,7 @@ import { AccountsPage } from "./pages/settings/AccountsPage";
 import { AgenticPage } from "./pages/settings/agentic/AgenticPage";
 import { AgentKeyFormPage } from "./pages/settings/agentic/AgentKeyFormPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
+import { AssetComparePage } from "./pages/tools/AssetComparePage";
 import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
 import { StrategyPage } from "./pages/settings/StrategyPage";
 
@@ -31,6 +33,7 @@ export function AppRoutes() {
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/performance" element={<PerformancePage />} />
+      <Route path="/health" element={<HealthPage />} />
       <Route path="/portfolio" element={<PortfolioPage />} />
       <Route path="/asset/new" element={<AssetFormPage />} />
       <Route path="/asset/:id" element={<AssetDetailPage />} />
@@ -46,6 +49,7 @@ export function AppRoutes() {
       <Route path="/ledger/earnings/:id/edit" element={<EarningFormPage />} />
       <Route path="/ledger/events/new" element={<EventFormPage />} />
       <Route path="/tools/fixed-income" element={<FixedIncomeComparePage />} />
+      <Route path="/tools/compare" element={<AssetComparePage />} />
       <Route path="/settings/strategy" element={<StrategyPage />} />
       <Route path="/settings/accounts" element={<AccountsPage />} />
       <Route path="/settings/market-data" element={<MarketDataPage />} />

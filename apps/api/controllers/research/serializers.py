@@ -5,8 +5,21 @@ Scope: B3 catalog screener and watchlist.
 
 from __future__ import annotations
 
-from controllers.research.responses import ScreenerItemDTO, TreasuryBondDTO
+from dataclasses import asdict
+
+from controllers.research.responses import (
+    AssetComparisonDTO,
+    AssetHistoryDTO,
+    ComparedAssetDTO,
+    ComparisonGroupDTO,
+    ComparisonIndicatorDTO,
+    ComparisonRowDTO,
+    ScreenerItemDTO,
+    TreasuryBondDTO,
+)
+from domain.assets.services.history import FundamentalPeriod
 from domain.market.entities import TreasuryBond
+from domain.research.services.comparison import GROUP_LABELS, INDICATORS, AssetComparison
 from domain.research.services.screener import ScreenerResult
 from domain.shared.enums import AssetType, default_arca_class
 
@@ -60,4 +73,42 @@ def to_treasury_bond_dto(bond: TreasuryBond, *, asset_id: int | None = None) -> 
         contracted_rate_percent=bond.contracted_rate_percent,
         liquidity=bond.liquidity,
         asset_id=asset_id,
+    )
+
+
+def to_asset_comparison_dto(comparison: AssetComparison) -> AssetComparisonDTO:
+    return AssetComparisonDTO(
+        assets=[
+            ComparedAssetDTO(
+                ticker=a.ticker,
+                name=a.name,
+                asset_type=a.asset_type,
+                profile=a.profile,
+                asset_id=a.asset_id,
+                currency=a.currency,
+                price=a.price,
+                valuation_verdict=a.valuation_verdict,
+                fair_value=a.fair_value,
+                margin_of_safety=a.margin_of_safety,
+                checklist_score=a.checklist_score,
+                checklist_max_score=a.checklist_max_score,
+                checklist_normalized_score=a.checklist_normalized_score,
+                checklist_coverage_pct=a.checklist_coverage_pct,
+                checklist_recommendation=a.checklist_recommendation,
+                statement_years=sum(
+                    1 for s in a.statements if s.period == FundamentalPeriod.ANNUAL
+                ),
+            )
+            for a in comparison.assets
+        ],
+        rows=[ComparisonRowDTO.model_validate(asdict(r)) for r in comparison.rows],
+        history=[AssetHistoryDTO.model_validate(asdict(h)) for h in comparison.history],
+        warnings=comparison.warnings,
+        groups=[ComparisonGroupDTO(group=g, label=label) for g, label in GROUP_LABELS.items()],
+        indicators=[
+            ComparisonIndicatorDTO(
+                key=i.key, label=i.label, group=i.group, unit=i.unit, better=i.better
+            )
+            for i in INDICATORS
+        ],
     )

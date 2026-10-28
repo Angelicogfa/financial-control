@@ -42,6 +42,15 @@ from domain.portfolio.services.consolidation import (
 )
 from domain.portfolio.services.curves import earliest_fixed_income_start, load_rate_curves
 from domain.portfolio.services.fixed_income import RateCurves
+from domain.portfolio.services.health import HealthInputs, HealthReport, diagnose
+from domain.portfolio.services.health_inputs import (
+    asset_return_grid,
+    bracket_lots,
+    build_holdings,
+    cdi_returns,
+    policy_benchmark,
+)
+from domain.portfolio.services.risk_metrics import class_time_weighted_returns, days_out_of_band
 from domain.shared.entities import AssetEntity, CatalogInstrument
 from domain.shared.enums import (
     ArcaClass,
@@ -52,7 +61,8 @@ from domain.shared.enums import (
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.tax.entities import TaxRuleBook
 from domain.tax.services.rules import rule_book
-from infra.providers.batch import fetch_market_data
+from domain.tax.services.status import asset_tax_status
+from infra.providers.batch import fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 
 
@@ -76,6 +86,11 @@ MIN_PORTFOLIO_RETURNS = 2
 
 
 BENCHMARK_SYMBOLS = ("IBOV", "IFIX", "SP500")
+
+
+HEALTH_PORTFOLIO_YEARS = 3
+HEALTH_HISTORY_RANGE = "2y"
+HEALTH_HISTORY_DAYS = 730
 
 
 class PortfolioApplicationService:
@@ -441,6 +456,111 @@ class PortfolioApplicationService:
             ),
             "curves": curves,
         }
+
+    def build_portfolio_health(
+        self, uow: AbstractUnitOfWork, *, as_of_date: date | None = None
+    ) -> HealthReport:
+        """Seven-pillar health diagnosis of the consolidated portfolio (Phase 29)."""
+        as_of = as_of_date or date.today()
+        policy = self.load_policy(uow)
+        report = self.build_portfolio_report(uow, as_of_date=as_of)
+        assets = {a.id: a for a in uow.assets.list_all(active_only=True) if a.id is not None}
+        held = [assets[p.asset_id] for p in report.positions if p.asset_id in assets]
+
+        fundamentals = fetch_market_data(
+            self.gateway,
+            held,
+            include_quotes=False,
+            max_workers=self.fetch_workers,
+            timeout_seconds=self.fetch_timeout_seconds,
+        ).fundamentals
+        statements = uow.fundamentals.list_for_many([a.ticker for a in held])
+        holdings = build_holdings(
+            report.positions,
+            assets,
+            as_of=as_of,
+            fundamentals=fundamentals,
+            statements=statements,
+        )
+
+        history_start = as_of - timedelta(days=HEALTH_HISTORY_DAYS)
+        histories = fetch_histories(
+            self.gateway,
+            [assets[p.asset_id] for p in report.positions if p.asset_id in assets],
+            range_period=HEALTH_HISTORY_RANGE,
+            max_workers=self.fetch_workers,
+            timeout_seconds=self.fetch_timeout_seconds,
+        )
+        portfolio_start = as_of - timedelta(days=365 * HEALTH_PORTFOLIO_YEARS)
+        cdi = cdi_returns(
+            uow.market_series.list_series(
+                "CDI", date_from=min(history_start, portfolio_start), date_to=as_of
+            )
+        )
+        asset_dates, asset_returns = asset_return_grid(
+            holdings, histories, cdi, date_from=history_start
+        )
+
+        snapshots = sorted(
+            uow.snapshots.list_range(date_from=portfolio_start, date_to=as_of),
+            key=lambda s: s.snapshot_date,
+        )
+        port_dates, port_returns = dated_time_weighted_returns(snapshots)
+        index_returns = {
+            sym: _dated_levels(
+                uow.market_series.list_series(sym, date_from=portfolio_start, date_to=as_of)
+            )
+            for sym in BENCHMARK_SYMBOLS
+        }
+        index_returns["CDI"] = cdi
+        targets = {c: p.target_pct for c, p in policy.arca.classes.items()}
+
+        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        fixed_income = [a for a in held if a.fixed_income_term is not None]
+        tax_statuses = []
+        if fixed_income:
+            curves = load_rate_curves(
+                uow.market_series,
+                date_from=earliest_fixed_income_start(fixed_income),
+                date_to=as_of,
+                annual_cdi_rate=annual_cdi,
+                annual_ipca_rate=annual_ipca,
+            )
+            rules = self.tax_rules(uow)
+            tax_statuses = [
+                asset_tax_status(a, as_of, curves=curves, rules=rules) for a in fixed_income
+            ]
+
+        inputs = HealthInputs(
+            as_of=as_of,
+            holdings=holdings,
+            allocations=report.allocations,
+            earnings_12m_brl=report.total_earnings_12m_brl,
+            portfolio_dates=port_dates,
+            portfolio_returns=port_returns,
+            benchmark_returns=policy_benchmark(port_dates, targets, index_returns),
+            cdi_returns=align_to_base(port_dates, cdi[0], cdi[1]) if port_dates else [],
+            asset_dates=asset_dates,
+            asset_returns=asset_returns,
+            class_returns={
+                ArcaClass(k): v
+                for k, v in class_time_weighted_returns(snapshots).items()
+                if k in {c.value for c in ArcaClass}
+            },
+            class_out_of_band_days={
+                ArcaClass(k): v
+                for k, v in days_out_of_band(
+                    snapshots, {c.value: b for c, b in policy.arca.bands.items()}, as_of
+                ).items()
+            },
+            bracket_lots=bracket_lots(tax_statuses),
+            annual_cdi_rate=annual_cdi,
+        )
+        return diagnose(inputs, policy.health)
+
+
+def _dated_levels(points: list[Any]) -> tuple[list[date], list[float]]:
+    return dated_simple_returns([p.reference_date for p in points], [p.value for p in points])
 
 
 def _aligned_correlation_matrix(

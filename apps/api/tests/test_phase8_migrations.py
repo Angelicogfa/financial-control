@@ -235,6 +235,8 @@ def test_script_00007_turns_arca_targets_into_policy_version(db: tuple[Config, E
         )
 
     command.upgrade(cfg, "script_00007")
+    # The current ORM reads columns added by later migrations (e.g. script_00021).
+    command.upgrade(cfg, "head")
 
     from sqlalchemy.orm import sessionmaker
 

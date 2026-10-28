@@ -4,11 +4,13 @@ import type { IconProps } from "./icons";
 import {
   BankIcon,
   BotIcon,
+  ColumnsIcon,
   BriefcaseIcon,
   DatabaseIcon,
   HomeIcon,
   ListIcon,
   PlusCircleIcon,
+  PulseIcon,
   ScaleIcon,
   SearchIcon,
   SlidersIcon,
@@ -37,6 +39,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/home", label: "Início", icon: HomeIcon, showsAlertCount: true },
       { to: "/performance", label: "Desempenho", icon: TrendIcon },
+      { to: "/health", label: "Saúde da carteira", icon: PulseIcon },
     ],
   },
   {
@@ -50,7 +53,10 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Ferramentas",
-    items: [{ to: "/tools/fixed-income", label: "Comparar renda fixa", icon: ScaleIcon }],
+    items: [
+      { to: "/tools/compare", label: "Comparar ativos", icon: ColumnsIcon },
+      { to: "/tools/fixed-income", label: "Comparar renda fixa", icon: ScaleIcon },
+    ],
   },
   {
     label: "Configuração",
@@ -71,6 +77,7 @@ export const NAV_SECTIONS: NavSection[] = [
 const PAGE_TITLES: Array<{ test: (path: string) => boolean; title: string }> = [
   { test: (p) => p === "/home", title: "Início" },
   { test: (p) => p.startsWith("/performance"), title: "Desempenho" },
+  { test: (p) => p.startsWith("/health"), title: "Saúde da carteira" },
   { test: (p) => p === "/asset/new", title: "Novo ativo" },
   { test: (p) => p.startsWith("/asset/"), title: "Ativo" },
   { test: (p) => p.startsWith("/portfolio"), title: "Carteira" },
@@ -79,6 +86,7 @@ const PAGE_TITLES: Array<{ test: (path: string) => boolean; title: string }> = [
   { test: (p) => p === "/ledger/import", title: "Importar extrato B3" },
   { test: (p) => p.startsWith("/ledger"), title: "Lançamentos" },
   { test: (p) => p.startsWith("/tools/fixed-income"), title: "Comparar renda fixa" },
+  { test: (p) => p.startsWith("/tools/compare"), title: "Comparar ativos" },
   { test: (p) => p.startsWith("/settings/strategy"), title: "Estratégia" },
   { test: (p) => p.startsWith("/settings/accounts"), title: "Contas" },
   { test: (p) => p.startsWith("/settings/market-data"), title: "Dados de mercado" },

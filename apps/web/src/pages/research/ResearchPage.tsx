@@ -32,6 +32,7 @@ import {
   VERDICT_TONES,
 } from "../../utils/labels";
 import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
+import { compareLink } from "../tools/AssetComparePage";
 
 type TabKey = "screener" | "treasury" | "watchlist";
 const TABS: TabSpec<TabKey>[] = [
@@ -158,7 +159,10 @@ function ResultsTable({
                   )}
                   <small>
                     {item.name}
-                    {item.sector ? ` · ${item.sector}` : ""}
+                    {item.sector ? ` · ${item.sector}` : ""} ·{" "}
+                    <Link className="app-link" to={compareLink(item.ticker)}>
+                      Comparar
+                    </Link>
                   </small>
                 </span>
               </td>
@@ -468,7 +472,10 @@ function Watchlist() {
                             {item.ticker}
                           </Link>
                           <small>
-                            {item.name} · {PROFILE_LABELS[item.checklist_profile]}
+                            {item.name} · {PROFILE_LABELS[item.checklist_profile]} ·{" "}
+                            <Link className="app-link" to={compareLink(item.ticker)}>
+                              Comparar
+                            </Link>
                           </small>
                         </span>
                       </td>

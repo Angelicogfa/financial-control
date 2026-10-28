@@ -13,6 +13,7 @@ from controllers.portfolio.responses import (
     ClassAllocationDTO,
     ContributionPlanResponseDTO,
     FixedIncomeValuationDTO,
+    PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     RiskReturnSummaryDTO,
     ValuedPositionDTO,
@@ -24,6 +25,7 @@ from domain.portfolio.services.consolidation import (
     ContributionPlan,
     ValuedAssetPosition,
 )
+from domain.portfolio.services.health import HealthReport
 
 
 def to_valued_position_dto(pos: ValuedAssetPosition) -> ValuedPositionDTO:
@@ -146,3 +148,7 @@ def to_risk_summary_dto(summary: RiskReturnSummary) -> RiskReturnSummaryDTO:
         benchmarks=[BenchmarkComparisonDTO(**asdict(b)) for b in summary.benchmarks],
         drawdown_curve=list(summary.drawdown_curve),
     )
+
+
+def to_portfolio_health_dto(report: HealthReport) -> PortfolioHealthDTO:
+    return PortfolioHealthDTO.model_validate(asdict(report))

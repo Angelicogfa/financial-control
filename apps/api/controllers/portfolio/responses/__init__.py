@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from controllers.shared.responses import CerradoEvaluationDTO
 from domain.market.entities import QuoteFreshness
+from domain.portfolio.services.health import HealthPillar, HealthStatus, HealthUnit
 from domain.shared.enums import (
     ArcaClass,
     AssetLifecycle,
@@ -192,3 +193,163 @@ class PortfolioAnalyticsResponseDTO(BaseModel):
     summary: RiskReturnSummaryDTO
     correlation_matrix: dict[str, dict[str, float]]
     curves: dict[str, list[dict[str, Any]]]
+
+
+class HealthCheckDTO(BaseModel):
+    """One health check: state, measured value, policy limits, explanation and action."""
+
+    key: str
+    title: str
+    status: HealthStatus
+    explanation: str
+    action: str | None = None
+    value: float | None = None
+    unit: HealthUnit = HealthUnit.FRACTION
+    warning_threshold: float | None = None
+    critical_threshold: float | None = None
+    observations: int | None = None
+    min_observations: int | None = None
+
+
+class HealthPillarDTO(BaseModel):
+    pillar: HealthPillar
+    title: str
+    status: HealthStatus
+    checks: list[HealthCheckDTO]
+
+
+class ConcentrationBreakdownDTO(BaseModel):
+    dimension: str
+    hhi: float
+    effective_count: float
+    weights: dict[str, float]
+
+
+class InstitutionExposureDTO(BaseModel):
+    issuer: str
+    value_brl: float
+    limit_brl: float
+    usage: float
+
+
+class RiskShareDTO(BaseModel):
+    label: str
+    weight: float
+    risk_share: float
+
+
+class CorrelatedPairDTO(BaseModel):
+    first: str
+    second: str
+    correlation: float
+
+
+class DiversificationDetailDTO(BaseModel):
+    observations: int = 0
+    shrinkage: float | None = None
+    volatility: float | None = None
+    diversification_ratio: float | None = None
+    by_asset: list[RiskShareDTO] = Field(default_factory=list)
+    by_class: list[RiskShareDTO] = Field(default_factory=list)
+    correlated_pairs: list[CorrelatedPairDTO] = Field(default_factory=list)
+    excluded: list[str] = Field(default_factory=list)
+
+
+class StressResultDTO(BaseModel):
+    worst_window_return: float
+    window_start: date | None = None
+    window_end: date | None = None
+    max_drawdown: float
+    observations: int
+
+
+class RiskDetailDTO(BaseModel):
+    observations: int = 0
+    volatility: float | None = None
+    current_drawdown: float | None = None
+    drawdown_periods: int | None = None
+    peak_date: date | None = None
+    ulcer_index: float | None = None
+    var_95: float | None = None
+    cvar_95: float | None = None
+    stress: StressResultDTO | None = None
+
+
+class ConfidenceIntervalDTO(BaseModel):
+    low: float
+    high: float
+    confidence: float = 0.95
+
+
+class RollingPointDTO(BaseModel):
+    end: date
+    cumulative_return: float
+    sharpe: float
+
+
+class PerformanceDetailDTO(BaseModel):
+    observations: int = 0
+    cumulative_return: float | None = None
+    cagr: float | None = None
+    benchmark_return: float | None = None
+    tracking_error: float | None = None
+    information_ratio: float | None = None
+    omega: float | None = None
+    sharpe: float | None = None
+    sharpe_interval: ConfidenceIntervalDTO | None = None
+    cagr_interval: ConfidenceIntervalDTO | None = None
+    cdi_consistency: float | None = None
+    months_compared: int = 0
+    rolling: list[RollingPointDTO] = Field(default_factory=list)
+    class_returns: dict[ArcaClass, float] = Field(default_factory=dict)
+
+
+class HoldingQualityDTO(BaseModel):
+    ticker: str
+    weight: float
+    checklist_ratio: float | None = None
+    stale: bool = False
+    f_score: int | None = None
+    z_score: float | None = None
+
+
+class MaturityDTO(BaseModel):
+    ticker: str
+    maturity_date: date
+    value_brl: float
+
+
+class BracketLotDTO(BaseModel):
+    ticker: str
+    start_date: date
+    next_bracket_date: date
+    days_to_next_bracket: int
+    current_rate: float
+    next_rate: float
+    tax_saving_by_waiting: float
+
+
+class LiquidityDetailDTO(BaseModel):
+    reserve_brl: float = 0.0
+    reserve_months: float | None = None
+    liquid_weight: float | None = None
+    maturities_12m: list[MaturityDTO] = Field(default_factory=list)
+    passive_income_12m_brl: float = 0.0
+    exempt_weight: float | None = None
+    bracket_lots: list[BracketLotDTO] = Field(default_factory=list)
+
+
+class PortfolioHealthDTO(BaseModel):
+    """Seven-pillar diagnosis; `pillars` come worst first and `status` is the worst one."""
+
+    as_of_date: date
+    status: HealthStatus
+    total_value_brl: float
+    pillars: list[HealthPillarDTO]
+    concentration: list[ConcentrationBreakdownDTO] = Field(default_factory=list)
+    institutions: list[InstitutionExposureDTO] = Field(default_factory=list)
+    diversification: DiversificationDetailDTO = Field(default_factory=DiversificationDetailDTO)
+    risk: RiskDetailDTO = Field(default_factory=RiskDetailDTO)
+    performance: PerformanceDetailDTO = Field(default_factory=PerformanceDetailDTO)
+    quality: list[HoldingQualityDTO] = Field(default_factory=list)
+    liquidity: LiquidityDetailDTO = Field(default_factory=LiquidityDetailDTO)

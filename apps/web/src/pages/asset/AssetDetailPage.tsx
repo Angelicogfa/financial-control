@@ -24,6 +24,7 @@ import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart } from "../../viz/TrendChart";
 import { ChecklistTab } from "./ChecklistTab";
 import { TaxTab } from "./TaxTab";
+import { compareLink } from "../tools/AssetComparePage";
 
 const BENCHMARK_LABELS: Record<string, string> = {
   IBOV: "Ibovespa",
@@ -481,6 +482,9 @@ export function AssetDetailPage() {
                 }
                 actions={
                   <>
+                    <Link className="app-secondary-button" to={compareLink(data.asset.ticker)}>
+                      Comparar
+                    </Link>
                     <Link className="app-secondary-button" to={`/asset/${assetId}/edit`}>
                       Editar ativo
                     </Link>

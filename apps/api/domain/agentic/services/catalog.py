@@ -61,11 +61,16 @@ from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
     ContributionPlanResponseDTO,
     PortfolioAnalyticsResponseDTO,
+    PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
 )
 from controllers.research.requests import WatchlistAddRequest
-from controllers.research.responses import ScreenerResponseDTO, WatchlistItemDTO
+from controllers.research.responses import (
+    AssetComparisonDTO,
+    ScreenerResponseDTO,
+    WatchlistItemDTO,
+)
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
 from controllers.tax.requests import FixedIncomeCompareRequest
@@ -117,6 +122,15 @@ class PortfolioReportInput(BaseModel):
     as_of_date: date | None = None
     date_from: date | None = None
     account_id: int | None = None
+
+
+class CompareInput(BaseModel):
+    tickers: list[str] = Field(..., min_length=2, max_length=5)
+    indicators: list[str] = Field(default_factory=list)
+
+
+class AsOfDateInput(BaseModel):
+    as_of_date: date | None = None
 
 
 class DateRangeInput(BaseModel):
@@ -425,6 +439,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=DateRangeInput,
         output_type=list[SnapshotPointDTO],
         invoke=lambda h, p: h.portfolio.list_snapshots(date_from=p.date_from, date_to=p.date_to),
+    ),
+    OperationSpec(
+        name="portfolio.health",
+        kind="query",
+        description=(
+            "Saúde da carteira em sete pilares (aderência à política, concentração, "
+            "diversificação de risco, risco, desempenho, qualidade dos ativos e liquidez, renda "
+            "e tributos). Cada checagem traz estado (OK, WARNING, CRITICAL ou "
+            "INSUFFICIENT_DATA), valor, limites da política, explicação e ação sugerida; os "
+            "pilares vêm do pior para o melhor. Frações seguem a ADR 0006 (0.15 = 15%)."
+        ),
+        input_model=AsOfDateInput,
+        output_type=PortfolioHealthDTO,
+        invoke=lambda h, p: h.portfolio.get_health(as_of_date=p.as_of_date),
     ),
     # 2. Assets & Checklist
     OperationSpec(
@@ -766,6 +794,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             ),
             below_band=p.below_band,
         ),
+    ),
+    OperationSpec(
+        name="research.compare",
+        kind="query",
+        description=(
+            "Compara de 2 a 5 ativos lado a lado (cadastrados ou do catálogo B3): indicadores "
+            "em cinco grupos (valuation, endividamento, eficiência, rentabilidade, "
+            "crescimento) com o melhor de cada linha em `best`, histórico anual (receita, "
+            "lucro, ROE, DY), veredito de valuation e nota do checklist. `indicators` escolhe "
+            "as linhas (todas quando vazio). Busca sob demanda os demonstrativos que faltarem."
+        ),
+        input_model=CompareInput,
+        output_type=AssetComparisonDTO,
+        invoke=lambda h, p: h.research.compare(p.tickers, p.indicators or None),
     ),
     OperationSpec(
         name="research.watchlist",

@@ -13,6 +13,7 @@ import type {
   ArcaClass,
   ArcaSuggestionDTO,
   AssetAnalysisResponseDTO,
+  AssetComparisonDTO,
   AssetCreateRequest,
   AssetResponseDTO,
   AssetTaxStatusDTO,
@@ -42,6 +43,7 @@ import type {
   PolicyDTO,
   PolicyUpdateRequest,
   PortfolioAnalyticsResponseDTO,
+  PortfolioHealthDTO,
   PortfolioReportResponseDTO,
   SavedContributionPlanDTO,
   ScreenerResponseDTO,
@@ -112,6 +114,7 @@ export const api = {
       request<PortfolioAnalyticsResponseDTO>("/portfolio/analytics", { query: { date_from: dateFrom } }),
     snapshots: (dateFrom?: string) =>
       request<SnapshotPointDTO[]>("/portfolio/snapshots", { query: { date_from: dateFrom } }),
+    health: () => request<PortfolioHealthDTO>("/portfolio/health"),
   },
   alerts: {
     list: () => request<AlertsResponseDTO>("/alerts"),
@@ -150,6 +153,10 @@ export const api = {
     treasury: (filters: TreasuryFilters = {}) =>
       request<TreasurySearchResponseDTO>("/research/treasury", { query: { ...filters } }),
     watchlist: () => request<WatchlistItemDTO[]>("/research/watchlist"),
+    compare: (tickers: string[], indicators: string[] = []) =>
+      request<AssetComparisonDTO>("/research/compare", {
+        query: { tickers: tickers.join(","), indicators: indicators.length ? indicators.join(",") : undefined },
+      }),
     follow: (body: WatchlistAddRequest) =>
       request<WatchlistItemDTO>("/research/watchlist", { method: "POST", body }),
     unfollow: (assetId: number) =>

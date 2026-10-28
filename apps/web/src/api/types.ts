@@ -123,6 +123,15 @@ export interface AssetAnalysisResponseDTO {
   price_history: Record<string, unknown>[];
 }
 
+export interface AssetComparisonDTO {
+  assets: ComparedAssetDTO[];
+  rows: ComparisonRowDTO[];
+  history: AssetHistoryDTO[];
+  warnings?: string[];
+  groups?: ComparisonGroupDTO[];
+  indicators?: ComparisonIndicatorDTO[];
+}
+
 export interface AssetContributionOrderDTO {
   asset_id: number;
   ticker: string;
@@ -153,6 +162,11 @@ export interface AssetCreateRequest {
   notes?: string | null;
   purpose?: AssetPurpose;
   fixed_income_term?: FixedIncomeTermPayload_Input | null;
+}
+
+export interface AssetHistoryDTO {
+  ticker: string;
+  points?: HistoryPointDTO[];
 }
 
 export type AssetLifecycle = "WATCHLIST" | "ELIGIBLE" | "HELD" | "REVIEW" | "ARCHIVED";
@@ -237,6 +251,18 @@ export interface BenchmarkComparisonDTO {
   beta?: number | null;
   alpha_annual?: number | null;
   correlation?: number | null;
+}
+
+export type Better = "HIGHER" | "LOWER";
+
+export interface BracketLotDTO {
+  ticker: string;
+  start_date: string;
+  next_bracket_date: string;
+  days_to_next_bracket: number;
+  current_rate: number;
+  next_rate: number;
+  tax_saving_by_waiting: number;
 }
 
 export interface BreakEvenDTO {
@@ -324,6 +350,61 @@ export interface ClassPolicyDTO {
   intra_class_strategy?: IntraClassStrategy;
 }
 
+export interface ComparedAssetDTO {
+  ticker: string;
+  name: string;
+  asset_type: AssetType;
+  profile: ChecklistProfile;
+  asset_id?: number | null;
+  currency?: string | null;
+  price?: number | null;
+  valuation_verdict?: string | null;
+  fair_value?: number | null;
+  margin_of_safety?: number | null;
+  checklist_score?: number | null;
+  checklist_max_score?: number | null;
+  checklist_normalized_score?: number | null;
+  checklist_coverage_pct?: number | null;
+  checklist_recommendation?: string | null;
+  statement_years?: number;
+}
+
+export interface ComparisonGroupDTO {
+  group: IndicatorGroup;
+  label: string;
+}
+
+export interface ComparisonIndicatorDTO {
+  key: string;
+  label: string;
+  group: IndicatorGroup;
+  unit: IndicatorUnit;
+  better: Better;
+}
+
+export interface ComparisonRowDTO {
+  key: string;
+  label: string;
+  group: IndicatorGroup;
+  unit: IndicatorUnit;
+  better: Better;
+  values: Record<string, number | null>;
+  best: string[];
+}
+
+export interface ConcentrationBreakdownDTO {
+  dimension: string;
+  hhi: number;
+  effective_count: number;
+  weights: Record<string, number>;
+}
+
+export interface ConfidenceIntervalDTO {
+  low: number;
+  high: number;
+  confidence?: number;
+}
+
 export interface ContributionConfirmRequest {
   trade_date: string;
   account_id?: number | null;
@@ -369,9 +450,26 @@ export interface CorporateEventRequest {
   notes?: string | null;
 }
 
+export interface CorrelatedPairDTO {
+  first: string;
+  second: string;
+  correlation: number;
+}
+
 export interface CurrentUserDTO {
   username: string;
   expires_at?: string | null;
+}
+
+export interface DiversificationDetailDTO {
+  observations?: number;
+  shrinkage?: number | null;
+  volatility?: number | null;
+  diversification_ratio?: number | null;
+  by_asset?: RiskShareDTO[];
+  by_class?: RiskShareDTO[];
+  correlated_pairs?: CorrelatedPairDTO[];
+  excluded?: string[];
 }
 
 export interface EarningCreateRequest {
@@ -551,6 +649,67 @@ export interface GrantableOperationDTO {
   grantable?: boolean;
 }
 
+export interface HealthCheckDTO {
+  key: string;
+  title: string;
+  status: HealthStatus;
+  explanation: string;
+  action?: string | null;
+  value?: number | null;
+  unit?: HealthUnit;
+  warning_threshold?: number | null;
+  critical_threshold?: number | null;
+  observations?: number | null;
+  min_observations?: number | null;
+}
+
+export type HealthPillar = "POLICY" | "CONCENTRATION" | "DIVERSIFICATION" | "RISK" | "PERFORMANCE" | "QUALITY" | "LIQUIDITY";
+
+export interface HealthPillarDTO {
+  pillar: HealthPillar;
+  title: string;
+  status: HealthStatus;
+  checks: HealthCheckDTO[];
+}
+
+export interface HealthPolicyDTO {
+  max_asset_weight_warning?: number;
+  max_asset_weight_critical?: number;
+  max_top5_weight_warning?: number;
+  max_top5_weight_critical?: number;
+  max_sector_weight_warning?: number;
+  max_sector_weight_critical?: number;
+  min_effective_assets_warning?: number;
+  min_effective_assets_critical?: number;
+  fgc_limit_brl?: number;
+  fgc_warning_ratio?: number;
+  min_diversification_ratio_warning?: number;
+  min_diversification_ratio_critical?: number;
+  high_correlation?: number;
+  max_asset_risk_share?: number;
+  max_volatility_warning?: number;
+  max_volatility_critical?: number;
+  max_drawdown_warning?: number;
+  max_drawdown_critical?: number;
+  max_stress_loss_warning?: number;
+  max_stress_loss_critical?: number;
+  min_cdi_consistency?: number;
+  min_checklist_quality_warning?: number;
+  min_checklist_quality_critical?: number;
+  checklist_max_age_months?: number;
+  max_stale_checklist_weight?: number;
+  monthly_expenses_brl?: number | null;
+  min_reserve_months_warning?: number;
+  min_reserve_months_critical?: number;
+  min_liquid_weight?: number;
+  bracket_window_days?: number;
+  min_observations?: number;
+}
+
+export type HealthStatus = "OK" | "WARNING" | "CRITICAL" | "INSUFFICIENT_DATA";
+
+export type HealthUnit = "FRACTION" | "RATIO" | "BRL" | "MONTHS" | "DAYS" | "COUNT";
+
 export interface HistoricalMetricsDTO {
   years: number;
   first_year?: number | null;
@@ -563,6 +722,23 @@ export interface HistoricalMetricsDTO {
   payout_average?: number | null;
   always_profitable: boolean;
   dividend_regularity?: number | null;
+}
+
+export interface HistoryPointDTO {
+  year: number;
+  revenue?: number | null;
+  net_income?: number | null;
+  roe?: number | null;
+  dividend_yield?: number | null;
+}
+
+export interface HoldingQualityDTO {
+  ticker: string;
+  weight: number;
+  checklist_ratio?: number | null;
+  stale?: boolean;
+  f_score?: number | null;
+  z_score?: number | null;
 }
 
 export interface ImportCommitDTO {
@@ -607,6 +783,17 @@ export interface ImportPreviewDTO {
   lines: ImportLineDTO[];
 }
 
+export type IndicatorGroup = "VALUATION" | "DEBT" | "EFFICIENCY" | "PROFITABILITY" | "GROWTH";
+
+export type IndicatorUnit = "FRACTION" | "MULTIPLE";
+
+export interface InstitutionExposureDTO {
+  issuer: string;
+  value_brl: number;
+  limit_brl: number;
+  usage: number;
+}
+
 export type IntraClassStrategy = "CERRADO" | "MANUAL_WEIGHT" | "EQUAL_WEIGHT";
 
 export interface JobRunDTO {
@@ -620,6 +807,16 @@ export interface JobRunDTO {
 }
 
 export type KeyExpiryDays = 30 | 90 | 180 | 365;
+
+export interface LiquidityDetailDTO {
+  reserve_brl?: number;
+  reserve_months?: number | null;
+  liquid_weight?: number | null;
+  maturities_12m?: MaturityDTO[];
+  passive_income_12m_brl?: number;
+  exempt_weight?: number | null;
+  bracket_lots?: BracketLotDTO[];
+}
 
 export interface LoginRequest {
   username: string;
@@ -645,6 +842,12 @@ export interface LotTaxStatusDTO {
   tax_at_next_bracket?: number | null;
   tax_saving_by_waiting?: number | null;
   net_gain_by_waiting?: number | null;
+}
+
+export interface MaturityDTO {
+  ticker: string;
+  maturity_date: string;
+  value_brl: number;
 }
 
 export interface MethodResultDTO {
@@ -711,10 +914,28 @@ export interface PaginatedResponse_TransactionResponseDTO_ {
   meta: PageMetaDTO;
 }
 
+export interface PerformanceDetailDTO {
+  observations?: number;
+  cumulative_return?: number | null;
+  cagr?: number | null;
+  benchmark_return?: number | null;
+  tracking_error?: number | null;
+  information_ratio?: number | null;
+  omega?: number | null;
+  sharpe?: number | null;
+  sharpe_interval?: ConfidenceIntervalDTO | null;
+  cagr_interval?: ConfidenceIntervalDTO | null;
+  cdi_consistency?: number | null;
+  months_compared?: number;
+  rolling?: RollingPointDTO[];
+  class_returns?: Record<string, number>;
+}
+
 export interface PolicyDTO {
   arca: ClassPolicyDTO[];
   eligibility?: EligibilityPolicyDTO;
   valuation?: ValuationPolicyDTO;
+  health?: HealthPolicyDTO;
   version?: number | null;
   created_at?: string | null;
 }
@@ -723,6 +944,7 @@ export interface PolicyUpdateRequest {
   arca: ClassPolicyDTO[];
   eligibility?: EligibilityPolicyDTO;
   valuation?: ValuationPolicyDTO;
+  health?: HealthPolicyDTO;
 }
 
 export interface PortfolioAnalyticsResponseDTO {
@@ -731,6 +953,20 @@ export interface PortfolioAnalyticsResponseDTO {
   summary: RiskReturnSummaryDTO;
   correlation_matrix: Record<string, Record<string, number>>;
   curves: Record<string, Record<string, unknown>[]>;
+}
+
+export interface PortfolioHealthDTO {
+  as_of_date: string;
+  status: HealthStatus;
+  total_value_brl: number;
+  pillars: HealthPillarDTO[];
+  concentration?: ConcentrationBreakdownDTO[];
+  institutions?: InstitutionExposureDTO[];
+  diversification?: DiversificationDetailDTO;
+  risk?: RiskDetailDTO;
+  performance?: PerformanceDetailDTO;
+  quality?: HoldingQualityDTO[];
+  liquidity?: LiquidityDetailDTO;
 }
 
 export interface PortfolioReportResponseDTO {
@@ -803,6 +1039,18 @@ export interface ResolvedOfferDTO {
   grace_days: number;
 }
 
+export interface RiskDetailDTO {
+  observations?: number;
+  volatility?: number | null;
+  current_drawdown?: number | null;
+  drawdown_periods?: number | null;
+  peak_date?: string | null;
+  ulcer_index?: number | null;
+  var_95?: number | null;
+  cvar_95?: number | null;
+  stress?: StressResultDTO | null;
+}
+
 export interface RiskReturnSummaryDTO {
   observations: number;
   cumulative_return: number;
@@ -818,6 +1066,18 @@ export interface RiskReturnSummaryDTO {
   cvar_95: number;
   benchmarks: BenchmarkComparisonDTO[];
   drawdown_curve: number[];
+}
+
+export interface RiskShareDTO {
+  label: string;
+  weight: number;
+  risk_share: number;
+}
+
+export interface RollingPointDTO {
+  end: string;
+  cumulative_return: number;
+  sharpe: number;
 }
 
 export interface SavedContributionPlanDTO {
@@ -884,6 +1144,14 @@ export interface SnapshotPointDTO {
   consolidated_pnl: number;
   earnings_cum: number;
   net_flow: number;
+}
+
+export interface StressResultDTO {
+  worst_window_return: number;
+  window_start?: string | null;
+  window_end?: string | null;
+  max_drawdown: number;
+  observations: number;
 }
 
 export interface TaxBracketDTO {

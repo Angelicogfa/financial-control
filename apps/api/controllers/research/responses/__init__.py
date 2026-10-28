@@ -9,6 +9,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
+from domain.research.services.comparison import Better, IndicatorGroup, IndicatorUnit
 from domain.shared.enums import (
     ArcaClass,
     AssetLifecycle,
@@ -115,3 +116,69 @@ class TreasurySearchResponseDTO(BaseModel):
     catalog_size: int = 0
     catalog_updated_at: datetime | None = None
     unavailable_reason: str | None = None
+
+
+class ComparisonIndicatorDTO(BaseModel):
+    key: str
+    label: str
+    group: IndicatorGroup
+    unit: IndicatorUnit
+    better: Better
+
+
+class ComparisonGroupDTO(BaseModel):
+    group: IndicatorGroup
+    label: str
+
+
+class ComparedAssetDTO(BaseModel):
+    ticker: str
+    name: str
+    asset_type: AssetType
+    profile: ChecklistProfile
+    asset_id: int | None = None
+    currency: str | None = None
+    price: float | None = None
+    valuation_verdict: str | None = None
+    fair_value: float | None = None
+    margin_of_safety: float | None = None
+    checklist_score: int | None = None
+    checklist_max_score: int | None = None
+    checklist_normalized_score: float | None = None
+    checklist_coverage_pct: float | None = None
+    checklist_recommendation: str | None = None
+    statement_years: int = 0
+
+
+class ComparisonRowDTO(BaseModel):
+    key: str
+    label: str
+    group: IndicatorGroup
+    unit: IndicatorUnit
+    better: Better
+    values: dict[str, float | None]
+    best: list[str]
+
+
+class HistoryPointDTO(BaseModel):
+    year: int
+    revenue: float | None = None
+    net_income: float | None = None
+    roe: float | None = None
+    dividend_yield: float | None = None
+
+
+class AssetHistoryDTO(BaseModel):
+    ticker: str
+    points: list[HistoryPointDTO] = Field(default_factory=list)
+
+
+class AssetComparisonDTO(BaseModel):
+    """Up to five assets side by side; `best` lists the tickers with the best value per row."""
+
+    assets: list[ComparedAssetDTO]
+    rows: list[ComparisonRowDTO]
+    history: list[AssetHistoryDTO]
+    warnings: list[str] = Field(default_factory=list)
+    groups: list[ComparisonGroupDTO] = Field(default_factory=list)
+    indicators: list[ComparisonIndicatorDTO] = Field(default_factory=list)

@@ -58,6 +58,8 @@ describe("strategy", () => {
 
     fireEvent.change(screen.getByLabelText("Meta de Caixa"), { target: { value: "20" } });
     fireEvent.change(screen.getByLabelText("Juro real de referência (NTN-B) (%)"), { target: { value: "6,5" } });
+    fireEvent.change(screen.getByLabelText("Maior ativo: atenção (%)"), { target: { value: "20" } });
+    fireEvent.change(screen.getByLabelText("Custo de vida mensal (R$)"), { target: { value: "5000" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar nova versão" }));
     await screen.findByText("Nova versão da estratégia salva.");
     const body = last(calls, "PUT", "/policy")?.body as {
@@ -68,6 +70,9 @@ describe("strategy", () => {
     expect(body.valuation.reference_real_yield).toBeCloseTo(0.065);
     expect(body.valuation.bazin_required_yield).toBeCloseTo(0.06);
     expect(body.valuation.projections).toEqual({ cash_cdi_multiplier: 1 });
+    const healthLimits = (last(calls, "PUT", "/policy")?.body as { health: Record<string, number> }).health;
+    expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
+    expect(healthLimits.monthly_expenses_brl).toBe(5000);
   });
 });
 
