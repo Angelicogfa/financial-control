@@ -238,9 +238,11 @@ describe("research", () => {
     ]);
     renderAt("/research");
     fireEvent.change(screen.getByLabelText("DY mínimo (%)"), { target: { value: "5" } });
-    fireEvent.click(screen.getByRole("button", { name: "Fundo imobiliário" }));
-    const classes = screen.getByRole("group", { name: "Classes ARCA" });
-    fireEvent.click(within(classes).getByRole("button", { name: "Ações" }));
+    fireEvent.click(screen.getByLabelText("Tipo"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Fundo imobiliário" }));
+    expect(screen.getByLabelText("Tipo")).toHaveTextContent("Fundo imobiliário");
+    fireEvent.click(screen.getByLabelText("Classe ARCA"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Ações" }));
     expect(await screen.findByRole("option", { name: "Finance" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Setor"), { target: { value: "Finance" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
