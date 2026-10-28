@@ -35,6 +35,8 @@ from domain.ledger.services.b3_import import (
     resolve_fixed_income,
 )
 from domain.ledger.services.ledger import LedgerConflictError, validate_ledger
+from domain.market.entities import AnnouncedDistributions
+from domain.portfolio.services.earnings_agenda import resolve_earning_ex_date, resolve_ex_date
 from domain.portfolio.services.positions import InsufficientQuantityError, build_position
 from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.research.services.service import (
@@ -48,7 +50,7 @@ from domain.shared.entities import (
     FixedIncomeTermEntity,
     TransactionEntity,
 )
-from domain.shared.enums import TransactionKind
+from domain.shared.enums import AssetType, TransactionKind
 from domain.shared.unit_of_work import AbstractUnitOfWork
 
 MAX_STATEMENT_BYTES = 5 * 1024 * 1024
@@ -278,6 +280,9 @@ def _classified(
     return _reject_unbacked_sells(mark_skipped(preview, skipped), assets)
 
 
+DistributionsLookup = Callable[[str, AssetType], AnnouncedDistributions]
+
+
 class ImportHandler:
     """Preview shows what would happen; commit applies only NEW lines, all or nothing.
 
@@ -285,8 +290,14 @@ class ImportHandler:
     is missing, or any line the user does not want, never blocks the rest of the statement.
     """
 
-    def __init__(self, uow_factory: UoWFactory) -> None:
+    def __init__(
+        self, uow_factory: UoWFactory, distributions: DistributionsLookup | None = None
+    ) -> None:
         self.uow_factory = uow_factory
+        # Declared distributions (B3) give the real ex date of imported events and earnings,
+        # which the statement dates by the credit (TD-08). Optional: without it the credit
+        # date is kept.
+        self.distributions = distributions
 
     def preview(
         self, filename: str, content: bytes, *, skip_lines: Iterable[int] = ()
@@ -396,14 +407,26 @@ class ImportHandler:
             created_assets=registered,
         )
 
-    @staticmethod
     def _apply(
+        self,
         uow: AbstractUnitOfWork,
         lines: list[ImportLine],
         assets: dict[str, AssetEntity],
         account_id: int | None,
     ) -> dict[str, int]:
         created = {"TRADE": 0, "EARNING": 0, "EVENT": 0}
+        declared: dict[str, AnnouncedDistributions] = {}
+
+        def declared_for(asset: AssetEntity) -> AnnouncedDistributions:
+            if self.distributions is None:
+                return AnnouncedDistributions()
+            if asset.ticker not in declared:
+                try:
+                    declared[asset.ticker] = self.distributions(asset.ticker, asset.asset_type)
+                except Exception:  # a provider failure keeps the statement dates
+                    declared[asset.ticker] = AnnouncedDistributions()
+            return declared[asset.ticker]
+
         by_ticker: dict[str, list[ImportLine]] = {}
         for line in lines:
             by_ticker.setdefault(line.ticker or "", []).append(line)
@@ -433,7 +456,11 @@ class ImportHandler:
                 (i for i in items if i.action == LineAction.EVENT),
                 key=lambda i: (i.when, i.line_no),
             ):
-                when = line.when or date.min
+                credit = line.when or date.min
+                when = (
+                    resolve_ex_date(line.event_kind, credit, declared_for(asset).stock)  # type: ignore[arg-type]
+                    or credit
+                )
                 try:
                     held = build_position(
                         ledger, up_to_date=when - timedelta(days=1), events=events
@@ -473,6 +500,11 @@ class ImportHandler:
                         asset_id=asset_id,
                         kind=line.earning_kind,  # type: ignore[arg-type]
                         payment_date=line.when,  # type: ignore[arg-type]
+                        ex_date=resolve_earning_ex_date(
+                            line.earning_kind,  # type: ignore[arg-type]
+                            line.when,  # type: ignore[arg-type]
+                            declared_for(asset).cash,
+                        ),
                         gross_amount=line.gross_amount or Decimal("0"),
                         withholding_tax=line.withholding_tax or Decimal("0"),
                         notes=note.format(line.line_no),

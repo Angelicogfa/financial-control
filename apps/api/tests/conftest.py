@@ -45,6 +45,7 @@ from domain.shared.enums import (
 )
 from infra.cache.redis_cache import InMemoryCache
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
+from infra.providers.b3_listed import B3ListedProvider
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
 from infra.providers.gateway import CachedMarketGateway
@@ -74,6 +75,7 @@ def offline_gateway() -> CachedMarketGateway:
         brapi=BrapiProvider(client=httpx.Client(transport=empty_brapi)),
         yfinance=YFinanceProvider(ticker_factory=_OfflineTicker),
         bcb=BcbSgsProvider(client=httpx.Client(transport=empty_bcb)),
+        b3=B3ListedProvider(client=httpx.Client(transport=empty_bcb)),
         cache=InMemoryCache(),
     )
 

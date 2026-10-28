@@ -12,12 +12,15 @@ from pydantic import BaseModel, Field
 
 from controllers.shared.responses import CerradoEvaluationDTO
 from domain.market.entities import QuoteFreshness
+from domain.portfolio.services.earnings_agenda import AgendaStatus
 from domain.portfolio.services.health import HealthPillar, HealthStatus, HealthUnit
+from domain.portfolio.services.mark_to_market import MarketStatus, SaleSignal
 from domain.shared.enums import (
     ArcaClass,
     AssetLifecycle,
     AssetPurpose,
     AssetType,
+    EarningKind,
     IntraClassStrategy,
 )
 
@@ -353,3 +356,86 @@ class PortfolioHealthDTO(BaseModel):
     performance: PerformanceDetailDTO = Field(default_factory=PerformanceDetailDTO)
     quality: list[HoldingQualityDTO] = Field(default_factory=list)
     liquidity: LiquidityDetailDTO = Field(default_factory=LiquidityDetailDTO)
+
+
+class LotMarketValueDTO(BaseModel):
+    start_date: date
+    quantity: float
+    principal: float
+    purchase_rate: float | None = None
+    curve_value: float
+    market_value: float
+    premium: float
+    holding_days: int
+    curve_annual_rate: float | None = None
+    market_annual_rate: float | None = None
+    excess_rate: float | None = None
+    iof_on_sale: float
+    income_tax_on_sale: float
+    net_sale_value: float
+    net_hold_value: float | None = None
+    breakeven_rate: float | None = None
+    signals: list[SaleSignal] = Field(default_factory=list)
+
+
+class MarketHistoryPointDTO(BaseModel):
+    day: date
+    curve_value: float
+    market_value: float
+    premium: float
+
+
+class TreasuryMarketDTO(BaseModel):
+    """Curve versus redemption price of a Treasury position; rates are fractions (ADR 0006)
+    except `market_rate`, the Tesouro sell rate in % a.a."""
+
+    asset_id: int | None = None
+    ticker: str
+    name: str
+    as_of_date: date
+    status: MarketStatus
+    explanation: str
+    maturity_date: date | None = None
+    price_date: date | None = None
+    market_price: float | None = None
+    market_rate: float | None = None
+    stale_price: bool = False
+    quantity: float = 0.0
+    curve_value: float = 0.0
+    market_value: float | None = None
+    premium: float | None = None
+    premium_pct: float | None = None
+    net_sale_value: float | None = None
+    reference_rate: float | None = None
+    approximate: bool = False
+    lots: list[LotMarketValueDTO] = Field(default_factory=list)
+    history: list[MarketHistoryPointDTO] = Field(default_factory=list)
+
+
+class AgendaItemDTO(BaseModel):
+    ticker: str
+    name: str
+    asset_id: int | None = None
+    kind: EarningKind
+    label: str
+    rate: float
+    com_date: date | None = None
+    ex_date: date | None = None
+    payment_date: date | None = None
+    status: AgendaStatus
+    held: bool
+    quantity: float = 0.0
+    gross_amount: float | None = None
+    withholding_tax: float | None = None
+    net_amount: float | None = None
+    related_to: str | None = None
+
+
+class EarningsAgendaDTO(BaseModel):
+    """Declared distributions still to be paid; amounts only for held assets."""
+
+    as_of_date: date
+    items: list[AgendaItemDTO] = Field(default_factory=list)
+    declared_net_brl: float = 0.0
+    declared_by_month: dict[str, float] = Field(default_factory=dict)
+    covered_tickers: list[str] = Field(default_factory=list)

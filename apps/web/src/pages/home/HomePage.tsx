@@ -19,6 +19,7 @@ import { BarList } from "../../viz/BarList";
 import { Sparkline } from "../../viz/Sparkline";
 import { TrendChart } from "../../viz/TrendChart";
 import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange, type Change } from "./story";
+import { DeclaredEarnings } from "./DeclaredEarnings";
 
 function Indicator({
   label,
@@ -295,6 +296,7 @@ export function HomePage() {
             alerts={alerts.error ? [] : alerts.data?.alerts ?? null}
             onAlertsChange={alerts.reload}
           />
+          <DeclaredEarnings />
         </>
       )}
       <ErrorBanner error={alerts.error} onRetry={alerts.reload} />

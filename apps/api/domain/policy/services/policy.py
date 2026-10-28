@@ -105,6 +105,11 @@ class ValuationPolicy:
     reference_real_yield: float = 0.06
     min_fii_spread: float = 0.02
     min_margin_of_safety: float = 0.15
+    # Tesouro Direto (Phase 26): weight the quadrant by the redemption price instead of
+    # the curve, and the thresholds of the early-sale opportunity.
+    treasury_mark_to_market: bool = False
+    early_sale_min_excess_rate: float = 0.01
+    early_sale_min_reinvest_spread: float = 0.005
     projections: ProjectionAssumptions = field(default_factory=ProjectionAssumptions)
 
     def __post_init__(self) -> None:
@@ -121,11 +126,17 @@ class ValuationPolicy:
                 raise ValidationError(f"{name} must be positive")
         if not 0.0 < self.bank_cost_of_equity < 1.0:
             raise ValidationError("bank_cost_of_equity must be an annual fraction")
-        for name in ("reference_real_yield", "min_fii_spread", "min_margin_of_safety"):
+        for name in (
+            "reference_real_yield",
+            "min_fii_spread",
+            "min_margin_of_safety",
+            "early_sale_min_excess_rate",
+            "early_sale_min_reinvest_spread",
+        ):
             if not -1.0 < getattr(self, name) < 1.0:
                 raise ValidationError(f"{name} must be a fraction (0.06 = 6%)")
 
-    def as_dict(self) -> dict[str, float]:
+    def as_dict(self) -> dict[str, float | bool]:
         """Scalar premises (projections excluded)."""
         return {f.name: getattr(self, f.name) for f in fields(self) if f.name != "projections"}
 

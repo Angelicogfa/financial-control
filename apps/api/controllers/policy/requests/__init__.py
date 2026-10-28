@@ -60,6 +60,9 @@ class ValuationPolicyDTO(BaseModel):
     reference_real_yield: float = 0.06
     min_fii_spread: float = 0.02
     min_margin_of_safety: float = 0.15
+    treasury_mark_to_market: bool = False
+    early_sale_min_excess_rate: float = Field(default=0.01, ge=0.0, le=0.5)
+    early_sale_min_reinvest_spread: float = Field(default=0.005, ge=0.0, le=0.5)
     projections: ProjectionAssumptionsDTO = Field(default_factory=ProjectionAssumptionsDTO)
 
 

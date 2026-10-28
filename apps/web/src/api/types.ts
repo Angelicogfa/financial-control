@@ -18,6 +18,27 @@ export interface AccountRequest {
   is_active?: boolean;
 }
 
+export interface AgendaItemDTO {
+  ticker: string;
+  name: string;
+  asset_id?: number | null;
+  kind: EarningKind;
+  label: string;
+  rate: number;
+  com_date?: string | null;
+  ex_date?: string | null;
+  payment_date?: string | null;
+  status: AgendaStatus;
+  held: boolean;
+  quantity?: number;
+  gross_amount?: number | null;
+  withholding_tax?: number | null;
+  net_amount?: number | null;
+  related_to?: string | null;
+}
+
+export type AgendaStatus = "UPCOMING" | "AWAITING_PAYMENT";
+
 export interface AgentKeyCreateRequest {
   name: string;
   contexts?: string[];
@@ -516,6 +537,14 @@ export interface EarningUpdateRequest {
   account_id?: number | null;
 }
 
+export interface EarningsAgendaDTO {
+  as_of_date: string;
+  items?: AgendaItemDTO[];
+  declared_net_brl?: number;
+  declared_by_month?: Record<string, number>;
+  covered_tickers?: string[];
+}
+
 export interface EligibilityPolicyDTO {
   require_evaluation?: boolean;
   min_score?: number;
@@ -823,6 +852,26 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface LotMarketValueDTO {
+  start_date: string;
+  quantity: number;
+  principal: number;
+  purchase_rate?: number | null;
+  curve_value: number;
+  market_value: number;
+  premium: number;
+  holding_days: number;
+  curve_annual_rate?: number | null;
+  market_annual_rate?: number | null;
+  excess_rate?: number | null;
+  iof_on_sale: number;
+  income_tax_on_sale: number;
+  net_sale_value: number;
+  net_hold_value?: number | null;
+  breakeven_rate?: number | null;
+  signals?: SaleSignal[];
+}
+
 export interface LotTaxStatusDTO {
   start_date: string;
   principal: number;
@@ -843,6 +892,15 @@ export interface LotTaxStatusDTO {
   tax_saving_by_waiting?: number | null;
   net_gain_by_waiting?: number | null;
 }
+
+export interface MarketHistoryPointDTO {
+  day: string;
+  curve_value: number;
+  market_value: number;
+  premium: number;
+}
+
+export type MarketStatus = "NO_MARKET_DATA" | "BELOW_CURVE" | "NEUTRAL" | "OPPORTUNITY";
 
 export interface MaturityDTO {
   ticker: string;
@@ -1080,6 +1138,8 @@ export interface RollingPointDTO {
   sharpe: number;
 }
 
+export type SaleSignal = "EXCESS_RETURN" | "REINVESTMENT";
+
 export interface SavedContributionPlanDTO {
   id: number;
   status: ContributionPlanStatus;
@@ -1135,7 +1195,7 @@ export interface SeriesStatusDTO {
   missing_business_days: number;
 }
 
-export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PRICE" | "INDEX_POINTS";
+export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PERCENT_PER_YEAR" | "PRICE" | "INDEX_POINTS";
 
 export interface SnapshotPointDTO {
   snapshot_date: string;
@@ -1250,6 +1310,30 @@ export interface TreasuryBondDTO {
   asset_id?: number | null;
 }
 
+export interface TreasuryMarketDTO {
+  asset_id?: number | null;
+  ticker: string;
+  name: string;
+  as_of_date: string;
+  status: MarketStatus;
+  explanation: string;
+  maturity_date?: string | null;
+  price_date?: string | null;
+  market_price?: number | null;
+  market_rate?: number | null;
+  stale_price?: boolean;
+  quantity?: number;
+  curve_value?: number;
+  market_value?: number | null;
+  premium?: number | null;
+  premium_pct?: number | null;
+  net_sale_value?: number | null;
+  reference_rate?: number | null;
+  approximate?: boolean;
+  lots?: LotMarketValueDTO[];
+  history?: MarketHistoryPointDTO[];
+}
+
 export interface TreasurySearchResponseDTO {
   results: TreasuryBondDTO[];
   total: number;
@@ -1277,6 +1361,9 @@ export interface ValuationPolicyDTO {
   reference_real_yield?: number;
   min_fii_spread?: number;
   min_margin_of_safety?: number;
+  treasury_mark_to_market?: boolean;
+  early_sale_min_excess_rate?: number;
+  early_sale_min_reinvest_spread?: number;
   projections?: ProjectionAssumptionsDTO;
 }
 

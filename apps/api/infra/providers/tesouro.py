@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from domain.market.entities import TreasuryBond, TreasuryCatalogResult
+from domain.market.services.treasury_prices import TreasuryPricePoint, bond_family
 from domain.shared.enums import (
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -32,6 +33,12 @@ DEFAULT_TESOURO_CSV_URL = (
 )
 DEFAULT_TESOURO_REDEEM_CSV_URL = (
     "https://www.tesourodireto.com.br/documents/d/guest/rendimento-resgatar-csv?download=true"
+)
+
+DEFAULT_TESOURO_HISTORY_CSV_URL = (
+    "https://www.tesourotransparente.gov.br/ckan/dataset/"
+    "df56aa42-484a-4a59-8184-7676580c81e3/resource/"
+    "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/PrecoTaxaTesouroDireto.csv"
 )
 
 _STALE_BASE_DATE_DAYS = 45
@@ -441,6 +448,55 @@ def parse_tesouro_transparente_csv(
     return []
 
 
+def parse_price_history_csv(
+    csv_text: str,
+    *,
+    families: set[str] | None = None,
+    since: date | None = None,
+) -> list[TreasuryPricePoint]:
+    """Every daily row of `PrecoTaxaTesouroDireto.csv` (optionally only some bond families)."""
+    cleaned = csv_text.lstrip("\ufeff")
+    reader = csv.DictReader(io.StringIO(cleaned), delimiter=";")
+    if not reader.fieldnames:
+        return []
+    header_map = {_strip_accents(name).strip().lower(): name for name in reader.fieldnames if name}
+    col_type = header_map.get("tipo titulo")
+    col_maturity = header_map.get("data vencimento")
+    col_base = header_map.get("data base")
+    if not col_type or not col_maturity or not col_base:
+        return []
+    col_sell_rate = header_map.get("taxa venda manha")
+    col_sell_pu = header_map.get("pu venda manha")
+    col_buy_rate = header_map.get("taxa compra manha")
+    col_buy_pu = header_map.get("pu compra manha")
+
+    points: list[TreasuryPricePoint] = []
+    for row in reader:
+        bond_type = (row.get(col_type) or "").strip()
+        if not bond_type or (families is not None and bond_family(bond_type) not in families):
+            continue
+        base_date = _parse_br_date(row.get(col_base))
+        maturity = _parse_br_date(row.get(col_maturity))
+        if base_date is None or maturity is None or (since is not None and base_date < since):
+            continue
+        points.append(
+            TreasuryPricePoint(
+                bond_type=bond_type,
+                maturity_date=maturity,
+                base_date=base_date,
+                sell_price=_parse_br_float(
+                    row.get(col_sell_pu) if col_sell_pu else None, positive_only=True
+                ),
+                sell_rate=_parse_br_float(row.get(col_sell_rate) if col_sell_rate else None),
+                buy_price=_parse_br_float(
+                    row.get(col_buy_pu) if col_buy_pu else None, positive_only=True
+                ),
+                buy_rate=_parse_br_float(row.get(col_buy_rate) if col_buy_rate else None),
+            )
+        )
+    return points
+
+
 class TesouroTransparenteProvider:
     """HTTP client for the official Tesouro Direto / Tesouro Transparente CSV datasets."""
 
@@ -450,6 +506,7 @@ class TesouroTransparenteProvider:
         self,
         csv_url: str = DEFAULT_TESOURO_CSV_URL,
         redeem_csv_url: str | None = DEFAULT_TESOURO_REDEEM_CSV_URL,
+        history_csv_url: str = DEFAULT_TESOURO_HISTORY_CSV_URL,
         client: httpx.Client | None = None,
         timeout: float = 30.0,
     ) -> None:
@@ -458,6 +515,7 @@ class TesouroTransparenteProvider:
             cleaned_url = DEFAULT_TESOURO_CSV_URL
         self.csv_url = cleaned_url
         self.redeem_csv_url = redeem_csv_url
+        self.history_csv_url = history_csv_url.strip() or DEFAULT_TESOURO_HISTORY_CSV_URL
         self._custom_client = client is not None
         self._client = client or httpx.Client(timeout=timeout, follow_redirects=True)
 
@@ -541,3 +599,23 @@ class TesouroTransparenteProvider:
                 pass
 
         return TreasuryCatalogResult(results=bonds)
+
+    def list_price_history(
+        self, *, families: set[str] | None = None, since: date | None = None
+    ) -> list[TreasuryPricePoint]:
+        """Daily redemption prices and rates of every bond since 2002 (about 15 MB).
+
+        A failure is reported to the worker request log and returns an empty list.
+        """
+        try:
+            text = self._download_csv_text(self.history_csv_url)
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="treasury_price_history",
+                target="TESOURO_DIRETO",
+                request_url=self.history_csv_url,
+                exc=exc,
+            )
+            return []
+        return parse_price_history_csv(text, families=families, since=since)

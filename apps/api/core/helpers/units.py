@@ -13,7 +13,9 @@ from core.errors import ValidationError
 from domain.shared.entities import MarketSeriesPoint
 from domain.shared.enums import SeriesUnit
 
-PERCENT_UNITS = frozenset({SeriesUnit.PERCENT_PER_DAY, SeriesUnit.PERCENT_PER_MONTH})
+PERCENT_UNITS = frozenset(
+    {SeriesUnit.PERCENT_PER_DAY, SeriesUnit.PERCENT_PER_MONTH, SeriesUnit.PERCENT_PER_YEAR}
+)
 
 # Unit of each BCB SGS series code (CDI 12, SELIC 11, IPCA 433).
 BCB_SERIES_UNITS: dict[str, SeriesUnit] = {

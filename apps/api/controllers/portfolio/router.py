@@ -13,10 +13,12 @@ from controllers.portfolio.dependencies import get_portfolio_handler
 from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
     ContributionPlanResponseDTO,
+    EarningsAgendaDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
+    TreasuryMarketDTO,
 )
 from domain.portfolio.services.use_cases import PortfolioHandler
 
@@ -79,3 +81,28 @@ def get_portfolio_health(
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> PortfolioHealthDTO:
     return handler.get_health(as_of_date=as_of_date)
+
+
+@portfolio_router.get("/treasury-market", response_model=list[TreasuryMarketDTO])
+def list_treasury_market(
+    as_of_date: date | None = Query(default=None),
+    handler: PortfolioHandler = Depends(get_portfolio_handler),
+) -> list[TreasuryMarketDTO]:
+    return handler.treasury_market(as_of_date=as_of_date)
+
+
+@portfolio_router.get("/treasury-market/{asset_id}", response_model=TreasuryMarketDTO)
+def get_treasury_market(
+    asset_id: int,
+    as_of_date: date | None = Query(default=None),
+    handler: PortfolioHandler = Depends(get_portfolio_handler),
+) -> TreasuryMarketDTO:
+    return handler.treasury_market_detail(asset_id, as_of_date=as_of_date)
+
+
+@portfolio_router.get("/earnings-agenda", response_model=EarningsAgendaDTO)
+def get_earnings_agenda(
+    as_of_date: date | None = Query(default=None),
+    handler: PortfolioHandler = Depends(get_portfolio_handler),
+) -> EarningsAgendaDTO:
+    return handler.earnings_agenda(as_of_date=as_of_date)

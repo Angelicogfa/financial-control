@@ -437,6 +437,8 @@ async def test_mcp_tools_list_call_scoping_and_idempotency(api: SimpleNamespace)
             "portfolio.analytics",
             "portfolio.snapshots",
             "portfolio.health",
+            "portfolio.treasury_market",
+            "portfolio.earnings_agenda",
             "assets.create",
             "assets.list",
         } == set(tool_map)

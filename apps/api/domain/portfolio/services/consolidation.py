@@ -300,7 +300,11 @@ def _estimate_yield_and_projection_by_type(
 
 
 def _value_fixed_income(
-    v: _Valuation, ref_date: date, curves: RateCurves, tax_rules: TaxRuleBook | None
+    v: _Valuation,
+    ref_date: date,
+    curves: RateCurves,
+    tax_rules: TaxRuleBook | None,
+    market_price: float | None = None,
 ) -> None:
     asset = v.asset
     assert asset.fixed_income_term is not None
@@ -321,6 +325,28 @@ def _value_fixed_income(
     v.realized_brl = v.fi_val.realized_pnl
     v.unit_price = v.current_brl / v.qty if v.qty > 0 else v.current_brl
     v.freshness = QuoteFreshness.CURVE
+    if market_price is not None and v.qty > 0:
+        _apply_market_price(v, market_price)
+
+
+def _apply_market_price(v: _Valuation, price: float) -> None:
+    """Value a Treasury position at its redemption price (policy option, item 26.2).
+
+    The taxes keep the effective IOF and IR rates of the curve valuation, applied to the
+    gain at market.
+    """
+    assert v.fi_val is not None
+    gross = round(v.qty * price, 2)
+    curve_gain = v.fi_val.gross_value - v.fi_val.invested_principal
+    gain = max(0.0, gross - v.fi_val.invested_principal)
+    iof_share = v.fi_val.iof_tax / curve_gain if curve_gain > 0 else 0.0
+    iof = gain * iof_share
+    ir = max(0.0, gain - iof) * v.fi_val.income_tax_rate
+    v.gross_brl = gross
+    v.tax_brl = round(iof + ir, 2)
+    v.current_brl = round(gross - iof - ir, 2)
+    v.unit_price = price
+    v.freshness = QuoteFreshness.LIVE
 
 
 def _value_market_asset(
@@ -372,6 +398,7 @@ def consolidate_portfolio(
     date_from: date | None = None,
     split_adjust_through: date | None = None,
     tax_rules: TaxRuleBook | None = None,
+    treasury_market_prices: Mapping[str, float] | None = None,
 ) -> ConsolidatedPortfolioReport:
     """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations.
 
@@ -394,7 +421,15 @@ def consolidate_portfolio(
         v = _Valuation(asset=asset)
         try:
             if asset.asset_type in FIXED_INCOME_TYPES and asset.fixed_income_term is not None:
-                _value_fixed_income(v, ref_date, rate_curves, tax_rules)
+                _value_fixed_income(
+                    v,
+                    ref_date,
+                    rate_curves,
+                    tax_rules,
+                    (treasury_market_prices or {}).get(asset.ticker)
+                    if asset.asset_type == AssetType.TREASURY
+                    else None,
+                )
             else:
                 _value_market_asset(
                     v,

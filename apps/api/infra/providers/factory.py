@@ -8,7 +8,11 @@ from infra.cache.redis_cache import build_cache_backend
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
 from infra.providers.gateway import CachedMarketGateway
-from infra.providers.tesouro import DEFAULT_TESOURO_CSV_URL, TesouroTransparenteProvider
+from infra.providers.tesouro import (
+    DEFAULT_TESOURO_CSV_URL,
+    DEFAULT_TESOURO_HISTORY_CSV_URL,
+    TesouroTransparenteProvider,
+)
 from infra.providers.yfinance_provider import YFinanceProvider
 
 
@@ -42,7 +46,11 @@ def build_market_gateway(settings: MarketSettings) -> CachedMarketGateway:
             default_cdi_annual=settings.risk_free_rate,
             default_ipca_annual=settings.default_annual_ipca,
         ),
-        tesouro=TesouroTransparenteProvider(csv_url=csv_url),
+        tesouro=TesouroTransparenteProvider(
+            csv_url=csv_url,
+            history_csv_url=getattr(settings, "tesouro_history_csv_url", "")
+            or DEFAULT_TESOURO_HISTORY_CSV_URL,
+        ),
         cache=build_cache_backend(settings.redis_url),
         quote_ttl_seconds=settings.quote_cache_ttl,
         fundamentals_ttl_seconds=settings.fundamentals_cache_ttl,

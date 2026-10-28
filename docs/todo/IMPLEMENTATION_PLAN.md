@@ -36,7 +36,7 @@
 | **Fase 23** | Importação B3: Ignorar Linhas e Vendas sem Saldo | `[x]` Implementado | 100% |
 | **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[x]` Implementado | 100% |
 | **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[ ]` Pendente | 0% |
-| **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[ ]` Pendente | 0% |
+| **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[x]` Implementado | 100% |
 | **Fase 27** | Comparador de Ativos | `[x]` Implementado | 100% |
 | **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
 | **Fase 29** | Estatísticas e Saúde da Carteira | `[x]` Implementado | 100% |
@@ -589,15 +589,18 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **25.5** `PRICE_BELOW_CEILING` não dispara (ou cai de severidade) quando o teto vem de dado suspeito; novo alerta interno de dado suspeito.
 - `[ ]` **25.6** Testes de unidade e integração; checklist e valuation exibem selo de dado suspeito e de resposta vencida.
 
-## Fase 26 — Tesouro a Mercado, Agenda de Proventos e Alertas Internos (`[ ]` Pendente)
+## Fase 26 — Tesouro a Mercado, Agenda de Proventos e Alertas Internos (`[x]` Implementado)
 
 **Objetivo:** corrigir o peso do quadrante Caixa e antecipar renda e eventos, com alertas apenas dentro do sistema (sem canal externo por ora).
 
-- `[ ]` **26.1** Marcação a mercado do Tesouro Direto (TD-02): estender `infra/providers/tesouro.py` para o preço unitário de resgate diário; o valor a mercado aparece ao lado do valor na curva.
-- `[ ]` **26.2** Opção na política: peso do quadrante pela curva ou pelo mercado no ARCA e no aporte.
-- `[ ]` **26.3** Agenda de proventos anunciados (data com, data ex, pagamento, valor por cota) para carteira e watchlist, e renda futura já declarada no Início; data ex real usada nos eventos importados (TD-08).
-- `[ ]` **26.4** Alertas internos novos: data com próxima, vencimento de renda fixa próximo, queda de faixa de IR próxima (Fase 24), checklist vencido e dado suspeito (Fase 25). Sem e-mail, Telegram ou push.
-- `[ ]` **26.5** Testes de unidade (provider com CSV de exemplo, regras de alerta), integração e UI.
+- `[x]` **26.1** Marcação a mercado do Tesouro Direto (TD-02) e oportunidade de venda antecipada.
+  - Série diária por título em `market_series` (`TD:<família>:<vencimento>` com o PU de venda e `…:R` com a taxa de venda em % a.a., unidade nova `PERCENT_PER_YEAR`); a família separa títulos de mesmo vencimento (IPCA+ × IPCA+ com juros semestrais). Rotina `sync_treasury_prices` no worker (dias úteis e na partida): busca o histórico em `PrecoTaxaTesouroDireto.csv` do Tesouro Transparente (`TESOURO_HISTORY_CSV_URL`) desde um ano antes da primeira compra quando falta série ou há buraco, e soma o ponto do dia pelo catálogo diário.
+  - Motor `domain/portfolio/services/mark_to_market.py`: por compra (lotes por quantidade, FIFO), valor na curva × quantidade × PU de venda, diferença, IR/IOF e líquido vendendo hoje, rentabilidade ao ano realizada vendendo hoje × a entregue pela curva, valor líquido segurando até o vencimento e taxa de reinvestimento de empate (bruta, tributada, até o vencimento). Sinais: ganho sobre a curva acima de `early_sale_min_excess_rate` com prêmio, ou CDI projetado acima do empate por `early_sale_min_reinvest_spread` (padrões 1 p.p. e 0,5 p.p., na política). Status `OPPORTUNITY`, `NEUTRAL`, `BELOW_CURVE` ou `NO_MARKET_DATA`; histórico curva × mercado (até 120 pontos) para ver os momentos de ganho. Validado com o PU oficial de 28/10/2026 (Prefixado 2029 comprado a 13,75%: curva R$ 1.857,02 × mercado R$ 1.815,96). Títulos com juros semestrais: comparação com o vencimento aproximada (sem os cupons).
+  - Rotas `GET /api/v1/portfolio/treasury-market` e `/treasury-market/{asset_id}` (com histórico), operação MCP `portfolio.treasury_market`, aba "Mercado" no detalhe do título e painel "Tesouro Direto a mercado" na Carteira.
+- `[x]` **26.2** `ValuationPolicy.treasury_mark_to_market`: com a opção ligada, `consolidate_portfolio` valoriza o Tesouro pelo PU de venda do dia (IR e IOF com as alíquotas efetivas da curva), o que muda o peso do quadrante no ARCA e no aporte; checkbox na Estratégia. Os retratos diários seguem pela curva.
+- `[x]` **26.3** Agenda de proventos anunciados pela página de empresas listadas da B3 (`infra/providers/b3_listed.py`, gratuita; o recurso de dividendos da brapi exige plano pago): dividendos, JCP e rendimentos de FII com data com, data ex (dia útil seguinte), pagamento e valor por cota, filtrados pela classe do ticker (ISIN ON/PN/units/cotas). `domain/portfolio/services/earnings_agenda.py` estima bruto, IR retido (JCP 17,5%; dividendos 10% acima de R$ 50 mil por empresa e mês) e líquido com a quantidade na data com. Rota `GET /api/v1/portfolio/earnings-agenda`, operação MCP `portfolio.earnings_agenda` e cartão "Proventos anunciados" no Início. TD-08: a importação da B3 usa a data com declarada para a data ex de desdobramentos, grupamentos e bonificações (crédito até 45 dias depois) e preenche a data ex dos proventos importados.
+- `[x]` **26.4** Alertas internos `EARNING_COM_DATE` (data com em até 7 dias, carteira e watchlist), `FIXED_INCOME_MATURITY` (vencimento em até 30 dias), `TAX_BRACKET_SOON` (lote que muda de faixa de IR dentro da janela da política de saúde) e `EARLY_SALE_OPPORTUNITY` (Tesouro com status `OPPORTUNITY`). Checklist vencido e dado suspeito ficam para a Fase 25, que cria esses sinais.
+- `[x]` **26.5** Testes: `tests/test_treasury_market.py` (famílias e símbolos, CSV histórico, provider, motor com o caso real, oportunidade, neutro, sem preço, FIFO, histórico, consolidação a mercado, rotina do worker, rotas, opção da política, MCP), `tests/test_earnings_agenda.py` (ISIN, parser e URLs da B3, agenda, datas ex, alertas, importação com data ex declarada, rota e MCP), `src/test/treasury.test.tsx` e `settings.test.tsx`.
 
 ## Fase 27 — Comparador de Ativos (`[x]` Implementado)
 

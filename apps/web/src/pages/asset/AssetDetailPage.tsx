@@ -25,6 +25,7 @@ import {
 import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart } from "../../viz/TrendChart";
 import { ChecklistTab } from "./ChecklistTab";
+import { MarketTab } from "./MarketTab";
 import { TaxTab } from "./TaxTab";
 import { compareLink } from "../tools/AssetComparePage";
 
@@ -36,7 +37,7 @@ const BENCHMARK_LABELS: Record<string, string> = {
   IPCA: "IPCA",
 };
 
-type TabKey = "summary" | "fundamentals" | "valuation" | "checklist" | "tax" | "earnings" | "ledger";
+type TabKey = "summary" | "market" | "fundamentals" | "valuation" | "checklist" | "tax" | "earnings" | "ledger";
 const TABS: TabSpec<TabKey>[] = [
   { key: "summary", label: "Resumo" },
   { key: "fundamentals", label: "Fundamentos" },
@@ -46,6 +47,8 @@ const TABS: TabSpec<TabKey>[] = [
   { key: "earnings", label: "Proventos" },
   { key: "ledger", label: "Lançamentos" },
 ];
+/** Treasury bonds also show the curve versus the redemption price (Phase 26). */
+const TREASURY_TABS: TabSpec<TabKey>[] = [TABS[0], { key: "market", label: "Mercado" }, ...TABS.slice(1)];
 
 function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
   const p = analysis.position;
@@ -453,7 +456,7 @@ function Ledger({ assetId }: Readonly<{ assetId: number }>) {
 export function AssetDetailPage() {
   const { id } = useParams();
   const assetId = Number(id);
-  const [tab, setTab] = useTab(TABS, "summary");
+  const [tab, setTab] = useTab(TREASURY_TABS, "summary");
   const [checklistSaved, setChecklistSaved] = useState(false);
   const analysis = useApi(`asset-${assetId}`, () => api.assets.analysis(assetId));
 
@@ -494,7 +497,12 @@ export function AssetDetailPage() {
                   </>
                 }
               />
-              <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Seções do ativo" />
+              <Tabs
+                tabs={data.asset.asset_type === "TREASURY" ? TREASURY_TABS : TABS}
+                active={tab}
+                onSelect={setTab}
+                label="Seções do ativo"
+              />
               {tab === "summary" && <Summary analysis={data} />}
               {tab === "fundamentals" && <Fundamentals analysis={data} />}
               {tab === "valuation" && <Valuation analysis={data} />}
@@ -515,6 +523,7 @@ export function AssetDetailPage() {
                   />
                 </>
               )}
+              {tab === "market" && data.asset.asset_type === "TREASURY" && <MarketTab assetId={assetId} />}
               {tab === "tax" && <TaxTab assetId={assetId} />}
               {tab === "earnings" && <Earnings assetId={assetId} />}
               {tab === "ledger" && <Ledger assetId={assetId} />}

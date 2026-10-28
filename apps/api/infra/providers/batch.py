@@ -13,7 +13,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from contextvars import copy_context
 from dataclasses import dataclass, field
 
-from domain.market.entities import Fundamentals, PricePoint, Quote
+from domain.market.entities import AnnouncedDistributions, Fundamentals, PricePoint, Quote
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import Market
 from infra.providers.error_tracker import report_provider_error
@@ -143,3 +143,33 @@ def fetch_histories(
             ", ".join(sorted(futures[f] for f in pending)),
         )
     return histories
+
+
+def fetch_distributions(
+    gateway: CachedMarketGateway,
+    assets: Iterable[AssetEntity],
+    *,
+    max_workers: int = 8,
+    timeout_seconds: float = 20.0,
+) -> dict[str, AnnouncedDistributions]:
+    """Declared dividends and stock events of B3 assets, fetched concurrently."""
+    tradable = [a for a in assets if a.market not in OFFLINE_MARKETS]
+    if not tradable:
+        return {}
+    executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="dividends")
+    futures: dict[Future, str] = {
+        executor.submit(
+            copy_context().run,
+            lambda a=asset: gateway.get_distributions(a.ticker, asset_type=a.asset_type),
+        ): asset.ticker
+        for asset in tradable
+    }
+    done, _pending = wait(futures, timeout=timeout_seconds)
+    executor.shutdown(wait=False, cancel_futures=True)
+    found: dict[str, AnnouncedDistributions] = {}
+    for future in done:
+        try:
+            found[futures[future]] = future.result()
+        except Exception as exc:  # a provider bug must not break the agenda
+            logger.warning("Distributions for %s failed: %s", futures[future], exc)
+    return found

@@ -60,10 +60,12 @@ from controllers.policy.responses import PolicyDTO
 from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
     ContributionPlanResponseDTO,
+    EarningsAgendaDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
+    TreasuryMarketDTO,
 )
 from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import (
@@ -127,6 +129,11 @@ class PortfolioReportInput(BaseModel):
 class CompareInput(BaseModel):
     tickers: list[str] = Field(..., min_length=2, max_length=5)
     indicators: list[str] = Field(default_factory=list)
+
+
+class TreasuryMarketInput(BaseModel):
+    as_of_date: date | None = None
+    asset_id: int | None = None
 
 
 class AsOfDateInput(BaseModel):
@@ -363,7 +370,13 @@ class AgenticRuntimeHandlers:
 
     @property
     def imports(self) -> ImportHandler:
-        return ImportHandler(uow_factory=self.uow_factory)
+        gateway = self.portfolio_service.gateway
+        return ImportHandler(
+            uow_factory=self.uow_factory,
+            distributions=lambda ticker, asset_type: gateway.get_distributions(
+                ticker, asset_type=asset_type
+            ),
+        )
 
     @property
     def market(self) -> MarketDataHandler:
@@ -439,6 +452,34 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=DateRangeInput,
         output_type=list[SnapshotPointDTO],
         invoke=lambda h, p: h.portfolio.list_snapshots(date_from=p.date_from, date_to=p.date_to),
+    ),
+    OperationSpec(
+        name="portfolio.treasury_market",
+        kind="query",
+        description=(
+            "Tesouro Direto a mercado: valor na curva (taxa da compra) contra o PU de venda do "
+            "dia, diferença (prêmio), rentabilidade realizada vendendo hoje contra a da curva, "
+            "taxa de reinvestimento de empate até o vencimento e sinal de oportunidade de venda "
+            "antecipada (status OPPORTUNITY). Com `asset_id`, inclui o histórico curva × mercado."
+        ),
+        input_model=TreasuryMarketInput,
+        output_type=list[TreasuryMarketDTO],
+        invoke=lambda h, p: h.portfolio.treasury_market(
+            as_of_date=p.as_of_date, asset_id=p.asset_id, with_history=p.asset_id is not None
+        ),
+    ),
+    OperationSpec(
+        name="portfolio.earnings_agenda",
+        kind="query",
+        description=(
+            "Agenda de proventos anunciados (dividendos, JCP e rendimentos de FII) das ações, "
+            "BDRs e FIIs da carteira e da watchlist, pela página de empresas listadas da B3: "
+            "data com, data ex, pagamento, valor por cota e, para quem tem posição, valor bruto, "
+            "IR retido estimado e líquido. Mostra só o que ainda não foi pago."
+        ),
+        input_model=AsOfDateInput,
+        output_type=EarningsAgendaDTO,
+        invoke=lambda h, p: h.portfolio.earnings_agenda(as_of_date=p.as_of_date),
     ),
     OperationSpec(
         name="portfolio.health",
