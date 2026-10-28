@@ -177,6 +177,8 @@ class AssetValuationDTO(BaseModel):
     margin: float | None = None
     verdict: str
     reason: str = ""
+    suspicious_inputs: list[str] = Field(default_factory=list)
+    extraordinary_dividends: bool = False
 
 
 class FundamentalSnapshotDTO(BaseModel):

@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from core.helpers.calendar import business_days_between, is_business_day
 from core.helpers.units import BCB_SERIES_UNITS
 from domain.assets.services.cerrado import (
+    answer_freshness,
     evaluate,
     evaluation_record,
     history_for_assets,
@@ -344,6 +345,7 @@ def record_checklist_evaluations_job(
         assets = [a for a in uow.assets.list_all(active_only=True) if a.id is not None]
         snapshots = uow.fundamentals.list_for_many([a.ticker for a in assets])
         histories = history_for_assets(assets, snapshots)
+        eligibility = current_policy(uow.policies).eligibility
         for asset in assets:
             fundamentals = (
                 None
@@ -356,6 +358,9 @@ def record_checklist_evaluations_job(
                 fundamentals,
                 use_cerrado=asset.use_cerrado,
                 history=histories.get(asset.ticker),
+                freshness=answer_freshness(
+                    eligibility, now.date(), snapshots.get(asset.ticker, [])
+                ),
             )
             if record_if_changed(uow.checklists, evaluation_record(asset.id or 0, evaluation, now)):
                 recorded += 1

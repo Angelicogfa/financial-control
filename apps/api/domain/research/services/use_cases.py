@@ -247,6 +247,7 @@ class ResearchHandler:
                 timeout_seconds=service.fetch_timeout_seconds,
             )
             histories = service.checklist_histories(uow, assets)
+            freshness = service.checklist_freshness(uow, assets)
             compared: list[ComparedAsset] = []
             for asset in assets:
                 quote = market.quotes.get(asset.ticker)
@@ -257,7 +258,9 @@ class ResearchHandler:
                     else (float(asset.manual_price) if asset.manual_price is not None else None)
                 )
                 statements = stored.get(asset.ticker, [])
-                evaluation = service.evaluate_with(asset, fund, histories.get(asset.ticker))
+                evaluation = service.evaluate_with(
+                    asset, fund, histories.get(asset.ticker), freshness.get(asset.ticker)
+                )
                 valuation = service.value(uow, asset, price, fund)
                 compared.append(
                     ComparedAsset(
@@ -308,6 +311,7 @@ class ResearchHandler:
             timeout_seconds=service.fetch_timeout_seconds,
         )
         histories = service.checklist_histories(uow, assets)
+        freshness = service.checklist_freshness(uow, assets)
         lifecycles = service.asset_lifecycles(uow, assets)
         items: list[WatchlistItemDTO] = []
         for asset in assets:
@@ -318,7 +322,9 @@ class ResearchHandler:
                 if quote
                 else (float(asset.manual_price) if asset.manual_price is not None else None)
             )
-            evaluation = service.evaluate_with(asset, fund, histories.get(asset.ticker))
+            evaluation = service.evaluate_with(
+                asset, fund, histories.get(asset.ticker), freshness.get(asset.ticker)
+            )
             valuation = service.value(uow, asset, price, fund)
             status, eligible = lifecycles.get(asset.id or 0, (AssetLifecycle.WATCHLIST, False))
             items.append(

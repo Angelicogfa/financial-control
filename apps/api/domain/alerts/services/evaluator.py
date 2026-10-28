@@ -13,8 +13,9 @@ from datetime import date, datetime, timedelta
 from enum import StrEnum
 
 from core.helpers.calendar import previous_business_day
+from domain.assets.services.cerrado import StaleReason
 from domain.assets.services.valuation import AssetValuation, ValuationVerdict
-from domain.market.entities import QuoteFreshness
+from domain.market.entities import Fundamentals, QuoteFreshness
 from domain.market.services.series_status import SeriesStatus
 from domain.policy.services.allocation import BAND_ABOVE, BAND_BELOW
 from domain.portfolio.services.consolidation import LEDGER_INVALID, ConsolidatedPortfolioReport
@@ -44,6 +45,8 @@ class AlertKind(StrEnum):
     FIXED_INCOME_MATURITY = "FIXED_INCOME_MATURITY"
     TAX_BRACKET_SOON = "TAX_BRACKET_SOON"
     EARLY_SALE_OPPORTUNITY = "EARLY_SALE_OPPORTUNITY"
+    SUSPICIOUS_DATA = "SUSPICIOUS_DATA"
+    CHECKLIST_EXPIRED = "CHECKLIST_EXPIRED"
 
 
 SEVERITY_ORDER = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}
@@ -153,6 +156,8 @@ def valuation_alerts(
             AssetLifecycle.HELD,
         ):
             continue
+        if valuation.suspicious_inputs:
+            continue  # a ceiling from suspicious data is no opportunity (Phase 25.5)
         margin = f" (margem {_pct((valuation.margin or 0) * 100)})" if valuation.margin else ""
         alerts.append(
             Alert(
@@ -221,6 +226,63 @@ def data_alerts(
                 (run.error or "Sem detalhes.")[:300],
                 run.job_name,
                 "/settings/market-data",
+            )
+        )
+    return alerts
+
+
+QUALITY_STATUSES = frozenset({AssetLifecycle.HELD, AssetLifecycle.ELIGIBLE, AssetLifecycle.REVIEW})
+
+
+def data_quality_alerts(
+    fundamentals: Mapping[str, Fundamentals],
+    lifecycles: Mapping[str, AssetLifecycle],
+    asset_ids: Mapping[str, int],
+) -> list[Alert]:
+    """Held or eligible assets whose provider indicators look wrong (Phase 25.3)."""
+    alerts: list[Alert] = []
+    for ticker, fund in sorted(fundamentals.items()):
+        if not fund.suspicious or lifecycles.get(ticker) not in QUALITY_STATUSES:
+            continue
+        reasons = list(fund.suspicious.values())
+        more = f" (+{len(reasons) - 2})" if len(reasons) > 2 else ""
+        alerts.append(
+            Alert(
+                f"suspicious:{ticker}:{','.join(sorted(fund.suspicious))}",
+                AlertKind.SUSPICIOUS_DATA,
+                AlertSeverity.WARNING,
+                f"{ticker}: dado suspeito do provedor",
+                " ".join(reasons[:2]) + more + " Confira antes de confiar no valuation.",
+                ticker,
+                f"/asset/{asset_ids.get(ticker, 0)}?tab=valuation",
+            )
+        )
+    return alerts
+
+
+def checklist_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
+    """Positions with manual checklist answers that expired or predate a new statement."""
+    alerts: list[Alert] = []
+    for position in report.positions:
+        evaluation = position.cerrado_evaluation
+        if evaluation.stale <= 0:
+            continue
+        reasons = {a.stale_reason for a in evaluation.answers if a.stale_reason is not None}
+        why = []
+        if StaleReason.EXPIRED in reasons:
+            why.append("passaram do prazo de validade da política")
+        if StaleReason.NEW_STATEMENT in reasons:
+            why.append("são anteriores ao demonstrativo anual mais recente")
+        alerts.append(
+            Alert(
+                f"checklist-stale:{position.ticker}:{evaluation.stale}",
+                AlertKind.CHECKLIST_EXPIRED,
+                AlertSeverity.WARNING,
+                f"{position.ticker}: checklist vencido",
+                f"{evaluation.stale} resposta(s) manual(is) {' e '.join(why)}. "
+                "Revise o checklist para manter o ativo elegível a aportes.",
+                position.ticker,
+                f"/asset/{position.asset_id}?tab=checklist",
             )
         )
     return alerts

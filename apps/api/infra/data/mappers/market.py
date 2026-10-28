@@ -41,6 +41,7 @@ def to_fundamental_snapshot(model: FundamentalSnapshotModel) -> FundamentalSnaps
         period=FundamentalPeriod(model.period),
         metrics=dict(model.metrics or {}),
         source=model.source,
+        first_seen_at=model.first_seen_at,
     )
 
 

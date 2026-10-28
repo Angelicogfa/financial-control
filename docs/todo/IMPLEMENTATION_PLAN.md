@@ -35,7 +35,7 @@
 | **Fase 22** | Importação B3: Tesouro Direto, CDB e Fracionário com Dígito | `[x]` Implementado | 100% |
 | **Fase 23** | Importação B3: Ignorar Linhas e Vendas sem Saldo | `[x]` Implementado | 100% |
 | **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[x]` Implementado | 100% |
-| **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[ ]` Pendente | 0% |
+| **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[x]` Implementado | 100% |
 | **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[x]` Implementado | 100% |
 | **Fase 27** | Comparador de Ativos | `[x]` Implementado | 100% |
 | **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
@@ -578,16 +578,16 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 ---
 
-## Fase 25 — Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas (`[ ]` Pendente)
+## Fase 25 — Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas (`[x]` Implementado)
 
 **Objetivo:** impedir que a sugestão de aporte siga uma tese vencida ou um dado de provedor errado.
 
-- `[ ]` **25.1** Validade das respostas manuais do checklist: prazo em meses na política versionada; resposta vencida marca o ativo para revisão (`ASSET_IN_REVIEW`) e, conforme opção da política, sai ou não da nota.
-- `[ ]` **25.2** Reabertura das respostas manuais quando chega demonstrativo anual novo do ativo, com o histórico da nota preservado.
-- `[ ]` **25.3** Sanidade dos indicadores no adaptador: faixas plausíveis por indicador e tipo de ativo, divergência brapi × Yahoo acima de um limite e marca `suspicious` no dado e no veredito de valuation (resolve parte do TD-06).
-- `[ ]` **25.4** DY normalizado para o Bazin: mediana de 3–5 anos de proventos, sinalizando proventos extraordinários.
-- `[ ]` **25.5** `PRICE_BELOW_CEILING` não dispara (ou cai de severidade) quando o teto vem de dado suspeito; novo alerta interno de dado suspeito.
-- `[ ]` **25.6** Testes de unidade e integração; checklist e valuation exibem selo de dado suspeito e de resposta vencida.
+- `[x]` **25.1** Validade das respostas manuais: `EligibilityPolicy.answer_validity_months` (padrão 12), `review_on_expired_answers` (padrão sim) e `drop_expired_answers` (padrão não). `evaluate(..., freshness=AnswerFreshness)` marca cada resposta manual vencida (`stale_reason`) e conta `stale`; com a opção, a resposta sai da nota (o histórico append-only a mantém). Resposta vencida torna o ativo inelegível, então quem tem posição vai para `REVIEW` (alerta `ASSET_IN_REVIEW`) e para de receber aportes. A validade vale na consolidação, no aporte, na pesquisa, na watchlist, no comparador e na rotina do worker que grava as avaliações; a Saúde da carteira passou a usar o mesmo vencimento (o limite próprio `checklist_max_age_months` foi removido).
+- `[x]` **25.2** Reabertura: `fundamental_snapshots.first_seen_at` (migration `script_00022_fundamentals_first_seen.py`, preenchida com `fetched_at`) guarda quando cada demonstrativo foi gravado pela primeira vez; respostas manuais anteriores ao demonstrativo anual mais novo ficam `NEW_STATEMENT`. A atualização semanal não mexe na data.
+- `[x]` **25.3** Sanidade no gateway (`domain/market/services/fundamentals_sanity.py`): faixas plausíveis por indicador e tipo (P/L, P/VP, DY, ROE, margem, dívida, crescimento; FII com P/VP 0,1–5) e, para ativos da B3, comparação brapi × Yahoo com divergência acima de 30% em P/L, P/VP, DY e ROE. As marcas ficam em `Fundamentals.suspicious` (com o motivo), seguem no cache e chegam ao valuation (`suspicious_inputs`, nota "dado suspeito" no método) — parte do TD-06.
+- `[x]` **25.4** Bazin com proventos normalizados: mediana dos proventos pagos nos últimos 3 a 5 anos fiscais, por ação de hoje (valor de mercado ÷ preço); `extraordinary_dividends` quando os 12 meses passam de 1,5× a mediana. Sem 3 anos de demonstrativos, segue o provento dos 12 meses (com a nota).
+- `[x]` **25.5** `PRICE_BELOW_CEILING` não dispara quando o valuation usa dado suspeito; alertas internos novos `SUSPICIOUS_DATA` (ativo com posição, elegível ou em revisão com indicador marcado) e `CHECKLIST_EXPIRED` (respostas vencidas ou reabertas). A Saúde da carteira ganhou a checagem "Peso com dado suspeito".
+- `[x]` **25.6** Testes: `tests/test_checklist_reliability.py` (motivos de vencimento, nota com e sem as vencidas, elegibilidade, demonstrativo mais novo, faixas, divergência, gateway, Bazin normalizado, alertas, migration, `first_seen_at` preservado, reabertura de ponta a ponta com `REVIEW` e alerta, política), ajustes em `test_research_flow.py` e `test_health_engine.py`; `src/test/reliability.test.tsx` (selos no checklist e no valuation) e `settings.test.tsx` (opções da política).
 
 ## Fase 26 — Tesouro a Mercado, Agenda de Proventos e Alertas Internos (`[x]` Implementado)
 

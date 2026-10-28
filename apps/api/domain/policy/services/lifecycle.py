@@ -30,6 +30,8 @@ def is_eligible(
     """Whether an asset meets the fundamentalist criteria of the policy."""
     if purpose != AssetPurpose.ARCA or not evaluation.use_cerrado:
         return True
+    if policy.review_on_expired_answers and evaluation.stale > 0:
+        return False
     if evaluation.answered == 0:
         return not policy.require_evaluation
     coverage_pct = evaluation.answered / evaluation.max_score * 100.0 if evaluation.max_score else 0

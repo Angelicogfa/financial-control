@@ -41,6 +41,7 @@ def to_cerrado_dto(eval_obj: CerradoEvaluation) -> CerradoEvaluationDTO:
         not_applicable=eval_obj.not_applicable,
         pending=eval_obj.pending,
         recommendation=eval_obj.recommendation.value,
+        stale=eval_obj.stale,
         answers=[
             EvaluatedAnswerDTO(
                 question_id=a.question_id,
@@ -53,6 +54,7 @@ def to_cerrado_dto(eval_obj: CerradoEvaluation) -> CerradoEvaluationDTO:
                 automatable=a.automatable,
                 evidence=a.evidence,
                 answered_at=a.answered_at,
+                stale_reason=a.stale_reason.value if a.stale_reason else None,
             )
             for a in eval_obj.answers
         ],

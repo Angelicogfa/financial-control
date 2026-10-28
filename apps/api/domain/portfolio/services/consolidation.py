@@ -13,11 +13,12 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from core.errors import ValidationError
 from domain.assets.services.cerrado import (
+    AnswerFreshness,
     CerradoEvaluation,
     Recommendation,
     evaluate,
@@ -399,6 +400,7 @@ def consolidate_portfolio(
     split_adjust_through: date | None = None,
     tax_rules: TaxRuleBook | None = None,
     treasury_market_prices: Mapping[str, float] | None = None,
+    statement_seen_at: Mapping[str, datetime | None] | None = None,
 ) -> ConsolidatedPortfolioReport:
     """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations.
 
@@ -453,6 +455,12 @@ def consolidate_portfolio(
             fund,
             use_cerrado=asset.use_cerrado,
             history=history_map.get(asset.ticker),
+            freshness=AnswerFreshness(
+                as_of=ref_date,
+                validity_months=eligibility_policy.answer_validity_months,
+                drop_stale=eligibility_policy.drop_expired_answers,
+                statement_seen_at=(statement_seen_at or {}).get(asset.ticker),
+            ),
         )
         received_brl, earnings_12m_brl, monthly = (
             _sum_earnings(asset.earnings, as_of_date=ref_date, date_from=date_from)

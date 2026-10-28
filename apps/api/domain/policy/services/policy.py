@@ -81,10 +81,18 @@ class EligibilityPolicy:
     require_evaluation: bool = False
     min_score: int = 1
     min_coverage_pct: float = 0.0
+    # Phase 25: a manual answer expires after `answer_validity_months` or when a newer
+    # annual statement arrives. Expired answers flag the asset for review
+    # (`review_on_expired_answers`) and, with `drop_expired_answers`, leave the score.
+    answer_validity_months: int = 12
+    review_on_expired_answers: bool = True
+    drop_expired_answers: bool = False
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.min_coverage_pct <= 100.0:
             raise ValidationError("min_coverage_pct must be between 0 and 100")
+        if not 1 <= self.answer_validity_months <= 120:
+            raise ValidationError("answer_validity_months must be between 1 and 120")
 
 
 @dataclass(frozen=True)
@@ -173,7 +181,6 @@ class HealthPolicy:
     min_cdi_consistency: float = 0.50
     min_checklist_quality_warning: float = 0.50
     min_checklist_quality_critical: float = 0.0
-    checklist_max_age_months: int = 12
     max_stale_checklist_weight: float = 0.20
     monthly_expenses_brl: float | None = None
     min_reserve_months_warning: float = 6.0
@@ -232,7 +239,7 @@ class HealthPolicy:
             raise ValidationError(
                 "monthly_expenses_brl must be positive", code="INVALID_HEALTH_LIMIT"
             )
-        for name in ("checklist_max_age_months", "bracket_window_days", "min_observations"):
+        for name in ("bracket_window_days", "min_observations"):
             if getattr(self, name) < 1:
                 raise ValidationError(f"{name} must be at least 1", code="INVALID_HEALTH_LIMIT")
 
