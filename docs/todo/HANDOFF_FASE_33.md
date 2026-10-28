@@ -7,7 +7,7 @@
    ```bash
    git worktree add .claude/worktrees/feature-simulation feature/simulation
    ```
-2. Peça à nova sessão: "Leia `docs/todo/HANDOFF_FASE_33.md` e siga com a etapa 33.1."
+2. Peça à nova sessão: "Leia `docs/todo/HANDOFF_FASE_33.md` e siga com a próxima etapa."
 3. Antes de codar, rode `uv run pytest` em `apps/api` para confirmar a base verde.
 
 ## Estado do repositório
@@ -45,11 +45,7 @@ Ferramenta de simulação: backtest da estratégia ARCA (camada A), projeção p
 - `apps/api/tests/test_simulation_backtest.py`: 13 testes de verdade conhecida e de look-ahead, todos passando. A suíte completa do backend também passou.
 
 ## Próximos passos
-1. **33.1 Carga de séries históricas**:
-   - preços ajustados (Yahoo, `range="max"`) e brutos dos ativos do universo, gravados localmente (sugestão: `market_series` com prefixo próprio, ou tabela nova com migration `script_00023`);
-   - índices estendidos além dos 10 anos atuais, câmbio USDBRL e IPCA mensal;
-   - relatório de cobertura por ativo;
-   - `MarketHistory` montada a partir do banco, sem rede durante a simulação.
+1. ~~33.1~~ concluída (ver o plano): séries `SIM:*` no `market_series`, rotina semanal `sync_simulation_history`, `coverage_report` e `build_market_history` em `domain/simulation/data.py`, rota `GET /api/v1/simulations/coverage`. Para ter dados reais, rode a rotina uma vez (ela não roda na partida do worker).
 2. **Completar a 33.2**:
    - venda e rebalanceamento com IR (isenção de R$ 20 mil/mês em ações, regressivo na renda fixa);
    - opção de política vigente em cada data;

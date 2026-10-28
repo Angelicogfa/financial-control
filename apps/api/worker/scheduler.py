@@ -24,6 +24,7 @@ from worker.jobs import (
     refresh_fundamentals_job,
     sync_bcb_and_benchmarks_job,
     sync_instrument_catalog_job,
+    sync_simulation_history_job,
     sync_treasury_catalog_job,
     sync_treasury_prices_job,
     warm_portfolio_quotes_job,
@@ -167,6 +168,19 @@ def create_scheduler(
         hour=cfg.fundamentals_cron_hour,
         minute=30,
         id="record_checklist_evaluations",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "sync_simulation_history",
+            partial(sync_simulation_history_job, catalog_top=cfg.simulation_catalog_top),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=cfg.fundamentals_cron_hour,
+        minute=50,
+        id="sync_simulation_history",
         replace_existing=True,
         **defaults,
     )

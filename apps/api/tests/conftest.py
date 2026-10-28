@@ -61,7 +61,7 @@ class _OfflineTicker:
         self.symbol = symbol
         self.info: dict[str, Any] = {}
 
-    def history(self, period: str = "1y", interval: str = "1d") -> Any:
+    def history(self, period: str = "1y", interval: str = "1d", **_kwargs: Any) -> Any:
         import pandas as pd
 
         return pd.DataFrame()

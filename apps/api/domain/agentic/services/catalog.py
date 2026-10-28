@@ -75,6 +75,7 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
+from controllers.simulation.responses import CoverageReportDTO
 from controllers.tax.requests import FixedIncomeCompareRequest
 from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from core.errors import ValidationError
@@ -95,6 +96,7 @@ from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
+from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
 
 OperationKind = Literal["query", "command"]
@@ -113,6 +115,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "alerts": "Alertas",
     "market": "Dados de Mercado",
     "tools": "Ferramentas · Tributação",
+    "simulation": "Simulação de carteira",
 }
 
 
@@ -134,6 +137,11 @@ class CompareInput(BaseModel):
 class TreasuryMarketInput(BaseModel):
     as_of_date: date | None = None
     asset_id: int | None = None
+
+
+class CoveragePeriodInput(BaseModel):
+    start: date | None = None
+    end: date | None = None
 
 
 class AsOfDateInput(BaseModel):
@@ -395,6 +403,10 @@ class AgenticRuntimeHandlers:
     @property
     def tax(self) -> TaxHandler:
         return TaxHandler(uow_factory=self.uow_factory, portfolio_service=self.portfolio_service)
+
+    @property
+    def simulation(self) -> SimulationHandler:
+        return SimulationHandler(uow_factory=self.uow_factory)
 
     @property
     def research(self) -> ResearchHandler:
@@ -1050,6 +1062,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=list[TaxRuleDTO],
         invoke=lambda h, _p: h.tax.list_rules(),
+    ),
+    # 14. Simulation
+    OperationSpec(
+        name="simulation.coverage",
+        kind="query",
+        description=(
+            "Cobertura das séries históricas que a simulação de carteira usa (ativos da "
+            "carteira, da watchlist e os mais negociados do catálogo, Ibovespa, IFIX, "
+            "S&P 500, dólar, CDI e IPCA): primeira e última data, meses cobertos, maior "
+            "intervalo sem dados e status OK, PARTIAL ou MISSING."
+        ),
+        input_model=CoveragePeriodInput,
+        output_type=CoverageReportDTO,
+        invoke=lambda h, p: h.simulation.coverage(start=p.start, end=p.end),
     ),
 )
 

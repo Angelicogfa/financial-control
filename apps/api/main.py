@@ -25,6 +25,7 @@ from controllers.market.router import market_router
 from controllers.policy.router import policy_router, settings_router
 from controllers.portfolio.router import portfolio_router
 from controllers.research.router import research_router
+from controllers.simulation.router import simulation_router
 from controllers.system.router import health_router
 from controllers.tax.router import tax_router
 from core.http_errors import install_error_handlers
@@ -53,6 +54,7 @@ PROTECTED_ROUTERS = (
     alerts_router,
     agentic_router,
     tax_router,
+    simulation_router,
 )
 
 

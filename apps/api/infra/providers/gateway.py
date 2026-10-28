@@ -247,6 +247,22 @@ class CachedMarketGateway:
             )
         return result
 
+    def get_full_history(
+        self,
+        symbol: str,
+        *,
+        asset_type: AssetType | None = None,
+        market: Market | None = None,
+        start: date | None = None,
+    ) -> list[PricePoint]:
+        """Long split- and dividend-adjusted history from Yahoo (not cached: the simulation
+        loader stores it in `market_series`)."""
+        norm_sym = symbol.strip().upper()
+        mkt = self._resolve_market(norm_sym, asset_type, market)
+        if mkt in (Market.MANUAL, Market.FIXED_INCOME_CURVE):
+            return []
+        return self.yfinance.get_full_history(norm_sym, market=mkt, start=start)
+
     def get_annual_statements(
         self,
         symbol: str,

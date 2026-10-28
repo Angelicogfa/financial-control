@@ -49,6 +49,15 @@ from domain.shared.enums import (
     SeriesUnit,
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.simulation.data import (
+    FX_USDBRL,
+    INDEX_SOURCES,
+    SIMULATION_HISTORY_START,
+    index_symbol,
+    px_symbol,
+    simulation_universe,
+    tr_symbol,
+)
 from infra.providers.batch import fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 
@@ -540,3 +549,69 @@ def backfill_and_record_snapshot_job(
     """
     backfill_snapshots_job(uow_factory, gateway)
     return record_daily_snapshot_job(uow_factory, gateway)
+
+
+def sync_simulation_history_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    as_of_date: date | None = None,
+    catalog_top: int = 50,
+    start: date = SIMULATION_HISTORY_START,
+) -> dict[str, int]:
+    """Store the long histories the simulation reads (Phase 33.1).
+
+    Asset histories are always reloaded in full from `start`: Yahoo rescales the whole
+    dividend-adjusted series after every new dividend, so appending would mix scales. CDI is
+    completed back to `start` incrementally (BCB values do not change).
+    """
+    end = as_of_date or date.today()
+    with uow_factory() as uow:
+        universe = simulation_universe(uow, catalog_top)
+        cdi_range = uow.market_series.date_range("CDI")
+
+    counts: dict[str, int] = {}
+    for asset in universe:
+        points = gateway.get_full_history(asset.ticker, asset_type=asset.asset_type, start=start)
+        if not points:
+            counts[asset.ticker] = 0
+            continue
+        with uow_factory() as uow:
+            counts[asset.ticker] = uow.market_series.upsert_points(
+                tr_symbol(asset.ticker),
+                [(p.date, p.adj_close or p.close) for p in points if p.date <= end],
+                unit=SeriesUnit.PRICE,
+            )
+            uow.market_series.upsert_points(
+                px_symbol(asset.ticker),
+                [(p.date, p.close) for p in points if p.date <= end],
+                unit=SeriesUnit.PRICE,
+            )
+            uow.commit()
+
+    for label, yahoo_symbol in INDEX_SOURCES.items():
+        points = gateway.get_full_history(yahoo_symbol, market=Market.INDEX, start=start)
+        with uow_factory() as uow:
+            counts[label] = uow.market_series.upsert_points(
+                index_symbol(label),
+                [(p.date, p.adj_close or p.close) for p in points if p.date <= end],
+                unit=SeriesUnit.INDEX_POINTS,
+            )
+            uow.commit()
+
+    fx = gateway.get_full_history(USD_BRL_SYMBOL, market=Market.INDEX, start=start)
+    with uow_factory() as uow:
+        counts["USDBRL"] = uow.market_series.upsert_points(
+            FX_USDBRL, [(p.date, p.close) for p in fx if p.date <= end], unit=SeriesUnit.PRICE
+        )
+        counts["CDI"] = 0
+        for window_start, window_end in _missing_windows(cdi_range, start, end, full=False):
+            points = gateway.fetch_bcb_series("CDI", start_date=window_start, end_date=window_end)
+            counts["CDI"] += uow.market_series.upsert_points(
+                "CDI",
+                [(p.reference_date, p.value) for p in points],
+                unit=BCB_SERIES_UNITS["CDI"],
+            )
+        uow.commit()
+    logger.info("Simulation history synced", extra={"job": "sync_simulation_history"})
+    return counts

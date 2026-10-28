@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     fundamentals_cron_day_of_week: str = "sun"
     fundamentals_cron_hour: int = Field(default=6, ge=0, le=23)
     catalog_sync_cron_hour: int = Field(default=19, ge=0, le=23)
+    # Simulation (Phase 33.1): most traded catalog instruments loaded besides the
+    # portfolio and the watchlist (0 = none).
+    simulation_catalog_top: int = Field(default=50, ge=0, le=500)
     job_max_retries: int = Field(default=3, ge=0)
     job_retry_backoff_seconds: float = Field(default=30.0, ge=0)
     job_lock_ttl_seconds: int = Field(default=3600, ge=60)
