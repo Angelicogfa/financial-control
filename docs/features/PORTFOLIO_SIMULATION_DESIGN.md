@@ -306,3 +306,19 @@ Cada etapa é um PR. A 33.9 pode terminar com a conclusão "nenhum modelo passou
 8. **Prior padrão da camada bayesiana:** o das premissas de projeção da política (recomendado, já versionado), um conservador (prêmio de ações sobre o CDI de 3% a.a.) ou o vago? Quanto peso, em meses equivalentes (proposta: 60)?
 9. **Evento de ruptura dos candidatos:** probabilidade anual e tamanho da queda (proposta: 1% ao ano, queda de 70%), ou desligado?
 10. **Calibração:** com que frequência recalcular (proposta: semanal) e o que fazer quando um gerador estiver mal calibrado: só avisar (recomendado) ou tirá-lo da mistura?
+
+### 10.1 Decisões provisórias adotadas para iniciar (2026-10-28)
+A implementação começou a pedido do usuário antes das respostas formais. Até a revisão, valem as opções recomendadas acima, e cada uma pode ser trocada sem refazer o motor (são parâmetros da simulação):
+
+| # | Decisão provisória |
+|---|---|
+| 1 | Universo do backtest: ativos que você teve ou observou, mais os índices |
+| 2 | Histórico longo: Yahoo (preço ajustado), com relatório de cobertura e sem preencher buracos |
+| 3 | ML: só regime e risco |
+| 4 | Meta: patrimônio e renda passiva mensal, as duas opcionais |
+| 5 | Política no passado: a atual aplicada ao passado inteiro, rotulada assim; a vigente em cada data fica como opção |
+| 6 | Orçamento: 5.000 trajetórias e 120 s por simulação |
+| 7 | Candidatos: watchlist mais o screener com os filtros da Pesquisa, até 20 por execução |
+| 8 | Prior: premissas de projeção da política, com peso de 60 meses |
+| 9 | Ruptura dos candidatos: 1% ao ano, queda de 70% |
+| 10 | Calibração: semanal, só avisando quando um gerador estiver mal calibrado |

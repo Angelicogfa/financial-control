@@ -40,7 +40,7 @@
 | **Fase 27** | Comparador de Ativos | `[x]` Implementado | 100% |
 | **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
 | **Fase 29** | Estatísticas e Saúde da Carteira | `[x]` Implementado | 100% |
-| **Fase 33** | Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana | `[ ]` Desenho em revisão | 0% |
+| **Fase 33** | Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana | `[~]` Em andamento (branch `feature/simulation`) | 10% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -669,13 +669,13 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **32.4** Investigar números implausíveis da Saúde da carteira (vistos em 28/10/2026): retorno de **-156,7%** na janela móvel de 12 meses (abaixo de -100%), volatilidade da carteira de **1160% a.a.** e XPML11 com 100% do risco tendo 1,5% do peso. Suspeita: série de preços com salto (ticker trocado, evento corporativo não aplicado ou preço em escala errada) ou janela com fluxo distorcendo o TWR. Conferir a série do XPML11 e o cálculo da janela móvel; marcar a métrica como suspeita quando sair da faixa possível.
 - `[ ]` **32.5** Padronizar o tamanho das caixas de seleção: em Estratégia (Elegibilidade e Valuation) cada checkbox sai de um tamanho — "Resposta vencida coloca o ativo em revisão" fica menor e "Pesar o Tesouro Direto…" quase some. Causa provável: `.app-check` é `inline-flex` e o `input` (16 px no tema) encolhe quando o texto quebra em várias linhas. Fixar o controle (`flex: none` / `flex-shrink: 0` em `.app-check input`), alinhar ao topo do texto quando houver quebra, usar a mesma fonte dos rótulos dos campos e não misturar checkbox como célula da grade de campos (linha própria abaixo da grade, como em 32.3).
 
-## Fase 33 — Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana (`[ ]` Desenho em revisão)
+## Fase 33 — Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana (`[~]` Em andamento)
 
 **Objetivo:** responder "onde eu estaria seguindo a minha estratégia desde X", "qual a faixa provável do patrimônio e da renda em N anos", "que ativos que ainda não tenho melhorariam a carteira nos cenários futuros" e "as probabilidades da simulação costumam se confirmar?", e testar se algum modelo de machine learning acrescenta informação útil fora da amostra. É simulação, nunca recomendação: nada da ferramenta altera a política ou dispara aportes. Desenho completo e teste de estresse (21 riscos) em [PORTFOLIO_SIMULATION_DESIGN.md](../features/PORTFOLIO_SIMULATION_DESIGN.md).
 
-- `[ ]` **33.0** Decisões da seção 10 do desenho tomadas (universo, fonte do histórico longo, escopo do ML, meta, política no passado, orçamento, fonte e teto dos candidatos, prior padrão, evento de ruptura, calibração) e desenho aprovado. **Nenhuma implementação antes disso.**
+- `[~]` **33.0** Decisões provisórias registradas na seção 10.1 do desenho (as opções recomendadas, adotadas para iniciar a pedido do usuário); falta a revisão formal. Decisões da seção 10 do desenho tomadas (universo, fonte do histórico longo, escopo do ML, meta, política no passado, orçamento, fonte e teto dos candidatos, prior padrão, evento de ruptura, calibração) e desenho aprovado. **Nenhuma implementação antes disso.**
 - `[ ]` **33.1** Carga de séries históricas point-in-time (preço ajustado e bruto, índices estendidos, câmbio) com relatório de cobertura.
-- `[ ]` **33.2** Backtest da estratégia (camada A): motor mensal com `plan_contribution`, custos, IR, eventos e política por data; testes de verdade conhecida e de look-ahead.
+- `[~]` **33.2** Backtest da estratégia (camada A): motor mensal com `plan_contribution`, custos, IR, eventos e política por data; testes de verdade conhecida e de look-ahead. Feito: `domain/simulation/market.py` (séries point-in-time com `LookAheadError`, fins de mês úteis, índice de taxa diária) e `domain/simulation/engine.py` (aporte mensal pelas regras reais de `consolidate_portfolio` + `plan_contribution`, caixa rendendo o CDI, emolumentos, correção pelo IPCA, entrada do ativo pela primeira data de preço, TWR, TIR, volatilidade e queda máxima; referências com o mesmo fluxo), com `tests/test_simulation_backtest.py` (anuidade, 100% CDI, pesos-alvo, lotes inteiros, custos, IPCA, look-ahead). Falta: venda e rebalanceamento com IR, política vigente em cada data e checklist histórico.
 - `[ ]` **33.3** Execução assíncrona no worker, persistência (`simulation_runs`, `simulation_results`) e reprodutibilidade (semente, priors, hash dos dados, versão).
 - `[ ]` **33.4** Telas Passado e Robustez: crises históricas, choques sintéticos e variantes contadas.
 - `[ ]` **33.5** Simulação prospectiva (camada B): bootstrap em blocos por classe ARCA e cenários de juros; percentis e probabilidade de meta.
