@@ -47,12 +47,13 @@ Ferramenta de simulação: backtest da estratégia ARCA (camada A), projeção p
 ## Próximos passos
 1. ~~33.1~~ concluída (ver o plano): séries `SIM:*` no `market_series`, rotina semanal `sync_simulation_history`, `coverage_report` e `build_market_history` em `domain/simulation/data.py`, rota `GET /api/v1/simulations/coverage`. Para ter dados reais, rode a rotina uma vez (ela não roda na partida do worker).
 2. ~~33.2~~ concluída: rebalanceamento com IR, política por data, checklist histórico e selo de sobrevivência (ver o plano).
-3. **Próxima: 33.3** (execução assíncrona no worker, `simulation_runs`/`simulation_results`, reprodutibilidade), 33.4 (telas Passado e Robustez) e as demais, na ordem da tabela da seção 9 do desenho.
+3. ~~33.3~~ concluída: `simulation_runs`/`simulation_results` (migração `script_00023`), `domain/simulation/runs.py` (parâmetros, entradas do banco, `data_hash`, reaproveitamento por parâmetros + dados + `ENGINE_VERSION`), limite de tempo de 120 s, job `run_pending_simulations` no worker (fila a cada 15 s), rotas `POST /api/v1/simulations/backtests`, `GET /api/v1/simulations[/{id}]` e MCP `simulation.backtest|get|list`. Limitação conhecida: uma rodada que fica em RUNNING porque o worker caiu no meio não é retomada sozinha.
+4. **Próxima: 33.4** (telas Passado e Robustez) e as demais, na ordem da tabela da seção 9 do desenho.
 
 ## Convenções e preferências do usuário
 - Respostas em **português**; código, commits e identificadores em inglês (ver `AGENTS.md`).
 - Testes de unidade obrigatórios. Ao fim de cada etapa: `uv run pytest`, `npm test`, `npm run lint` e `npm run build` em `apps/web`, e `docker compose --env-file .env.example build` (o worktree não tem `.env`).
-- Migrations Alembic sequenciais `script_#####` (a última na `main` é `script_00022`).
+- Migrations Alembic sequenciais `script_#####` (a última na `main` é `script_00022`; nesta branch, `script_00023`).
 - Tipos do front gerados: `uv run python scripts/gen_web_types.py`.
 - Atualizar `docs/todo/IMPLEMENTATION_PLAN.md` a cada etapa.
 - **Publicação:** o usuário usa a skill `triade-git` (PR, merge, pull). O **CI do GitHub não roda** porque a cobrança do Actions está bloqueada (TD-10). O usuário já autorizou mergear com a validação local nos PRs anteriores, mas a skill pede confirmação a cada PR.

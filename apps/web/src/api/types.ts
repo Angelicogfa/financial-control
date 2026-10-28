@@ -267,6 +267,47 @@ export interface AssetValuationDTO {
   extraordinary_dividends?: boolean;
 }
 
+export interface BacktestPointDTO {
+  day: string;
+  contribution: number;
+  contributed: number;
+  market_value: number;
+  cash: number;
+  fees: number;
+  taxes?: number;
+  by_class?: Record<string, number>;
+}
+
+export interface BacktestRequest {
+  start: string;
+  end: string;
+  monthly_contribution: number;
+  initial_contribution?: number;
+  correct_by_ipca?: boolean;
+  fee_rate?: number;
+  rebalance?: boolean;
+  universe?: "REGISTERED" | "REGISTERED_AND_CATALOG";
+  catalog_top?: number | null;
+  policy_mode?: "CURRENT" | "AS_OF";
+  benchmarks?: ("CDI" | "IBOV" | "IFIX" | "SP500_BRL")[];
+  label?: string | null;
+}
+
+export interface BacktestSummaryDTO {
+  final_value: number;
+  contributed: number;
+  gain: number;
+  money_weighted_return?: number | null;
+  time_weighted_return: number;
+  annual_twr: number;
+  volatility: number;
+  max_drawdown: number;
+  trades: number;
+  fees: number;
+  taxes?: number;
+  sales?: number;
+}
+
 export interface BenchmarkComparisonDTO {
   benchmark: string;
   benchmark_return: number;
@@ -479,6 +520,15 @@ export interface CorrelatedPairDTO {
   second: string;
   correlation: number;
 }
+
+export interface CoverageReportDTO {
+  start: string;
+  end: string;
+  series?: SeriesCoverageDTO[];
+  missing?: string[];
+}
+
+export type CoverageStatus = "OK" | "PARTIAL" | "MISSING";
 
 export interface CurrentUserDTO {
   username: string;
@@ -1191,6 +1241,20 @@ export interface ScreenerResponseDTO {
   catalog_updated_at?: string | null;
 }
 
+export interface SeriesCoverageDTO {
+  key: string;
+  label: string;
+  status: CoverageStatus;
+  first_date?: string | null;
+  last_date?: string | null;
+  points?: number;
+  months_expected?: number;
+  months_covered?: number;
+  share?: number;
+  longest_gap_days?: number;
+  note?: string | null;
+}
+
 export interface SeriesStatusDTO {
   symbol: string;
   unit?: SeriesUnit | null;
@@ -1202,6 +1266,54 @@ export interface SeriesStatusDTO {
 }
 
 export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PERCENT_PER_YEAR" | "PRICE" | "INDEX_POINTS";
+
+export type SimulationKind = "BACKTEST";
+
+export interface SimulationResultDTO {
+  key: string;
+  label: string;
+  summary: BacktestSummaryDTO;
+  points?: BacktestPointDTO[];
+  unavailable?: string[];
+  survivorship_bias?: boolean;
+}
+
+export interface SimulationRunDTO {
+  id: number;
+  kind: SimulationKind;
+  status: SimulationStatus;
+  label?: string | null;
+  params?: Record<string, unknown>;
+  params_hash: string;
+  data_hash?: string | null;
+  code_version: string;
+  seed: number;
+  error?: string | null;
+  reused_from?: number | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface SimulationRunDetailDTO {
+  id: number;
+  kind: SimulationKind;
+  status: SimulationStatus;
+  label?: string | null;
+  params?: Record<string, unknown>;
+  params_hash: string;
+  data_hash?: string | null;
+  code_version: string;
+  seed: number;
+  error?: string | null;
+  reused_from?: number | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  results?: SimulationResultDTO[];
+}
+
+export type SimulationStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "TIMEOUT";
 
 export interface SnapshotPointDTO {
   snapshot_date: string;

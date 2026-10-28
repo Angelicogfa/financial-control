@@ -58,6 +58,7 @@ from domain.simulation.data import (
     simulation_universe,
     tr_symbol,
 )
+from domain.simulation.runs import execute_next_run
 from infra.providers.batch import fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 
@@ -615,3 +616,35 @@ def sync_simulation_history_job(
         uow.commit()
     logger.info("Simulation history synced", extra={"job": "sync_simulation_history"})
     return counts
+
+
+def run_pending_simulations_job(
+    uow_factory: UoWFactory,
+    _gateway: CachedMarketGateway | None = None,
+    *,
+    timeout_seconds: float = 120.0,
+    max_runs: int = 5,
+) -> dict[str, int]:
+    """Execute queued simulation runs, oldest first (Phase 33.3).
+
+    Each run has its own time limit; a failing or timed-out run is stored as such and the
+    next one still runs.
+    """
+    counts: dict[str, int] = {}
+    for _ in range(max_runs):
+        run = execute_next_run(uow_factory, timeout_seconds=timeout_seconds)
+        if run is None:
+            break
+        counts[run.status.value] = counts.get(run.status.value, 0) + 1
+        logger.info(
+            "Simulation run %s finished with %s",
+            run.id,
+            run.status.value,
+            extra={"job": "run_pending_simulations"},
+        )
+    return counts
+
+
+def has_pending_simulations(uow_factory: UoWFactory) -> bool:
+    with uow_factory() as uow:
+        return uow.simulations.next_pending() is not None

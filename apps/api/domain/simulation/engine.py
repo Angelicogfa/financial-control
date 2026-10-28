@@ -56,6 +56,17 @@ QUANTITY_DECIMALS = Decimal("0.00000001")
 PRICE_DECIMALS = Decimal("0.00000001")
 # Sales of Brazilian stocks up to this amount in a month are exempt (Lei 11.033/2004).
 STOCK_MONTHLY_EXEMPTION_BRL = 20_000.0
+# Stored with every run: results are reused only for the same engine version (Phase 33.3).
+ENGINE_VERSION = "33.3.0"
+
+
+class SimulationTimeout(Exception):
+    """The run went past its time limit."""
+
+
+def _check(deadline: Callable[[], bool] | None) -> None:
+    if deadline is not None and deadline():
+        raise SimulationTimeout("simulation time limit reached")
 
 
 @dataclass(frozen=True)
@@ -313,8 +324,13 @@ def run_backtest(
     label: str = "Estratégia",
     policy_versions: Sequence[InvestmentPolicy] = (),
     tax_rules: TaxRuleBook | None = None,
+    deadline: Callable[[], bool] | None = None,
 ) -> BacktestResult:
-    """Replay the policy's monthly contributions over the history (see module docstring)."""
+    """Replay the policy's monthly contributions over the history (see module docstring).
+
+    `deadline` is polled every month; when it returns True the run stops with
+    `SimulationTimeout`.
+    """
     days = month_ends(config.start, config.end)
     amounts = _contribution_schedule(history.view, config, days)
     rules = tax_rules or DEFAULT_RULE_BOOK
@@ -340,6 +356,7 @@ def run_backtest(
         )
 
     for day, amount in zip(days, amounts, strict=True):
+        _check(deadline)
         view = history.view(day)
         rules_today = policy_on(day, policy, policy_versions)
         targets = rules_today.arca.targets
@@ -456,6 +473,7 @@ def run_benchmark(
     config: BacktestConfig,
     *,
     label: str | None = None,
+    deadline: Callable[[], bool] | None = None,
 ) -> BacktestResult:
     """The same contribution flow invested entirely in one series (fractional, with fees)."""
     days = month_ends(config.start, config.end)
@@ -465,6 +483,7 @@ def run_benchmark(
     previous: date | None = None
     trades = 0
     for day, amount in zip(days, amounts, strict=True):
+        _check(deadline)
         view = history.view(day)
         cash = cash * _cash_growth(view, config.cash_symbol, previous) + amount
         contributed += amount

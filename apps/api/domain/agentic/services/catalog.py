@@ -75,7 +75,12 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.responses import CoverageReportDTO
+from controllers.simulation.requests import BacktestRequest
+from controllers.simulation.responses import (
+    CoverageReportDTO,
+    SimulationRunDetailDTO,
+    SimulationRunDTO,
+)
 from controllers.tax.requests import FixedIncomeCompareRequest
 from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from core.errors import ValidationError
@@ -142,6 +147,14 @@ class TreasuryMarketInput(BaseModel):
 class CoveragePeriodInput(BaseModel):
     start: date | None = None
     end: date | None = None
+
+
+class SimulationIdInput(BaseModel):
+    run_id: int
+
+
+class SimulationListInput(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
 
 
 class AsOfDateInput(BaseModel):
@@ -1076,6 +1089,38 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=CoveragePeriodInput,
         output_type=CoverageReportDTO,
         invoke=lambda h, p: h.simulation.coverage(start=p.start, end=p.end),
+    ),
+    OperationSpec(
+        name="simulation.backtest",
+        kind="command",
+        description=(
+            "Agenda um backtest da estratégia: as regras reais de aporte (metas, bandas ARCA, "
+            "checklist e política) reaplicadas mês a mês sobre o histórico, com taxas, IR na "
+            "venda e comparação com CDI, Ibovespa, IFIX ou S&P 500 em reais. Roda no worker; "
+            "acompanhe com simulation.get."
+        ),
+        input_model=BacktestRequest,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, p: h.simulation.submit_backtest(p),
+    ),
+    OperationSpec(
+        name="simulation.get",
+        kind="query",
+        description=(
+            "Status e resultados de uma simulação: resumo (valor final, TIR, TWR, "
+            "volatilidade, drawdown, taxas e IR), série mensal e hashes de reprodutibilidade."
+        ),
+        input_model=SimulationIdInput,
+        output_type=SimulationRunDetailDTO,
+        invoke=lambda h, p: h.simulation.get_run(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.list",
+        kind="query",
+        description="Simulações solicitadas, mais recentes primeiro, com status e parâmetros.",
+        input_model=SimulationListInput,
+        output_type=list[SimulationRunDTO],
+        invoke=lambda h, p: h.simulation.list_runs(p.limit),
     ),
 )
 

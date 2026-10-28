@@ -19,9 +19,11 @@ from worker.jobs import (
     backfill_and_record_snapshot_job,
     backfill_snapshots_job,
     ensure_series_coverage_job,
+    has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
     refresh_fundamentals_job,
+    run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_instrument_catalog_job,
     sync_simulation_history_job,
@@ -57,6 +59,17 @@ def _guarded(
         lock=lock,
         policy=policy,
     )
+
+
+def _when_pending(uow_factory: UoWFactory, job: Callable[[], Any]) -> Callable[[], Any]:
+    """Run `job` only when a simulation is queued, so idle polls leave no job_runs rows."""
+
+    def tick() -> Any:
+        if has_pending_simulations(uow_factory):
+            return job()
+        return None
+
+    return tick
 
 
 def create_scheduler(
@@ -181,6 +194,22 @@ def create_scheduler(
         hour=cfg.fundamentals_cron_hour,
         minute=50,
         id="sync_simulation_history",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        _when_pending(
+            uow_factory,
+            guard(
+                "run_pending_simulations",
+                partial(
+                    run_pending_simulations_job, timeout_seconds=cfg.simulation_timeout_seconds
+                ),
+            ),
+        ),
+        trigger="interval",
+        seconds=cfg.simulation_poll_seconds,
+        id="run_pending_simulations",
         replace_existing=True,
         **defaults,
     )

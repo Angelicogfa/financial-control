@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     # Simulation (Phase 33.1): most traded catalog instruments loaded besides the
     # portfolio and the watchlist (0 = none).
     simulation_catalog_top: int = Field(default=50, ge=0, le=500)
+    # Phase 33.3: time limit of one run and how often the worker looks for queued runs.
+    simulation_timeout_seconds: int = Field(default=120, ge=5, le=3600)
+    simulation_poll_seconds: int = Field(default=15, ge=1, le=3600)
     job_max_retries: int = Field(default=3, ge=0)
     job_retry_backoff_seconds: float = Field(default=30.0, ge=0)
     job_lock_ttl_seconds: int = Field(default=3600, ge=60)

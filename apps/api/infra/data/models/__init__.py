@@ -25,6 +25,7 @@ from infra.data.models.market import (
 )
 from infra.data.models.policy import InvestmentPolicyModel
 from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshotModel
+from infra.data.models.simulation import SimulationResultModel, SimulationRunModel
 from infra.data.models.tax import TaxRuleModel
 
 __all__ = [
@@ -44,6 +45,8 @@ __all__ = [
     "JobRunModel",
     "MarketSeriesModel",
     "PortfolioSnapshotModel",
+    "SimulationResultModel",
+    "SimulationRunModel",
     "TaxRuleModel",
     "TransactionModel",
     "TreasuryCatalogModel",
