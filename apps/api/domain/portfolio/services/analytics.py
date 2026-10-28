@@ -84,12 +84,20 @@ def cumulative_return(returns: Sequence[float]) -> float:
 
 def dated_time_weighted_returns(
     snapshots: Sequence[PortfolioSnapshotEntity],
+    *,
+    purchases_at_start: bool = False,
 ) -> tuple[list[date], list[float]]:
     """Sub-period TWR returns, each dated by the snapshot that closes the period.
 
     r_t = (V_t - V_{t-1} - CF_t + D_t) / V_{t-1}, where CF_t is the net external flow
     (purchases minus sale proceeds) and D_t the earnings received in the period, taken
-    from the change in cumulative earnings (finding I-09).
+    from the change in cumulative earnings (finding I-09). The flow is at the end of the
+    period, as in the backtest, where the contribution comes after the month's move.
+
+    `purchases_at_start` (Modified Dietz, Phase 32.4) divides by V_{t-1} + max(CF_t, 0) for
+    daily snapshots, where a purchase happens during the day and earns that day's move: the
+    end-of-period form made a R$ 2,730 purchase on a R$ 32 portfolio a -416% day out of a
+    R$ 133 difference between the trade price and the close.
     """
     if len(snapshots) < 2:
         return [], []
@@ -99,9 +107,8 @@ def dated_time_weighted_returns(
     for prev, curr in zip(ordered[:-1], ordered[1:], strict=False):
         if prev.market_value > 0:
             income = curr.earnings_cum - prev.earnings_cum
-            r_t = (
-                curr.market_value - prev.market_value - curr.net_flow + income
-            ) / prev.market_value
+            base = prev.market_value + (max(curr.net_flow, 0.0) if purchases_at_start else 0.0)
+            r_t = (curr.market_value - prev.market_value - curr.net_flow + income) / base
             dates.append(curr.snapshot_date)
             sub_returns.append(r_t)
     return dates, sub_returns

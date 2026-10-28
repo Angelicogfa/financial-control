@@ -194,7 +194,8 @@ def test_band_deviation_beyond_twice_the_band_is_critical() -> None:
     check = _check(report, "band_adherence")
 
     assert check.status == HealthStatus.CRITICAL
-    assert "há 40 dias" in check.explanation
+    assert check.explanation == "2 quadrante(s) fora da banda:"
+    assert any("há 40 dias" in item for item in check.items)
     mild = diagnose(
         HealthInputs(
             as_of=AS_OF,
@@ -309,7 +310,7 @@ def test_diversification_with_twin_assets_flags_the_pair() -> None:
 
     pairs = _check(report, "correlated_pairs")
     assert pairs.status == HealthStatus.WARNING
-    assert "ITUB4 × ITSA4" in pairs.explanation
+    assert pairs.items == ["ITUB4 × ITSA4 (1,00)"]
     assert report.diversification.diversification_ratio is not None
     assert sum(s.risk_share for s in report.diversification.by_asset) == pytest.approx(1, abs=1e-3)
     assert _check(report, "historical_stress").status != HealthStatus.INSUFFICIENT_DATA

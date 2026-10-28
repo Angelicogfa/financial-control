@@ -11,12 +11,14 @@ income position follows the CDI (there is no mark-to-market yet, TD-02).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 
 from domain.assets.services.history import STATEMENT_TYPES, FundamentalSnapshot
 from domain.assets.services.scores import accounting_scores
 from domain.market.entities import Fundamentals, PricePoint
+from domain.market.services.price_sanity import price_spikes
 from domain.portfolio.services.analytics import align_to_base, dated_simple_returns
 from domain.portfolio.services.consolidation import LEDGER_VALID, ValuedAssetPosition
 from domain.portfolio.services.health import BracketLot, Holding
@@ -154,6 +156,44 @@ def cdi_returns(points: Sequence[MarketSeriesPoint]) -> tuple[list[date], list[f
     """Daily CDI rates (% per day) as dated returns."""
     ordered = sorted(points, key=lambda p: p.reference_date)
     return [p.reference_date for p in ordered], [p.value / 100.0 for p in ordered]
+
+
+# A portfolio does not lose 95% in one day: such a period is a data or flow error.
+IMPOSSIBLE_PERIOD_RETURN = -0.95
+
+
+def clean_histories(
+    histories: Mapping[str, Sequence[PricePoint]],
+) -> tuple[dict[str, list[PricePoint]], list[str]]:
+    """Histories without the provider's isolated bad prints, and a note per asset affected."""
+    cleaned: dict[str, list[PricePoint]] = {}
+    notes: list[str] = []
+    for ticker, points in histories.items():
+        ordered = sorted((p for p in points if p.close > 0), key=lambda p: p.date)
+        keep, spikes = price_spikes([p.date for p in ordered], [p.close for p in ordered])
+        cleaned[ticker] = [p for p, ok in zip(ordered, keep, strict=True) if ok]
+        if spikes:
+            notes.append(
+                f"{ticker}: preço do provedor fora de escala descartado em "
+                + "; ".join(s.describe() for s in spikes)
+            )
+    return cleaned, notes
+
+
+def drop_impossible_periods(
+    dates: Sequence[date], returns: Sequence[float]
+) -> tuple[list[date], list[float], list[str]]:
+    """Portfolio periods with an impossible return are left out, each with a note."""
+    kept_dates: list[date] = []
+    kept: list[float] = []
+    notes: list[str] = []
+    for d, r in zip(dates, returns, strict=True):
+        if r <= IMPOSSIBLE_PERIOD_RETURN or not math.isfinite(r):
+            notes.append(f"{d:%d/%m/%Y} ({r * 100:.1f}%)")
+            continue
+        kept_dates.append(d)
+        kept.append(r)
+    return kept_dates, kept, notes
 
 
 def asset_return_grid(

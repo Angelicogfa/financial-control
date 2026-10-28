@@ -212,6 +212,10 @@ class HealthCheckDTO(BaseModel):
     critical_threshold: float | None = None
     observations: int | None = None
     min_observations: int | None = None
+    # One line each under the explanation (quadrants out of band, risk by quadrant, pairs).
+    items: list[str] = Field(default_factory=list)
+    # Data out of the possible range was dropped from the series behind this check.
+    suspicious: str | None = None
 
 
 class HealthPillarDTO(BaseModel):

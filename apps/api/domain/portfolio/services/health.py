@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from enum import StrEnum
 
@@ -173,6 +173,9 @@ class HealthInputs:
     cdi_returns: Sequence[float | None] = ()
     asset_dates: Sequence[date] = ()
     asset_returns: Mapping[str, Sequence[float | None]] = field(default_factory=dict)
+    # What was dropped from the series as out of the possible range (Phase 32.4).
+    asset_data_notes: Sequence[str] = ()
+    portfolio_data_notes: Sequence[str] = ()
     class_returns: Mapping[ArcaClass, float] = field(default_factory=dict)
     class_out_of_band_days: Mapping[ArcaClass, int] = field(default_factory=dict)
     bracket_lots: Sequence[BracketLot] = ()
@@ -192,6 +195,10 @@ class HealthCheck:
     critical_threshold: float | None = None
     observations: int | None = None
     min_observations: int | None = None
+    # Enumerations shown one per line under the explanation (Phase 32.2).
+    items: list[str] = field(default_factory=list)
+    # The input series had data out of the possible range, dropped before computing (32.4).
+    suspicious: str | None = None
 
 
 @dataclass(frozen=True)
@@ -468,7 +475,8 @@ def _policy_pillar(
                     title="Quadrantes dentro da banda",
                     status=HealthStatus.CRITICAL if critical else HealthStatus.WARNING,
                     value=deepest / 100.0,
-                    explanation="Fora da banda: " + "; ".join(parts) + ".",
+                    explanation=f"{len(parts)} quadrante(s) fora da banda:",
+                    items=parts,
                     action=(
                         "Direcione os próximos aportes para os quadrantes abaixo da banda "
                         "(o simulador de aporte já os prioriza). Um desvio maior que o dobro "
@@ -819,11 +827,11 @@ def _diversification_pillar(
         )
     else:
         heavy = top.risk_share > policy.max_asset_risk_share
-        class_text = "; ".join(
-            f"{ARCA_LABELS[ArcaClass(s.label)]} {_pct(s.weight, 0)} do peso e "
+        class_items = [
+            f"{ARCA_LABELS[ArcaClass(s.label)]}: {_pct(s.weight, 0)} do peso e "
             f"{_pct(s.risk_share, 0)} do risco"
             for s in detail.by_class
-        )
+        ]
         checks.append(
             HealthCheck(
                 key="risk_contribution",
@@ -834,8 +842,9 @@ def _diversification_pillar(
                 observations=estimate.observations,
                 explanation=(
                     f"{top.label} responde por {_pct(top.risk_share)} do risco com "
-                    f"{_pct(top.weight)} do peso. Por quadrante: {class_text}."
+                    f"{_pct(top.weight)} do peso. Por quadrante:"
                 ),
+                items=class_items,
                 action=(
                     f"Reduza o peso de {top.label} ou aporte em ativos que oscilem menos."
                     if heavy
@@ -854,12 +863,11 @@ def _diversification_pillar(
             warning_threshold=policy.high_correlation,
             observations=estimate.observations,
             explanation=(
-                f"{len(high)} par(es) com correlação acima de {_num(policy.high_correlation)}: "
-                + ", ".join(f"{p.first} × {p.second} ({_num(p.correlation)})" for p in high[:5])
-                + "."
+                f"{len(high)} par(es) com correlação acima de {_num(policy.high_correlation)}:"
                 if high
                 else f"Nenhum par com correlação acima de {_num(policy.high_correlation)}."
             ),
+            items=[f"{p.first} × {p.second} ({_num(p.correlation)})" for p in high[:5]],
             action=(
                 "Ativos muito correlacionados se comportam como um só: avalie manter apenas o "
                 "de melhor nota no checklist."
@@ -1544,6 +1552,48 @@ def _liquidity_pillar(
     return checks, detail
 
 
+# Checks computed from each series: they carry the note of what was dropped from it.
+ASSET_SERIES_CHECKS = frozenset(
+    {"diversification_ratio", "risk_contribution", "correlated_pairs", "historical_stress"}
+)
+PORTFOLIO_SERIES_CHECKS = frozenset(
+    {
+        "volatility",
+        "current_drawdown",
+        "information_ratio",
+        "cdi_consistency",
+        "rolling_sharpe",
+        "sharpe_confidence",
+    }
+)
+
+
+def _mark_suspicious(checks: list[HealthCheck], inputs: HealthInputs) -> list[HealthCheck]:
+    asset_note = (
+        "Dados descartados antes do cálculo: " + "; ".join(inputs.asset_data_notes) + "."
+        if inputs.asset_data_notes
+        else None
+    )
+    portfolio_note = (
+        "Dias com retorno impossível da carteira (aporte ou dado errado) ficaram de fora: "
+        + ", ".join(inputs.portfolio_data_notes)
+        + "."
+        if inputs.portfolio_data_notes
+        else None
+    )
+    out = []
+    for check in checks:
+        note = (
+            asset_note
+            if check.key in ASSET_SERIES_CHECKS
+            else portfolio_note
+            if check.key in PORTFOLIO_SERIES_CHECKS
+            else None
+        )
+        out.append(replace(check, suspicious=note) if note else check)
+    return out
+
+
 def diagnose(inputs: HealthInputs, policy: HealthPolicy) -> HealthReport:
     """Run every pillar and order them worst first."""
     holdings = [h for h in inputs.holdings if h.value_brl > 0 and math.isfinite(h.value_brl)]
@@ -1556,6 +1606,10 @@ def diagnose(inputs: HealthInputs, policy: HealthPolicy) -> HealthReport:
     performance_checks, performance = _performance_pillar(inputs, policy)
     quality_checks, quality = _quality_pillar(holdings, total, policy)
     liquidity_checks, liquidity = _liquidity_pillar(inputs, holdings, total, policy)
+
+    diversification_checks = _mark_suspicious(diversification_checks, inputs)
+    risk_checks = _mark_suspicious(risk_checks, inputs)
+    performance_checks = _mark_suspicious(performance_checks, inputs)
 
     pillars = [
         _pillar(HealthPillar.POLICY, policy_checks),
