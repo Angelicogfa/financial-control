@@ -7,6 +7,7 @@ import {
   ColumnsIcon,
   BriefcaseIcon,
   DatabaseIcon,
+  HistoryIcon,
   HomeIcon,
   ListIcon,
   PlusCircleIcon,
@@ -56,6 +57,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/tools/compare", label: "Comparar ativos", icon: ColumnsIcon },
       { to: "/tools/fixed-income", label: "Comparar renda fixa", icon: ScaleIcon },
+      { to: "/tools/simulation", label: "Simular carteira", icon: HistoryIcon },
     ],
   },
   {
@@ -87,6 +89,7 @@ const PAGE_TITLES: Array<{ test: (path: string) => boolean; title: string }> = [
   { test: (p) => p.startsWith("/ledger"), title: "Lançamentos" },
   { test: (p) => p.startsWith("/tools/fixed-income"), title: "Comparar renda fixa" },
   { test: (p) => p.startsWith("/tools/compare"), title: "Comparar ativos" },
+  { test: (p) => p.startsWith("/tools/simulation"), title: "Simular carteira" },
   { test: (p) => p.startsWith("/settings/strategy"), title: "Estratégia" },
   { test: (p) => p.startsWith("/settings/accounts"), title: "Contas" },
   { test: (p) => p.startsWith("/settings/market-data"), title: "Dados de mercado" },

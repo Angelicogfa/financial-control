@@ -1,7 +1,8 @@
 import { useId, useState } from "react";
 
 /** Lines over time, one per series, labeled at the end, with the value of the hovered
- *  point read in text below the chart. Missing points (null) break the line. */
+ *  point read in text below the chart. Missing points (null) break the line. Optional bands
+ *  shade the area between two value lists (e.g. a percentile fan) behind the lines. */
 
 const WIDTH = 720;
 const HEIGHT = 220;
@@ -14,6 +15,13 @@ export interface TrendSeries {
   values: Array<number | null>;
 }
 
+export interface TrendBand {
+  key: string;
+  color: string;
+  low: number[];
+  high: number[];
+}
+
 export function TrendChart({
   title,
   labels,
@@ -21,6 +29,7 @@ export function TrendChart({
   hint,
   format = (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
   baseline,
+  bands = [],
 }: Readonly<{
   /** What the chart concludes, for screen readers (<title>). */
   title: string;
@@ -30,10 +39,15 @@ export function TrendChart({
   format?: (value: number) => string;
   /** A reference line (e.g. 100 on a base-100 chart). */
   baseline?: number;
+  /** Shaded areas between `low` and `high`, drawn under the lines. */
+  bands?: TrendBand[];
 }>) {
   const titleId = useId();
   const [active, setActive] = useState<number | null>(null);
-  const known = series.flatMap((s) => s.values.filter((v): v is number => v !== null));
+  const known = [
+    ...series.flatMap((s) => s.values.filter((v): v is number => v !== null)),
+    ...bands.flatMap((b) => [...b.low, ...b.high]),
+  ];
   if (labels.length < 2 || known.length === 0) return null;
 
   const rawLow = Math.min(...known, baseline ?? Infinity);
@@ -91,6 +105,18 @@ export function TrendChart({
         {baseline !== undefined && (
           <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(baseline)} y2={y(baseline)} className="viz-base" />
         )}
+        {bands.map((b) => (
+          <path
+            key={b.key}
+            d={`${b.high.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} ${b.low
+              .map((v, i) => `L${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+              .reverse()
+              .join(" ")} Z`}
+            fill={b.color}
+            fillOpacity={0.18}
+            stroke="none"
+          />
+        ))}
         {series.map((s) => (
           <path
             key={s.key}

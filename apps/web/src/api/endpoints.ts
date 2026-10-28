@@ -19,6 +19,7 @@ import type {
   AssetTaxStatusDTO,
   AssetType,
   AssetUpdateRequest,
+  BacktestRequest,
   CerradoUpdateRequest,
   ContributionConfirmRequest,
   ContributionPlanStatus,
@@ -47,8 +48,14 @@ import type {
   PortfolioHealthDTO,
   PortfolioReportResponseDTO,
   SavedContributionPlanDTO,
+  ProjectionDTO,
+  ProjectionRequest,
+  RobustnessDTO,
   ScreenerResponseDTO,
   SeriesStatusDTO,
+  SimulationKind,
+  SimulationRunDetailDTO,
+  SimulationRunDTO,
   SnapshotPointDTO,
   TaxRuleDTO,
   TransactionCreateRequest,
@@ -147,6 +154,17 @@ export const api = {
       request<ArcaSuggestionDTO>("/assets/classification", {
         query: { ticker, asset_type: assetType },
       }),
+  },
+  simulations: {
+    list: (limit = 20, kind?: SimulationKind) =>
+      request<SimulationRunDTO[]>("/simulations", { query: { limit, kind } }),
+    get: (id: number) => request<SimulationRunDetailDTO>(`/simulations/${id}`),
+    robustness: (id: number) => request<RobustnessDTO>(`/simulations/${id}/robustness`),
+    projection: (id: number) => request<ProjectionDTO>(`/simulations/${id}/projection`),
+    submitBacktest: (body: BacktestRequest) =>
+      request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
+    submitProjection: (body: ProjectionRequest) =>
+      request<SimulationRunDTO>("/simulations/projections", { method: "POST", body }),
   },
   tax: {
     rules: () => request<TaxRuleDTO[]>("/tax/rules"),
@@ -248,6 +266,8 @@ export const api = {
   market: {
     series: () => request<SeriesStatusDTO[]>("/market/series-status"),
     jobs: () => request<JobRunDTO[]>("/market/job-runs"),
+    requestJob: (name: string) =>
+      request<JobRunDTO>(`/market/job-runs/${encodeURIComponent(name)}/request`, { method: "POST" }),
     workerErrors: (includeResolved = false) =>
       request<WorkerErrorsResponseDTO>("/market/worker-errors", {
         query: { include_resolved: includeResolved },

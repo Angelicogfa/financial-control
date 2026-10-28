@@ -39,7 +39,7 @@ def test_policy_handler_rejects_non_100_targets_without_committing() -> None:
 
 
 def test_every_feature_router_is_checked() -> None:
-    assert len(ROUTERS) == 13
+    assert len(ROUTERS) == 14
 
 
 @pytest.mark.parametrize("router_path", ROUTERS, ids=lambda p: p.parent.name)

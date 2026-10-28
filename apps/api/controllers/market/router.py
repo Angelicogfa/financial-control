@@ -25,6 +25,19 @@ def get_job_runs(
     return handler.job_runs()
 
 
+@market_router.post(
+    "/job-runs/{job_name}/request",
+    response_model=JobRunDTO,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def request_job(
+    job_name: str,
+    handler: MarketDataHandler = Depends(get_market_data_handler),
+) -> JobRunDTO:
+    """Ask the worker to run a job now (only the jobs allowed to run by hand)."""
+    return handler.request_job(job_name)
+
+
 @market_router.get("/series-status", response_model=list[SeriesStatusDTO])
 def get_series_status(
     handler: MarketDataHandler = Depends(get_market_data_handler),

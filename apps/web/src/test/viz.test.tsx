@@ -18,6 +18,23 @@ describe("Sparkline", () => {
 });
 
 describe("TrendChart", () => {
+  it("shades bands under the lines and fits them in the scale", () => {
+    const { container } = render(
+      <TrendChart
+        title="Faixas"
+        labels={["0", "1", "2"]}
+        hint="faixa"
+        series={[{ key: "m", label: "Mediana", color: "red", values: [10, 12, 14] }]}
+        bands={[{ key: "b", color: "red", low: [8, 9, 10], high: [12, 30, 40] }]}
+      />,
+    );
+    const band = container.querySelector('path[fill="red"]');
+    expect(band?.getAttribute("d")).toMatch(/^M.* Z$/);
+    expect(band).toHaveAttribute("fill-opacity", "0.18");
+    // The band's top (40) sets the scale: the line ends below the top of the chart.
+    expect(screen.getByText("Mediana 14")).toBeInTheDocument();
+  });
+
   it("titles the chart, labels the line ends and reads the hovered point", () => {
     const { container } = render(
       <TrendChart

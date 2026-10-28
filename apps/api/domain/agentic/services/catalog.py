@@ -75,6 +75,14 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
+from controllers.simulation.requests import BacktestRequest, ProjectionRequest
+from controllers.simulation.responses import (
+    CoverageReportDTO,
+    ProjectionDTO,
+    RobustnessDTO,
+    SimulationRunDetailDTO,
+    SimulationRunDTO,
+)
 from controllers.tax.requests import FixedIncomeCompareRequest
 from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from core.errors import ValidationError
@@ -95,6 +103,8 @@ from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
+from domain.simulation.entities import SimulationKind
+from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
 
 OperationKind = Literal["query", "command"]
@@ -113,6 +123,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "alerts": "Alertas",
     "market": "Dados de Mercado",
     "tools": "Ferramentas · Tributação",
+    "simulation": "Simulação de carteira",
 }
 
 
@@ -134,6 +145,24 @@ class CompareInput(BaseModel):
 class TreasuryMarketInput(BaseModel):
     as_of_date: date | None = None
     asset_id: int | None = None
+
+
+class CoveragePeriodInput(BaseModel):
+    start: date | None = None
+    end: date | None = None
+
+
+class JobRequestInput(BaseModel):
+    job_name: Literal["sync_simulation_history"]
+
+
+class SimulationIdInput(BaseModel):
+    run_id: int
+
+
+class SimulationListInput(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    kind: SimulationKind | None = None
 
 
 class AsOfDateInput(BaseModel):
@@ -395,6 +424,12 @@ class AgenticRuntimeHandlers:
     @property
     def tax(self) -> TaxHandler:
         return TaxHandler(uow_factory=self.uow_factory, portfolio_service=self.portfolio_service)
+
+    @property
+    def simulation(self) -> SimulationHandler:
+        return SimulationHandler(
+            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
+        )
 
     @property
     def research(self) -> ResearchHandler:
@@ -994,6 +1029,19 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, _p: h.market.job_runs(),
     ),
     OperationSpec(
+        name="market.request_job",
+        kind="command",
+        description=(
+            "Pede ao worker que rode agora uma rotina que aceita disparo manual (hoje, "
+            "`sync_simulation_history`: a carga do histórico longo que a simulação de carteira "
+            "usa). O worker atende em até 15 s; acompanhe com market.job_runs. Um pedido que "
+            "ainda espera é devolvido, sem duplicar."
+        ),
+        input_model=JobRequestInput,
+        output_type=JobRunDTO,
+        invoke=lambda h, p: h.market.request_job(p.job_name),
+    ),
+    OperationSpec(
         name="market.worker_errors",
         kind="query",
         description=(
@@ -1050,6 +1098,95 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=list[TaxRuleDTO],
         invoke=lambda h, _p: h.tax.list_rules(),
+    ),
+    # 14. Simulation
+    OperationSpec(
+        name="simulation.coverage",
+        kind="query",
+        description=(
+            "Cobertura das séries históricas que a simulação de carteira usa (ativos da "
+            "carteira, da watchlist e os mais negociados do catálogo, Ibovespa, IFIX, "
+            "S&P 500, dólar, CDI e IPCA): primeira e última data, meses cobertos, maior "
+            "intervalo sem dados e status OK, PARTIAL ou MISSING."
+        ),
+        input_model=CoveragePeriodInput,
+        output_type=CoverageReportDTO,
+        invoke=lambda h, p: h.simulation.coverage(start=p.start, end=p.end),
+    ),
+    OperationSpec(
+        name="simulation.backtest",
+        kind="command",
+        description=(
+            "Agenda um backtest da estratégia: as regras reais de aporte (metas, bandas ARCA, "
+            "checklist e política) reaplicadas mês a mês sobre o histórico, com taxas, IR na "
+            "venda e comparação com CDI, Ibovespa, IFIX ou S&P 500 em reais. Roda no worker; "
+            "acompanhe com simulation.get."
+        ),
+        input_model=BacktestRequest,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, p: h.simulation.submit_backtest(p),
+    ),
+    OperationSpec(
+        name="simulation.get",
+        kind="query",
+        description=(
+            "Status e resultados de uma simulação: resumo (valor final, TIR, TWR, "
+            "volatilidade, drawdown, taxas e IR), série mensal e hashes de reprodutibilidade."
+        ),
+        input_model=SimulationIdInput,
+        output_type=SimulationRunDetailDTO,
+        invoke=lambda h, p: h.simulation.get_run(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.robustness",
+        kind="query",
+        description=(
+            "Robustez de uma simulação concluída: a estratégia e as referências nas crises "
+            "de 2008, 2015-16, Joesley Day, Covid e alta de juros de 2021-22; choques "
+            "sintéticos sobre a alocação final; e, se pedidas, as variantes de banda e "
+            "rebalanceamento com a distribuição de todas, a janela reservada dos últimos 3 "
+            "anos, a contagem de tentativas e os avisos de amostra."
+        ),
+        input_model=SimulationIdInput,
+        output_type=RobustnessDTO,
+        invoke=lambda h, p: h.simulation.robustness(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.project",
+        kind="command",
+        description=(
+            "Agenda uma projeção da carteira (camada B): bootstrap em blocos dos retornos "
+            "históricos de Ações, FIIs e Internacional acima do CDI, somados ao CDI dos "
+            "cenários de juros da política (base, queda e alta), com aporte mensal constante "
+            "em termos reais e metas de patrimônio e de renda passiva mensal, tudo em R$ de "
+            "hoje. Sem `initial_by_class`, parte da carteira atual. Roda no worker; acompanhe "
+            "com simulation.projection."
+        ),
+        input_model=ProjectionRequest,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, p: h.simulation.submit_projection(p),
+    ),
+    OperationSpec(
+        name="simulation.projection",
+        kind="query",
+        description=(
+            "Resultado de uma projeção concluída, por cenário de juros: percentis 5, 25, 50, "
+            "75 e 95 do patrimônio e da renda mensal ano a ano, probabilidade de cada meta "
+            "com o erro da simulação, tempo até a meta de renda, queda máxima da estratégia, "
+            "premissas de cada classe (prêmio sobre o CDI, volatilidade, DY) e avisos de "
+            "amostra. Simulação, não recomendação."
+        ),
+        input_model=SimulationIdInput,
+        output_type=ProjectionDTO,
+        invoke=lambda h, p: h.simulation.projection(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.list",
+        kind="query",
+        description="Simulações solicitadas, mais recentes primeiro, com status e parâmetros.",
+        input_model=SimulationListInput,
+        output_type=list[SimulationRunDTO],
+        invoke=lambda h, p: h.simulation.list_runs(p.limit, p.kind),
     ),
 )
 

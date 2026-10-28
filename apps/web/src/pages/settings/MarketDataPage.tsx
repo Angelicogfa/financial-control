@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "../../api/endpoints";
+import { errorMessage } from "../../api/http";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
@@ -23,7 +24,29 @@ const JOB_LABELS: Record<string, string> = {
   refresh_fundamentals: "Demonstrativos anuais",
   record_checklist_evaluations: "Reavaliação dos checklists",
   sync_instrument_catalog: "Catálogo de ativos B3",
+  sync_simulation_history: "Histórico longo da simulação",
+  run_pending_simulations: "Simulações na fila",
 };
+
+const JOB_STATUS_LABELS: Record<string, string> = {
+  REQUESTED: "Pedida",
+  RUNNING: "Rodando",
+  SUCCESS: "Concluída",
+  FAILED: "Falhou",
+  SKIPPED: "Pulada",
+};
+
+/** Jobs that can be run by hand (the API accepts only these). */
+export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> = [
+  {
+    name: "sync_simulation_history",
+    action: "Carregar o histórico da simulação",
+    hint:
+      "Baixa do Yahoo o histórico longo dos ativos, do Ibovespa, do S&P 500 e do dólar que a simulação de carteira usa. " +
+      "Roda sozinha uma vez por semana; use aqui para não esperar. Pode levar alguns minutos.",
+  },
+];
+const JOB_POLL_MS = 5000;
 
 const OPERATION_LABELS: Record<string, string> = {
   quote: "Cotação",
@@ -34,7 +57,13 @@ const OPERATION_LABELS: Record<string, string> = {
   catalog: "Catálogo B3",
 };
 
-const JOB_TONES: Record<string, string> = { SUCCESS: "success", FAILED: "danger", RUNNING: "info", SKIPPED: "neutral" };
+const JOB_TONES: Record<string, string> = {
+  SUCCESS: "success",
+  FAILED: "danger",
+  REQUESTED: "info",
+  RUNNING: "info",
+  SKIPPED: "neutral",
+};
 
 function notifyWorkerErrorsChanged() {
   window.dispatchEvent(new CustomEvent("fincontrol:worker-errors-changed"));
@@ -51,6 +80,30 @@ export function MarketDataPage() {
   );
 
   const reloading = series.loading || jobs.loading || workerErrors.loading;
+  const [requesting, setRequesting] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const statusOf = (name: string) => jobs.data?.find((j) => j.job_name === name)?.status;
+  const anyActive = MANUAL_JOBS.some((j) => ["REQUESTED", "RUNNING"].includes(statusOf(j.name) ?? ""));
+
+  // Follow a manual run until the worker finishes it.
+  useEffect(() => {
+    if (!anyActive) return undefined;
+    const timer = setTimeout(() => jobs.reload(), JOB_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [anyActive, jobs]);
+
+  const handleRequest = async (name: string) => {
+    setRequesting(name);
+    setRequestError(null);
+    try {
+      await api.market.requestJob(name);
+      jobs.reload();
+    } catch (err) {
+      setRequestError(errorMessage(err));
+    } finally {
+      setRequesting(null);
+    }
+  };
 
   const handleResolveOne = async (errorId: number) => {
     setResolvingId(errorId);
@@ -236,6 +289,39 @@ export function MarketDataPage() {
             )}
           </Async>
         </section>
+        <section className="app-card app-card-padded" aria-label="Rodar agora">
+          <h2 className="app-card-heading">Rodar agora</h2>
+          {requestError && (
+            <p className="app-error-banner" role="alert">
+              {requestError}
+            </p>
+          )}
+          {MANUAL_JOBS.map((job) => {
+            const status = statusOf(job.name);
+            const active = status === "REQUESTED" || status === "RUNNING";
+            return (
+              <div key={job.name} className="app-page-stack">
+                <p className="app-card-hint">{job.hint}</p>
+                <div className="app-form-actions">
+                  <button
+                    type="button"
+                    className="app-primary-button"
+                    disabled={active || requesting !== null}
+                    onClick={() => handleRequest(job.name)}
+                  >
+                    {(active || requesting === job.name) && <Spinner size="sm" />}
+                    <span>{job.action}</span>
+                  </button>
+                  {active && (
+                    <span className="app-muted" role="status">
+                      {status === "REQUESTED" ? "Pedido registrado; o worker começa em até 15 segundos." : "Rodando…"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </section>
         <section>
           <h2 className="app-card-heading">Rotinas do worker</h2>
           <Async state={jobs}>
@@ -260,7 +346,7 @@ export function MarketDataPage() {
                         <tr key={job.job_name}>
                           <td>{JOB_LABELS[job.job_name] ?? job.job_name}</td>
                           <td>
-                            <Badge tone={JOB_TONES[job.status] ?? "neutral"}>{job.status}</Badge>
+                            <Badge tone={JOB_TONES[job.status] ?? "neutral"}>{JOB_STATUS_LABELS[job.status] ?? job.status}</Badge>
                           </td>
                           <td>{dateTime(job.started_at)}</td>
                           <td>{dateTime(job.finished_at)}</td>

@@ -25,6 +25,7 @@ from domain.shared.repositories import (
     AbstractTreasuryCatalogRepository,
     AbstractWorkerErrorRepository,
 )
+from domain.simulation.repositories import AbstractSimulationRepository
 from domain.tax.repositories import AbstractTaxRuleRepository
 
 
@@ -50,6 +51,7 @@ class AbstractUnitOfWork(ABC):
     alert_dismissals: AbstractAlertDismissalRepository
     agent_keys: AbstractAgentKeyRepository
     tax_rules: AbstractTaxRuleRepository
+    simulations: AbstractSimulationRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

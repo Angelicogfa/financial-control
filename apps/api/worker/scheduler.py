@@ -11,6 +11,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from core.logging import configure_logging
 from core.settings import Settings, get_settings
+from domain.market.services.use_cases import MANUAL_JOBS
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
 from infra.providers.factory import build_market_gateway
 from infra.providers.gateway import CachedMarketGateway
@@ -19,16 +20,19 @@ from worker.jobs import (
     backfill_and_record_snapshot_job,
     backfill_snapshots_job,
     ensure_series_coverage_job,
+    has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
     refresh_fundamentals_job,
+    run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_instrument_catalog_job,
+    sync_simulation_history_job,
     sync_treasury_catalog_job,
     sync_treasury_prices_job,
     warm_portfolio_quotes_job,
 )
-from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job
+from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job, run_requested
 
 logger = logging.getLogger("fincontrol_worker")
 
@@ -56,6 +60,27 @@ def _guarded(
         lock=lock,
         policy=policy,
     )
+
+
+def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGateway], Any]]:
+    """The jobs of `MANUAL_JOBS`, each taking (uow_factory, gateway) like the scheduled ones."""
+    jobs: dict[str, Callable[[UoWFactory, CachedMarketGateway], Any]] = {
+        "sync_simulation_history": partial(
+            sync_simulation_history_job, catalog_top=cfg.simulation_catalog_top
+        ),
+    }
+    return {name: jobs[name] for name in MANUAL_JOBS}
+
+
+def _when_pending(uow_factory: UoWFactory, job: Callable[[], Any]) -> Callable[[], Any]:
+    """Run `job` only when a simulation is queued, so idle polls leave no job_runs rows."""
+
+    def tick() -> Any:
+        if has_pending_simulations(uow_factory):
+            return job()
+        return None
+
+    return tick
 
 
 def create_scheduler(
@@ -170,6 +195,53 @@ def create_scheduler(
         replace_existing=True,
         **defaults,
     )
+    scheduler.add_job(
+        guard(
+            "sync_simulation_history",
+            partial(sync_simulation_history_job, catalog_top=cfg.simulation_catalog_top),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=cfg.fundamentals_cron_hour,
+        minute=50,
+        id="sync_simulation_history",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        _when_pending(
+            uow_factory,
+            guard(
+                "run_pending_simulations",
+                partial(
+                    run_pending_simulations_job, timeout_seconds=cfg.simulation_timeout_seconds
+                ),
+            ),
+        ),
+        trigger="interval",
+        seconds=cfg.simulation_poll_seconds,
+        id="run_pending_simulations",
+        replace_existing=True,
+        **defaults,
+    )
+    # Manual requests (Market data screen, MCP): served on the same short interval; an idle
+    # check leaves no job_runs row, and the scheduled run of the same job shares its lock.
+    for name, job in manual_jobs(cfg).items():
+        scheduler.add_job(
+            partial(
+                run_requested,
+                name,
+                partial(job, uow_factory, gw),
+                uow_factory=uow_factory,
+                lock=job_lock,
+                policy=policy,
+            ),
+            trigger="interval",
+            seconds=cfg.simulation_poll_seconds,
+            id=f"manual_{name}",
+            replace_existing=True,
+            **defaults,
+        )
     return scheduler
 
 

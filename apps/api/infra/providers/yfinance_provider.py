@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -168,6 +169,50 @@ class YFinanceProvider:
                 operation="history",
                 target=f"{yf_sym} ({range_period})",
                 request_url=f"yfinance://Ticker({yf_sym})/history?period={range_period}&interval=1d",
+                exc=exc,
+            )
+            return []
+
+    def get_full_history(
+        self,
+        symbol: str,
+        market: Market | None = None,
+        *,
+        start: date | None = None,
+    ) -> list[PricePoint]:
+        """Daily history for simulations: `close` adjusted only for splits, `adj_close` also
+        for dividends (total return). From `start`, or the whole history when None."""
+        yf_sym = resolve_yahoo_symbol(symbol, market)
+        try:
+            ticker_obj = self._get_ticker(yf_sym)
+            if start is None:
+                df = ticker_obj.history(period="max", interval="1d", auto_adjust=False)
+            else:
+                df = ticker_obj.history(start=start.isoformat(), interval="1d", auto_adjust=False)
+            if df is None or df.empty:
+                return []
+            points: list[PricePoint] = []
+            for idx, row in df.iterrows():
+                close_val = _safe_float(row.get("Close"))
+                if close_val is None or close_val <= 0:
+                    continue
+                adj = _safe_float(row.get("Adj Close"))
+                points.append(
+                    PricePoint(
+                        date=idx.date() if hasattr(idx, "date") else idx,
+                        close=close_val,
+                        adj_close=adj if adj is not None and adj > 0 else close_val,
+                        volume=_safe_float(row.get("Volume")),
+                    )
+                )
+            points.sort(key=lambda p: p.date)
+            return points
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation="full_history",
+                target=yf_sym,
+                request_url=f"yfinance://Ticker({yf_sym})/history?period=max&auto_adjust=False",
                 exc=exc,
             )
             return []

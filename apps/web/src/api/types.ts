@@ -267,6 +267,48 @@ export interface AssetValuationDTO {
   extraordinary_dividends?: boolean;
 }
 
+export interface BacktestPointDTO {
+  day: string;
+  contribution: number;
+  contributed: number;
+  market_value: number;
+  cash: number;
+  fees: number;
+  taxes?: number;
+  by_class?: Record<string, number>;
+}
+
+export interface BacktestRequest {
+  start: string;
+  end: string;
+  monthly_contribution: number;
+  initial_contribution?: number;
+  correct_by_ipca?: boolean;
+  fee_rate?: number;
+  rebalance?: boolean;
+  universe?: "REGISTERED" | "REGISTERED_AND_CATALOG";
+  catalog_top?: number | null;
+  policy_mode?: "CURRENT" | "AS_OF";
+  benchmarks?: ("CDI" | "IBOV" | "IFIX" | "SP500_BRL")[];
+  variants?: boolean;
+  label?: string | null;
+}
+
+export interface BacktestSummaryDTO {
+  final_value: number;
+  contributed: number;
+  gain: number;
+  money_weighted_return?: number | null;
+  time_weighted_return: number;
+  annual_twr: number;
+  volatility: number;
+  max_drawdown: number;
+  trades: number;
+  fees: number;
+  taxes?: number;
+  sales?: number;
+}
+
 export interface BenchmarkComparisonDTO {
   benchmark: string;
   benchmark_return: number;
@@ -372,6 +414,15 @@ export interface ClassPolicyDTO {
   target_pct: number;
   band_pct?: number;
   intra_class_strategy?: IntraClassStrategy;
+}
+
+export interface ClassPremiseDTO {
+  arca_class: string;
+  proxy: string;
+  excess_annual: number;
+  volatility: number;
+  expected_annual: number;
+  income_yield: number;
 }
 
 export interface ComparedAssetDTO {
@@ -480,9 +531,33 @@ export interface CorrelatedPairDTO {
   correlation: number;
 }
 
+export interface CoverageReportDTO {
+  start: string;
+  end: string;
+  series?: SeriesCoverageDTO[];
+  missing?: string[];
+}
+
+export type CoverageStatus = "OK" | "PARTIAL" | "MISSING";
+
+export interface CrisisDTO {
+  key: string;
+  label: string;
+  start: string;
+  end: string;
+  outcomes?: Record<string, WindowOutcomeDTO>;
+}
+
 export interface CurrentUserDTO {
   username: string;
   expires_at?: string | null;
+}
+
+export interface DistributionDTO {
+  count: number;
+  minimum?: number | null;
+  median?: number | null;
+  maximum?: number | null;
 }
 
 export interface DiversificationDetailDTO {
@@ -665,6 +740,13 @@ export interface FundamentalSnapshotDTO {
   period: string;
   metrics: Record<string, number | null>;
   source?: string | null;
+}
+
+export interface GoalOutcomeDTO {
+  target: number;
+  probability: number;
+  standard_error: number;
+  months?: PercentilesDTO | null;
 }
 
 export interface GrantOptionsDTO {
@@ -978,6 +1060,14 @@ export interface PaginatedResponse_TransactionResponseDTO_ {
   meta: PageMetaDTO;
 }
 
+export interface PercentilesDTO {
+  p5: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p95: number;
+}
+
 export interface PerformanceDetailDTO {
   observations?: number;
   cumulative_return?: number | null;
@@ -1069,6 +1159,62 @@ export interface ProjectionAssumptionsDTO {
   scenario_rate_shift?: number;
 }
 
+export interface ProjectionDTO {
+  run_id: number;
+  status: SimulationStatus;
+  scenarios?: ProjectionScenarioDTO[];
+  sample_start?: string | null;
+  sample_end?: string | null;
+  sample_months?: number;
+  classes?: string[];
+  targets?: Record<string, number>;
+  warnings?: string[];
+}
+
+export interface ProjectionPointDTO {
+  month: number;
+  contributed: number;
+  wealth: PercentilesDTO;
+  income: PercentilesDTO;
+}
+
+export interface ProjectionRequest {
+  horizon_years?: number;
+  monthly_contribution: number;
+  contribution_real_growth?: number;
+  initial_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  income_yield_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  cdi_rate?: number | null;
+  ipca_rate?: number | null;
+  wealth_goal?: number | null;
+  income_goal?: number | null;
+  rebalance?: boolean;
+  paths?: number;
+  mean_block_months?: number;
+  fee_rate?: number;
+  sample_start?: string | null;
+  label?: string | null;
+}
+
+export interface ProjectionScenarioDTO {
+  key: string;
+  label: string;
+  scenario: RateScenarioDTO;
+  paths: number;
+  horizon_months: number;
+  points?: ProjectionPointDTO[];
+  final_wealth: PercentilesDTO;
+  final_net_wealth: PercentilesDTO;
+  final_income: PercentilesDTO;
+  max_drawdown: PercentilesDTO;
+  contributed: number;
+  wealth_goal?: GoalOutcomeDTO | null;
+  income_goal?: GoalOutcomeDTO | null;
+  premises?: ClassPremiseDTO[];
+  fees?: number;
+  taxes?: number;
+}
+
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
 
 export interface RateScenarioDTO {
@@ -1138,6 +1284,22 @@ export interface RiskShareDTO {
   risk_share: number;
 }
 
+export interface RobustnessDTO {
+  run_id: number;
+  status: SimulationStatus;
+  series?: SeriesRefDTO[];
+  crises?: CrisisDTO[];
+  shocks?: ShockDTO[];
+  variants?: VariantDTO[];
+  annual_twr_distribution: DistributionDTO;
+  selection_distribution: DistributionDTO;
+  holdout_distribution: DistributionDTO;
+  holdout_start?: string | null;
+  trials_in_run?: number;
+  trials_total?: number;
+  warnings?: string[];
+}
+
 export interface RollingPointDTO {
   end: string;
   cumulative_return: number;
@@ -1191,6 +1353,25 @@ export interface ScreenerResponseDTO {
   catalog_updated_at?: string | null;
 }
 
+export interface SeriesCoverageDTO {
+  key: string;
+  label: string;
+  status: CoverageStatus;
+  first_date?: string | null;
+  last_date?: string | null;
+  points?: number;
+  months_expected?: number;
+  months_covered?: number;
+  share?: number;
+  longest_gap_days?: number;
+  note?: string | null;
+}
+
+export interface SeriesRefDTO {
+  key: string;
+  label: string;
+}
+
 export interface SeriesStatusDTO {
   symbol: string;
   unit?: SeriesUnit | null;
@@ -1202,6 +1383,65 @@ export interface SeriesStatusDTO {
 }
 
 export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PERCENT_PER_YEAR" | "PRICE" | "INDEX_POINTS";
+
+export interface ShockDTO {
+  key: string;
+  label: string;
+  before: number;
+  after: number;
+  change: number;
+  change_rate: number;
+  by_class?: Record<string, number>;
+  note?: string;
+}
+
+export type SimulationKind = "BACKTEST" | "PROJECTION";
+
+export interface SimulationResultDTO {
+  key: string;
+  label: string;
+  summary: BacktestSummaryDTO;
+  points?: BacktestPointDTO[];
+  unavailable?: string[];
+  survivorship_bias?: boolean;
+}
+
+export interface SimulationRunDTO {
+  id: number;
+  kind: SimulationKind;
+  status: SimulationStatus;
+  label?: string | null;
+  params?: Record<string, unknown>;
+  params_hash: string;
+  data_hash?: string | null;
+  code_version: string;
+  seed: number;
+  error?: string | null;
+  reused_from?: number | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface SimulationRunDetailDTO {
+  id: number;
+  kind: SimulationKind;
+  status: SimulationStatus;
+  label?: string | null;
+  params?: Record<string, unknown>;
+  params_hash: string;
+  data_hash?: string | null;
+  code_version: string;
+  seed: number;
+  error?: string | null;
+  reused_from?: number | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  results?: SimulationResultDTO[];
+}
+
+export type SimulationStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "TIMEOUT";
 
 export interface SnapshotPointDTO {
   snapshot_date: string;
@@ -1414,6 +1654,16 @@ export interface ValuedPositionDTO {
   eligible?: boolean;
 }
 
+export interface VariantDTO {
+  key: string;
+  label: string;
+  band_pct: number;
+  rebalance: boolean;
+  summary: BacktestSummaryDTO;
+  selection: WindowOutcomeDTO;
+  holdout: WindowOutcomeDTO;
+}
+
 export interface WatchlistAddRequest {
   ticker: string;
   asset_type?: AssetType | null;
@@ -1443,6 +1693,13 @@ export interface WatchlistItemDTO {
   valuation_verdict: string;
   fair_value?: number | null;
   margin?: number | null;
+}
+
+export interface WindowOutcomeDTO {
+  covered: boolean;
+  months?: number;
+  return_rate?: number | null;
+  max_drawdown?: number | null;
 }
 
 export interface WorkerErrorsResponseDTO {
