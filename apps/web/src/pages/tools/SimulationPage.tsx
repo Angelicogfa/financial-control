@@ -6,6 +6,9 @@ import { errorMessage } from "../../api/http";
 import type {
   BacktestRequest,
   BacktestSummaryDTO,
+  CalibrationDTO,
+  EventOutcomeDTO,
+  GeneratorCalibrationDTO,
   GoalOutcomeDTO,
   PercentilesDTO,
   ProjectionDTO,
@@ -25,16 +28,92 @@ import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, points, today } from "../../utils/format";
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
+import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 
 type Benchmark = NonNullable<BacktestRequest["benchmarks"]>[number];
-type TabKey = "past" | "future" | "robustness";
+type TabKey = "past" | "future" | "robustness" | "confidence";
 
 const TABS: TabSpec<TabKey>[] = [
   { key: "past", label: "Passado" },
   { key: "future", label: "Futuro" },
   { key: "robustness", label: "Robustez" },
+  { key: "confidence", label: "Confiança" },
 ];
+
+/** What sets each view apart: the question, how it is computed and when to use it. */
+export const TAB_GUIDE: Record<TabKey, { question: string; method: string; use: string; from: string }> = {
+  past: {
+    question: "Onde eu estaria se tivesse seguido a minha estratégia desde uma data?",
+    method:
+      "Reaplica mês a mês as suas regras reais de aporte (metas e bandas ARCA, checklist, política) sobre os preços " +
+      "históricos, com custos e IR, e compara com CDI e índices recebendo os mesmos aportes nas mesmas datas.",
+    use: "Para conferir se as regras teriam funcionado. Descreve o que aconteceu; não diz nada sobre o futuro.",
+    from: "Período escolhido no passado e as regras de hoje (ou as vigentes em cada data)",
+  },
+  future: {
+    question: "Qual a faixa provável do patrimônio e da renda daqui a N anos, e com que chance chego à meta?",
+    method:
+      "Parte da carteira de hoje e gera milhares de futuros possíveis: sorteia trechos do histórico e parâmetros " +
+      "incertos (o prêmio de cada classe sobre o CDI) e soma aos juros de três cenários (queda, premissa e alta).",
+    use: "Para planejar aportes e metas. Mostra faixas e chances com intervalo, nunca um número único.",
+    from: "A carteira e as premissas de hoje, projetadas para frente",
+  },
+  robustness: {
+    question: "O resultado do Passado depende de um período sortudo ou de uma escolha de regra?",
+    method:
+      "Mede a simulação do Passado selecionada dentro de crises conhecidas, aplica choques à alocação final e repete " +
+      "o cálculo com outras bandas e com e sem rebalanceamento, mostrando todas as variantes.",
+    use: "Para não escolher uma regra por sorte. Usa a mesma simulação da aba Passado.",
+    from: "A simulação do Passado selecionada",
+  },
+  confidence: {
+    question: "As chances que a aba Futuro mostra costumam se confirmar?",
+    method:
+      "Em cada mês do passado, cada gerador de cenários prevê os 12 meses seguintes usando só os dados até ali; a " +
+      "previsão é comparada com o que aconteceu (cobertura, PIT, Brier, log score) e define os pesos da combinação.",
+    use: "Para saber quanto confiar nas probabilidades do Futuro. Roda sozinha toda semana.",
+    from: "Todo o histórico guardado, mês a mês",
+  },
+};
+
+function TabGuide({ tab }: Readonly<{ tab: TabKey }>) {
+  const guide = TAB_GUIDE[tab];
+  return (
+    <section className="app-card app-card-padded" aria-label="Sobre esta aba">
+      <p>
+        <strong>{guide.question}</strong>
+      </p>
+      <p className="app-card-hint">{guide.method}</p>
+      <p className="app-muted">{guide.use}</p>
+      <details>
+        <summary>O que diferencia Passado, Futuro, Robustez e Confiança</summary>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Comparação das abas">
+            <thead>
+              <tr>
+                <th>Aba</th>
+                <th>Pergunta</th>
+                <th>Parte de</th>
+                <th>Quando usar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TABS.map((t) => (
+                <tr key={t.key} aria-current={t.key === tab ? "true" : undefined}>
+                  <td>{t.label}</td>
+                  <td>{TAB_GUIDE[t.key].question}</td>
+                  <td>{TAB_GUIDE[t.key].from}</td>
+                  <td>{TAB_GUIDE[t.key].use}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  );
+}
 
 export const BENCHMARK_LABELS: Record<Benchmark, string> = {
   CDI: "CDI",
@@ -593,8 +672,16 @@ interface ProjectionFormState {
   initial: Record<ClassKey, string>;
   cdi: string;
   ipca: string;
+  generator: NonNullable<ProjectionRequest["generator"]>;
   label: string;
 }
+
+const GENERATOR_OPTIONS: Array<[NonNullable<ProjectionRequest["generator"]>, string]> = [
+  ["STACKED", "Combinação calibrada (recomendado)"],
+  ["BOOTSTRAP", "Só o bootstrap em blocos"],
+  ["BAYESIAN_BOOTSTRAP", "Só o bootstrap bayesiano"],
+  ["BAYESIAN_NORMAL", "Só a normal bayesiana"],
+];
 
 const INITIAL_PROJECTION: ProjectionFormState = {
   horizonYears: "20",
@@ -607,6 +694,7 @@ const INITIAL_PROJECTION: ProjectionFormState = {
   initial: { ACOES: "0", REAL_ESTATE: "0", ATIVOS_INTERNACIONAIS: "0", CAIXA: "0" },
   cdi: "",
   ipca: "",
+  generator: "STACKED",
   label: "",
 };
 
@@ -637,6 +725,7 @@ export function toProjectionRequest(form: ProjectionFormState): ProjectionReques
       : Object.fromEntries(CLASS_KEYS.map((k) => [k, Math.max(parseDecimal(form.initial[k]) ?? 0, 0)])),
     cdi_rate: percentInput(form.cdi),
     ipca_rate: percentInput(form.ipca),
+    generator: form.generator,
     label: form.label.trim() || null,
   };
 }
@@ -709,6 +798,20 @@ function ProjectionForm({ onSubmitted }: Readonly<{ onSubmitted: (run: Simulatio
           <input id="proj-ipca" inputMode="decimal" value={form.ipca} onChange={(e) => set({ ipca: e.target.value })} />
         </div>
         <div className="app-field">
+          <label htmlFor="proj-generator">Gerador de cenários</label>
+          <select
+            id="proj-generator"
+            value={form.generator}
+            onChange={(e) => set({ generator: e.target.value as ProjectionFormState["generator"] })}
+          >
+            {GENERATOR_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="app-field">
           <label htmlFor="proj-label">Nome (opcional)</label>
           <input id="proj-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
         </div>
@@ -764,6 +867,41 @@ function yearsLabel(months: number): string {
   return Number.isInteger(years) ? `${years} ${years === 1 ? "ano" : "anos"}` : `${months} meses`;
 }
 
+const GENERATOR_NAMES: Record<string, string> = {
+  BOOTSTRAP: "Bootstrap em blocos",
+  BAYESIAN_BOOTSTRAP: "Bootstrap bayesiano",
+  BAYESIAN_NORMAL: "Normal bayesiana",
+  STACKED: "Combinação",
+};
+
+/** How the interval was built: the disagreement between generators, if any. */
+function ChanceDetail({ chance }: Readonly<{ chance: { by_generator?: Record<string, number> } }>) {
+  const shares = Object.entries(chance.by_generator ?? {});
+  if (shares.length < 2) return null;
+  return (
+    <p className="app-muted">
+      Por gerador: {shares.map(([g, p]) => `${GENERATOR_NAMES[g] ?? g} ${pct(p, 0)}`).join(" · ")}. O intervalo de 90%
+      cobre essa divergência, o número finito de trajetórias e a incerteza dos parâmetros.
+    </p>
+  );
+}
+
+function EventList({ events }: Readonly<{ events: EventOutcomeDTO[] }>) {
+  if (events.length === 0) return null;
+  return (
+    <section className="app-card app-card-padded">
+      <h2 className="app-card-heading">Outras chances da estratégia</h2>
+      <ul aria-label="Outras chances">
+        {events.map((e) => (
+          <li key={e.key}>
+            {e.label}: <strong>{pct(e.probability, 0)}</strong> ({pct(e.low, 0)} a {pct(e.high, 0)})
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function GoalLine({ title, goal, money }: Readonly<{ title: string; goal: GoalOutcomeDTO; money: string }>) {
   return (
     <div className="app-card app-card-padded">
@@ -771,9 +909,12 @@ function GoalLine({ title, goal, money }: Readonly<{ title: string; goal: GoalOu
         {title}: {money}
       </h3>
       <p>
-        <strong>{pct(goal.probability, 0)}</strong> das trajetórias chegam lá no horizonte{" "}
-        <span className="app-muted">(erro da simulação ± {points(goal.standard_error * 100, 1)} p.p.)</span>
+        <strong>{pct(goal.probability, 0)}</strong> de chance de chegar lá no horizonte{" "}
+        <span>
+          ({pct(goal.low, 0)} a {pct(goal.high, 0)})
+        </span>
       </p>
+      <ChanceDetail chance={goal} />
       {goal.months ? (
         <p className="app-muted">
           Quando chegam: em {yearsLabel(Math.round(goal.months.p50))} na mediana, entre {yearsLabel(Math.round(goal.months.p25))} e{" "}
@@ -823,6 +964,15 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
           CDI {pct(current.scenario.annual_cdi_rate, 2)} a.a. · IPCA {pct(current.scenario.annual_ipca_rate, 2)} a.a. ·{" "}
           {current.paths} trajetórias de {yearsLabel(current.horizon_months)}
         </p>
+        {(current.generators ?? []).length > 0 && (
+          <p className="app-muted">
+            Geradores:{" "}
+            {(current.generators ?? []).map((g) => `${g.label} ${pct(g.weight, 0)}`).join(" · ")}
+            {data.calibration_run ? ` (pesos da calibração #${data.calibration_run})` : ""}.
+            {current.prior_months != null &&
+              ` O prior conservador pesa o equivalente a ${num(current.prior_months, 0)} meses de dados.`}
+          </p>
+        )}
       </section>
 
       {(current.wealth_goal || current.income_goal) && (
@@ -835,6 +985,8 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
           )}
         </div>
       )}
+
+      <EventList events={current.events ?? []} />
 
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Patrimônio em R$ de hoje</h2>
@@ -918,7 +1070,9 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
                 <th>Classe</th>
                 <th>Referência</th>
                 <th className="app-numeric">Meta</th>
-                <th className="app-numeric">Prêmio sobre o CDI a.a.</th>
+                <th className="app-numeric">Prêmio histórico sobre o CDI a.a.</th>
+                <th className="app-numeric">Alvo do prior</th>
+                <th className="app-numeric">Prêmio a posteriori</th>
                 <th className="app-numeric">Volatilidade a.a.</th>
                 <th className="app-numeric">Retorno no cenário a.a.</th>
                 <th className="app-numeric">Renda (DY)</th>
@@ -931,6 +1085,10 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
                   <td>{p.arca_class === "CAIXA" ? "CDI líquido de IR" : p.proxy}</td>
                   <td className="app-numeric">{points(data.targets?.[p.arca_class], 0)}</td>
                   <td className="app-numeric">{p.arca_class === "CAIXA" ? "—" : pct(p.excess_annual, 1, true)}</td>
+                  <td className="app-numeric">{p.prior_excess_annual == null ? "—" : pct(p.prior_excess_annual, 1, true)}</td>
+                  <td className="app-numeric">
+                    {p.posterior_excess_annual == null ? "—" : pct(p.posterior_excess_annual, 1, true)}
+                  </td>
                   <td className="app-numeric">{p.arca_class === "CAIXA" ? "—" : pct(p.volatility, 1)}</td>
                   <td className="app-numeric">{pct(p.expected_annual, 1)}</td>
                   <td className="app-numeric">{pct(p.income_yield, 1)}</td>
@@ -940,8 +1098,9 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
           </table>
         </div>
         <p className="app-card-hint">
-          A renda do Caixa conta só o rendimento acima da inflação. A probabilidade de meta tem só o erro da simulação; a
-          incerteza dos próprios prêmios entra na camada bayesiana.
+          A renda do Caixa conta só o rendimento acima da inflação. O prêmio a posteriori é o histórico puxado para o alvo
+          conservador (CDI + 3% em ações, CDI + 2% em FIIs) na medida em que os dados não o sustentam; a normal bayesiana
+          sorteia os prêmios em torno dele em cada trajetória.
         </p>
       </section>
       <Reproducibility run={run} />
@@ -953,6 +1112,194 @@ function ProjectionTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
   const state = useApi(`simulation-projection-${run.id}-${run.status}`, () => api.simulations.projection(run.id));
   if (run.status !== "DONE") return <RunProblem run={run} />;
   return <Async state={state}>{(data) => <ProjectionView data={data} run={run} />}</Async>;
+}
+
+// --- confidence -------------------------------------------------------------------------------
+
+const CALIBRATION_STATUS: Record<GeneratorCalibrationDTO["status"], { label: string; tone: string }> = {
+  CALIBRATED: { label: "Calibrado", tone: "success" },
+  MISCALIBRATED: { label: "Mal calibrado", tone: "danger" },
+  INCONCLUSIVE: { label: "Inconclusivo", tone: "warning" },
+};
+
+export function CalibrationView({ data }: Readonly<{ data: CalibrationDTO }>) {
+  const generators = data.generators ?? [];
+  const stacked = generators.find((g) => g.key === "STACKED");
+  const origins = data.origins ?? [];
+  return (
+    <div className="app-page-stack">
+      <ul className="app-warning-banner" aria-label="Avisos da calibração">
+        {(data.warnings ?? []).map((w) => (
+          <li key={w}>{w}</li>
+        ))}
+      </ul>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Geradores de cenário</h2>
+        <p className="app-card-hint">
+          {data.windows} previsões de 12 meses, de {day(data.first_origin)} a {day(data.last_origin)} (cerca de{" "}
+          {num(data.effective_windows, 0)} janelas independentes). Um intervalo de 90% bem calibrado contém o realizado em
+          cerca de 90% das vezes.
+        </p>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Calibração dos geradores">
+            <thead>
+              <tr>
+                <th>Gerador</th>
+                <th className="app-numeric">Peso na combinação</th>
+                <th className="app-numeric">Cobertura do intervalo de 90%</th>
+                <th>Situação</th>
+                <th className="app-numeric">PIT médio</th>
+                <th className="app-numeric">Brier: perder 10%</th>
+                <th className="app-numeric">Brier: bater o CDI</th>
+                <th className="app-numeric">Log score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {generators.map((g) => (
+                <tr key={g.key}>
+                  <td>{g.label}</td>
+                  <td className="app-numeric">{g.key === "STACKED" ? "—" : pct(g.weight, 0)}</td>
+                  <td className="app-numeric">
+                    {pct(g.coverage, 0)}
+                    <div className="app-muted">
+                      {pct(g.coverage_low, 0)} a {pct(g.coverage_high, 0)}
+                    </div>
+                  </td>
+                  <td>
+                    <Badge tone={CALIBRATION_STATUS[g.status].tone}>{CALIBRATION_STATUS[g.status].label}</Badge>
+                  </td>
+                  <td className="app-numeric">{num(g.mean_pit, 2)}</td>
+                  <td className="app-numeric">{num(g.brier_loss, 3)}</td>
+                  <td className="app-numeric">{num(g.brier_beat_cdi, 3)}</td>
+                  <td className="app-numeric">{num(g.log_score, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-card-hint">
+          PIT médio perto de 0,5 = sem viés; Brier menor e log score maior = melhor. O intervalo da cobertura leva em
+          conta que as janelas se sobrepõem; quando ele é largo demais, a situação é inconclusiva, e isso é um resultado,
+          não um erro.
+        </p>
+      </section>
+      {stacked && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Onde o realizado caiu na previsão da combinação</h2>
+          <ColumnChart
+            title="Histograma do PIT da combinação"
+            columns={(stacked.pit_histogram ?? []).map((value, i) => ({ label: `${i * 10}–${i * 10 + 10}%`, value }))}
+            hint="Colunas parecidas = bem calibrado. Concentração nas pontas = intervalos estreitos demais; no meio = largos demais."
+            format={(v) => `${v} janelas`}
+          />
+        </section>
+      )}
+      {origins.length > 1 && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Previsto contra realizado (12 meses)</h2>
+          <TrendChart
+            title="Retorno de 12 meses previsto pela combinação e realizado, por origem"
+            labels={origins.map((o) => day(o.origin))}
+            series={[
+              {
+                key: "realized",
+                label: "Realizado",
+                color: "var(--viz-serie-2)",
+                values: origins.map((o) => o.realized),
+              },
+              {
+                key: "p50",
+                label: "Mediana prevista",
+                color: "var(--viz-serie-1)",
+                values: origins.map((o) => o.forecasts?.STACKED?.p50 ?? null),
+              },
+            ]}
+            bands={[
+              {
+                key: "p5-p95",
+                color: "var(--viz-serie-1)",
+                low: origins.map((o) => o.forecasts?.STACKED?.p5 ?? 0),
+                high: origins.map((o) => o.forecasts?.STACKED?.p95 ?? 0),
+              },
+            ]}
+            hint="Faixa: intervalo de 90% previsto em cada origem; linha: o que aconteceu nos 12 meses seguintes."
+            format={(v) => pct(v, 0)}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function ConfidencePanel() {
+  const [tick, setTick] = useState(0);
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const state = useApi(`simulation-calibration-${tick}`, () => api.simulations.calibration());
+  const pending = state.data?.pending_run_id ?? null;
+
+  useEffect(() => {
+    if (pending === null) return undefined;
+    const timer = setTimeout(() => setTick((t) => t + 1), POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pending, tick]);
+
+  const recalibrate = async () => {
+    setRequesting(true);
+    setError(null);
+    try {
+      await api.simulations.submitCalibration();
+      setTick((t) => t + 1);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Calibração</h2>
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="app-form-actions">
+          <button
+            type="button"
+            className="app-primary-button"
+            disabled={requesting || pending !== null}
+            onClick={recalibrate}
+          >
+            {(requesting || pending !== null) && <Spinner size="sm" />}
+            <span>Recalcular agora</span>
+          </button>
+          {pending !== null && (
+            <span className="app-muted" role="status">
+              Calibração na fila do worker; a página atualiza sozinha.
+            </span>
+          )}
+          {state.data?.finished_at && (
+            <span className="app-muted">Última: {dateTime(state.data.finished_at)}</span>
+          )}
+        </div>
+      </section>
+      <Async state={state}>
+        {(data) =>
+          data.run_id === null || data.run_id === undefined ? (
+            <Empty
+              title="Ainda não há calibração"
+              hint="Ela roda depois de cada carga do histórico; clique em Recalcular agora para rodar já."
+            />
+          ) : (
+            <CalibrationView data={data} />
+          )
+        }
+      </Async>
+    </>
+  );
 }
 
 // --- page -------------------------------------------------------------------------------------
@@ -998,7 +1345,7 @@ function useSelected(param: string, runs: SimulationRunDTO[] | null | undefined)
   return [selected, select];
 }
 
-function BacktestPanel({ tab }: Readonly<{ tab: TabKey }>) {
+function BacktestPanel({ tab }: Readonly<{ tab: "past" | "robustness" }>) {
   const runs = useApi("simulation-runs", () => api.simulations.list(20, "BACKTEST"));
   const [selected, select] = useSelected("run", runs.data);
   return (
@@ -1060,7 +1407,10 @@ export function SimulationPage() {
       />
       <div className="app-page-stack">
         <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Visões da simulação" />
-        {tab === "future" ? <FuturePanel /> : <BacktestPanel tab={tab} />}
+        <TabGuide tab={tab} />
+        {tab === "future" && <FuturePanel />}
+        {tab === "confidence" && <ConfidencePanel />}
+        {(tab === "past" || tab === "robustness") && <BacktestPanel tab={tab} />}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import type {
   AssetType,
   AssetUpdateRequest,
   BacktestRequest,
+  CalibrationDTO,
   CerradoUpdateRequest,
   ContributionConfirmRequest,
   ContributionPlanStatus,
@@ -161,6 +162,9 @@ export const api = {
     get: (id: number) => request<SimulationRunDetailDTO>(`/simulations/${id}`),
     robustness: (id: number) => request<RobustnessDTO>(`/simulations/${id}/robustness`),
     projection: (id: number) => request<ProjectionDTO>(`/simulations/${id}/projection`),
+    calibration: (runId?: number) =>
+      request<CalibrationDTO>("/simulations/calibration", { query: { run_id: runId } }),
+    submitCalibration: () => request<SimulationRunDTO>("/simulations/calibrations", { method: "POST" }),
     submitBacktest: (body: BacktestRequest) =>
       request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
     submitProjection: (body: ProjectionRequest) =>

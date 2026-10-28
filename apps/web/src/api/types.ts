@@ -339,6 +339,25 @@ export interface BreakEvenDTO {
   always_ahead: boolean;
 }
 
+export interface CalibrationDTO {
+  run_id?: number | null;
+  status?: SimulationStatus | null;
+  finished_at?: string | null;
+  error?: string | null;
+  horizon_months?: number;
+  windows?: number;
+  effective_windows?: number;
+  first_origin?: string | null;
+  last_origin?: string | null;
+  classes?: string[];
+  targets?: Record<string, number>;
+  weights?: Record<string, number>;
+  generators?: GeneratorCalibrationDTO[];
+  origins?: OriginForecastDTO[];
+  warnings?: string[];
+  pending_run_id?: number | null;
+}
+
 export interface CerradoEvaluationDTO {
   profile: ChecklistProfile;
   checklist_version: number;
@@ -423,6 +442,8 @@ export interface ClassPremiseDTO {
   volatility: number;
   expected_annual: number;
   income_yield: number;
+  prior_excess_annual?: number | null;
+  posterior_excess_annual?: number | null;
 }
 
 export interface ComparedAssetDTO {
@@ -653,6 +674,16 @@ export interface EvaluatedAnswerDTO {
   stale_reason?: string | null;
 }
 
+export interface EventOutcomeDTO {
+  key: string;
+  label: string;
+  probability: number;
+  standard_error: number;
+  low: number;
+  high: number;
+  by_generator?: Record<string, number>;
+}
+
 export interface ExecutionDTO {
   asset_id: number;
   quantity: number | string;
@@ -742,11 +773,38 @@ export interface FundamentalSnapshotDTO {
   source?: string | null;
 }
 
+export interface GeneratorCalibrationDTO {
+  key: string;
+  label: string;
+  weight: number;
+  windows: number;
+  effective_windows: number;
+  coverage: number;
+  coverage_low: number;
+  coverage_high: number;
+  status: "CALIBRATED" | "MISCALIBRATED" | "INCONCLUSIVE";
+  pit_histogram?: number[];
+  mean_pit: number;
+  brier_loss: number;
+  brier_beat_cdi: number;
+  log_score: number;
+}
+
+export interface GeneratorShareDTO {
+  key: string;
+  label: string;
+  weight: number;
+  paths: number;
+}
+
 export interface GoalOutcomeDTO {
   target: number;
   probability: number;
   standard_error: number;
   months?: PercentilesDTO | null;
+  low?: number;
+  high?: number;
+  by_generator?: Record<string, number>;
 }
 
 export interface GrantOptionsDTO {
@@ -1034,6 +1092,12 @@ export interface OfferProjectionDTO {
   equivalent_rates: EquivalentRateDTO[];
 }
 
+export interface OriginForecastDTO {
+  origin: string;
+  realized: number;
+  forecasts?: Record<string, Record<string, number>>;
+}
+
 export interface PageMetaDTO {
   page: number;
   page_size: number;
@@ -1169,6 +1233,7 @@ export interface ProjectionDTO {
   classes?: string[];
   targets?: Record<string, number>;
   warnings?: string[];
+  calibration_run?: number | null;
 }
 
 export interface ProjectionPointDTO {
@@ -1193,6 +1258,7 @@ export interface ProjectionRequest {
   mean_block_months?: number;
   fee_rate?: number;
   sample_start?: string | null;
+  generator?: "STACKED" | "BOOTSTRAP" | "BAYESIAN_BOOTSTRAP" | "BAYESIAN_NORMAL";
   label?: string | null;
 }
 
@@ -1213,6 +1279,9 @@ export interface ProjectionScenarioDTO {
   premises?: ClassPremiseDTO[];
   fees?: number;
   taxes?: number;
+  events?: EventOutcomeDTO[];
+  generators?: GeneratorShareDTO[];
+  prior_months?: number | null;
 }
 
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
@@ -1395,7 +1464,7 @@ export interface ShockDTO {
   note?: string;
 }
 
-export type SimulationKind = "BACKTEST" | "PROJECTION";
+export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION";
 
 export interface SimulationResultDTO {
   key: string;

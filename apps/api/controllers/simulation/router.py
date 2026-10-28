@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, status
 from controllers.simulation.dependencies import get_simulation_handler
 from controllers.simulation.requests import BacktestRequest, ProjectionRequest
 from controllers.simulation.responses import (
+    CalibrationDTO,
     CoverageReportDTO,
     ProjectionDTO,
     RobustnessDTO,
@@ -48,6 +49,23 @@ def submit_projection(
     handler: SimulationHandler = Depends(get_simulation_handler),
 ) -> SimulationRunDTO:
     return handler.submit_projection(req)
+
+
+@simulation_router.post(
+    "/calibrations", response_model=SimulationRunDTO, status_code=status.HTTP_202_ACCEPTED
+)
+def submit_calibration(
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> SimulationRunDTO:
+    return handler.submit_calibration()
+
+
+@simulation_router.get("/calibration", response_model=CalibrationDTO)
+def get_calibration(
+    run_id: int | None = Query(default=None),
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> CalibrationDTO:
+    return handler.calibration(run_id)
 
 
 @simulation_router.get("", response_model=list[SimulationRunDTO])

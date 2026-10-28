@@ -77,6 +77,7 @@ from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
 from controllers.simulation.requests import BacktestRequest, ProjectionRequest
 from controllers.simulation.responses import (
+    CalibrationDTO,
     CoverageReportDTO,
     ProjectionDTO,
     RobustnessDTO,
@@ -154,6 +155,10 @@ class CoveragePeriodInput(BaseModel):
 
 class JobRequestInput(BaseModel):
     job_name: Literal["sync_simulation_history"]
+
+
+class CalibrationInput(BaseModel):
+    run_id: int | None = None
 
 
 class SimulationIdInput(BaseModel):
@@ -1179,6 +1184,32 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationIdInput,
         output_type=ProjectionDTO,
         invoke=lambda h, p: h.simulation.projection(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.calibrate",
+        kind="command",
+        description=(
+            "Agenda a calibração walk-forward dos geradores de cenário (bootstrap em blocos, "
+            "bootstrap bayesiano e normal bayesiana): em cada mês passado, prevê os 12 meses "
+            "seguintes da carteira-modelo só com os dados até ali e compara com o realizado. "
+            "Roda toda semana sozinha; acompanhe com simulation.calibration."
+        ),
+        input_model=EmptyInput,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, _p: h.simulation.submit_calibration(),
+    ),
+    OperationSpec(
+        name="simulation.calibration",
+        kind="query",
+        description=(
+            "Calibração mais recente (ou a de `run_id`): por gerador e para a combinação, a "
+            "cobertura do intervalo de 90% com intervalo de credibilidade, o status "
+            "(calibrado, mal calibrado ou inconclusivo), o histograma do PIT, o Brier de perder "
+            "mais de 10% e de bater o CDI, o log score e os pesos do stacking que a projeção usa."
+        ),
+        input_model=CalibrationInput,
+        output_type=CalibrationDTO,
+        invoke=lambda h, p: h.simulation.calibration(p.run_id),
     ),
     OperationSpec(
         name="simulation.list",

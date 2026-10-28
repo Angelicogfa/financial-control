@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from controllers.shared.dependencies import UoWFactory
 from controllers.simulation.requests import BacktestRequest, ProjectionRequest
 from controllers.simulation.responses import (
+    CalibrationDTO,
     CoverageReportDTO,
     CrisisDTO,
     DistributionDTO,
@@ -50,14 +51,18 @@ from domain.simulation.robustness import (
     window_outcome,
 )
 from domain.simulation.runs import (
+    CALIBRATION_KEY,
     PROJECTION_PREFIX,
     STRATEGY_KEY,
     BacktestParams,
     ProjectionParams,
     Universe,
     income_yields,
+    latest_calibration,
     new_backtest_run,
     new_projection_run,
+    pending_calibration,
+    queue_calibration,
 )
 
 
@@ -166,6 +171,7 @@ class SimulationHandler:
                 mean_block_months=req.mean_block_months,
                 fee_rate=req.fee_rate,
                 sample_start=req.sample_start,
+                generator=req.generator,
             )
             run = uow.simulations.add(new_projection_run(params, label=req.label))
             uow.commit()
@@ -224,6 +230,39 @@ class SimulationHandler:
             trials_total = uow.simulations.count_results(VARIANT_PREFIX)
         return build_robustness(run, results, trials_total=trials_total)
 
+    def submit_calibration(self) -> SimulationRunDTO:
+        """Queue a calibration of the generators; one already waiting is returned instead."""
+        with self.uow_factory() as uow:
+            run = queue_calibration(uow)
+            uow.commit()
+        return to_run_dto(run)
+
+    def calibration(self, run_id: int | None = None) -> CalibrationDTO:
+        """A calibration by id, or the latest finished one (empty when there is none)."""
+        with self.uow_factory() as uow:
+            pending = pending_calibration(uow)
+            if run_id is not None:
+                run = self._get(uow, run_id, SimulationKind.CALIBRATION)
+                rows = [r for r in uow.simulations.results(run_id) if r.key == CALIBRATION_KEY]
+                found = (run, rows[0] if rows else None)
+            else:
+                latest = latest_calibration(uow)
+                found = (latest[0], latest[1]) if latest else None
+        pending_id = pending.id if pending is not None else None
+        if found is None:
+            return CalibrationDTO(pending_run_id=pending_id)
+        run, result = found
+        base = {
+            "run_id": run.id,
+            "status": run.status,
+            "finished_at": run.finished_at,
+            "error": run.error,
+            "pending_run_id": pending_id if pending_id != run.id else None,
+        }
+        if result is None:
+            return CalibrationDTO(**base)
+        return CalibrationDTO(**base, **result.summary, origins=result.points)
+
     def projection(self, run_id: int) -> ProjectionDTO:
         """Percentiles, goals and premises of a projection (empty while it is not DONE)."""
         with self.uow_factory() as uow:
@@ -274,6 +313,7 @@ def build_projection(run: SimulationRun, results: list[SimulationResult]) -> Pro
         classes=extra.get("classes", []),
         targets=extra.get("targets", {}),
         warnings=extra.get("warnings", []),
+        calibration_run=extra.get("calibration_run"),
     )
 
 

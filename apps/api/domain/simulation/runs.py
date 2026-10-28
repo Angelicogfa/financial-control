@@ -22,6 +22,13 @@ from domain.policy.services.policy import InvestmentPolicy, current_policy
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, AssetType
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.simulation.calibration import (
+    MIN_TRAIN_MONTHS,
+    PATHS_PER_ORIGIN,
+    STACKED,
+    CalibrationResult,
+    calibrate,
+)
 from domain.simulation.data import (
     CDI_KEY,
     IBOV_KEY,
@@ -46,11 +53,19 @@ from domain.simulation.entities import (
     SimulationRun,
     SimulationStatus,
 )
+from domain.simulation.generators import (
+    EQUAL_WEIGHTS,
+    GENERATOR_LABELS,
+    Generator,
+    draw_mixture,
+    sample_posterior,
+)
 from domain.simulation.market import MarketHistory
 from domain.simulation.robustness import rule_variants, with_band
 from domain.simulation.scenarios import (
     CLASS_ORDER,
     ClassSample,
+    GeneratorShare,
     ProjectionConfig,
     ProjectionResult,
     class_sample,
@@ -68,6 +83,8 @@ CASH_TICKER = "CAIXA-CDI"
 STRATEGY_KEY = "strategy"
 BENCHMARK_PREFIX = "benchmark:"
 PROJECTION_PREFIX = "projection:"
+CALIBRATION_KEY = "calibration"
+CALIBRATION_LOOKUP = 20
 # Income yield of a class without a position to measure it (annual share of the value).
 DEFAULT_INCOME_YIELD: dict[ArcaClass, float] = {
     ArcaClass.ACOES: 0.05,
@@ -393,6 +410,9 @@ class ProjectionParams:
     mean_block_months: float = 12.0
     fee_rate: float = 0.0003
     sample_start: date | None = None
+    # STACKED mixes the generators with the latest calibration's weights; a generator name
+    # (BOOTSTRAP, BAYESIAN_BOOTSTRAP, BAYESIAN_NORMAL) uses that one alone (Phase 33.6).
+    generator: str = STACKED
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -420,6 +440,7 @@ class ProjectionParams:
             mean_block_months=float(data.get("mean_block_months", 12.0)),
             fee_rate=float(data.get("fee_rate", 0.0003)),
             sample_start=date.fromisoformat(start) if start else None,
+            generator=data.get("generator", STACKED),
         )
 
     def class_values(self, data: dict[str, float]) -> dict[ArcaClass, float]:
@@ -465,6 +486,53 @@ class ProjectionInputs:
     sample: ClassSample
     policy: InvestmentPolicy
     data_hash: str = ""
+    # Generator mixture and where its weights came from.
+    weights: dict[str, float] = field(default_factory=lambda: {Generator.BOOTSTRAP.value: 1.0})
+    calibration_run: int | None = None
+    generator_note: str | None = None
+
+
+def latest_calibration(
+    uow: AbstractUnitOfWork,
+) -> tuple[SimulationRun, SimulationResult] | None:
+    """The newest finished calibration and its stored result."""
+    for run in uow.simulations.list_recent(CALIBRATION_LOOKUP, SimulationKind.CALIBRATION):
+        if run.status == SimulationStatus.DONE and run.id is not None:
+            rows = [r for r in uow.simulations.results(run.id) if r.key == CALIBRATION_KEY]
+            if rows:
+                return run, rows[0]
+    return None
+
+
+def mixture_weights(
+    uow: AbstractUnitOfWork, generator: str, sample: ClassSample
+) -> tuple[dict[str, float], int | None, str | None]:
+    """Generator weights of a projection: the calibration's, when it fits the same classes."""
+    if generator != STACKED:
+        return {Generator(generator).value: 1.0}, None, None
+    found = latest_calibration(uow)
+    if found is None:
+        return (
+            dict(EQUAL_WEIGHTS),
+            None,
+            (
+                "Ainda não há calibração: os três geradores entram com pesos iguais. Rode a "
+                "calibração na aba Confiança."
+            ),
+        )
+    run, result = found
+    classes = set(result.summary.get("classes", []))
+    if classes != {c.value for c in sample.classes}:
+        return (
+            dict(EQUAL_WEIGHTS),
+            run.id,
+            (
+                "A última calibração foi feita com outras classes (a política mudou?): os três "
+                "geradores entram com pesos iguais até a próxima calibração."
+            ),
+        )
+    weights = {k: float(v) for k, v in result.summary.get("weights", {}).items()}
+    return weights, run.id, None
 
 
 def required_classes(params: ProjectionParams, policy: InvestmentPolicy) -> list[ArcaClass]:
@@ -486,12 +554,22 @@ def load_projection_inputs(
         end=today or date.today(),
     )
     sample = class_sample(history, required_classes(params, policy), start=params.sample_start)
+    weights, calibration_run, note = mixture_weights(uow, params.generator, sample)
     return ProjectionInputs(
         sample=sample,
         policy=policy,
         data_hash=_digest(
-            {"series": _series_fingerprint(history), "policy": repr(policy), "sample": sample.size}
+            {
+                "series": _series_fingerprint(history),
+                "policy": repr(policy),
+                "sample": sample.size,
+                "weights": weights,
+                "calibration": calibration_run,
+            }
         ),
+        weights=weights,
+        calibration_run=calibration_run,
+        generator_note=note,
     )
 
 
@@ -523,10 +601,10 @@ def run_projection_params(
     seed: int,
     deadline: Callable[[], bool] | None = None,
 ) -> list[ProjectionResult]:
-    """One projection per rate scenario, all with the same seed (common random numbers).
+    """One projection per rate scenario, all from the same draws (common random numbers).
 
-    The same bootstrap draws in every scenario make their differences come from the rates
-    alone, not from sampling noise.
+    The paths of the generator mixture are drawn once and reused in every scenario, so the
+    differences between scenarios come from the rates alone, not from sampling noise.
     """
     config = projection_config(params, inputs.policy)
     scenarios = default_scenarios(
@@ -534,7 +612,36 @@ def run_projection_params(
         params.ipca_rate,
         ProjectionAssumptions(scenario_rate_shift=params.rate_shift),
     )
-    return [project(inputs.sample, s, config, seed=seed, deadline=deadline) for s in scenarios]
+    posterior = sample_posterior(inputs.sample)
+    excess, labels = draw_mixture(
+        inputs.sample,
+        inputs.weights,
+        config.paths,
+        config.horizon_months,
+        mean_block=config.mean_block_months,
+        seed=seed,
+        posterior=posterior,
+    )
+    counts = {g: int((labels == g).sum()) for g in inputs.weights}
+    shares = [
+        GeneratorShare(key=g, label=GENERATOR_LABELS.get(g, g), weight=round(w, 4), paths=counts[g])
+        for g, w in inputs.weights.items()
+        if counts[g] > 0
+    ]
+    return [
+        project(
+            inputs.sample,
+            s,
+            config,
+            seed=seed,
+            deadline=deadline,
+            excess=excess,
+            labels=labels,
+            posterior=posterior,
+            generators=shares,
+        )
+        for s in scenarios
+    ]
 
 
 def to_stored_projection(
@@ -561,8 +668,117 @@ def to_stored_projection(
             "sample_months": sample.size,
             "classes": [c.value for c in sample.classes],
             "targets": {c.value: p.target_pct for c, p in inputs.policy.arca.classes.items()},
-            "warnings": projection_warnings(sample, projection_config(params, inputs.policy)),
+            "warnings": projection_warnings(sample, projection_config(params, inputs.policy))
+            + bayes_warnings(result, inputs),
+            "calibration_run": inputs.calibration_run,
         },
+    )
+
+
+def bayes_warnings(result: ProjectionResult, inputs: ProjectionInputs) -> list[str]:
+    """Where the weights came from and when the prior outweighs the data (risk R15)."""
+    out = [inputs.generator_note] if inputs.generator_note else []
+    if result.prior_months is not None and result.prior_months > inputs.sample.size:
+        out.append(
+            f"O prior pesa mais que os dados: equivale a {result.prior_months:.0f} meses contra "
+            f"{inputs.sample.size} de histórico, e puxa os prêmios para o alvo conservador "
+            "(CDI + 3% em ações, CDI + 2% em FIIs)."
+        )
+    return out
+
+
+@dataclass(frozen=True)
+class CalibrationParams:
+    """A weekly (or requested) calibration of the generators over the stored history."""
+
+    mean_block_months: float = 12.0
+    paths_per_origin: int = PATHS_PER_ORIGIN
+    min_train_months: int = MIN_TRAIN_MONTHS
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CalibrationParams:
+        return cls(
+            mean_block_months=float(data.get("mean_block_months", 12.0)),
+            paths_per_origin=int(data.get("paths_per_origin", PATHS_PER_ORIGIN)),
+            min_train_months=int(data.get("min_train_months", MIN_TRAIN_MONTHS)),
+        )
+
+
+def new_calibration_run(
+    params: CalibrationParams | None = None, *, seed: int = DEFAULT_SEED
+) -> SimulationRun:
+    params = params or CalibrationParams()
+    return SimulationRun(
+        kind=SimulationKind.CALIBRATION,
+        params=params.to_dict(),
+        params_hash=_digest({"kind": "CALIBRATION", **params.to_dict()}),
+        code_version=ENGINE_VERSION,
+        seed=seed,
+        label="Calibração dos geradores",
+    )
+
+
+def pending_calibration(uow: AbstractUnitOfWork) -> SimulationRun | None:
+    """A calibration still queued or running."""
+    for run in uow.simulations.list_recent(CALIBRATION_LOOKUP, SimulationKind.CALIBRATION):
+        if run.status in (SimulationStatus.PENDING, SimulationStatus.RUNNING):
+            return run
+    return None
+
+
+def queue_calibration(uow: AbstractUnitOfWork) -> SimulationRun:
+    """Queue a calibration (no commit); one already waiting is returned instead."""
+    waiting = pending_calibration(uow)
+    return waiting if waiting is not None else uow.simulations.add(new_calibration_run())
+
+
+@dataclass(frozen=True)
+class CalibrationInputs:
+    sample: ClassSample
+    targets: dict[ArcaClass, float]
+    data_hash: str = ""
+
+
+def load_calibration_inputs(
+    uow: AbstractUnitOfWork, *, today: date | None = None
+) -> CalibrationInputs:
+    """The common history of the classes with a target, and those targets (model portfolio)."""
+    policy = current_policy(uow.policies)
+    targets = {c: p.target_pct / 100.0 for c, p in policy.arca.classes.items()}
+    history = build_market_history(
+        uow.market_series, [], start=SIMULATION_HISTORY_START, end=today or date.today()
+    )
+    sample = class_sample(history, [c for c in CLASS_ORDER if targets.get(c, 0.0) > 0])
+    return CalibrationInputs(
+        sample=sample,
+        targets=targets,
+        data_hash=_digest(
+            {
+                "series": _series_fingerprint(history),
+                "targets": {c.value: v for c, v in targets.items()},
+            }
+        ),
+    )
+
+
+def to_stored_calibration(run_id: int, result: CalibrationResult) -> SimulationResult:
+    summary = asdict(result)
+    origins = summary.pop("origins")
+    summary["classes"] = [c.value for c in result.classes]
+    summary["targets"] = {c.value: v for c, v in result.targets.items()}
+    summary["first_origin"] = result.first_origin.isoformat()
+    summary["last_origin"] = result.last_origin.isoformat()
+    for g in summary["generators"]:
+        g["status"] = g["status"].value
+    return SimulationResult(
+        run_id=run_id,
+        key=CALIBRATION_KEY,
+        label="Calibração dos geradores",
+        summary=summary,
+        points=[{**o, "origin": o["origin"].isoformat()} for o in origins],
     )
 
 
@@ -572,6 +788,23 @@ Compute = Callable[[Callable[[], bool]], list[SimulationResult]]
 def prepare_run(uow: AbstractUnitOfWork, run: SimulationRun) -> tuple[str, Compute]:
     """Read the run's inputs and return their hash and the computation (by kind)."""
     run_id: int = run.id  # type: ignore[assignment]
+    if run.kind == SimulationKind.CALIBRATION:
+        calibration = CalibrationParams.from_dict(run.params)
+        c_inputs = load_calibration_inputs(uow)
+        return c_inputs.data_hash, lambda deadline: [
+            to_stored_calibration(
+                run_id,
+                calibrate(
+                    c_inputs.sample,
+                    c_inputs.targets,
+                    seed=run.seed,
+                    mean_block=calibration.mean_block_months,
+                    paths=calibration.paths_per_origin,
+                    min_train=calibration.min_train_months,
+                    deadline=deadline,
+                ),
+            )
+        ]
     if run.kind == SimulationKind.PROJECTION:
         projection = ProjectionParams.from_dict(run.params)
         p_inputs = load_projection_inputs(uow, projection)
