@@ -13,6 +13,7 @@ Fair-price methods (kind PRICE) are combined by their median; multiples and yiel
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from statistics import median
@@ -22,7 +23,7 @@ from domain.assets.services.classic_valuation import (
     graham_fair_value,
     margin_of_safety,
 )
-from domain.assets.services.history import FundamentalSnapshot
+from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
 from domain.market.entities import Fundamentals
 from domain.policy.services.policy import ValuationPolicy
 from domain.shared.enums import ChecklistProfile
@@ -66,6 +67,9 @@ class AssetValuation:
     margin: float | None
     verdict: ValuationVerdict
     reason: str = ""
+    # Phase 25: inputs flagged as suspicious and one-off dividends in the trailing year.
+    suspicious_inputs: tuple[str, ...] = ()
+    extraordinary_dividends: bool = False
 
 
 NOT_APPLICABLE_REASONS: dict[ChecklistProfile, str] = {
@@ -118,6 +122,65 @@ def _dividends_per_share(price: float | None, f: Fundamentals) -> float | None:
     return None
 
 
+NORMALIZED_MIN_YEARS = 3
+NORMALIZED_MAX_YEARS = 5
+EXTRAORDINARY_RATIO = 1.5
+
+# Indicators each method reads; a flagged one makes the method (and the verdict) suspicious.
+METHOD_INPUTS: dict[str, tuple[str, ...]] = {
+    "GRAHAM": ("price_to_earnings", "price_to_book"),
+    "BAZIN": ("dividend_yield",),
+    "PE": ("price_to_earnings",),
+    "EV_EBITDA": (),
+    "JUSTIFIED_PB": ("return_on_equity", "price_to_book"),
+    "PB": ("price_to_book",),
+    "DY": ("dividend_yield",),
+    "SPREAD": ("dividend_yield",),
+}
+
+
+@dataclass(frozen=True)
+class NormalizedDividends:
+    """Median yearly dividends per share over 3-5 fiscal years (Phase 25.4)."""
+
+    per_share: float
+    years: int
+    extraordinary: bool
+
+
+def normalized_dividends(
+    statements: Sequence[FundamentalSnapshot], price: float | None, f: Fundamentals
+) -> NormalizedDividends | None:
+    """Median of the dividends paid in the last 3-5 fiscal years, per share today.
+
+    The share count is today's market cap / price. `extraordinary` marks trailing dividends
+    above 1.5x the median (a one-off payment would inflate the Bazin ceiling).
+    """
+    if not price or price <= 0 or not f.market_cap:
+        return None
+    paid = [
+        abs(s.value("dividends_paid") or 0.0)
+        for s in sorted(
+            (s for s in statements if s.period == FundamentalPeriod.ANNUAL),
+            key=lambda s: s.reference_date,
+            reverse=True,
+        )
+        if s.value("dividends_paid") is not None
+    ][:NORMALIZED_MAX_YEARS]
+    if len(paid) < NORMALIZED_MIN_YEARS:
+        return None
+    shares = f.market_cap / price
+    per_share = median(paid) / shares
+    if per_share <= 0:
+        return None
+    trailing = _dividends_per_share(price, f)
+    return NormalizedDividends(
+        per_share=per_share,
+        years=len(paid),
+        extraordinary=trailing is not None and trailing > EXTRAORDINARY_RATIO * per_share,
+    )
+
+
 def ev_to_ebitda(f: Fundamentals, statement: FundamentalSnapshot | None) -> float | None:
     """EV/EBITDA from market cap and the latest yearly statement."""
     if statement is None or f.market_cap is None:
@@ -135,9 +198,22 @@ def _graham(price: float | None, f: Fundamentals, policy: ValuationPolicy) -> Me
     return _price_method("GRAHAM", "Preço justo de Graham", fair, price)
 
 
-def _bazin(price: float | None, f: Fundamentals, policy: ValuationPolicy) -> MethodResult:
+def _bazin(
+    price: float | None,
+    f: Fundamentals,
+    policy: ValuationPolicy,
+    normalized: NormalizedDividends | None = None,
+) -> MethodResult:
+    if normalized is not None:
+        fair = bazin_ceiling_price(normalized.per_share, policy.bazin_required_yield)
+        note = f"Proventos normalizados: mediana de {normalized.years} anos"
+        if normalized.extraordinary:
+            note += "; os últimos 12 meses têm proventos extraordinários"
+        return _price_method("BAZIN", "Preço teto de Bazin", fair, price, note=note)
     fair = bazin_ceiling_price(_dividends_per_share(price, f), policy.bazin_required_yield)
-    return _price_method("BAZIN", "Preço teto de Bazin", fair, price)
+    return _price_method(
+        "BAZIN", "Preço teto de Bazin", fair, price, note="Proventos dos últimos 12 meses"
+    )
 
 
 def _pe(f: Fundamentals, policy: ValuationPolicy) -> MethodResult:
@@ -204,8 +280,13 @@ def value_asset(
     policy: ValuationPolicy | None = None,
     *,
     latest_statement: FundamentalSnapshot | None = None,
+    statements: Sequence[FundamentalSnapshot] = (),
 ) -> AssetValuation:
-    """Value an asset with the methods that fit its profile."""
+    """Value an asset with the methods that fit its profile.
+
+    With `statements`, Bazin uses the median dividends of 3-5 years instead of the
+    trailing ones.
+    """
     rules = policy or ValuationPolicy()
     if profile in NOT_APPLICABLE_REASONS:
         return AssetValuation(
@@ -224,16 +305,19 @@ def value_asset(
         )
 
     f = fundamentals
+    normalized = normalized_dividends(statements, price, f)
+    if latest_statement is None and statements:
+        latest_statement = max(statements, key=lambda s: s.reference_date)
     if profile == ChecklistProfile.STOCK:
         methods = [
             _graham(price, f, rules),
-            _bazin(price, f, rules),
+            _bazin(price, f, rules, normalized),
             _pe(f, rules),
             _ev_ebitda(f, latest_statement, rules),
         ]
     elif profile == ChecklistProfile.BANK:
         methods = [
-            _bazin(price, f, rules),
+            _bazin(price, f, rules, normalized),
             _justified_pb(price, f, rules),
             _ceiling(
                 "PB", "P/VP", f.price_to_book, rules.max_price_to_book_bank, MethodKind.MULTIPLE
@@ -268,6 +352,20 @@ def value_asset(
             verdict = ValuationVerdict.FAIR
         else:
             verdict = ValuationVerdict.EXPENSIVE
+    flagged = sorted(
+        {
+            field
+            for m in methods
+            for field in METHOD_INPUTS.get(m.method, ())
+            if field in f.suspicious
+        }
+    )
+    methods = [
+        replace(m, note=(m.note + "; " if m.note else "") + "dado suspeito")
+        if any(field in f.suspicious for field in METHOD_INPUTS.get(m.method, ()))
+        else m
+        for m in methods
+    ]
     return AssetValuation(
         profile,
         True,
@@ -276,4 +374,6 @@ def value_asset(
         _round(fair_value),
         _round(margin, 4),
         verdict,
+        suspicious_inputs=tuple(flagged),
+        extraordinary_dividends=bool(normalized and normalized.extraordinary),
     )

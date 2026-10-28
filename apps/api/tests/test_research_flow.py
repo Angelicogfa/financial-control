@@ -143,14 +143,19 @@ def test_research_flow_from_screener_to_analysis(research: SimpleNamespace) -> N
     assert valuation["profile"] == "BANK"
     methods = {m["method"]: m for m in valuation["methods"]}
     assert methods["JUSTIFIED_PB"]["value"] == pytest.approx(30.0)
-    assert methods["BAZIN"]["value"] == pytest.approx(2.24 / 0.06, abs=0.01)
+    # Bazin uses the median dividends of the last 5 fiscal years (Phase 25.4): 11 bi over
+    # 310 bi / 32 = 9.6875 bi shares -> 1.1355 per share -> 18.92 at a 6% yield.
+    assert methods["BAZIN"]["value"] == pytest.approx(11e9 / (310e9 / 32.0) / 0.06, abs=0.01)
+    assert "mediana de 5 anos" in methods["BAZIN"]["note"]
+    assert valuation["extraordinary_dividends"] is True
     assert len(analysis["checklist_history"]) == 1
 
     # The watchlist lists it with checklist and valuation; the screener marks it registered.
     watchlist = client.get("/api/v1/research/watchlist").json()
     assert [w["ticker"] for w in watchlist] == ["ITUB4"]
     assert watchlist[0]["checklist_profile"] == "BANK"
-    assert watchlist[0]["valuation_verdict"] in {"DISCOUNTED", "FAIR"}
+    # Normalized Bazin 18.92 and justified P/B 30.00 -> fair 24.46 < price 32 (Phase 25.4).
+    assert watchlist[0]["valuation_verdict"] == "EXPENSIVE"
     registered = client.get("/api/v1/research/screener", params={"q": "itau"}).json()
     assert registered["results"][0]["asset_id"] == asset_id
     assert registered["results"][0]["lifecycle_status"] in {"WATCHLIST", "ELIGIBLE"}

@@ -61,6 +61,8 @@ describe("strategy", () => {
     fireEvent.change(screen.getByLabelText("Maior ativo: atenção (%)"), { target: { value: "20" } });
     fireEvent.change(screen.getByLabelText("Custo de vida mensal (R$)"), { target: { value: "5000" } });
     fireEvent.click(screen.getByLabelText(/Pesar o Tesouro Direto pelo preço de mercado/));
+    fireEvent.change(screen.getByLabelText("Validade das respostas manuais (meses)"), { target: { value: "6" } });
+    fireEvent.click(screen.getByLabelText("Tirar respostas vencidas da nota"));
     fireEvent.click(screen.getByRole("button", { name: "Salvar nova versão" }));
     await screen.findByText("Nova versão da estratégia salva.");
     const body = last(calls, "PUT", "/policy")?.body as {
@@ -72,6 +74,8 @@ describe("strategy", () => {
     expect(body.valuation.bazin_required_yield).toBeCloseTo(0.06);
     expect(body.valuation.projections).toEqual({ cash_cdi_multiplier: 1 });
     expect(body.valuation.treasury_mark_to_market).toBe(true);
+    const eligibility = (last(calls, "PUT", "/policy")?.body as { eligibility: Record<string, unknown> }).eligibility;
+    expect(eligibility).toMatchObject({ answer_validity_months: 6, drop_expired_answers: true, review_on_expired_answers: true });
     const healthLimits = (last(calls, "PUT", "/policy")?.body as { health: Record<string, number> }).health;
     expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
     expect(healthLimits.monthly_expenses_brl).toBe(5000);

@@ -111,6 +111,12 @@ export function ChecklistTab({
             </span>
           </div>
         </div>
+        {(checklist.stale ?? 0) > 0 && (
+          <p className="app-info-banner" role="note" style={{ marginTop: "var(--space-3)" }}>
+            {checklist.stale} resposta(s) manual(is) vencida(s): passaram do prazo de validade da estratégia ou são
+            anteriores ao último demonstrativo anual. Revise e salve para renová-las.
+          </p>
+        )}
         {profileChanged && (
           <p className="app-info-banner" style={{ marginTop: "var(--space-3)" }}>
             Salve para ver as perguntas do perfil {PROFILE_LABELS[profile]}.
@@ -125,7 +131,14 @@ export function ChecklistTab({
           return (
             <li key={answer.question_id} className="app-checklist-item">
               <div>
-                <div>{answer.text}</div>
+                <div>
+                  {answer.text}{" "}
+                  {answer.stale_reason && (
+                    <Badge tone="warning">
+                      {answer.stale_reason === "NEW_STATEMENT" ? "Reaberta: demonstrativo novo" : "Resposta vencida"}
+                    </Badge>
+                  )}
+                </div>
                 <small>
                   {answer.category}
                   {draft.value === null && answer.source === "AUTO" && answer.evidence
