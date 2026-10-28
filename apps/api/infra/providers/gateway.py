@@ -11,6 +11,9 @@ from domain.assets.services.history import (
     snapshot_to_dict,
 )
 from domain.market.entities import (
+    AnnouncedDistributions,
+    AnnouncedEarning,
+    AnnouncedStockEvent,
     Fundamentals,
     PricePoint,
     Quote,
@@ -18,9 +21,11 @@ from domain.market.entities import (
     TreasuryBond,
     TreasuryCatalogResult,
 )
+from domain.market.services.treasury_prices import TreasuryPricePoint
 from domain.shared.entities import CatalogInstrument, MarketSeriesPoint
 from domain.shared.enums import AssetType, Market, market_for
 from infra.cache.redis_cache import AbstractCacheBackend, InMemoryCache
+from infra.providers.b3_listed import B3ListedProvider
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
 from infra.providers.tesouro import TesouroTransparenteProvider
@@ -36,6 +41,7 @@ class CachedMarketGateway:
         yfinance: YFinanceProvider | None = None,
         bcb: BcbSgsProvider | None = None,
         tesouro: TesouroTransparenteProvider | None = None,
+        b3: B3ListedProvider | None = None,
         cache: AbstractCacheBackend | None = None,
         quote_ttl_seconds: int = 900,
         fundamentals_ttl_seconds: int = 86400,
@@ -47,6 +53,7 @@ class CachedMarketGateway:
         self.yfinance = yfinance or YFinanceProvider()
         self.bcb = bcb or BcbSgsProvider()
         self.tesouro = tesouro or TesouroTransparenteProvider()
+        self.b3 = b3 or B3ListedProvider()
         self.cache = cache or InMemoryCache()
         self.quote_ttl = quote_ttl_seconds
         self.fundamentals_ttl = fundamentals_ttl_seconds
@@ -199,6 +206,37 @@ class CachedMarketGateway:
             self._remember_miss(cache_key)
         return fund
 
+    def get_distributions(
+        self,
+        symbol: str,
+        *,
+        asset_type: AssetType | None = None,
+        bypass_cache: bool = False,
+    ) -> AnnouncedDistributions:
+        """Declared dividends and stock events of a B3 ticker (cached like fundamentals)."""
+        norm_sym = symbol.strip().upper()
+        if self._resolve_market(norm_sym, asset_type, None) != Market.B3:
+            return AnnouncedDistributions()
+        cache_key = f"distributions:{norm_sym}"
+        if not bypass_cache:
+            cached = self._cached(cache_key)
+            if isinstance(cached, dict):
+                return AnnouncedDistributions(
+                    cash=[AnnouncedEarning.from_dict(i) for i in cached.get("cash", [])],
+                    stock=[AnnouncedStockEvent.from_dict(i) for i in cached.get("stock", [])],
+                )
+        result = self.b3.get_distributions(norm_sym, asset_type or AssetType.STOCK_BR)
+        if result.cash or result.stock:
+            self.cache.set_json(
+                cache_key,
+                {
+                    "cash": [i.to_dict() for i in result.cash],
+                    "stock": [i.to_dict() for i in result.stock],
+                },
+                self.fundamentals_ttl,
+            )
+        return result
+
     def get_annual_statements(
         self,
         symbol: str,
@@ -236,6 +274,12 @@ class CachedMarketGateway:
     def list_instruments(self) -> list[CatalogInstrument]:
         """Listed B3 instruments (not cached: the worker stores them once a day)."""
         return self.brapi.list_instruments()
+
+    def get_treasury_price_history(
+        self, *, families: set[str] | None = None, since: date | None = None
+    ) -> list[TreasuryPricePoint]:
+        """Tesouro price history (not cached: the worker stores it in `market_series`)."""
+        return self.tesouro.list_price_history(families=families, since=since)
 
     def list_treasury_bonds(
         self,

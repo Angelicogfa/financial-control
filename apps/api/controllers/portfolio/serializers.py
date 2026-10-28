@@ -12,10 +12,12 @@ from controllers.portfolio.responses import (
     BenchmarkComparisonDTO,
     ClassAllocationDTO,
     ContributionPlanResponseDTO,
+    EarningsAgendaDTO,
     FixedIncomeValuationDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     RiskReturnSummaryDTO,
+    TreasuryMarketDTO,
     ValuedPositionDTO,
 )
 from controllers.shared.serializers import to_cerrado_dto
@@ -25,7 +27,9 @@ from domain.portfolio.services.consolidation import (
     ContributionPlan,
     ValuedAssetPosition,
 )
+from domain.portfolio.services.earnings_agenda import EarningsAgenda
 from domain.portfolio.services.health import HealthReport
+from domain.portfolio.services.mark_to_market import TreasuryMarketValuation
 
 
 def to_valued_position_dto(pos: ValuedAssetPosition) -> ValuedPositionDTO:
@@ -152,3 +156,11 @@ def to_risk_summary_dto(summary: RiskReturnSummary) -> RiskReturnSummaryDTO:
 
 def to_portfolio_health_dto(report: HealthReport) -> PortfolioHealthDTO:
     return PortfolioHealthDTO.model_validate(asdict(report))
+
+
+def to_treasury_market_dto(valuation: TreasuryMarketValuation) -> TreasuryMarketDTO:
+    return TreasuryMarketDTO.model_validate(asdict(valuation))
+
+
+def to_earnings_agenda_dto(agenda: EarningsAgenda) -> EarningsAgendaDTO:
+    return EarningsAgendaDTO.model_validate(asdict(agenda))

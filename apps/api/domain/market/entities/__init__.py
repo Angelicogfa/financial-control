@@ -193,3 +193,69 @@ class TreasuryCatalogResult:
 
     results: list[TreasuryBond] = field(default_factory=list)
     unavailable_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class AnnouncedEarning:
+    """A cash distribution declared by the issuer (item 26.3).
+
+    `com_date` is the last day to hold the share with the right (data com); the ex date is the
+    next business day. `rate` is the gross amount per share in the trading currency.
+    """
+
+    ticker: str
+    label: str
+    rate: float
+    com_date: date | None
+    payment_date: date | None
+    approved_on: date | None = None
+    related_to: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        for key in ("com_date", "payment_date", "approved_on"):
+            value = data[key]
+            data[key] = value.isoformat() if value else None
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AnnouncedEarning:
+        payload = dict(data)
+        for key in ("com_date", "payment_date", "approved_on"):
+            value = payload.get(key)
+            payload[key] = date.fromisoformat(value) if value else None
+        return cls(**payload)
+
+
+@dataclass(frozen=True)
+class AnnouncedStockEvent:
+    """A split, reverse split or bonus issue declared by the issuer (data com included)."""
+
+    ticker: str
+    label: str
+    factor: float | None
+    com_date: date | None
+    approved_on: date | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        for key in ("com_date", "approved_on"):
+            value = data[key]
+            data[key] = value.isoformat() if value else None
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AnnouncedStockEvent:
+        payload = dict(data)
+        for key in ("com_date", "approved_on"):
+            value = payload.get(key)
+            payload[key] = date.fromisoformat(value) if value else None
+        return cls(**payload)
+
+
+@dataclass(frozen=True)
+class AnnouncedDistributions:
+    """Cash and stock distributions of a ticker as published by the provider."""
+
+    cash: list[AnnouncedEarning] = field(default_factory=list)
+    stock: list[AnnouncedStockEvent] = field(default_factory=list)

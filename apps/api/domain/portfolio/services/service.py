@@ -20,6 +20,12 @@ from domain.assets.services.history import HistoricalMetrics, historical_metrics
 from domain.assets.services.questions import STATEMENT_PROFILES
 from domain.assets.services.valuation import AssetValuation, value_asset
 from domain.market.entities import Fundamentals
+from domain.market.services.treasury_prices import (
+    RATE_SUFFIX,
+    asset_price_symbol,
+    bond_family,
+    price_symbol,
+)
 from domain.policy.services.allocation import BAND_BELOW
 from domain.policy.services.lifecycle import asset_lifecycle
 from domain.policy.services.policy import InvestmentPolicy, current_policy
@@ -41,6 +47,7 @@ from domain.portfolio.services.consolidation import (
     plan_contribution,
 )
 from domain.portfolio.services.curves import earliest_fixed_income_start, load_rate_curves
+from domain.portfolio.services.earnings_agenda import EarningsAgenda, build_agenda
 from domain.portfolio.services.fixed_income import RateCurves
 from domain.portfolio.services.health import HealthInputs, HealthReport, diagnose
 from domain.portfolio.services.health_inputs import (
@@ -49,6 +56,13 @@ from domain.portfolio.services.health_inputs import (
     build_holdings,
     cdi_returns,
     policy_benchmark,
+)
+from domain.portfolio.services.mark_to_market import (
+    EarlySaleRules,
+    MarketQuoteTD,
+    TreasuryMarketValuation,
+    evaluate_mark_to_market,
+    quantity_lots,
 )
 from domain.portfolio.services.risk_metrics import class_time_weighted_returns, days_out_of_band
 from domain.shared.entities import AssetEntity, CatalogInstrument
@@ -62,7 +76,7 @@ from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.tax.entities import TaxRuleBook
 from domain.tax.services.rules import rule_book
 from domain.tax.services.status import asset_tax_status
-from infra.providers.batch import fetch_histories, fetch_market_data
+from infra.providers.batch import fetch_distributions, fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 
 
@@ -86,6 +100,9 @@ MIN_PORTFOLIO_RETURNS = 2
 
 
 BENCHMARK_SYMBOLS = ("IBOV", "IFIX", "SP500")
+
+
+AGENDA_TYPES = frozenset({AssetType.STOCK_BR, AssetType.BDR, AssetType.FII})
 
 
 HEALTH_PORTFOLIO_YEARS = 3
@@ -198,6 +215,120 @@ class PortfolioApplicationService:
             annual_ipca_rate=annual_ipca,
         )
 
+    def treasury_quote(
+        self, uow: AbstractUnitOfWork, asset: AssetEntity, as_of: date
+    ) -> tuple[MarketQuoteTD | None, list[tuple[date, float]]]:
+        """Latest redemption price up to `as_of` and the stored price history of a bond.
+
+        Without a stored series, today's daily catalog is used (when it is about `as_of`).
+        """
+        symbol = asset_price_symbol(asset)
+        if symbol is None:
+            return None, []
+        points = uow.market_series.list_series(symbol, date_to=as_of)
+        history = [(p.reference_date, p.value) for p in points]
+        if points:
+            last = points[-1]
+            rates = uow.market_series.list_series(
+                f"{symbol}:{RATE_SUFFIX}", date_from=last.reference_date, date_to=as_of
+            )
+            rate = rates[-1].value if rates else None
+            return MarketQuoteTD(last.value, last.reference_date, rate), history
+        for bond in uow.treasury_catalog.list_all():
+            if price_symbol(bond_family(bond.bond_type), bond.maturity_date) != symbol:
+                continue
+            if bond.sell_price and bond.base_date and bond.base_date <= as_of:
+                return MarketQuoteTD(bond.sell_price, bond.base_date, bond.sell_rate), history
+        return None, history
+
+    def treasury_market_prices(
+        self, uow: AbstractUnitOfWork, assets: list[AssetEntity], as_of: date
+    ) -> dict[str, float]:
+        """Redemption price of each Treasury asset on `as_of` (assets without one are left out)."""
+        prices: dict[str, float] = {}
+        for asset in assets:
+            if asset.asset_type != AssetType.TREASURY:
+                continue
+            quote, _ = self.treasury_quote(uow, asset, as_of)
+            if quote is not None:
+                prices[asset.ticker] = quote.price
+        return prices
+
+    def treasury_market(
+        self,
+        uow: AbstractUnitOfWork,
+        *,
+        as_of_date: date | None = None,
+        asset_id: int | None = None,
+        with_history: bool = False,
+    ) -> list[TreasuryMarketValuation]:
+        """Curve versus market of the open Treasury positions, with the early-sale signals."""
+        as_of = as_of_date or date.today()
+        assets = [
+            a
+            for a in uow.assets.list_all(active_only=True)
+            if a.asset_type == AssetType.TREASURY
+            and a.fixed_income_term is not None
+            and (asset_id is None or a.id == asset_id)
+            and sum(q.quantity for q in quantity_lots(a.transactions, as_of)) > 0
+        ]
+        if not assets:
+            return []
+        policy = self.load_policy(uow).valuation
+        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        curves = load_rate_curves(
+            uow.market_series,
+            date_from=earliest_fixed_income_start(assets),
+            date_to=as_of,
+            annual_cdi_rate=annual_cdi,
+            annual_ipca_rate=annual_ipca,
+        )
+        rules = self.tax_rules(uow)
+        reference = (
+            policy.projections.projected_cdi_rate
+            if policy.projections.projected_cdi_rate is not None
+            else annual_cdi
+        )
+        thresholds = EarlySaleRules(
+            min_excess_rate=policy.early_sale_min_excess_rate,
+            min_reinvest_spread=policy.early_sale_min_reinvest_spread,
+        )
+        results: list[TreasuryMarketValuation] = []
+        for asset in assets:
+            quote, history = self.treasury_quote(uow, asset, as_of)
+            results.append(
+                evaluate_mark_to_market(
+                    asset,
+                    as_of,
+                    quote=quote,
+                    curves=curves,
+                    rules=rules,
+                    reference_rate=reference,
+                    early_sale=thresholds,
+                    price_history=history if with_history else (),
+                )
+            )
+        return results
+
+    def earnings_agenda(
+        self, uow: AbstractUnitOfWork, *, as_of_date: date | None = None
+    ) -> EarningsAgenda:
+        """Declared distributions of the held and followed B3 stocks, BDRs and FIIs."""
+        as_of = as_of_date or date.today()
+        assets = [a for a in uow.assets.list_all(active_only=True) if a.asset_type in AGENDA_TYPES]
+        declared = fetch_distributions(
+            self.gateway,
+            assets,
+            max_workers=self.fetch_workers,
+            timeout_seconds=self.fetch_timeout_seconds,
+        )
+        return build_agenda(
+            assets,
+            {ticker: d.cash for ticker, d in declared.items()},
+            as_of=as_of,
+            rules=self.tax_rules(uow),
+        )
+
     def build_portfolio_report(
         self,
         uow: AbstractUnitOfWork,
@@ -250,6 +381,11 @@ class PortfolioApplicationService:
             as_of_date=ref_date,
             date_from=date_from,
             tax_rules=self.tax_rules(uow),
+            treasury_market_prices=(
+                self.treasury_market_prices(uow, assets, ref_date)
+                if policy.valuation.treasury_mark_to_market
+                else None
+            ),
         )
 
     def simulate_contribution(

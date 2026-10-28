@@ -20,6 +20,7 @@ import { ColumnChart } from "../../viz/ColumnChart";
 import { Sparkline } from "../../viz/Sparkline";
 import { TrendChart } from "../../viz/TrendChart";
 import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange, type Change } from "./story";
+import { DeclaredEarnings } from "./DeclaredEarnings";
 
 function Indicator({
   label,
@@ -299,6 +300,7 @@ export function HomePage() {
           <KpiAct report={report.data} snapshots={snapshots.data ?? []} analytics={analytics.data} />
           <AllocationAct report={report.data} alerts={alerts.error ? [] : alerts.data?.alerts ?? null} onAlertsChange={alerts.reload} />
           <EvolutionAct report={report.data} analytics={analytics.data} failed={Boolean(analytics.error)} />
+          <DeclaredEarnings />
         </>
       )}
       <ErrorBanner error={alerts.error} onRetry={alerts.reload} />

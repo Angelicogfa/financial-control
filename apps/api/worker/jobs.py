@@ -17,6 +17,13 @@ from domain.assets.services.cerrado import (
 )
 from domain.assets.services.history import STATEMENT_TYPES
 from domain.market.entities import Quote, QuoteFreshness
+from domain.market.services.treasury_prices import (
+    RATE_SUFFIX,
+    asset_family,
+    asset_price_symbol,
+    bond_family,
+    price_symbol,
+)
 from domain.policy.services.allocation import ArcaTargets
 from domain.policy.services.policy import EligibilityPolicy, current_policy
 from domain.portfolio.services.consolidation import consolidate_portfolio
@@ -241,6 +248,87 @@ def sync_treasury_catalog_job(uow_factory: UoWFactory, gateway: CachedMarketGate
         return 0
     with uow_factory() as uow:
         stored = uow.treasury_catalog.upsert(outcome.results)
+        uow.commit()
+    return stored
+
+
+TREASURY_HISTORY_LOOKBACK = timedelta(days=365)
+# The daily catalog adds one point a day; a longer hole means the history must be refetched.
+TREASURY_GAP_TOLERANCE = timedelta(days=5)
+
+
+def sync_treasury_prices_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    today: date | None = None,
+) -> dict[str, int]:
+    """Store the daily redemption price and rate of every held Tesouro bond (Phase 26.1).
+
+    Bonds without history (or with a hole) get it from the Tesouro Transparente price file,
+    from one year before the first purchase; then the stored daily catalog adds today's point.
+    """
+    reference = today or date.today()
+    with uow_factory() as uow:
+        assets = [a for a in uow.assets.list_all(active_only=True) if asset_price_symbol(a)]
+        catalog = uow.treasury_catalog.list_all()
+        targets: dict[str, tuple[str, date]] = {}
+        for asset in assets:
+            symbol = asset_price_symbol(asset) or ""
+            first = min((t.trade_date for t in asset.transactions), default=reference)
+            previous = targets.get(symbol)
+            targets[symbol] = (
+                asset_family(asset) or "",
+                min(first, previous[1]) if previous else first,
+            )
+        coverage = {symbol: uow.market_series.date_range(symbol) for symbol in targets}
+    if not targets:
+        return {}
+
+    # Refetch when there is no series, it starts after the first purchase or has a hole at
+    # the end; the fetch starts one year before the first purchase for context.
+    stale = {
+        symbol: first - TREASURY_HISTORY_LOOKBACK
+        for symbol, (_family, first) in targets.items()
+        if coverage[symbol] is None
+        or coverage[symbol][0] > first
+        or reference - coverage[symbol][1] > TREASURY_GAP_TOLERANCE
+    }
+    prices: dict[str, list[tuple[date, float]]] = {s: [] for s in targets}
+    rates: dict[str, list[tuple[date, float]]] = {s: [] for s in targets}
+    if stale:
+        history = gateway.get_treasury_price_history(
+            families={targets[s][0] for s in stale}, since=min(stale.values())
+        )
+        for point in history:
+            symbol = price_symbol(bond_family(point.bond_type), point.maturity_date)
+            if symbol not in stale or point.base_date < stale[symbol]:
+                continue
+            if point.sell_price is not None:
+                prices[symbol].append((point.base_date, point.sell_price))
+            if point.sell_rate is not None:
+                rates[symbol].append((point.base_date, point.sell_rate))
+
+    for bond in catalog:
+        symbol = price_symbol(bond_family(bond.bond_type), bond.maturity_date)
+        if symbol not in targets or bond.base_date is None:
+            continue
+        if bond.sell_price is not None:
+            prices[symbol].append((bond.base_date, bond.sell_price))
+        if bond.sell_rate is not None:
+            rates[symbol].append((bond.base_date, bond.sell_rate))
+
+    stored: dict[str, int] = {}
+    with uow_factory() as uow:
+        for symbol in targets:
+            stored[symbol] = uow.market_series.upsert_points(
+                symbol, sorted(dict(prices[symbol]).items()), unit=SeriesUnit.PRICE
+            )
+            uow.market_series.upsert_points(
+                f"{symbol}:{RATE_SUFFIX}",
+                sorted(dict(rates[symbol]).items()),
+                unit=SeriesUnit.PERCENT_PER_YEAR,
+            )
         uow.commit()
     return stored
 

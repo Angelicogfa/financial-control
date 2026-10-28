@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import StrEnum
 
 from core.helpers.calendar import previous_business_day
@@ -18,8 +18,11 @@ from domain.market.entities import QuoteFreshness
 from domain.market.services.series_status import SeriesStatus
 from domain.policy.services.allocation import BAND_ABOVE, BAND_BELOW
 from domain.portfolio.services.consolidation import LEDGER_INVALID, ConsolidatedPortfolioReport
+from domain.portfolio.services.earnings_agenda import AgendaStatus, EarningsAgenda
+from domain.portfolio.services.mark_to_market import MarketStatus, TreasuryMarketValuation
 from domain.shared.entities import JobRunEntity
 from domain.shared.enums import AssetLifecycle, JobRunStatus
+from domain.tax.services.status import AssetTaxStatus
 
 
 class AlertSeverity(StrEnum):
@@ -37,6 +40,10 @@ class AlertKind(StrEnum):
     STALE_SERIES = "STALE_SERIES"
     SNAPSHOT_MISSING = "SNAPSHOT_MISSING"
     JOB_FAILED = "JOB_FAILED"
+    EARNING_COM_DATE = "EARNING_COM_DATE"
+    FIXED_INCOME_MATURITY = "FIXED_INCOME_MATURITY"
+    TAX_BRACKET_SOON = "TAX_BRACKET_SOON"
+    EARLY_SALE_OPPORTUNITY = "EARLY_SALE_OPPORTUNITY"
 
 
 SEVERITY_ORDER = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}
@@ -214,6 +221,133 @@ def data_alerts(
                 (run.error or "Sem detalhes.")[:300],
                 run.job_name,
                 "/settings/market-data",
+            )
+        )
+    return alerts
+
+
+COM_DATE_WINDOW_DAYS = 7
+MATURITY_WINDOW_DAYS = 30
+
+
+@dataclass(frozen=True)
+class MaturityItem:
+    """An open fixed income position and its maturity."""
+
+    ticker: str
+    asset_id: int
+    maturity_date: date
+    value_brl: float
+
+
+def _day(value: date) -> str:
+    return value.strftime("%d/%m/%Y")
+
+
+def _brl(value: float) -> str:
+    text = f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {text}"
+
+
+def agenda_alerts(agenda: EarningsAgenda, *, today: date) -> list[Alert]:
+    """Data com within a week: hold (or buy) the share until the close of that day."""
+    alerts: list[Alert] = []
+    limit = today + timedelta(days=COM_DATE_WINDOW_DAYS)
+    for item in agenda.items:
+        if item.status != AgendaStatus.UPCOMING or item.com_date is None:
+            continue
+        if not today <= item.com_date <= limit:
+            continue
+        amount = (
+            f" Valor estimado para a sua posição: {_brl(item.net_amount)}."
+            if item.net_amount
+            else f" {item.rate:.4f} por cota.".replace(".", ",", 1)
+        )
+        payment = f", pagamento em {_day(item.payment_date)}" if item.payment_date else ""
+        alerts.append(
+            Alert(
+                f"com:{item.ticker}:{item.kind.value}:{item.com_date.isoformat()}",
+                AlertKind.EARNING_COM_DATE,
+                AlertSeverity.INFO,
+                f"{item.ticker}: data com em {_day(item.com_date)}",
+                f"{item.label.capitalize()} declarado{payment}. Quem tiver a ação no fechamento "
+                f"de {_day(item.com_date)} recebe; a partir de "
+                f"{_day(item.ex_date or item.com_date)} ela é negociada sem o direito.{amount}",
+                item.ticker,
+                f"/asset/{item.asset_id}" if item.asset_id else "/research",
+            )
+        )
+    return alerts
+
+
+def maturity_alerts(items: Iterable[MaturityItem], *, today: date) -> list[Alert]:
+    """Fixed income maturing within a month: plan where the money goes next."""
+    alerts: list[Alert] = []
+    limit = today + timedelta(days=MATURITY_WINDOW_DAYS)
+    for item in items:
+        if not today <= item.maturity_date <= limit:
+            continue
+        days = (item.maturity_date - today).days
+        alerts.append(
+            Alert(
+                f"maturity:{item.ticker}:{item.maturity_date.isoformat()}",
+                AlertKind.FIXED_INCOME_MATURITY,
+                AlertSeverity.INFO,
+                f"{item.ticker} vence em {days} dia(s)",
+                f"Vencimento em {_day(item.maturity_date)}, com cerca de {_brl(item.value_brl)}. "
+                "Planeje o reinvestimento para o dinheiro não ficar parado.",
+                item.ticker,
+                f"/asset/{item.asset_id}",
+            )
+        )
+    return alerts
+
+
+def tax_bracket_alerts(
+    statuses: Iterable[AssetTaxStatus], *, window_days: int, today: date
+) -> list[Alert]:
+    """Lots whose income tax rate drops soon: redeeming before the date costs more tax."""
+    alerts: list[Alert] = []
+    for status in statuses:
+        for lot in status.lots:
+            if lot.next_bracket_date is None or lot.days_to_next_bracket is None:
+                continue
+            if lot.days_to_next_bracket > window_days or (lot.tax_saving_by_waiting or 0) <= 0:
+                continue
+            alerts.append(
+                Alert(
+                    f"bracket:{status.ticker}:{lot.start_date.isoformat()}:"
+                    f"{lot.next_bracket_date.isoformat()}",
+                    AlertKind.TAX_BRACKET_SOON,
+                    AlertSeverity.INFO,
+                    f"{status.ticker}: IR cai em {lot.days_to_next_bracket} dia(s)",
+                    f"O lote de {_day(lot.start_date)} passa de "
+                    f"{_pct(lot.income_tax_rate * 100)} para "
+                    f"{_pct((lot.next_income_tax_rate or 0) * 100)} em "
+                    f"{_day(lot.next_bracket_date)}; esperar economiza cerca de "
+                    f"{_brl(lot.tax_saving_by_waiting or 0)} se for resgatar.",
+                    status.ticker,
+                    f"/asset/{status.asset_id}?tab=tax" if status.asset_id else None,
+                )
+            )
+    return alerts
+
+
+def early_sale_alerts(valuations: Iterable[TreasuryMarketValuation]) -> list[Alert]:
+    """Treasury bonds whose redemption price makes an early sale worth considering."""
+    alerts: list[Alert] = []
+    for valuation in valuations:
+        if valuation.status != MarketStatus.OPPORTUNITY or valuation.price_date is None:
+            continue
+        alerts.append(
+            Alert(
+                f"early-sale:{valuation.ticker}:{valuation.price_date.isoformat()}",
+                AlertKind.EARLY_SALE_OPPORTUNITY,
+                AlertSeverity.INFO,
+                f"{valuation.ticker}: venda antecipada pode compensar",
+                valuation.explanation,
+                valuation.ticker,
+                f"/asset/{valuation.asset_id}?tab=market" if valuation.asset_id else None,
             )
         )
     return alerts
