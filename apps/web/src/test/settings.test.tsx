@@ -73,7 +73,7 @@ describe("strategy", () => {
     const healthLimits = (last(calls, "PUT", "/policy")?.body as { health: Record<string, number> }).health;
     expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
     expect(healthLimits.monthly_expenses_brl).toBe(5000);
-  });
+  }, 20_000); // the full strategy form exceeds the 5 s default under coverage instrumentation
 });
 
 describe("accounts", () => {
