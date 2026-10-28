@@ -685,3 +685,20 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **33.8** Validação estatística: walk-forward com purga, Deflated Sharpe, PBO (CSCV) e portão bayesiano; teste com ruído dá resultado nulo.
 - `[ ]` **33.9** Laboratório de ML (regime por HMM/mistura gaussiana e risco condicional primeiro) com portões fora da amostra; "nenhum modelo passou" é um resultado válido.
 - `[ ]` **33.10** MCP, documentação, testes de integração e UI, `docker compose build`.
+
+## Fase 34 — Otimização da Composição de Ativos dentro do ARCA (`[ ]` Proposta)
+
+**Objetivo:** mantendo as proporções ARCA da política, procurar entre os ativos disponíveis (carteira, watchlist e, opcionalmente, o catálogo filtrado), com base nas métricas de cada um e, à escolha, na análise do Cerrado, a composição dentro de cada classe que melhor atende a um objetivo de retorno: **valorização**, **dividendos** ou **misto**. O resultado é uma proposta para estudo, comparada com a carteira atual, com pesos iguais e com o aporte pelo Cerrado, nunca uma ordem de compra; nada muda a política sozinho. Desenho completo e teste de estresse (13 riscos) em [ASSET_COMPOSITION_OPTIMIZATION_DESIGN.md](../features/ASSET_COMPOSITION_OPTIMIZATION_DESIGN.md).
+
+**Depende de:** Fase 33 (trajetórias da camada B, camada bayesiana da 33.6, modelo de ativo da 33.7 e validação da 33.8). **Ganha insumos com:** Fase 28 (fatos relevantes e mapa ticker → CNPJ) e uma extensão dos dados abertos da CVM: DFP/ITR com data de entrega para escores point-in-time, cadastro com cancelamentos contra o viés de sobrevivência e, a confirmar, o informe mensal de FII para o objetivo Dividendos.
+
+- `[ ]` **34.0** Decisões da seção 10 do desenho: forma do objetivo misto, modo do Cerrado, universo e teto por classe, Caixa dentro ou fora, limites de concentração, restrição de risco, ponto de partida, `scipy`, aplicação como peso manual e ordem em relação à CVM.
+- `[ ]` **34.1** Universo e filtros: os mesmos do aporte real (elegibilidade, checklist e respostas vencidas, sem dado suspeito, liquidez, 36 meses de histórico) e o Cerrado em três modos (exigido, ponderado, ignorado).
+- `[ ]` **34.2** Escores por objetivo: z robusto por classe e setor, pesos das métricas versionados por objetivo (valorização, dividendos, misto) e pré-seleção dos K melhores por classe, com a explicação por ativo.
+- `[ ]` **34.3** Modelo de retorno de cada ativo (reaproveita a 33.7), com proventos separados da valorização e o prior do α calibrado pelos escores.
+- `[ ]` **34.4** Otimizador sobre cenários dentro de cada classe: metas ARCA, limites por ativo, setor e emissor, CVaR de 12 meses e lotes inteiros.
+- `[ ]` **34.5** Reamostragem bayesiana dos pesos, estabilidade por ativo e P(melhora) com intervalo de credibilidade.
+- `[ ]` **34.6** Walk-forward contra pesos iguais, a carteira atual e o aporte pelo Cerrado, com os portões da 33.8 e a contagem de tentativas; "otimizar não melhora" é um resultado válido.
+- `[ ]` **34.7** Plano de transição: só com aportes (sem venda) ou com vendas, IR e custos.
+- `[ ]` **34.8** Aba Composição em Simular carteira, MCP `simulation.optimize` e `simulation.composition`, guia de abas atualizado, testes de UI e integração, `docker compose build`.
+- `[ ]` **34.9** Escores point-in-time com os dados da CVM (depois da Fase 28 e da extensão), sem look-ahead nos fundamentos.
