@@ -40,7 +40,7 @@
 | **Fase 27** | Comparador de Ativos | `[x]` Implementado | 100% |
 | **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
 | **Fase 29** | Estatísticas e Saúde da Carteira | `[x]` Implementado | 100% |
-| **Fase 33** | Simulação de Carteira: Backtesting e Machine Learning | `[ ]` Desenho em revisão | 0% |
+| **Fase 33** | Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana | `[ ]` Desenho em revisão | 0% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -669,16 +669,18 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **32.4** Investigar números implausíveis da Saúde da carteira (vistos em 28/10/2026): retorno de **-156,7%** na janela móvel de 12 meses (abaixo de -100%), volatilidade da carteira de **1160% a.a.** e XPML11 com 100% do risco tendo 1,5% do peso. Suspeita: série de preços com salto (ticker trocado, evento corporativo não aplicado ou preço em escala errada) ou janela com fluxo distorcendo o TWR. Conferir a série do XPML11 e o cálculo da janela móvel; marcar a métrica como suspeita quando sair da faixa possível.
 - `[ ]` **32.5** Padronizar o tamanho das caixas de seleção: em Estratégia (Elegibilidade e Valuation) cada checkbox sai de um tamanho — "Resposta vencida coloca o ativo em revisão" fica menor e "Pesar o Tesouro Direto…" quase some. Causa provável: `.app-check` é `inline-flex` e o `input` (16 px no tema) encolhe quando o texto quebra em várias linhas. Fixar o controle (`flex: none` / `flex-shrink: 0` em `.app-check input`), alinhar ao topo do texto quando houver quebra, usar a mesma fonte dos rótulos dos campos e não misturar checkbox como célula da grade de campos (linha própria abaixo da grade, como em 32.3).
 
-## Fase 33 — Simulação de Carteira: Backtesting e Machine Learning (`[ ]` Desenho em revisão)
+## Fase 33 — Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana (`[ ]` Desenho em revisão)
 
-**Objetivo:** responder "onde eu estaria seguindo a minha estratégia desde X", "qual a faixa provável do patrimônio e da renda em N anos" e "o resultado depende de um período sortudo?", e testar se algum modelo de machine learning acrescenta informação útil fora da amostra. É simulação, nunca recomendação: nada da ferramenta altera a política ou dispara aportes. Desenho completo e teste de estresse em [PORTFOLIO_SIMULATION_DESIGN.md](../features/PORTFOLIO_SIMULATION_DESIGN.md).
+**Objetivo:** responder "onde eu estaria seguindo a minha estratégia desde X", "qual a faixa provável do patrimônio e da renda em N anos", "que ativos que ainda não tenho melhorariam a carteira nos cenários futuros" e "as probabilidades da simulação costumam se confirmar?", e testar se algum modelo de machine learning acrescenta informação útil fora da amostra. É simulação, nunca recomendação: nada da ferramenta altera a política ou dispara aportes. Desenho completo e teste de estresse (21 riscos) em [PORTFOLIO_SIMULATION_DESIGN.md](../features/PORTFOLIO_SIMULATION_DESIGN.md).
 
-- `[ ]` **33.0** Decisões da seção 8 do desenho tomadas (universo, fonte do histórico longo, escopo do ML, meta, política no passado, orçamento de execução) e desenho aprovado. **Nenhuma implementação antes disso.**
+- `[ ]` **33.0** Decisões da seção 10 do desenho tomadas (universo, fonte do histórico longo, escopo do ML, meta, política no passado, orçamento, fonte e teto dos candidatos, prior padrão, evento de ruptura, calibração) e desenho aprovado. **Nenhuma implementação antes disso.**
 - `[ ]` **33.1** Carga de séries históricas point-in-time (preço ajustado e bruto, índices estendidos, câmbio) com relatório de cobertura.
 - `[ ]` **33.2** Backtest da estratégia (camada A): motor mensal com `plan_contribution`, custos, IR, eventos e política por data; testes de verdade conhecida e de look-ahead.
-- `[ ]` **33.3** Execução assíncrona no worker, persistência (`simulation_runs`, `simulation_results`) e reprodutibilidade (semente, hash dos dados, versão).
+- `[ ]` **33.3** Execução assíncrona no worker, persistência (`simulation_runs`, `simulation_results`) e reprodutibilidade (semente, priors, hash dos dados, versão).
 - `[ ]` **33.4** Telas Passado e Robustez: crises históricas, choques sintéticos e variantes contadas.
 - `[ ]` **33.5** Simulação prospectiva (camada B): bootstrap em blocos por classe ARCA e cenários de juros; percentis e probabilidade de meta.
-- `[ ]` **33.6** Validação estatística: walk-forward com purga, Deflated Sharpe e PBO (CSCV); teste com ruído dá resultado nulo.
-- `[ ]` **33.7** Laboratório de ML (regime por HMM/mistura gaussiana e risco condicional primeiro) com portões fora da amostra; "nenhum modelo passou" é um resultado válido.
-- `[ ]` **33.8** MCP, documentação, testes de integração e UI, `docker compose build`.
+- `[ ]` **33.6** Camada bayesiana: posterior normal-inverso-Wishart dos parâmetros das classes, bootstrap bayesiano, intervalos de credibilidade em toda probabilidade, calibração walk-forward (PIT, cobertura com posterior Beta-binomial, Brier, log score) e combinação dos geradores por stacking; aba Confiança.
+- `[ ]` **33.7** Ativos candidatos (camada D): watchlist e screener com os filtros do aporte real (checklist, valuation, sem dado suspeito, liquidez, 36 meses de histórico), modelo de fator com α e β hierárquicos encolhidos, evento de ruptura, efeito marginal (diversificação, CVaR, renda, chance de meta) com P(melhora) e estabilidade do ranking; aba Candidatos ("para investigar", sem compra).
+- `[ ]` **33.8** Validação estatística: walk-forward com purga, Deflated Sharpe, PBO (CSCV) e portão bayesiano; teste com ruído dá resultado nulo.
+- `[ ]` **33.9** Laboratório de ML (regime por HMM/mistura gaussiana e risco condicional primeiro) com portões fora da amostra; "nenhum modelo passou" é um resultado válido.
+- `[ ]` **33.10** MCP, documentação, testes de integração e UI, `docker compose build`.
