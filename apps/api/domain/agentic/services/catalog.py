@@ -78,6 +78,7 @@ from controllers.shared.responses import PaginatedResponse
 from controllers.simulation.requests import BacktestRequest
 from controllers.simulation.responses import (
     CoverageReportDTO,
+    RobustnessDTO,
     SimulationRunDetailDTO,
     SimulationRunDTO,
 )
@@ -1113,6 +1114,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationIdInput,
         output_type=SimulationRunDetailDTO,
         invoke=lambda h, p: h.simulation.get_run(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.robustness",
+        kind="query",
+        description=(
+            "Robustez de uma simulação concluída: a estratégia e as referências nas crises "
+            "de 2008, 2015-16, Joesley Day, Covid e alta de juros de 2021-22; choques "
+            "sintéticos sobre a alocação final; e, se pedidas, as variantes de banda e "
+            "rebalanceamento com a distribuição de todas, a janela reservada dos últimos 3 "
+            "anos, a contagem de tentativas e os avisos de amostra."
+        ),
+        input_model=SimulationIdInput,
+        output_type=RobustnessDTO,
+        invoke=lambda h, p: h.simulation.robustness(p.run_id),
     ),
     OperationSpec(
         name="simulation.list",

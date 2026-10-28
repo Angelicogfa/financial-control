@@ -92,3 +92,75 @@ class SimulationResultDTO(BaseModel):
 
 class SimulationRunDetailDTO(SimulationRunDTO):
     results: list[SimulationResultDTO] = Field(default_factory=list)
+
+
+class WindowOutcomeDTO(BaseModel):
+    """Return (contributions removed) and drawdown of one series inside a window."""
+
+    covered: bool
+    months: int = 0
+    return_rate: float | None = None
+    max_drawdown: float | None = None
+
+
+class SeriesRefDTO(BaseModel):
+    key: str
+    label: str
+
+
+class CrisisDTO(BaseModel):
+    key: str
+    label: str
+    start: date
+    end: date
+    # By series key (`strategy`, `benchmark:IBOV`, ...).
+    outcomes: dict[str, WindowOutcomeDTO] = Field(default_factory=dict)
+
+
+class ShockDTO(BaseModel):
+    """First-order effect of an instant shock on the final allocation."""
+
+    key: str
+    label: str
+    before: float
+    after: float
+    change: float
+    change_rate: float
+    by_class: dict[str, float] = Field(default_factory=dict)
+    note: str = ""
+
+
+class VariantDTO(BaseModel):
+    key: str
+    label: str
+    band_pct: float
+    rebalance: bool
+    summary: BacktestSummaryDTO
+    # Before the reserved window (where a rule may be chosen) and inside it (validation only).
+    selection: WindowOutcomeDTO
+    holdout: WindowOutcomeDTO
+
+
+class DistributionDTO(BaseModel):
+    count: int
+    minimum: float | None = None
+    median: float | None = None
+    maximum: float | None = None
+
+
+class RobustnessDTO(BaseModel):
+    run_id: int
+    status: SimulationStatus
+    series: list[SeriesRefDTO] = Field(default_factory=list)
+    crises: list[CrisisDTO] = Field(default_factory=list)
+    shocks: list[ShockDTO] = Field(default_factory=list)
+    variants: list[VariantDTO] = Field(default_factory=list)
+    # Distribution over every variant of this run (never only the best one).
+    annual_twr_distribution: DistributionDTO
+    selection_distribution: DistributionDTO
+    holdout_distribution: DistributionDTO
+    holdout_start: date | None = None
+    # Variants computed in this run and in every computed run so far (risk R3).
+    trials_in_run: int = 0
+    trials_total: int = 0
+    warnings: list[str] = Field(default_factory=list)

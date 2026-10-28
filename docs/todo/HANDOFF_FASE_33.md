@@ -12,7 +12,7 @@
 
 ## Estado do repositório
 - **`main`** (`ae7d40c`): Fases 25, 26, 27, 29 e o desenho inicial da 33 já mergeados (PRs #17, #19, #21, #23).
-- **`feature/simulation`**, 3 commits à frente da `main`, **sem push e sem PR**:
+- **`feature/simulation`**, à frente da `main` com 33.1 a 33.4 (já enviada ao `origin`, ainda sem PR). Os primeiros commits:
   - `a82dae3`: desenho revisado (ativos candidatos e lógica bayesiana);
   - `4ff2c70`: motor do backtest (33.2, primeira parte) e decisões provisórias;
   - `7cc630b`: decisões finais com fundamentação e avaliação do PyMC.
@@ -48,7 +48,8 @@ Ferramenta de simulação: backtest da estratégia ARCA (camada A), projeção p
 1. ~~33.1~~ concluída (ver o plano): séries `SIM:*` no `market_series`, rotina semanal `sync_simulation_history`, `coverage_report` e `build_market_history` em `domain/simulation/data.py`, rota `GET /api/v1/simulations/coverage`. Para ter dados reais, rode a rotina uma vez (ela não roda na partida do worker).
 2. ~~33.2~~ concluída: rebalanceamento com IR, política por data, checklist histórico e selo de sobrevivência (ver o plano).
 3. ~~33.3~~ concluída: `simulation_runs`/`simulation_results` (migração `script_00023`), `domain/simulation/runs.py` (parâmetros, entradas do banco, `data_hash`, reaproveitamento por parâmetros + dados + `ENGINE_VERSION`), limite de tempo de 120 s, job `run_pending_simulations` no worker (fila a cada 15 s), rotas `POST /api/v1/simulations/backtests`, `GET /api/v1/simulations[/{id}]` e MCP `simulation.backtest|get|list`. Limitação conhecida: uma rodada que fica em RUNNING porque o worker caiu no meio não é retomada sozinha.
-4. **Próxima: 33.4** (telas Passado e Robustez) e as demais, na ordem da tabela da seção 9 do desenho.
+4. ~~33.4~~ concluída: `domain/simulation/robustness.py` (crises, choques, variantes contadas, janela reservada de 36 meses, avisos de amostra), rota `GET /api/v1/simulations/{id}/robustness`, MCP `simulation.robustness` e a tela `/tools/simulation` com as abas Passado e Robustez.
+5. **Próxima: 33.5** (simulação prospectiva, camada B) e as demais, na ordem da tabela da seção 9 do desenho.
 
 ## Convenções e preferências do usuário
 - Respostas em **português**; código, commits e identificadores em inglês (ver `AGENTS.md`).

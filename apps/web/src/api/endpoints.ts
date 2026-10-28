@@ -19,6 +19,7 @@ import type {
   AssetTaxStatusDTO,
   AssetType,
   AssetUpdateRequest,
+  BacktestRequest,
   CerradoUpdateRequest,
   ContributionConfirmRequest,
   ContributionPlanStatus,
@@ -47,8 +48,11 @@ import type {
   PortfolioHealthDTO,
   PortfolioReportResponseDTO,
   SavedContributionPlanDTO,
+  RobustnessDTO,
   ScreenerResponseDTO,
   SeriesStatusDTO,
+  SimulationRunDetailDTO,
+  SimulationRunDTO,
   SnapshotPointDTO,
   TaxRuleDTO,
   TransactionCreateRequest,
@@ -147,6 +151,13 @@ export const api = {
       request<ArcaSuggestionDTO>("/assets/classification", {
         query: { ticker, asset_type: assetType },
       }),
+  },
+  simulations: {
+    list: (limit = 20) => request<SimulationRunDTO[]>("/simulations", { query: { limit } }),
+    get: (id: number) => request<SimulationRunDetailDTO>(`/simulations/${id}`),
+    robustness: (id: number) => request<RobustnessDTO>(`/simulations/${id}/robustness`),
+    submitBacktest: (body: BacktestRequest) =>
+      request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
   },
   tax: {
     rules: () => request<TaxRuleDTO[]>("/tax/rules"),

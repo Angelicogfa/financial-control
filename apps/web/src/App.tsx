@@ -25,6 +25,7 @@ import { AgentKeyFormPage } from "./pages/settings/agentic/AgentKeyFormPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
 import { AssetComparePage } from "./pages/tools/AssetComparePage";
 import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
+import { SimulationPage } from "./pages/tools/SimulationPage";
 import { StrategyPage } from "./pages/settings/StrategyPage";
 
 export function AppRoutes() {
@@ -50,6 +51,7 @@ export function AppRoutes() {
       <Route path="/ledger/events/new" element={<EventFormPage />} />
       <Route path="/tools/fixed-income" element={<FixedIncomeComparePage />} />
       <Route path="/tools/compare" element={<AssetComparePage />} />
+      <Route path="/tools/simulation" element={<SimulationPage />} />
       <Route path="/settings/strategy" element={<StrategyPage />} />
       <Route path="/settings/accounts" element={<AccountsPage />} />
       <Route path="/settings/market-data" element={<MarketDataPage />} />

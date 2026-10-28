@@ -25,4 +25,6 @@ class BacktestRequest(BaseModel):
     catalog_top: int | None = Field(default=None, ge=0, le=500)
     policy_mode: Literal["CURRENT", "AS_OF"] = "CURRENT"
     benchmarks: list[BenchmarkKey] = Field(default_factory=lambda: ["CDI", "IBOV"])
+    # Also run the rule variants (bands x rebalancing) shown in the Robustness view.
+    variants: bool = False
     label: str | None = Field(default=None, max_length=120)

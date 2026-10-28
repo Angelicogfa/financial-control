@@ -10,6 +10,7 @@ from controllers.simulation.dependencies import get_simulation_handler
 from controllers.simulation.requests import BacktestRequest
 from controllers.simulation.responses import (
     CoverageReportDTO,
+    RobustnessDTO,
     SimulationRunDetailDTO,
     SimulationRunDTO,
 )
@@ -43,6 +44,14 @@ def list_runs(
     handler: SimulationHandler = Depends(get_simulation_handler),
 ) -> list[SimulationRunDTO]:
     return handler.list_runs(limit)
+
+
+@simulation_router.get("/{run_id}/robustness", response_model=RobustnessDTO)
+def get_robustness(
+    run_id: int,
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> RobustnessDTO:
+    return handler.robustness(run_id)
 
 
 @simulation_router.get("/{run_id}", response_model=SimulationRunDetailDTO)

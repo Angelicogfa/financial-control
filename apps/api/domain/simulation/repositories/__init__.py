@@ -45,3 +45,8 @@ class AbstractSimulationRepository(ABC):
     @abstractmethod
     def results(self, run_id: int) -> list[SimulationResult]:
         raise NotImplementedError
+
+    @abstractmethod
+    def count_results(self, key_prefix: str) -> int:
+        """Results whose key starts with the prefix, over runs actually computed (not reused)."""
+        raise NotImplementedError

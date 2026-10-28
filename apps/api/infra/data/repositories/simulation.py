@@ -5,7 +5,7 @@ It takes and returns pure domain entities and never commits
 
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from domain.simulation.entities import SimulationResult, SimulationRun, SimulationStatus
@@ -92,3 +92,14 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
             .order_by(SimulationResultModel.id.asc())
         )
         return [to_simulation_result(m) for m in self.session.scalars(stmt).all()]
+
+    def count_results(self, key_prefix: str) -> int:
+        stmt = (
+            select(func.count(SimulationResultModel.id))
+            .join(SimulationRunModel, SimulationRunModel.id == SimulationResultModel.run_id)
+            .where(
+                SimulationResultModel.key.startswith(key_prefix, autoescape=True),
+                SimulationRunModel.reused_from.is_(None),
+            )
+        )
+        return int(self.session.scalar(stmt) or 0)

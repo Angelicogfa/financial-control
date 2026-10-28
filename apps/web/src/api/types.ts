@@ -290,6 +290,7 @@ export interface BacktestRequest {
   catalog_top?: number | null;
   policy_mode?: "CURRENT" | "AS_OF";
   benchmarks?: ("CDI" | "IBOV" | "IFIX" | "SP500_BRL")[];
+  variants?: boolean;
   label?: string | null;
 }
 
@@ -530,9 +531,24 @@ export interface CoverageReportDTO {
 
 export type CoverageStatus = "OK" | "PARTIAL" | "MISSING";
 
+export interface CrisisDTO {
+  key: string;
+  label: string;
+  start: string;
+  end: string;
+  outcomes?: Record<string, WindowOutcomeDTO>;
+}
+
 export interface CurrentUserDTO {
   username: string;
   expires_at?: string | null;
+}
+
+export interface DistributionDTO {
+  count: number;
+  minimum?: number | null;
+  median?: number | null;
+  maximum?: number | null;
 }
 
 export interface DiversificationDetailDTO {
@@ -1188,6 +1204,22 @@ export interface RiskShareDTO {
   risk_share: number;
 }
 
+export interface RobustnessDTO {
+  run_id: number;
+  status: SimulationStatus;
+  series?: SeriesRefDTO[];
+  crises?: CrisisDTO[];
+  shocks?: ShockDTO[];
+  variants?: VariantDTO[];
+  annual_twr_distribution: DistributionDTO;
+  selection_distribution: DistributionDTO;
+  holdout_distribution: DistributionDTO;
+  holdout_start?: string | null;
+  trials_in_run?: number;
+  trials_total?: number;
+  warnings?: string[];
+}
+
 export interface RollingPointDTO {
   end: string;
   cumulative_return: number;
@@ -1255,6 +1287,11 @@ export interface SeriesCoverageDTO {
   note?: string | null;
 }
 
+export interface SeriesRefDTO {
+  key: string;
+  label: string;
+}
+
 export interface SeriesStatusDTO {
   symbol: string;
   unit?: SeriesUnit | null;
@@ -1266,6 +1303,17 @@ export interface SeriesStatusDTO {
 }
 
 export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PERCENT_PER_YEAR" | "PRICE" | "INDEX_POINTS";
+
+export interface ShockDTO {
+  key: string;
+  label: string;
+  before: number;
+  after: number;
+  change: number;
+  change_rate: number;
+  by_class?: Record<string, number>;
+  note?: string;
+}
 
 export type SimulationKind = "BACKTEST";
 
@@ -1526,6 +1574,16 @@ export interface ValuedPositionDTO {
   eligible?: boolean;
 }
 
+export interface VariantDTO {
+  key: string;
+  label: string;
+  band_pct: number;
+  rebalance: boolean;
+  summary: BacktestSummaryDTO;
+  selection: WindowOutcomeDTO;
+  holdout: WindowOutcomeDTO;
+}
+
 export interface WatchlistAddRequest {
   ticker: string;
   asset_type?: AssetType | null;
@@ -1555,6 +1613,13 @@ export interface WatchlistItemDTO {
   valuation_verdict: string;
   fair_value?: number | null;
   margin?: number | null;
+}
+
+export interface WindowOutcomeDTO {
+  covered: boolean;
+  months?: number;
+  return_rate?: number | null;
+  max_drawdown?: number | null;
 }
 
 export interface WorkerErrorsResponseDTO {

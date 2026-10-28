@@ -45,6 +45,7 @@ from domain.simulation.entities import (
     SimulationStatus,
 )
 from domain.simulation.market import MarketHistory
+from domain.simulation.robustness import rule_variants, with_band
 from domain.tax.entities import TaxRuleBook
 from domain.tax.services.rules import rule_book
 
@@ -89,6 +90,8 @@ class BacktestParams:
     catalog_top: int = 0
     policy_mode: str = PolicyMode.CURRENT
     benchmarks: tuple[str, ...] = (CDI_KEY, IBOV_KEY)
+    # Also run the rule variants (bands x rebalancing) for the Robustness view (33.4).
+    variants: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -111,6 +114,7 @@ class BacktestParams:
             catalog_top=int(data.get("catalog_top", 0)),
             policy_mode=data.get("policy_mode", PolicyMode.CURRENT),
             benchmarks=tuple(data.get("benchmarks", (CDI_KEY, IBOV_KEY))),
+            variants=bool(data.get("variants", False)),
         )
 
     def config(self) -> BacktestConfig:
@@ -301,6 +305,25 @@ def run_backtest_params(
                 ),
             )
         )
+    if params.variants:
+        for variant in rule_variants():
+            out.append(
+                (
+                    variant.key,
+                    run_backtest(
+                        inputs.assets,
+                        inputs.history,
+                        with_band(inputs.policy, variant.band_pct),
+                        replace(config, rebalance=variant.rebalance),
+                        label=variant.label,
+                        policy_versions=[
+                            with_band(p, variant.band_pct) for p in inputs.policy_versions
+                        ],
+                        tax_rules=inputs.tax_rules,
+                        deadline=deadline,
+                    ),
+                )
+            )
     return out
 
 
