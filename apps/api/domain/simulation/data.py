@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from enum import StrEnum
 
 from core.helpers.units import daily_rates, monthly_rates
+from domain.market.services.price_sanity import price_spikes
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import Market
 from domain.shared.repositories import AbstractMarketSeriesRepository
@@ -185,7 +186,10 @@ def coverage_report(
 
 
 def _price_series(points: Sequence[tuple[date, float]]) -> PriceSeries:
-    return PriceSeries.from_points(points)
+    """The stored series without isolated bad prints of the provider (Phase 32.4)."""
+    ordered = sorted((d, p) for d, p in points if p is not None and p > 0)
+    keep, _ = price_spikes([d for d, _ in ordered], [p for _, p in ordered])
+    return PriceSeries.from_points([pt for pt, ok in zip(ordered, keep, strict=True) if ok])
 
 
 def _in_brl(points: Sequence[tuple[date, float]], usd_brl: PriceSeries) -> list[tuple[date, float]]:

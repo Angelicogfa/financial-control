@@ -79,6 +79,18 @@ function CheckRow({ check }: Readonly<{ check: HealthCheckDTO }>) {
         {!insufficient && <span className="health-check-value">{formatHealthValue(check.value, check.unit)}</span>}
       </div>
       <p className="health-check-text">{check.explanation}</p>
+      {check.suspicious && (
+        <p className="health-check-suspicious" role="note">
+          <Badge tone="warning">Dado suspeito</Badge> {check.suspicious}
+        </p>
+      )}
+      {(check.items ?? []).length > 0 && (
+        <ul className="health-check-items">
+          {(check.items ?? []).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      )}
       {check.action && <p className="health-check-action">{check.action}</p>}
       <p className="app-muted health-check-meta">
         {[

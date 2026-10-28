@@ -837,6 +837,8 @@ export interface HealthCheckDTO {
   critical_threshold?: number | null;
   observations?: number | null;
   min_observations?: number | null;
+  items?: string[];
+  suspicious?: string | null;
 }
 
 export type HealthPillar = "POLICY" | "CONCENTRATION" | "DIVERSIFICATION" | "RISK" | "PERFORMANCE" | "QUALITY" | "LIQUIDITY";

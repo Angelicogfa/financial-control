@@ -11,7 +11,14 @@ import { dateTime, parseDecimal } from "../../utils/format";
 import { ARCA_CLASSES, ARCA_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 
 /** Fields edited as percentages but stored as fractions (ADR 0006). */
-const VALUATION_FIELDS: Array<{ key: string; label: string; percent: boolean; hint: string }> = [
+const VALUATION_FIELDS: Array<{
+  key: string;
+  label: string;
+  percent: boolean;
+  hint: string;
+  /** Treasury fields go with the mark-to-market option, under the grid. */
+  treasury?: boolean;
+}> = [
   { key: "bazin_required_yield", label: "Yield exigido (Bazin)", percent: true, hint: "Dividendo mínimo para o preço teto." },
   { key: "graham_multiplier", label: "Multiplicador de Graham", percent: false, hint: "22,5 = P/L 15 × P/VP 1,5." },
   { key: "max_price_to_earnings", label: "P/L máximo", percent: false, hint: "Ações." },
@@ -24,15 +31,17 @@ const VALUATION_FIELDS: Array<{ key: string; label: string; percent: boolean; hi
   { key: "min_margin_of_safety", label: "Margem de segurança", percent: true, hint: "Para considerar descontado." },
   {
     key: "early_sale_min_excess_rate",
-    label: "Tesouro: ganho mínimo da venda sobre a curva (a.a.)",
+    label: "Ganho mínimo da venda sobre a curva (a.a.)",
     percent: true,
     hint: "Rentabilidade ao ano vendendo hoje menos a da curva para sugerir a venda antecipada.",
+    treasury: true,
   },
   {
     key: "early_sale_min_reinvest_spread",
-    label: "Tesouro: folga do CDI sobre a taxa de empate (a.a.)",
+    label: "Folga do CDI sobre a taxa de empate (a.a.)",
     percent: true,
     hint: "Quanto o CDI projetado precisa superar a taxa de empate até o vencimento.",
+    treasury: true,
   },
 ];
 
@@ -278,10 +287,6 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
             </span>
             <input id="policy-coverage" inputMode="decimal" value={minCoverage} disabled={saving} onChange={(e) => setMinCoverage(e.target.value)} />
           </div>
-          <label className="app-check">
-            <input type="checkbox" checked={requireEvaluation} disabled={saving} onChange={(e) => setRequireEvaluation(e.target.checked)} />
-            Exigir checklist respondido para aportar
-          </label>
           <div className="app-field">
             <span className="app-field-label">
               <label htmlFor="policy-validity">Validade das respostas manuais (meses)</label>
@@ -291,6 +296,12 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
             </span>
             <input id="policy-validity" inputMode="numeric" value={validityMonths} disabled={saving} onChange={(e) => setValidityMonths(e.target.value)} />
           </div>
+        </div>
+        <div className="app-check-row">
+          <label className="app-check">
+            <input type="checkbox" checked={requireEvaluation} disabled={saving} onChange={(e) => setRequireEvaluation(e.target.checked)} />
+            Exigir checklist respondido para aportar
+          </label>
           <label className="app-check">
             <input type="checkbox" checked={reviewExpired} disabled={saving} onChange={(e) => setReviewExpired(e.target.checked)} />
             Resposta vencida coloca o ativo em revisão (sem aportes)
@@ -305,7 +316,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Valuation</h2>
         <div className="app-field-grid">
-          {VALUATION_FIELDS.map((f) => (
+          {VALUATION_FIELDS.filter((f) => !f.treasury).map((f) => (
             <div key={f.key} className="app-field">
               <span className="app-field-label">
                 <label htmlFor={`valuation-${f.key}`}>
@@ -323,16 +334,45 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
               />
             </div>
           ))}
-          <label className="app-check">
-            <input
-              type="checkbox"
-              checked={treasuryAtMarket}
-              disabled={saving}
-              onChange={(e) => setTreasuryAtMarket(e.target.checked)}
-            />
-            Pesar o Tesouro Direto pelo preço de mercado (em vez da curva) na carteira e no aporte
-          </label>
         </div>
+        <fieldset className="app-fieldset">
+          <legend>Tesouro Direto</legend>
+          <div className="app-check-row">
+            <span className="app-field-label">
+              <label className="app-check">
+                <input
+                  type="checkbox"
+                  checked={treasuryAtMarket}
+                  disabled={saving}
+                  onChange={(e) => setTreasuryAtMarket(e.target.checked)}
+                />
+                Pesar o Tesouro Direto pelo preço de mercado (em vez da curva) na carteira e no aporte
+              </label>
+              <Hint about="Tesouro pelo preço de mercado">
+                Vale para a política inteira, não para um campo. Ligada, o Tesouro entra na carteira e no peso do
+                quadrante Caixa pelo preço de venda do dia (com IR e IOF), o que muda quanto vai para o Caixa no
+                próximo aporte. Desligada, entra pela curva contratada. Os retratos diários seguem pela curva.
+              </Hint>
+            </span>
+          </div>
+          <div className="app-field-grid" style={{ marginTop: "var(--space-3)" }}>
+            {VALUATION_FIELDS.filter((f) => f.treasury).map((f) => (
+              <div key={f.key} className="app-field">
+                <span className="app-field-label">
+                  <label htmlFor={`valuation-${f.key}`}>{f.label} (%)</label>
+                  <Hint about={f.label}>{f.hint}</Hint>
+                </span>
+                <input
+                  id={`valuation-${f.key}`}
+                  inputMode="decimal"
+                  value={valuationText[f.key]}
+                  disabled={saving}
+                  onChange={(e) => setValuationText((all) => ({ ...all, [f.key]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+        </fieldset>
       </section>
 
       <section className="app-card app-card-padded">

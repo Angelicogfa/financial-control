@@ -88,6 +88,42 @@ describe("portfolio health", () => {
     expect(screen.getByRole("cell", { name: "BANCO A" })).toBeInTheDocument();
   });
 
+  it("lists enumerations one per line and marks checks built from cleaned data", async () => {
+    const report: PortfolioHealthDTO = {
+      ...health,
+      pillars: [
+        {
+          pillar: "DIVERSIFICATION",
+          title: "Diversificação de risco",
+          status: "WARNING",
+          checks: [
+            {
+              key: "risk_contribution",
+              title: "Contribuição ao risco",
+              status: "WARNING",
+              value: 0.4,
+              unit: "FRACTION",
+              explanation: "WEGE3 responde por 40,0% do risco com 20,0% do peso. Por quadrante:",
+              items: ["Ações Brasil: 60% do peso e 90% do risco", "Caixa & Renda Fixa: 40% do peso e 10% do risco"],
+              suspicious: "Dados descartados antes do cálculo: XPML11: preço do provedor fora de escala descartado em 14/01/2026.",
+            },
+          ],
+        },
+      ],
+    };
+    mockApi([{ path: "/portfolio/health", reply: report }]);
+    renderAt("/health");
+    const pillar = (await screen.findAllByRole("region"))[1];
+    const items = within(pillar).getAllByRole("listitem").filter((li) => li.closest(".health-check-items"));
+    expect(items.map((li) => li.textContent)).toEqual([
+      "Ações Brasil: 60% do peso e 90% do risco",
+      "Caixa & Renda Fixa: 40% do peso e 10% do risco",
+    ]);
+    const note = within(pillar).getByRole("note");
+    expect(note).toHaveTextContent("Dado suspeito");
+    expect(note).toHaveTextContent(/XPML11: preço do provedor fora de escala/);
+  });
+
   it("shows the error state when the API fails", async () => {
     mockApi([{ path: "/portfolio/health", reply: { status: 503, json: { detail: "fora do ar" } } }]);
     renderAt("/health");

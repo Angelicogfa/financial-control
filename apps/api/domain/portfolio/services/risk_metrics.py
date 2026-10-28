@@ -343,7 +343,8 @@ def class_time_weighted_returns(
             flow = float(data.get("invested_value") or 0.0) - float(
                 before.get("invested_value") or 0.0
             )
-            r = (float(data.get("current_value") or 0.0) - start - flow) / start
+            # Purchases count from the start of the period, as in the portfolio TWR.
+            r = (float(data.get("current_value") or 0.0) - start - flow) / (start + max(flow, 0.0))
             factors[name] = factors.get(name, 1.0) * (1.0 + r)
     return {name: round(f - 1.0, 4) for name, f in factors.items()}
 

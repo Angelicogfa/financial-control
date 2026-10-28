@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { App } from "../App";
@@ -80,6 +80,31 @@ describe("strategy", () => {
     expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
     expect(healthLimits.monthly_expenses_brl).toBe(5000);
   }, 20_000); // a long form: slow under a loaded full run
+
+  it("keeps policy-wide options out of the field grids", async () => {
+    mockApi([
+      { path: "/policy", reply: policy },
+      { path: "/policy/versions", reply: [policy] },
+    ]);
+    renderAt("/settings/strategy");
+    const treasury = (await screen.findByText("Tesouro Direto")).closest("fieldset") as HTMLElement;
+    const inside = within(treasury);
+    expect(inside.getByLabelText(/Pesar o Tesouro Direto pelo preço de mercado/)).toBeInTheDocument();
+    expect(inside.getByLabelText("Ganho mínimo da venda sobre a curva (a.a.) (%)")).toBeInTheDocument();
+    expect(inside.getByLabelText("Folga do CDI sobre a taxa de empate (a.a.) (%)")).toBeInTheDocument();
+    expect(inside.getByRole("button", { name: /Tesouro pelo preço de mercado/ })).toBeInTheDocument();
+
+    for (const label of [
+      "Exigir checklist respondido para aportar",
+      "Resposta vencida coloca o ativo em revisão (sem aportes)",
+      "Tirar respostas vencidas da nota",
+      /Pesar o Tesouro Direto/,
+    ]) {
+      const check = screen.getByLabelText(label);
+      expect(check.closest(".app-field-grid"), String(label)).toBeNull();
+      expect(check.closest(".app-check-row"), String(label)).not.toBeNull();
+    }
+  });
 });
 
 describe("accounts", () => {

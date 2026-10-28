@@ -57,6 +57,8 @@ from domain.portfolio.services.health_inputs import (
     bracket_lots,
     build_holdings,
     cdi_returns,
+    clean_histories,
+    drop_impossible_periods,
     policy_benchmark,
 )
 from domain.portfolio.services.mark_to_market import (
@@ -564,7 +566,7 @@ class PortfolioApplicationService:
             uow.snapshots.list_range(date_from=start, date_to=end),
             key=lambda s: s.snapshot_date,
         )
-        port_dates, port_returns = dated_time_weighted_returns(snapshots)
+        port_dates, port_returns = dated_time_weighted_returns(snapshots, purchases_at_start=True)
         has_history = len(port_returns) >= MIN_PORTFOLIO_RETURNS
         if not has_history:
             port_dates, port_returns = [], []
@@ -643,12 +645,14 @@ class PortfolioApplicationService:
         )
 
         history_start = as_of - timedelta(days=HEALTH_HISTORY_DAYS)
-        histories = fetch_histories(
-            self.gateway,
-            [assets[p.asset_id] for p in report.positions if p.asset_id in assets],
-            range_period=HEALTH_HISTORY_RANGE,
-            max_workers=self.fetch_workers,
-            timeout_seconds=self.fetch_timeout_seconds,
+        histories, asset_notes = clean_histories(
+            fetch_histories(
+                self.gateway,
+                [assets[p.asset_id] for p in report.positions if p.asset_id in assets],
+                range_period=HEALTH_HISTORY_RANGE,
+                max_workers=self.fetch_workers,
+                timeout_seconds=self.fetch_timeout_seconds,
+            )
         )
         portfolio_start = as_of - timedelta(days=365 * HEALTH_PORTFOLIO_YEARS)
         cdi = cdi_returns(
@@ -664,7 +668,9 @@ class PortfolioApplicationService:
             uow.snapshots.list_range(date_from=portfolio_start, date_to=as_of),
             key=lambda s: s.snapshot_date,
         )
-        port_dates, port_returns = dated_time_weighted_returns(snapshots)
+        port_dates, port_returns, portfolio_notes = drop_impossible_periods(
+            *dated_time_weighted_returns(snapshots, purchases_at_start=True)
+        )
         index_returns = {
             sym: _dated_levels(
                 uow.market_series.list_series(sym, date_from=portfolio_start, date_to=as_of)
@@ -701,6 +707,8 @@ class PortfolioApplicationService:
             cdi_returns=align_to_base(port_dates, cdi[0], cdi[1]) if port_dates else [],
             asset_dates=asset_dates,
             asset_returns=asset_returns,
+            asset_data_notes=asset_notes,
+            portfolio_data_notes=portfolio_notes,
             class_returns={
                 ArcaClass(k): v
                 for k, v in class_time_weighted_returns(snapshots).items()
