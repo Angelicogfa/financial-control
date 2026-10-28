@@ -14,8 +14,28 @@ from controllers.market.responses import (
     WorkerRequestErrorDTO,
 )
 from controllers.shared.dependencies import UoWFactory
-from core.errors import NotFoundError
+from core.errors import NotFoundError, ValidationError
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
+from domain.shared.entities import JobRunEntity
+from domain.shared.enums import JobRunStatus
+
+# Jobs that may be run by hand (Market data screen, MCP and `python -m worker.run_now`);
+# the worker serves a request within its polling interval. Name -> what it does.
+MANUAL_JOBS: dict[str, str] = {
+    "sync_simulation_history": "Carga do histórico longo usado pela simulação de carteira",
+}
+
+
+def to_job_run_dto(run: JobRunEntity) -> JobRunDTO:
+    return JobRunDTO(
+        job_name=run.job_name,
+        status=run.status.value,
+        attempts=run.attempts,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        details=run.details,
+        error=run.error,
+    )
 
 
 class MarketDataHandler:
@@ -41,18 +61,28 @@ class MarketDataHandler:
     def job_runs(self) -> list[JobRunDTO]:
         """Latest execution of each worker job (data freshness indicator)."""
         with self.uow_factory() as uow:
-            return [
-                JobRunDTO(
-                    job_name=run.job_name,
-                    status=run.status.value,
-                    attempts=run.attempts,
-                    started_at=run.started_at,
-                    finished_at=run.finished_at,
-                    details=run.details,
-                    error=run.error,
+            return [to_job_run_dto(run) for run in uow.job_runs.latest_per_job()]
+
+    def request_job(self, job_name: str, *, now: datetime | None = None) -> JobRunDTO:
+        """Queue a manual run of a job; a request still waiting is returned, not duplicated."""
+        if job_name not in MANUAL_JOBS:
+            raise ValidationError(
+                f"job {job_name!r} cannot be run by hand; allowed: {', '.join(MANUAL_JOBS)}",
+                code="JOB_NOT_MANUAL",
+            )
+        with self.uow_factory() as uow:
+            waiting = uow.job_runs.requested(job_name)
+            if waiting:
+                return to_job_run_dto(waiting[0])
+            run = uow.job_runs.add(
+                JobRunEntity(
+                    job_name=job_name,
+                    started_at=now or datetime.now(UTC),
+                    status=JobRunStatus.REQUESTED,
                 )
-                for run in uow.job_runs.latest_per_job()
-            ]
+            )
+            uow.commit()
+        return to_job_run_dto(run)
 
     def worker_errors(
         self, *, include_resolved: bool = False, limit: int = 100

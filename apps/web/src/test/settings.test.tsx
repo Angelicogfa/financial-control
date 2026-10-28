@@ -195,6 +195,59 @@ describe("market data", () => {
   });
 });
 
+describe("manual job runs", () => {
+  const empty = { unresolved_count: 0, errors: [] };
+
+  it("requests the simulation history and follows the request", async () => {
+    let requested = false;
+    const { calls } = mockApi([
+      { path: "/market/series-status", reply: [] },
+      {
+        path: "/market/job-runs",
+        reply: () =>
+          requested
+            ? [{ job_name: "sync_simulation_history", status: "REQUESTED", attempts: 0, started_at: "2026-10-28T19:00:00Z" }]
+            : [{ job_name: "sync_simulation_history", status: "SUCCESS", attempts: 1, started_at: "2026-10-21T04:50:00Z" }],
+      },
+      { path: "/market/worker-errors", reply: empty },
+      {
+        method: "POST",
+        path: "/market/job-runs/sync_simulation_history/request",
+        reply: () => {
+          requested = true;
+          return { status: 202, json: { job_name: "sync_simulation_history", status: "REQUESTED", attempts: 0, started_at: "2026-10-28T19:00:00Z" } };
+        },
+      },
+    ]);
+    renderAt("/settings/market-data");
+    expect(await screen.findByText("Concluída")).toBeInTheDocument();
+    expect(screen.getAllByText("Histórico longo da simulação").length).toBeGreaterThan(0);
+    const button = screen.getByRole("button", { name: "Carregar o histórico da simulação" });
+    fireEvent.click(button);
+
+    expect(await screen.findByText(/Pedido registrado; o worker começa em até 15 segundos/)).toBeInTheDocument();
+    expect(screen.getByText("Pedida")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Carregar o histórico da simulação/ })).toBeDisabled();
+    expect(last(calls, "POST", "/market/job-runs/sync_simulation_history/request")).toBeDefined();
+  });
+
+  it("shows the error of a refused request", async () => {
+    mockApi([
+      { path: "/market/series-status", reply: [] },
+      { path: "/market/job-runs", reply: [] },
+      { path: "/market/worker-errors", reply: empty },
+      {
+        method: "POST",
+        path: "/market/job-runs/sync_simulation_history/request",
+        reply: { status: 400, json: { detail: "job cannot be run by hand", code: "JOB_NOT_MANUAL" } },
+      },
+    ]);
+    renderAt("/settings/market-data");
+    fireEvent.click(await screen.findByRole("button", { name: "Carregar o histórico da simulação" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("job cannot be run by hand");
+  });
+});
+
 describe("session", () => {
   it("shows the login while there is no session and enters the shell after it", async () => {
     let logged = false;

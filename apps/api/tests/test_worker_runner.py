@@ -228,6 +228,7 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "sync_treasury_prices",
         "sync_simulation_history",
         "run_pending_simulations",
+        "manual_sync_simulation_history",
     }
     assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"

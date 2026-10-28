@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
@@ -339,6 +339,14 @@ function RunProblem({ run }: Readonly<{ run: SimulationRunDTO }>) {
   return (
     <p className="app-error-banner" role="alert">
       {run.status === "TIMEOUT" ? "A simulação passou do tempo limite." : "A simulação falhou."} {run.error}
+      {run.error?.includes("InsufficientHistory") && (
+        <>
+          {" "}
+          <Link className="app-link" to="/settings/market-data">
+            Carregar o histórico em Dados de mercado
+          </Link>
+        </>
+      )}
     </p>
   );
 }

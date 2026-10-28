@@ -235,6 +235,11 @@ class AbstractJobRunRepository(ABC):
         """Most recent execution of each job name."""
         raise NotImplementedError
 
+    @abstractmethod
+    def requested(self, job_name: str) -> list[JobRunEntity]:
+        """Manual requests (REQUESTED) of a job still waiting for the worker, oldest first."""
+        raise NotImplementedError
+
 
 class AbstractWorkerErrorRepository(ABC):
     """Repository port for failed external HTTP/API requests recorded during worker jobs."""

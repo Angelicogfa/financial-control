@@ -15,6 +15,7 @@ from domain.shared.entities import (
     JobRunEntity,
     WorkerRequestErrorEntity,
 )
+from domain.shared.enums import JobRunStatus
 from domain.shared.repositories import (
     AbstractJobRunRepository,
     AbstractWorkerErrorRepository,
@@ -49,6 +50,7 @@ class SqlAlchemyJobRunRepository(AbstractJobRunRepository):
             raise NotFoundError(f"Job run id={run.id} not found")
         model.status = run.status.value
         model.attempts = run.attempts
+        model.started_at = run.started_at
         model.finished_at = run.finished_at
         model.details = dict(run.details)
         model.error = run.error
@@ -65,6 +67,17 @@ class SqlAlchemyJobRunRepository(AbstractJobRunRepository):
             select(JobRunModel)
             .join(latest, JobRunModel.id == latest.c.max_id)
             .order_by(JobRunModel.job_name.asc())
+        )
+        return [to_job_run_entity(m) for m in self.session.scalars(stmt).all()]
+
+    def requested(self, job_name: str) -> list[JobRunEntity]:
+        stmt = (
+            select(JobRunModel)
+            .where(
+                JobRunModel.job_name == job_name,
+                JobRunModel.status == JobRunStatus.REQUESTED.value,
+            )
+            .order_by(JobRunModel.id.asc())
         )
         return [to_job_run_entity(m) for m in self.session.scalars(stmt).all()]
 

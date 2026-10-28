@@ -137,6 +137,7 @@ class AssetLifecycle(StrEnum):
 class JobRunStatus(StrEnum):
     """Lifecycle of a background job execution."""
 
+    REQUESTED = "REQUESTED"  # asked for by hand; the worker turns it into the run
     RUNNING = "RUNNING"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"

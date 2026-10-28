@@ -266,6 +266,8 @@ export const api = {
   market: {
     series: () => request<SeriesStatusDTO[]>("/market/series-status"),
     jobs: () => request<JobRunDTO[]>("/market/job-runs"),
+    requestJob: (name: string) =>
+      request<JobRunDTO>(`/market/job-runs/${encodeURIComponent(name)}/request`, { method: "POST" }),
     workerErrors: (includeResolved = false) =>
       request<WorkerErrorsResponseDTO>("/market/worker-errors", {
         query: { include_resolved: includeResolved },

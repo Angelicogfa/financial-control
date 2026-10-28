@@ -152,6 +152,10 @@ class CoveragePeriodInput(BaseModel):
     end: date | None = None
 
 
+class JobRequestInput(BaseModel):
+    job_name: Literal["sync_simulation_history"]
+
+
 class SimulationIdInput(BaseModel):
     run_id: int
 
@@ -1023,6 +1027,19 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=list[JobRunDTO],
         invoke=lambda h, _p: h.market.job_runs(),
+    ),
+    OperationSpec(
+        name="market.request_job",
+        kind="command",
+        description=(
+            "Pede ao worker que rode agora uma rotina que aceita disparo manual (hoje, "
+            "`sync_simulation_history`: a carga do histórico longo que a simulação de carteira "
+            "usa). O worker atende em até 15 s; acompanhe com market.job_runs. Um pedido que "
+            "ainda espera é devolvido, sem duplicar."
+        ),
+        input_model=JobRequestInput,
+        output_type=JobRunDTO,
+        invoke=lambda h, p: h.market.request_job(p.job_name),
     ),
     OperationSpec(
         name="market.worker_errors",

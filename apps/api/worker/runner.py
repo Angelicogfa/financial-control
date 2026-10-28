@@ -126,23 +126,25 @@ def run_job(
     lock: JobLock,
     policy: RetryPolicy,
     sleep: Callable[[float], None] = time.sleep,
+    request: JobRunEntity | None = None,
 ) -> JobRunEntity:
     """Run `job` once under a lock, retrying with exponential backoff, and log it in job_runs.
 
+    With `request` (a manual REQUESTED row), that row becomes the run instead of a new one.
     Never raises: failures are logged and recorded so the scheduler keeps running.
     """
     now = datetime.now(UTC)
+    start = (
+        replace(request, status=JobRunStatus.RUNNING, started_at=now)
+        if request is not None
+        else JobRunEntity(job_name=name, started_at=now)
+    )
     token = lock.acquire(name, policy.lock_ttl_seconds)
     if token is None:
         logger.info("Job %s skipped: another run holds the lock", name, extra={"job": name})
-        return _record(
-            uow_factory,
-            JobRunEntity(
-                job_name=name, started_at=now, status=JobRunStatus.SKIPPED, finished_at=now
-            ),
-        )
+        return _record(uow_factory, replace(start, status=JobRunStatus.SKIPPED, finished_at=now))
 
-    run = _record(uow_factory, JobRunEntity(job_name=name, started_at=now))
+    run = _record(uow_factory, start)
     try:
         for attempt in range(1, policy.max_retries + 2):
             with capture_worker_request_errors(job_name=name, job_run_id=run.id) as recorder:
@@ -197,3 +199,28 @@ def run_job(
         raise AssertionError("unreachable")
     finally:
         lock.release(name, token)
+
+
+def run_requested(
+    name: str,
+    job: Callable[[], Any],
+    *,
+    uow_factory: UoWFactory,
+    lock: JobLock,
+    policy: RetryPolicy,
+    sleep: Callable[[float], None] = time.sleep,
+) -> JobRunEntity | None:
+    """Serve the oldest manual request of `name` (None when nothing was requested)."""
+    with uow_factory() as uow:
+        waiting = uow.job_runs.requested(name)
+    if not waiting:
+        return None
+    return run_job(
+        name,
+        job,
+        uow_factory=uow_factory,
+        lock=lock,
+        policy=policy,
+        sleep=sleep,
+        request=waiting[0],
+    )
