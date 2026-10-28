@@ -46,12 +46,8 @@ Ferramenta de simulação: backtest da estratégia ARCA (camada A), projeção p
 
 ## Próximos passos
 1. ~~33.1~~ concluída (ver o plano): séries `SIM:*` no `market_series`, rotina semanal `sync_simulation_history`, `coverage_report` e `build_market_history` em `domain/simulation/data.py`, rota `GET /api/v1/simulations/coverage`. Para ter dados reais, rode a rotina uma vez (ela não roda na partida do worker).
-2. **Completar a 33.2**:
-   - venda e rebalanceamento com IR (isenção de R$ 20 mil/mês em ações, regressivo na renda fixa);
-   - opção de política vigente em cada data;
-   - checklist histórico pelo `answered_at`;
-   - universo do catálogo com o selo de sobrevivência.
-3. Em seguida: 33.3 (execução assíncrona no worker, `simulation_runs`/`simulation_results`, reprodutibilidade), 33.4 (telas Passado e Robustez) e as demais, na ordem da tabela da seção 9 do desenho.
+2. ~~33.2~~ concluída: rebalanceamento com IR, política por data, checklist histórico e selo de sobrevivência (ver o plano).
+3. **Próxima: 33.3** (execução assíncrona no worker, `simulation_runs`/`simulation_results`, reprodutibilidade), 33.4 (telas Passado e Robustez) e as demais, na ordem da tabela da seção 9 do desenho.
 
 ## Convenções e preferências do usuário
 - Respostas em **português**; código, commits e identificadores em inglês (ver `AGENTS.md`).
