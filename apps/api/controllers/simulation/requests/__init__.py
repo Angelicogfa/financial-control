@@ -55,4 +55,6 @@ class ProjectionRequest(BaseModel):
     mean_block_months: float = Field(default=12.0, ge=3.0, le=24.0)
     fee_rate: float = Field(default=0.0003, ge=0, le=0.05)
     sample_start: date | None = None
+    # STACKED: the calibrated mixture of generators; or one generator alone.
+    generator: Literal["STACKED", "BOOTSTRAP", "BAYESIAN_BOOTSTRAP", "BAYESIAN_NORMAL"] = "STACKED"
     label: str | None = Field(default=None, max_length=120)

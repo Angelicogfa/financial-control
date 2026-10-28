@@ -58,7 +58,7 @@ from domain.simulation.data import (
     simulation_universe,
     tr_symbol,
 )
-from domain.simulation.runs import execute_next_run
+from domain.simulation.runs import execute_next_run, queue_calibration
 from infra.providers.batch import fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 
@@ -613,6 +613,8 @@ def sync_simulation_history_job(
                 [(p.reference_date, p.value) for p in points],
                 unit=BCB_SERIES_UNITS["CDI"],
             )
+        # Fresh history: recalibrate the scenario generators (Phase 33.6, decision 10).
+        counts["calibration_run"] = queue_calibration(uow).id or 0
         uow.commit()
     logger.info("Simulation history synced", extra={"job": "sync_simulation_history"})
     return counts

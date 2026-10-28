@@ -20,12 +20,13 @@ passive income is a reading of the distributed share (value x yield), never extr
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import date
 
 import numpy as np
 
 from domain.shared.enums import ArcaClass
+from domain.simulation.bayes import NiwPosterior, credible_interval
 from domain.simulation.data import CDI_KEY, IBOV_KEY, IFIX_KEY, SP500_BRL_KEY
 from domain.simulation.engine import SimulationTimeout
 from domain.simulation.market import MarketHistory, month_ends
@@ -188,14 +189,80 @@ def percentiles(values: np.ndarray) -> Percentiles:
 
 
 @dataclass(frozen=True)
+class Chance:
+    """A probability with its 90% credibility interval (design 6.3).
+
+    The interval is the Beta(k + 1, n - k + 1) posterior of the share of favourable paths,
+    widened to cover the share of each generator of the mixture (their disagreement). The
+    parameter uncertainty is already inside the paths of the Bayesian generators.
+    """
+
+    probability: float
+    standard_error: float  # Monte Carlo only
+    low: float
+    high: float
+    by_generator: dict[str, float] = field(default_factory=dict)
+
+
+# Generators with fewer paths than this give a share too noisy to widen the interval.
+MIN_GENERATOR_PATHS = 100
+
+
+def chance(hits: np.ndarray, labels: np.ndarray | None = None) -> Chance:
+    n = hits.size
+    k = float(hits.sum())
+    p = k / n
+    low, high = credible_interval(k, n)
+    shares: dict[str, float] = {}
+    if labels is not None:
+        for g in dict.fromkeys(labels.tolist()):
+            mask = labels == g
+            if mask.sum() >= MIN_GENERATOR_PATHS:
+                shares[g] = round(float(hits[mask].mean()), 4)
+    if len(shares) > 1:
+        low, high = min(low, *shares.values()), max(high, *shares.values())
+    return Chance(
+        probability=round(p, 4),
+        standard_error=round(float(np.sqrt(p * (1.0 - p) / n)), 4),
+        low=round(low, 4),
+        high=round(high, 4),
+        by_generator=shares,
+    )
+
+
+@dataclass(frozen=True)
 class GoalOutcome:
-    """Share of the paths that reach a goal, with the Monte Carlo standard error."""
+    """Share of the paths that reach a goal, with its credibility interval."""
 
     target: float
     probability: float
     standard_error: float
     # Months until the goal among the paths that reach it (None when none does).
     months: Percentiles | None = None
+    low: float = 0.0
+    high: float = 1.0
+    by_generator: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EventOutcome:
+    """A probability of the strategy itself (design 6.3: loss in 12 months, beating the CDI)."""
+
+    key: str
+    label: str
+    probability: float
+    standard_error: float
+    low: float
+    high: float
+    by_generator: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class GeneratorShare:
+    key: str
+    label: str
+    weight: float
+    paths: int
 
 
 @dataclass(frozen=True)
@@ -216,6 +283,9 @@ class ClassPremise:
     volatility: float  # annualized standard deviation of the monthly excess
     expected_annual: float  # nominal: (1 + scenario CDI) x (1 + excess) - 1
     income_yield: float
+    # Bayesian layer: the decision 8 target and the posterior premium (geometric, a year).
+    prior_excess_annual: float | None = None
+    posterior_excess_annual: float | None = None
 
 
 @dataclass(frozen=True)
@@ -235,17 +305,24 @@ class ProjectionResult:
     premises: list[ClassPremise]
     fees: float  # median, today's money
     taxes: float  # median, today's money
+    events: list[EventOutcome] = field(default_factory=list)
+    generators: list[GeneratorShare] = field(default_factory=list)
+    prior_months: float | None = None  # weight of the prior in equivalent months of data
 
 
-def _goal(reached_at: np.ndarray, hit_final: np.ndarray, target: float) -> GoalOutcome:
-    n = hit_final.size
-    p = float(hit_final.mean())
+def _goal(
+    reached_at: np.ndarray, hit_final: np.ndarray, target: float, labels: np.ndarray | None
+) -> GoalOutcome:
     reached = reached_at[reached_at >= 0]
+    c = chance(hit_final, labels)
     return GoalOutcome(
         target=target,
-        probability=round(p, 4),
-        standard_error=round(float(np.sqrt(p * (1.0 - p) / n)), 4),
+        probability=c.probability,
+        standard_error=c.standard_error,
         months=percentiles(reached) if reached.size else None,
+        low=c.low,
+        high=c.high,
+        by_generator=c.by_generator,
     )
 
 
@@ -261,7 +338,10 @@ def _allocate(values: np.ndarray, amount: np.ndarray, targets: np.ndarray) -> np
 
 
 def premises(
-    sample: ClassSample, scenario: RateScenario, config: ProjectionConfig
+    sample: ClassSample,
+    scenario: RateScenario,
+    config: ProjectionConfig,
+    posterior: NiwPosterior | None = None,
 ) -> list[ClassPremise]:
     cash_net = cash_annual_net(scenario, config)
     out: list[ClassPremise] = []
@@ -275,6 +355,11 @@ def premises(
             expected = (1.0 + scenario.annual_cdi_rate) * (1.0 + excess) - 1.0
         else:
             continue
+        prior = post = None
+        if posterior is not None and cls in posterior.classes:
+            j = posterior.classes.index(cls)
+            prior = round(float(np.expm1(12.0 * posterior.prior_mean[j])), 6)
+            post = round(float(np.expm1(12.0 * posterior.mean[j])), 6)
         out.append(
             ClassPremise(
                 arca_class=cls,
@@ -288,6 +373,8 @@ def premises(
                     else config.income_yield.get(cls, 0.0),
                     6,
                 ),
+                prior_excess_annual=prior,
+                posterior_excess_annual=post,
             )
         )
     return out
@@ -312,9 +399,16 @@ def project(
     *,
     seed: int,
     deadline: Callable[[], bool] | None = None,
+    excess: np.ndarray | None = None,
+    labels: np.ndarray | None = None,
+    posterior: NiwPosterior | None = None,
+    generators: Sequence[GeneratorShare] = (),
 ) -> ProjectionResult:
-    """Simulate `config.paths` futures of the portfolio under one rate scenario."""
-    rng = np.random.default_rng(seed)
+    """Simulate `config.paths` futures of the portfolio under one rate scenario.
+
+    `excess` (paths, horizon, K) are the drawn monthly excess returns over the CDI and
+    `labels` the generator of each path; without them, the plain block bootstrap is used.
+    """
     paths, horizon = config.paths, config.horizon_months
     targets = np.array([config.targets.get(c, 0.0) for c in CLASS_ORDER])
     bands = np.array([config.bands.get(c, 0.0) for c in CLASS_ORDER])
@@ -334,7 +428,15 @@ def project(
     )
     monthly_income_yield = income_yield / 12.0
 
-    idx = stationary_bootstrap_indices(sample.size, horizon, paths, config.mean_block_months, rng)
+    if excess is None:
+        rng = np.random.default_rng(seed)
+        idx = stationary_bootstrap_indices(
+            sample.size, horizon, paths, config.mean_block_months, rng
+        )
+        excess = sample.excess[idx]
+        labels = np.full(paths, "BOOTSTRAP")
+    if excess.shape[:2] != (paths, horizon):
+        raise ValueError(f"excess paths {excess.shape[:2]} do not match {(paths, horizon)}")
 
     values = np.tile(
         np.array([max(config.initial_by_class.get(c, 0.0), 0.0) for c in CLASS_ORDER]),
@@ -349,6 +451,7 @@ def project(
     deflator = 1.0
     contribution = config.monthly_contribution
     contributed = float(values[0].sum())
+    strategy_12m: np.ndarray | None = None
 
     wealth = np.empty((paths, horizon + 1))
     net = np.empty((paths, horizon + 1))
@@ -366,7 +469,7 @@ def project(
     for t in range(1, horizon + 1):
         if deadline is not None and deadline():
             raise SimulationTimeout(f"projection stopped at month {t}")
-        returns = (1.0 + sample.excess[idx[:, t - 1]]) * (1.0 + cdi_m) - 1.0
+        returns = (1.0 + excess[:, t - 1]) * (1.0 + cdi_m) - 1.0
         returns[:, CASH_INDEX] = cash_m
         before = values.sum(axis=1)
         values = values * (1.0 + returns)
@@ -374,6 +477,8 @@ def project(
         strategy *= np.where(before > 0, after / np.where(before > 0, before, 1.0), 1.0)
         peak = np.maximum(peak, strategy)
         drawdown = np.minimum(drawdown, strategy / peak - 1.0)
+        if t == 12:
+            strategy_12m = strategy.copy()
 
         deflator *= 1.0 + ipca_m
         contribution *= 1.0 + growth_m
@@ -424,9 +529,26 @@ def project(
 
     wealth_goal = income_goal = None
     if config.wealth_goal:
-        wealth_goal = _goal(*first_hit(net, config.wealth_goal), config.wealth_goal)
+        wealth_goal = _goal(*first_hit(net, config.wealth_goal), config.wealth_goal, labels)
     if config.income_goal:
-        income_goal = _goal(*first_hit(income, config.income_goal), config.income_goal)
+        income_goal = _goal(*first_hit(income, config.income_goal), config.income_goal, labels)
+
+    events: list[EventOutcome] = []
+    if strategy_12m is not None:
+        events.append(
+            EventOutcome(
+                key="LOSS_10_12M",
+                label="Perder mais de 10% nos primeiros 12 meses",
+                **asdict(chance(strategy_12m < 0.90, labels)),
+            )
+        )
+    events.append(
+        EventOutcome(
+            key="BEAT_CDI",
+            label="Render mais que o CDI no horizonte",
+            **asdict(chance(strategy > (1.0 + cdi_m) ** horizon, labels)),
+        )
+    )
 
     return ProjectionResult(
         scenario=scenario,
@@ -443,9 +565,12 @@ def project(
         contributed=round(contributed, 2),
         wealth_goal=wealth_goal,
         income_goal=income_goal,
-        premises=premises(sample, scenario, config),
+        premises=premises(sample, scenario, config, posterior),
         fees=round(float(np.median(fees)), 2),
         taxes=round(float(np.median(taxes)), 2),
+        events=events,
+        generators=list(generators),
+        prior_months=posterior.prior_months if posterior is not None else None,
     )
 
 

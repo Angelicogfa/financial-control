@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -177,9 +177,29 @@ class PercentilesDTO(BaseModel):
 class GoalOutcomeDTO(BaseModel):
     target: float
     probability: float
-    # Monte Carlo error of the probability only; parameter uncertainty comes in Phase 33.6.
-    standard_error: float
+    standard_error: float  # Monte Carlo only
     months: PercentilesDTO | None = None
+    # 90% credibility interval: finite paths plus the spread between generators (33.6).
+    low: float = 0.0
+    high: float = 1.0
+    by_generator: dict[str, float] = Field(default_factory=dict)
+
+
+class EventOutcomeDTO(BaseModel):
+    key: str
+    label: str
+    probability: float
+    standard_error: float
+    low: float
+    high: float
+    by_generator: dict[str, float] = Field(default_factory=dict)
+
+
+class GeneratorShareDTO(BaseModel):
+    key: str
+    label: str
+    weight: float
+    paths: int
 
 
 class ProjectionPointDTO(BaseModel):
@@ -196,6 +216,8 @@ class ClassPremiseDTO(BaseModel):
     volatility: float
     expected_annual: float
     income_yield: float
+    prior_excess_annual: float | None = None
+    posterior_excess_annual: float | None = None
 
 
 class RateScenarioDTO(BaseModel):
@@ -223,6 +245,9 @@ class ProjectionScenarioDTO(BaseModel):
     premises: list[ClassPremiseDTO] = Field(default_factory=list)
     fees: float = 0.0
     taxes: float = 0.0
+    events: list[EventOutcomeDTO] = Field(default_factory=list)
+    generators: list[GeneratorShareDTO] = Field(default_factory=list)
+    prior_months: float | None = None
 
 
 class ProjectionDTO(BaseModel):
@@ -235,3 +260,52 @@ class ProjectionDTO(BaseModel):
     classes: list[str] = Field(default_factory=list)
     targets: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    calibration_run: int | None = None
+
+
+CalibrationStatusKey = Literal["CALIBRATED", "MISCALIBRATED", "INCONCLUSIVE"]
+
+
+class GeneratorCalibrationDTO(BaseModel):
+    key: str
+    label: str
+    weight: float
+    windows: int
+    effective_windows: float
+    coverage: float
+    coverage_low: float
+    coverage_high: float
+    status: CalibrationStatusKey
+    pit_histogram: list[int] = Field(default_factory=list)
+    mean_pit: float
+    brier_loss: float
+    brier_beat_cdi: float
+    log_score: float
+
+
+class OriginForecastDTO(BaseModel):
+    origin: date
+    realized: float
+    forecasts: dict[str, dict[str, float]] = Field(default_factory=dict)
+
+
+class CalibrationDTO(BaseModel):
+    """The latest (or a given) calibration; `run_id` is None when none was ever run."""
+
+    run_id: int | None = None
+    status: SimulationStatus | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+    horizon_months: int = 12
+    windows: int = 0
+    effective_windows: float = 0.0
+    first_origin: date | None = None
+    last_origin: date | None = None
+    classes: list[str] = Field(default_factory=list)
+    targets: dict[str, float] = Field(default_factory=dict)
+    weights: dict[str, float] = Field(default_factory=dict)
+    generators: list[GeneratorCalibrationDTO] = Field(default_factory=list)
+    origins: list[OriginForecastDTO] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    # A newer calibration still queued or running.
+    pending_run_id: int | None = None

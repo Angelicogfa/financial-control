@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   BacktestSummaryDTO,
+  CalibrationDTO,
   PercentilesDTO,
   ProjectionDTO,
   ProjectionScenarioDTO,
@@ -12,8 +13,10 @@ import type {
   SimulationRunDTO,
 } from "../api/types";
 import {
+  CalibrationView,
   ProjectionView,
   RobustnessView,
+  TAB_GUIDE,
   isActive,
   seriesOf,
   toBacktestRequest,
@@ -277,14 +280,40 @@ function scenario(name: string, label: string, overrides: Partial<ProjectionScen
     final_income: band(180),
     max_drawdown: { p5: -0.3, p25: -0.2, p50: -0.15, p75: -0.1, p95: -0.05 },
     contributed: 34000,
-    wealth_goal: { target: 35000, probability: 0.72, standard_error: 0.0063, months: { p5: 18, p25: 20, p50: 22, p75: 24, p95: 24 } },
+    wealth_goal: {
+      target: 35000,
+      probability: 0.72,
+      standard_error: 0.0063,
+      months: { p5: 18, p25: 20, p50: 22, p75: 24, p95: 24 },
+      low: 0.64,
+      high: 0.8,
+      by_generator: { BOOTSTRAP: 0.8, BAYESIAN_NORMAL: 0.64 },
+    },
     income_goal: { target: 10000, probability: 0, standard_error: 0, months: null },
     premises: [
-      { arca_class: "ACOES", proxy: "IBOV", excess_annual: 0.031, volatility: 0.22, expected_annual: 0.134, income_yield: 0.05 },
+      {
+        arca_class: "ACOES",
+        proxy: "IBOV",
+        excess_annual: 0.031,
+        volatility: 0.22,
+        expected_annual: 0.134,
+        income_yield: 0.05,
+        prior_excess_annual: 0.03,
+        posterior_excess_annual: 0.025,
+      },
       { arca_class: "CAIXA", proxy: "CDI", excess_annual: 0, volatility: 0, expected_annual: 0.085, income_yield: 0.04 },
     ],
     fees: 10,
     taxes: 0,
+    events: [
+      { key: "LOSS_10_12M", label: "Perder mais de 10% nos primeiros 12 meses", probability: 0.08, standard_error: 0.004, low: 0.06, high: 0.11 },
+      { key: "BEAT_CDI", label: "Render mais que o CDI no horizonte", probability: 0.55, standard_error: 0.007, low: 0.5, high: 0.6 },
+    ],
+    generators: [
+      { key: "BOOTSTRAP", label: "Bootstrap em blocos", weight: 0.3, paths: 1500 },
+      { key: "BAYESIAN_NORMAL", label: "Normal bayesiana", weight: 0.7, paths: 3500 },
+    ],
+    prior_months: 84,
     ...overrides,
   };
 }
@@ -304,6 +333,7 @@ function projection(overrides: Partial<ProjectionDTO> = {}): ProjectionDTO {
     classes: ["ACOES", "CAIXA"],
     targets: { ACOES: 60, CAIXA: 40 },
     warnings: ["Simulação, não recomendação: teste."],
+    calibration_run: 9,
     ...overrides,
   };
 }
@@ -327,6 +357,7 @@ describe("projection helpers", () => {
     initial: { ACOES: "0", REAL_ESTATE: "0", ATIVOS_INTERNACIONAIS: "0", CAIXA: "0" },
     cdi: "",
     ipca: "4,5",
+    generator: "STACKED" as const,
     label: "",
   };
 
@@ -341,6 +372,7 @@ describe("projection helpers", () => {
       initial_by_class: null,
       cdi_rate: null,
       ipca_rate: 0.045,
+      generator: "STACKED",
       label: null,
     });
   });
@@ -361,6 +393,12 @@ describe("ProjectionView", () => {
     expect(screen.getByText("Simulação, não recomendação: teste.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Juros na premissa" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("72%")).toBeInTheDocument();
+    expect(screen.getByText("(64% a 80%)")).toBeInTheDocument();
+    expect(screen.getByText(/Por gerador: Bootstrap em blocos 80% · Normal bayesiana 64%/)).toBeInTheDocument();
+    const others = screen.getByRole("list", { name: "Outras chances" });
+    expect(within(others).getByText(/Perder mais de 10% nos primeiros 12 meses/)).toHaveTextContent("8% (6% a 11%)");
+    expect(screen.getByText(/Bootstrap em blocos 30% · Normal bayesiana 70% \(pesos da calibração #9\)/)).toBeInTheDocument();
+    expect(screen.getByText(/pesa o equivalente a 84 meses/)).toBeInTheDocument();
     expect(screen.getByText(/Nenhuma trajetória chega à meta/)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Faixas prováveis do patrimônio ano a ano" })).toBeInTheDocument();
 
@@ -371,6 +409,8 @@ describe("ProjectionView", () => {
     const premises = screen.getByRole("table", { name: "Premissas por classe" });
     expect(within(premises).getByText("CDI líquido de IR")).toBeInTheDocument();
     expect(within(premises).getByText("+3,1%")).toBeInTheDocument();
+    expect(within(premises).getByText("+3,0%")).toBeInTheDocument();
+    expect(within(premises).getByText("+2,5%")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Juros em alta" }));
     expect(within(wealth).getByText("R$ 50.000,00")).toBeInTheDocument();
@@ -402,5 +442,107 @@ describe("SimulationPage future tab", () => {
     expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
     const body = last(calls, "POST", "/simulations/projections")?.body as Record<string, unknown>;
     expect(body).toMatchObject({ horizon_years: 20, monthly_contribution: 1000, income_goal: 5000, initial_by_class: null });
+  });
+});
+
+// --- confidence and tab guide -----------------------------------------------------------------
+
+function calibration(overrides: Partial<CalibrationDTO> = {}): CalibrationDTO {
+  const generator = (key: string, label: string, status: "CALIBRATED" | "MISCALIBRATED" | "INCONCLUSIVE", weight: number) => ({
+    key,
+    label,
+    weight,
+    windows: 120,
+    effective_windows: 10,
+    coverage: status === "MISCALIBRATED" ? 0.62 : 0.88,
+    coverage_low: status === "MISCALIBRATED" ? 0.45 : 0.72,
+    coverage_high: status === "MISCALIBRATED" ? 0.78 : 0.96,
+    status,
+    pit_histogram: [12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+    mean_pit: 0.51,
+    brier_loss: 0.041,
+    brier_beat_cdi: 0.2,
+    log_score: 1.02,
+  });
+  return {
+    run_id: 9,
+    status: "DONE",
+    finished_at: "2026-10-28T20:00:00Z",
+    horizon_months: 12,
+    windows: 120,
+    effective_windows: 10,
+    first_origin: "2012-01-31",
+    last_origin: "2025-10-31",
+    classes: ["ACOES", "CAIXA"],
+    targets: { ACOES: 0.6, CAIXA: 0.4 },
+    weights: { BOOTSTRAP: 0.1, BAYESIAN_BOOTSTRAP: 0.2, BAYESIAN_NORMAL: 0.7 },
+    generators: [
+      generator("BOOTSTRAP", "Bootstrap em blocos", "MISCALIBRATED", 0.1),
+      generator("BAYESIAN_BOOTSTRAP", "Bootstrap bayesiano", "INCONCLUSIVE", 0.2),
+      generator("BAYESIAN_NORMAL", "Normal bayesiana", "CALIBRATED", 0.7),
+      generator("STACKED", "Combinação (stacking)", "CALIBRATED", 1),
+    ],
+    origins: [
+      { origin: "2012-01-31", realized: 0.08, forecasts: { STACKED: { p5: -0.1, p50: 0.09, p95: 0.3, pit: 0.45 } } },
+      { origin: "2012-02-29", realized: -0.05, forecasts: { STACKED: { p5: -0.12, p50: 0.08, p95: 0.29, pit: 0.2 } } },
+    ],
+    warnings: ["Há gerador mal calibrado: teste."],
+    pending_run_id: null,
+    ...overrides,
+  };
+}
+
+describe("CalibrationView", () => {
+  it("shows every generator with its coverage interval, status and weight", () => {
+    render(<CalibrationView data={calibration()} />);
+    expect(screen.getByText("Há gerador mal calibrado: teste.")).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Calibração dos geradores" });
+    const bootstrap = within(table).getByText("Bootstrap em blocos").closest("tr") as HTMLElement;
+    expect(within(bootstrap).getByText("Mal calibrado")).toBeInTheDocument();
+    expect(within(bootstrap).getByText("62%")).toBeInTheDocument();
+    expect(within(bootstrap).getByText("45% a 78%")).toBeInTheDocument();
+    expect(within(table).getByText("Inconclusivo")).toBeInTheDocument();
+    const normal = within(table).getByText("Normal bayesiana").closest("tr") as HTMLElement;
+    expect(within(normal).getByText("70%")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Histograma do PIT da combinação" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /previsto pela combinação e realizado/ })).toBeInTheDocument();
+  });
+});
+
+describe("SimulationPage confidence tab", () => {
+  it("asks for a calibration and follows it until it is stored", async () => {
+    let queued = false;
+    const { calls } = mockApi([
+      {
+        path: "/simulations/calibration",
+        reply: () => (queued ? calibration({ run_id: null, generators: [], pending_run_id: 10 }) : { run_id: null, pending_run_id: null }),
+      },
+      {
+        method: "POST",
+        path: "/simulations/calibrations",
+        reply: () => {
+          queued = true;
+          return { status: 202, json: run({ id: 10, kind: "CALIBRATION", status: "PENDING" }) };
+        },
+      },
+    ]);
+    renderAt("/tools/simulation?tab=confidence");
+    expect(await screen.findByText("Ainda não há calibração")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Recalcular agora" }));
+    expect(await screen.findByText(/Calibração na fila do worker/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Recalcular agora/ })).toBeDisabled();
+    expect(last(calls, "POST", "/simulations/calibrations")).toBeDefined();
+  });
+
+  it("explains what sets each tab apart", async () => {
+    mockApi([{ path: "/simulations/calibration", reply: calibration() }]);
+    renderAt("/tools/simulation?tab=confidence");
+    expect(await screen.findAllByText(TAB_GUIDE.confidence.question)).toHaveLength(2);
+    const comparison = screen.getByRole("table", { name: "Comparação das abas" });
+    const rows = within(comparison).getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Passado", "Futuro", "Robustez", "Confiança"]);
+    expect(within(comparison).getByText(TAB_GUIDE.future.question)).toBeInTheDocument();
+    expect(rows[3]).toHaveAttribute("aria-current", "true");
+    expect(await screen.findByRole("table", { name: "Calibração dos geradores" })).toBeInTheDocument();
   });
 });
