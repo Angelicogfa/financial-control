@@ -25,6 +25,7 @@ import type {
   ContributionSimulationRequest,
   CorporateEventDTO,
   CorporateEventRequest,
+  EarningsAgendaDTO,
   EarningCreateRequest,
   EarningResponseDTO,
   EarningUpdateRequest,
@@ -53,6 +54,7 @@ import type {
   TransactionCreateRequest,
   TransactionResponseDTO,
   TransactionUpdateRequest,
+  TreasuryMarketDTO,
   TreasurySearchResponseDTO,
   WatchlistAddRequest,
   WatchlistItemDTO,
@@ -115,6 +117,10 @@ export const api = {
     snapshots: (dateFrom?: string) =>
       request<SnapshotPointDTO[]>("/portfolio/snapshots", { query: { date_from: dateFrom } }),
     health: () => request<PortfolioHealthDTO>("/portfolio/health"),
+    treasuryMarket: () => request<TreasuryMarketDTO[]>("/portfolio/treasury-market"),
+    treasuryMarketDetail: (assetId: number) =>
+      request<TreasuryMarketDTO>(`/portfolio/treasury-market/${assetId}`),
+    earningsAgenda: () => request<EarningsAgendaDTO>("/portfolio/earnings-agenda"),
   },
   alerts: {
     list: () => request<AlertsResponseDTO>("/alerts"),

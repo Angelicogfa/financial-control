@@ -19,6 +19,7 @@ import {
 } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { compareLink } from "../tools/AssetComparePage";
+import { TreasuryMarketPanel } from "./TreasuryMarketPanel";
 
 type ClassTab = "ALL" | ArcaClass;
 const TABS: TabSpec<ClassTab>[] = [
@@ -195,6 +196,7 @@ export function PortfolioPage() {
             <div className="app-page-stack">
               {tab !== "ALL" && <Composition report={data} arcaClass={tab} />}
               <PositionsTable report={data} onlyClass={tab} />
+              {(tab === "ALL" || tab === "CAIXA") && <TreasuryMarketPanel />}
             </div>
           ) : (
             <Empty title="Nenhuma posição ainda" hint="Registre compras em Lançamentos ou importe o extrato da B3.">

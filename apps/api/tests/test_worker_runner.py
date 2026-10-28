@@ -225,6 +225,7 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "record_checklist_evaluations",
         "sync_instrument_catalog",
         "sync_treasury_catalog",
+        "sync_treasury_prices",
     }
     assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"

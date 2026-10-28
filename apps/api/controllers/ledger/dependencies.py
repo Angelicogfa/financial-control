@@ -19,9 +19,16 @@ from domain.portfolio.services.service import PortfolioApplicationService
 
 def get_import_handler(
     uow_factory: UoWFactory = Depends(get_uow_factory),
+    portfolio_service: PortfolioApplicationService = Depends(get_portfolio_service),
 ) -> ImportHandler:
-    """Provide the ImportHandler instance."""
-    return ImportHandler(uow_factory=uow_factory)
+    """Provide the ImportHandler instance (declared distributions fix imported ex dates)."""
+    gateway = portfolio_service.gateway
+    return ImportHandler(
+        uow_factory=uow_factory,
+        distributions=lambda ticker, asset_type: gateway.get_distributions(
+            ticker, asset_type=asset_type
+        ),
+    )
 
 
 def get_event_handler(

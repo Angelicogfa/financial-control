@@ -22,6 +22,18 @@ const VALUATION_FIELDS: Array<{ key: string; label: string; percent: boolean; hi
   { key: "reference_real_yield", label: "Juro real de referência (NTN-B)", percent: true, hint: "Base do spread dos FIIs." },
   { key: "min_fii_spread", label: "Spread mínimo de FIIs", percent: true, hint: "DY acima do juro real." },
   { key: "min_margin_of_safety", label: "Margem de segurança", percent: true, hint: "Para considerar descontado." },
+  {
+    key: "early_sale_min_excess_rate",
+    label: "Tesouro: ganho mínimo da venda sobre a curva (a.a.)",
+    percent: true,
+    hint: "Rentabilidade ao ano vendendo hoje menos a da curva para sugerir a venda antecipada.",
+  },
+  {
+    key: "early_sale_min_reinvest_spread",
+    label: "Tesouro: folga do CDI sobre a taxa de empate (a.a.)",
+    percent: true,
+    hint: "Quanto o CDI projetado precisa superar a taxa de empate até o vencimento.",
+  },
 ];
 
 const PROJECTION_FIELDS: Array<{ key: string; label: string; percent: boolean }> = [
@@ -121,6 +133,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
   const [healthText, setHealthText] = useState<Record<string, string>>(() =>
     Object.fromEntries(HEALTH_FIELDS.map((f) => [f.key, toText(health[f.key] ?? undefined, f.percent)])),
   );
+  const [treasuryAtMarket, setTreasuryAtMarket] = useState(Boolean(policy.valuation?.treasury_mark_to_market));
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -157,7 +170,11 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
           min_score: Math.round(parseDecimal(minScore) ?? 0),
           min_coverage_pct: parseDecimal(minCoverage) ?? 0,
         },
-        valuation: { ...read(VALUATION_FIELDS, valuationText), projections: read(PROJECTION_FIELDS, projectionText) },
+        valuation: {
+          ...read(VALUATION_FIELDS, valuationText),
+          treasury_mark_to_market: treasuryAtMarket,
+          projections: read(PROJECTION_FIELDS, projectionText),
+        },
         health: read(HEALTH_FIELDS, healthText),
       });
       onSaved();
@@ -284,6 +301,15 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
               />
             </div>
           ))}
+          <label className="app-check">
+            <input
+              type="checkbox"
+              checked={treasuryAtMarket}
+              disabled={saving}
+              onChange={(e) => setTreasuryAtMarket(e.target.checked)}
+            />
+            Pesar o Tesouro Direto pelo preço de mercado (em vez da curva) na carteira e no aporte
+          </label>
         </div>
       </section>
 

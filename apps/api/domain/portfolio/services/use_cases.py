@@ -10,18 +10,23 @@ from datetime import date
 from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
     ContributionPlanResponseDTO,
+    EarningsAgendaDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
+    TreasuryMarketDTO,
 )
 from controllers.portfolio.serializers import (
     to_contribution_plan_dto,
+    to_earnings_agenda_dto,
     to_portfolio_health_dto,
     to_portfolio_report_dto,
     to_risk_summary_dto,
+    to_treasury_market_dto,
 )
 from controllers.shared.dependencies import UoWFactory
+from core.errors import NotFoundError
 from domain.accounts.services.use_cases import resolve_account_id
 from domain.portfolio.services.service import PortfolioApplicationService
 
@@ -101,3 +106,29 @@ class PortfolioHandler:
         with self.uow_factory() as uow:
             report = self.portfolio_service.build_portfolio_health(uow, as_of_date=as_of_date)
         return to_portfolio_health_dto(report)
+
+    def treasury_market(
+        self,
+        *,
+        as_of_date: date | None = None,
+        asset_id: int | None = None,
+        with_history: bool = False,
+    ) -> list[TreasuryMarketDTO]:
+        with self.uow_factory() as uow:
+            valuations = self.portfolio_service.treasury_market(
+                uow, as_of_date=as_of_date, asset_id=asset_id, with_history=with_history
+            )
+        return [to_treasury_market_dto(v) for v in valuations]
+
+    def treasury_market_detail(
+        self, asset_id: int, *, as_of_date: date | None = None
+    ) -> TreasuryMarketDTO:
+        found = self.treasury_market(as_of_date=as_of_date, asset_id=asset_id, with_history=True)
+        if not found:
+            raise NotFoundError(f"No open Treasury position for asset id={asset_id}")
+        return found[0]
+
+    def earnings_agenda(self, *, as_of_date: date | None = None) -> EarningsAgendaDTO:
+        with self.uow_factory() as uow:
+            agenda = self.portfolio_service.earnings_agenda(uow, as_of_date=as_of_date)
+        return to_earnings_agenda_dto(agenda)

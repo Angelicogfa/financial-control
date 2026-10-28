@@ -22,6 +22,8 @@ function overviewApi(overrides: Record<string, unknown> = {}) {
     },
     { method: "POST", path: "/alerts/dismissals", reply: { status: 204 } },
     { path: "/accounts", reply: [{ id: 1, name: "XP", is_active: true }] },
+    { path: "/portfolio/earnings-agenda", reply: { as_of_date: "2026-03-10", items: [], declared_net_brl: 0 } },
+    { path: "/portfolio/treasury-market", reply: [] },
   ]);
 }
 
