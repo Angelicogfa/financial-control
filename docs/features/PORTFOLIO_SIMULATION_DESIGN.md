@@ -2,7 +2,7 @@
 
 *Status: desenho em revisão, nenhuma linha de código. Data: 2026-10-28 (revisão 2: ativos candidatos e lógica bayesiana). Fase proposta: 33 (ver [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md)).*
 
-Este documento descreve a ferramenta e, na seção 8, ataca o próprio desenho: cada premissa é testada contra o que pode dar errado com os dados, a estatística e o uso. A implementação só começa depois que as decisões da seção 10 forem tomadas.
+Este documento descreve a ferramenta e, na seção 8, ataca o próprio desenho: cada premissa é testada contra o que pode dar errado com os dados, a estatística e o uso. As decisões da seção 10 foram tomadas em 2026-10-28 (10.1 a 10.4).
 
 ## 1. Perguntas que a ferramenta responde
 
@@ -190,8 +190,25 @@ Para saber se as probabilidades merecem confiança, a simulação é testada con
 ### 6.5 Portão bayesiano no laboratório de ML
 Além do Deflated Sharpe e do PBO (7.2), um modelo só passa se a probabilidade a posteriori de superar a referência simples for de pelo menos 95%. Essa probabilidade é a da diferença de log score fora da amostra, estimada por bootstrap bayesiano.
 
-### 6.6 Implementação
-Tudo em fórmulas conjugadas e numpy. Nada de MCMC no caminho padrão: PyMC/Stan acrescentam centenas de MB à imagem e minutos por execução. Se um dia for preciso, entra só no laboratório, com decisão registrada. Os priors são parâmetros versionados da simulação, gravados em `simulation_runs`.
+### 6.6 Implementação e o papel do PyMC
+**Decisão: modelo híbrido.** As peças bayesianas do caminho principal têm solução fechada:
+- normal-inverso-Wishart para média e covariância;
+- Bayes-Stein para as médias;
+- normal-normal com Bayes empírico para o α dos candidatos;
+- Beta-binomial para a cobertura.
+
+Essas peças ficam em numpy, com testes de verdade conhecida (8.2). O **PyMC** entra em dois papéis:
+1. **Oráculo nos testes** (dependência só de desenvolvimento): os mesmos dados passam pelas fórmulas fechadas e por um modelo PyMC equivalente, e as médias e variâncias da posterior precisam coincidir dentro do erro de amostragem. É isso que protege contra erro na escrita da lógica, sem levar o PyMC para a execução.
+2. **Laboratório** (grupo opcional de dependências): modelos sem solução fechada, onde amostrar é o único caminho. Exemplos: retornos com caudas pesadas (t de Student), volatilidade estocástica, HMM bayesiano, hierarquia com τ totalmente bayesiano. Aí o PyMC reduz o risco: o amostrador NUTS e os diagnósticos (R-hat, ESS, divergências, via ArviZ) já estão prontos e testados.
+
+**Por que não usar o PyMC no caminho principal:**
+- Em modelos conjugados, o MCMC aproxima o que a fórmula dá exato, com erro de amostragem e tempo de execução.
+- Ele acrescenta modos de falha que precisam de vigilância: não convergência e divergências.
+- Os resultados podem variar entre versões.
+- O PyTensor compila o modelo (C ou Numba), e a documentação recomenda instalar pelo conda-forge, enquanto as nossas imagens usam uv/pip em base slim. Seria preciso um compilador ou o Numba na imagem do worker, com o custo de tamanho e de build medido no `docker compose build` antes de aceitar.
+- O PyMC não elimina a lógica que pode estar errada: ela migra da álgebra para a especificação do modelo (priors, parametrização), que também precisa de testes.
+
+Os priors são parâmetros versionados da simulação, gravados em `simulation_runs`.
 
 ## 7. Camada C: laboratório de machine learning
 
@@ -307,18 +324,55 @@ Cada etapa é um PR. A 33.9 pode terminar com a conclusão "nenhum modelo passou
 9. **Evento de ruptura dos candidatos:** probabilidade anual e tamanho da queda (proposta: 1% ao ano, queda de 70%), ou desligado?
 10. **Calibração:** com que frequência recalcular (proposta: semanal) e o que fazer quando um gerador estiver mal calibrado: só avisar (recomendado) ou tirá-lo da mistura?
 
-### 10.1 Decisões provisórias adotadas para iniciar (2026-10-28)
-A implementação começou a pedido do usuário antes das respostas formais. Até a revisão, valem as opções recomendadas acima, e cada uma pode ser trocada sem refazer o motor (são parâmetros da simulação):
+### 10.1 Decisões tomadas (2026-10-28)
+| # | Decisão | Fundamento |
+|---|---|---|
+| 1 | **Universo: inclui o catálogo atual**, além dos ativos que você teve ou observou | Escolha do usuário. Como o catálogo só tem sobreviventes, o resultado com o catálogo leva o selo "universo com viés de sobrevivência", entra o evento de ruptura (decisão 9) e a comparação com o universo "teve/observou" fica sempre ao lado |
+| 2 | **Yahoo** como fonte do histórico longo (preço ajustado) | Escolha do usuário; relatório de cobertura e nada de preencher buracos (R13) |
+| 3 | **ML: só regime e risco** | Recomendação seguida |
+| 4 | **Meta: patrimônio e renda passiva mensal** | Escolha do usuário |
+| 5 | **Política no passado: as regras atuais aplicadas ao histórico inteiro**, com a política vigente em cada data como opção | Ver 10.2 |
+| 6 | **Orçamento: 5.000 trajetórias e 120 s** por simulação | Recomendação seguida |
+| 7 | **Candidatos: watchlist + screener com os filtros da Pesquisa, até 20 por execução** | Recomendação seguida |
+| 8 | **Prior: média das classes encolhida por Bayes-Stein para um alvo de prêmios conservadores sobre o CDI**, com a intensidade dada pelos dados; premissas da política como "visões" à la Black-Litterman, com confiança declarada | Ver 10.3 |
+| 9 | **Ruptura: probabilidade anual pela qualidade de crédito (zona do Z''-score); perda central de 55%, estresse em 90%** | Ver 10.4 |
+| 10 | **Calibração semanal, só avisando** quando um gerador estiver mal calibrado | Recomendação seguida |
 
-| # | Decisão provisória |
-|---|---|
-| 1 | Universo do backtest: ativos que você teve ou observou, mais os índices |
-| 2 | Histórico longo: Yahoo (preço ajustado), com relatório de cobertura e sem preencher buracos |
-| 3 | ML: só regime e risco |
-| 4 | Meta: patrimônio e renda passiva mensal, as duas opcionais |
-| 5 | Política no passado: a atual aplicada ao passado inteiro, rotulada assim; a vigente em cada data fica como opção |
-| 6 | Orçamento: 5.000 trajetórias e 120 s por simulação |
-| 7 | Candidatos: watchlist mais o screener com os filtros da Pesquisa, até 20 por execução |
-| 8 | Prior: premissas de projeção da política, com peso de 60 meses |
-| 9 | Ruptura dos candidatos: 1% ao ano, queda de 70% |
-| 10 | Calibração: semanal, só avisando quando um gerador estiver mal calibrado |
+### 10.2 Política no passado (decisão 5)
+- **Regra como objeto do teste.** O protocolo de Arnott, Harvey e Markowitz (2019) e o trabalho de Bailey, Borwein, López de Prado e Zhu sobre overfitting de backtest tratam a estratégia como uma regra fixa, especificada antes, e testada no histórico inteiro. Aplicar as regras atuais em todo o período é isso. A política vigente em cada data não serve como padrão por dois motivos: a política só existe desde 2026, e as mudanças dela são decisões discricionárias, não uma regra.
+- **Viés de retrospectiva.** As regras atuais foram escolhidas por quem já conhecia o passado. Por isso o backtest com elas é **descritivo**, não uma validação. Os últimos 3 anos ficam reservados (R3), e toda variante de regra testada entra na contagem de tentativas (PBO, Deflated Sharpe).
+- **Opção:** a política vigente em cada data continua disponível, para comparar o que você de fato decidiu com a regra fixa.
+
+### 10.3 Prior das médias (decisão 8)
+- **Por que encolher:** a média amostral é um estimador ruim para a média esperada; o resultado de Stein mostra que ela é inadmissível. Jorion (1986) propôs o estimador Bayes-Stein, o bayesiano mais usado nessa literatura. Ele puxa as médias para um alvo comum, com intensidade calculada pelos próprios dados: `w = (N + 2) / ((N + 2) + T·(μ̂ − μ₀)ᵀ Σ⁻¹ (μ̂ − μ₀))`. Isso substitui o peso fixo de 60 meses proposto antes. O peso efetivo, em meses equivalentes, continua visível (R15).
+- **O alvo (μ₀):** prêmios conservadores sobre o CDI projetado, por classe. A referência é o Global Investment Returns Yearbook (Dimson, Marsh e Staunton):
+  - prêmio histórico das ações mundiais sobre títulos de curto prazo de cerca de 4,2–4,3% a.a.;
+  - prêmio esperado estimado pelos autores entre 3% e 3,5%.
+
+  Proposta: Ações Brasil e Internacional (em reais) a **CDI + 3% a.a.**, Real Estate (FIIs) a **CDI + 2% a.a.** e Caixa ao **CDI**. Prêmios maiores para o Brasil, como o prêmio de risco-país de Damodaran (perto de 3,7% em jan/2023), ficam como sensibilidade, e não como alvo, porque o histórico recente do Ibovespa contra o CDI não os sustenta.
+- **Covariância:** prior centrado no Ledoit-Wolf que já existe.
+- **Visões:** as premissas de projeção da política entram como visões à la Black-Litterman, com a confiança declarada. Sem visão, o resultado é só o encolhimento.
+
+### 10.4 Evento de ruptura (decisão 9)
+- **Perda:** Shumway (1997) mostrou que os retornos de saída de bolsa por mau desempenho faltavam na base CRSP e eram grandes. Shumway e Warther (1999) estimaram em **−55%** a correção adequada no Nasdaq. Na falência, o acionista costuma perder quase tudo. Proposta: perda central de 55%, com sensibilidade em 90%.
+- **Probabilidade:** pela qualidade de crédito, como o próprio Altman recomenda hoje: associar o escore a uma nota de crédito equivalente e usar a taxa histórica de default dessa nota. A média histórica de default anual da S&P para grau especulativo foi de 4,91% (1981–2004), e a de grau de investimento fica perto de zero. Proposta:
+  - Z''-score em zona de estresse: **5% ao ano**;
+  - zona cinza: **1% ao ano**;
+  - zona segura: **0,2% ao ano**;
+  - sem demonstrativos para calcular o escore (a maioria hoje, ver Fase 29): **1% ao ano**;
+  - FIIs (sem alavancagem relevante): **0,5% ao ano**.
+
+  Os valores são parâmetros da simulação, gravados em cada execução.
+
+### 10.5 Referências
+- Arnott, R.; Harvey, C.; Markowitz, H. (2019). A Backtesting Protocol in the Era of Machine Learning. *Journal of Financial Data Science* 1(1), 64–74. https://papers.ssrn.com/abstract=3275654
+- Bailey, D.; Borwein, J.; López de Prado, M.; Zhu, Q. The Probability of Backtest Overfitting. *Journal of Computational Finance*. https://papers.ssrn.com/abstract=2326253
+- Jorion, P. (1986). Bayes-Stein Estimation for Portfolio Analysis. *Journal of Financial and Quantitative Analysis* 21(3), 279–292. https://ideas.repec.org/a/cup/jfinqa/v21y1986i03p279-292_01.html
+- Black, F.; Litterman, R. Modelo de equilíbrio com visões (resumo da formulação): https://www.mathworks.com/help/finance/black-litterman-portfolio-optimization.html
+- Dimson, E.; Marsh, P.; Staunton, M. Global Investment Returns Yearbook (prêmio de risco das ações). https://www.london.edu/news/keeping-faith-with-stocks
+- Damodaran, A. Prêmio de risco-país (slides, jan/2023). https://pages.stern.nyu.edu/~adamodar/podcasts/valUGspr23/session5slides.pdf
+- Shumway, T. (1997). The Delisting Bias in CRSP Data. *Journal of Finance* 52(1), 327–340. https://ideas.repec.org/a/bla/jfinan/v52y1997i1p327-40.html
+- Shumway, T.; Warther, V. (1999). The Delisting Bias in CRSP's Nasdaq Data and Its Implications for the Size Effect. https://academicnewsletter.sufe.edu.cn/info/361673
+- S&P Global Ratings. Annual Global Corporate Default and Rating Transition Study. https://www.spglobal.com/ratings/en/research/articles/230425-default-transition-and-recovery-2022-annual-global-corporate-default-and-rating-transition-study-12702145 ; média de grau especulativo 1981–2004: https://investmentexecutive.com/?p=289769
+- Altman, E. Z-score e nota de crédito equivalente (entrevista ao CFA Institute). https://rpc.cfainstitute.org/blogs/enterprising-investor/2016/the-altman-z-score-after-50-years-use-and-misuse
+- PyMC: instalação recomendada e backends. https://pymc.readthedocs.io/en/latest/installation.html ; PyTensor (C, JAX, Numba): https://pypi.org/project/pytensor
