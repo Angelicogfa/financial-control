@@ -10,6 +10,7 @@ import httpx
 from domain.market.entities import Fundamentals
 from domain.research.services.screener import (
     ScreenerCriteria,
+    catalog_sectors,
     passes_fundamentals,
     prefilter,
     screen,
@@ -90,6 +91,17 @@ def test_prefilter_by_catalog_criteria() -> None:
     registered = {"ITUB4": AssetEntity(ticker="ITUB4", name="Itau", asset_type=AssetType.STOCK_BR)}
     fresh = ScreenerCriteria(asset_types=frozenset({AssetType.STOCK_BR}), exclude_registered=True)
     assert [i.ticker for i in prefilter(CATALOG, fresh, registered)] == ["TINY3"]
+
+
+def test_catalog_sectors_are_distinct_sorted_and_screenable() -> None:
+    catalog = [
+        *CATALOG,
+        CatalogInstrument("BBAS3", "BB ON", AssetType.STOCK_BR, "finance", 25.0, None, 5e8),
+        CatalogInstrument("NOSEC3", "No sector", AssetType.STOCK_BR, "  ", 1.0, None, 1e3),
+        CatalogInstrument("ODD2", "Unknown kind", None, "Mining"),
+    ]
+    assert catalog_sectors(catalog) == ["Finance", "Real Estate", "Tech"]
+    assert catalog_sectors([]) == []
 
 
 def test_fundamental_criteria_fail_on_missing_data() -> None:

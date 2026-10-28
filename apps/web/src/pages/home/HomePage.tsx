@@ -13,10 +13,9 @@ import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { ErrorBanner, Loading } from "../../components/States";
-import { brl, brlCompact, daysAgo, monthLabel, pct, points } from "../../utils/format";
+import { brl, brlCompact, daysAgo, pct, points } from "../../utils/format";
 import { SEVERITY_TONES } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
-import { ColumnChart } from "../../viz/ColumnChart";
 import { Sparkline } from "../../viz/Sparkline";
 import { TrendChart } from "../../viz/TrendChart";
 import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange, type Change } from "./story";
@@ -83,7 +82,7 @@ function KpiAct({
       <div className="home-kpis">
         <Indicator
           label="Patrimônio"
-          value={brlCompact(report.total_current_value_brl)}
+          value={brl(report.total_current_value_brl)}
           note={<Delta change={change} />}
           trend={<Sparkline values={snapshots.map((s) => s.market_value)} />}
         />
@@ -157,15 +156,93 @@ function AlertsPanel({ alerts, onChange }: Readonly<{ alerts: AlertDTO[]; onChan
   );
 }
 
-function AllocationAct({
-  report,
-  alerts,
-  onAlertsChange,
-}: Readonly<{ report: PortfolioReportResponseDTO; alerts: AlertDTO[] | null; onAlertsChange: () => void }>) {
+function AllocationPanel({ report }: Readonly<{ report: PortfolioReportResponseDTO }>) {
   const scale = Math.max(
     10,
     ...report.allocations.map((a) => Math.max(a.current_pct, a.target_pct + (a.band_pct ?? 0))),
   ) * 1.1;
+  return (
+    <div className="home-panel">
+      <h3 className="home-panel-title">Atual × meta</h3>
+      <p className="home-panel-hint">A faixa clara é a banda de tolerância; o traço, a meta.</p>
+      <BarList
+        label="Peso atual de cada classe contra a meta"
+        bars={report.allocations.map((a) => ({
+          id: a.arca_class,
+          label: a.label,
+          note: brl(a.current_value),
+          share: a.current_pct / scale,
+          goal: a.target_pct / scale,
+          band: [
+            Math.max(0, a.target_pct - (a.band_pct ?? 0)) / scale,
+            (a.target_pct + (a.band_pct ?? 0)) / scale,
+          ],
+          tone: a.band_status === "BELOW" ? "is-low" : a.band_status === "ABOVE" ? "is-mid" : undefined,
+          value: `${points(a.current_pct)} · meta ${points(a.target_pct, 0)}`,
+        }))}
+      />
+    </div>
+  );
+}
+
+function EvolutionPanel({
+  analytics,
+  failed,
+}: Readonly<{ analytics: PortfolioAnalyticsResponseDTO | null; failed: boolean }>) {
+  const aligned = analytics ? alignCurves(analytics.curves, ["PORTFOLIO", "CDI", "IBOV"]) : null;
+  return (
+    <section className="home-panel" aria-labelledby="act-evolution">
+      <div className="home-panel-head">
+        <h2 id="act-evolution" className="home-panel-title">
+          Evolução: carteira × referências (base 100)
+        </h2>
+        <Link className="app-link" to="/performance">
+          Ver desempenho
+        </Link>
+      </div>
+      <p className="home-panel-hint">12 meses; a carteira usa a rentabilidade ponderada pelo tempo.</p>
+      {!analytics ? (
+        failed ? (
+          <p className="app-muted">Não foi possível carregar o histórico agora.</p>
+        ) : (
+          <Loading />
+        )
+      ) : analytics.status !== "OK" || !aligned || aligned.labels.length < 2 ? (
+        <p className="app-muted">
+          Histórico insuficiente: o gráfico aparece depois de alguns retratos diários da carteira.
+        </p>
+      ) : (
+        <TrendChart
+          title="Evolução da carteira contra CDI e Ibovespa em base 100"
+          labels={aligned.labels.map((d) => d.split("-").reverse().join("/"))}
+          baseline={100}
+          hint="Passe o mouse para ver cada dia."
+          series={Object.entries(aligned.series).map(([key, values]) => ({
+            key,
+            label: CURVE_LABELS[key] ?? key,
+            color: CURVE_COLORS[key] ?? "var(--viz-serie-4)",
+            values,
+          }))}
+        />
+      )}
+    </section>
+  );
+}
+
+/** Allocation and evolution stacked in the main column, alerts beside them: no gap under a short panel. */
+function AllocationAct({
+  report,
+  analytics,
+  analyticsFailed,
+  alerts,
+  onAlertsChange,
+}: Readonly<{
+  report: PortfolioReportResponseDTO;
+  analytics: PortfolioAnalyticsResponseDTO | null;
+  analyticsFailed: boolean;
+  alerts: AlertDTO[] | null;
+  onAlertsChange: () => void;
+}>) {
   return (
     <section className="home-act" aria-labelledby="act-allocation">
       <div className="home-act-head">
@@ -176,26 +253,10 @@ function AllocationAct({
           Aportar
         </Link>
       </div>
-      <div className="home-grid">
-        <div className="home-panel">
-          <h3 className="home-panel-title">Atual × meta</h3>
-          <p className="home-panel-hint">A faixa clara é a banda de tolerância; o traço, a meta.</p>
-          <BarList
-            label="Peso atual de cada classe contra a meta"
-            bars={report.allocations.map((a) => ({
-              id: a.arca_class,
-              label: a.label,
-              note: brl(a.current_value),
-              share: a.current_pct / scale,
-              goal: a.target_pct / scale,
-              band: [
-                Math.max(0, a.target_pct - (a.band_pct ?? 0)) / scale,
-                (a.target_pct + (a.band_pct ?? 0)) / scale,
-              ],
-              tone: a.band_status === "BELOW" ? "is-low" : a.band_status === "ABOVE" ? "is-mid" : undefined,
-              value: `${points(a.current_pct)} · meta ${points(a.target_pct, 0)}`,
-            }))}
-          />
+      <div className="home-layout">
+        <div className="home-stack">
+          <AllocationPanel report={report} />
+          <EvolutionPanel analytics={analytics} failed={analyticsFailed} />
         </div>
         {alerts ? <AlertsPanel alerts={alerts} onChange={onAlertsChange} /> : <div className="home-panel"><Loading /></div>}
       </div>
@@ -203,77 +264,7 @@ function AllocationAct({
   );
 }
 
-function EvolutionAct({
-  report,
-  analytics,
-  failed,
-}: Readonly<{
-  report: PortfolioReportResponseDTO;
-  analytics: PortfolioAnalyticsResponseDTO | null;
-  failed: boolean;
-}>) {
-  const aligned = analytics ? alignCurves(analytics.curves, ["PORTFOLIO", "CDI", "IBOV"]) : null;
-  const months = lastMonths(report.earnings_by_month);
-  const total12 = months.reduce((sum, [, v]) => sum + v, 0);
-  return (
-    <section className="home-act" aria-labelledby="act-evolution">
-      <div className="home-act-head">
-        <h2 id="act-evolution" className="home-act-title">
-          Evolução
-        </h2>
-        <Link className="app-link" to="/performance">
-          Ver desempenho
-        </Link>
-      </div>
-      <div className="home-grid">
-        <div className="home-panel">
-          <h3 className="home-panel-title">Carteira × referências (base 100)</h3>
-          <p className="home-panel-hint">12 meses; a carteira usa a rentabilidade ponderada pelo tempo.</p>
-          {!analytics ? (
-            failed ? (
-              <p className="app-muted">Não foi possível carregar o histórico agora.</p>
-            ) : (
-              <Loading />
-            )
-          ) : analytics.status !== "OK" || !aligned || aligned.labels.length < 2 ? (
-            <p className="app-muted">
-              Histórico insuficiente: o gráfico aparece depois de alguns retratos diários da carteira.
-            </p>
-          ) : (
-            <TrendChart
-              title="Evolução da carteira contra CDI e Ibovespa em base 100"
-              labels={aligned.labels.map((d) => d.split("-").reverse().join("/"))}
-              baseline={100}
-              hint="Passe o mouse para ver cada dia."
-              series={Object.entries(aligned.series).map(([key, values]) => ({
-                key,
-                label: CURVE_LABELS[key] ?? key,
-                color: CURVE_COLORS[key] ?? "var(--viz-serie-4)",
-                values,
-              }))}
-            />
-          )}
-        </div>
-        <div className="home-panel">
-          <h3 className="home-panel-title">Proventos por mês</h3>
-          <p className="home-panel-hint">Últimos 12 meses: {brl(total12)} líquidos.</p>
-          {total12 > 0 ? (
-            <ColumnChart
-              title={`Proventos recebidos por mês, total de ${brl(total12)} em 12 meses`}
-              columns={months.map(([key, value]) => ({ label: monthLabel(key), value }))}
-              hint="Passe o mouse para ver o mês."
-              format={brlCompact}
-            />
-          ) : (
-            <p className="app-muted">Nenhum provento nos últimos 12 meses.</p>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/** Home = analytics (ADR 0007): headline, indicators, allocation with alerts, evolution. */
+/** Home = analytics (ADR 0007): headline, indicators, allocation and evolution with alerts beside. */
 export function HomePage() {
   const since = daysAgo(365);
   const report = useApi("home-report", () => api.portfolio.report());
@@ -298,8 +289,13 @@ export function HomePage() {
       {report.data && (
         <>
           <KpiAct report={report.data} snapshots={snapshots.data ?? []} analytics={analytics.data} />
-          <AllocationAct report={report.data} alerts={alerts.error ? [] : alerts.data?.alerts ?? null} onAlertsChange={alerts.reload} />
-          <EvolutionAct report={report.data} analytics={analytics.data} failed={Boolean(analytics.error)} />
+          <AllocationAct
+            report={report.data}
+            analytics={analytics.data}
+            analyticsFailed={Boolean(analytics.error)}
+            alerts={alerts.error ? [] : alerts.data?.alerts ?? null}
+            onAlertsChange={alerts.reload}
+          />
           <DeclaredEarnings />
         </>
       )}

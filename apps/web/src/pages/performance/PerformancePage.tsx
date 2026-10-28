@@ -6,9 +6,10 @@ import { useApi } from "../../api/useApi";
 import { Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Empty } from "../../components/States";
-import { brl, daysAgo, num, pct, points } from "../../utils/format";
+import { brl, brlCompact, daysAgo, monthLabel, num, pct, points } from "../../utils/format";
+import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart } from "../../viz/TrendChart";
-import { alignCurves, curveReturn } from "../home/story";
+import { alignCurves, curveReturn, lastMonths } from "../home/story";
 
 const PERIODS = [
   { key: "6m", label: "6 meses", days: 182 },
@@ -117,6 +118,29 @@ function ClassTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function EarningsByMonth({ report }: Readonly<{ report: PortfolioReportResponseDTO }>) {
+  const months = lastMonths(report.earnings_by_month);
+  const total12 = months.reduce((sum, [, v]) => sum + v, 0);
+  return (
+    <section className="app-card app-card-padded">
+      <h2 className="app-card-heading">Proventos por mês</h2>
+      <p className="app-card-hint">
+        Últimos 12 meses: {brl(total12)} líquidos · yield on cost {points(report.portfolio_yield_on_cost_pct, 1)}.
+      </p>
+      {total12 > 0 ? (
+        <ColumnChart
+          title={`Proventos recebidos por mês, total de ${brl(total12)} em 12 meses`}
+          columns={months.map(([key, value]) => ({ label: monthLabel(key), value }))}
+          hint="Passe o mouse para ver o mês."
+          format={brlCompact}
+        />
+      ) : (
+        <p className="app-muted">Nenhum provento nos últimos 12 meses.</p>
+      )}
+    </section>
   );
 }
 
@@ -233,6 +257,8 @@ function Content({
           <ClassTable report={report} analytics={analytics} />
         </section>
       )}
+
+      {report && <EarningsByMonth report={report} />}
     </div>
   );
 }

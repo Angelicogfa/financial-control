@@ -646,3 +646,14 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **30.4** Interface web: "Data de emissão (opcional)" informativa no cadastro e na importação (sem padrão "hoje" e sem obrigatoriedade); cadastro pela Pesquisa sem data de emissão; opção "Paga juros semestrais" para títulos do Tesouro (marcada pelo catálogo) e aviso de que o Prefixado rende pela taxa implícita no PU; tipos regenerados.
 - `[x]` **30.5** Testes: `test_treasury_rates.py` (VNA na base, no dia 15, pró-rata e com lacuna; taxa recuperada para LTN, NTN-F, NTN-B Principal e NTN-B; casos sem taxa), `test_fixed_income_engine.py` (taxa implícita, lotes com taxas diferentes, valor de face no vencimento, resgate parcial mantendo a taxa, fallback com juros semestrais, data de emissão sem efeito), `test_treasury_pro_rata_api.py` (rotas, carteira e migration 00020), `test_b3_import_api.py` e `operations.test.tsx`.
 
+
+## Fase 31 — Melhorias de Interface: Início, Ajudas, Ações e Pesquisa (`[x]` Implementado)
+
+**Objetivo:** reduzir ruído visual e espaço perdido nas telas mais usadas e ampliar os filtros do screener.
+
+- `[x]` **31.1** Início: patrimônio com o valor completo (sem abreviação); a Evolução fica logo abaixo de "Atual × meta" na coluna principal, com os alertas ao lado (`home-layout`), sem o vão causado pela altura do painel de alertas.
+- `[x]` **31.2** "Proventos por mês" sai do Início e vai para Desempenho (com o yield on cost).
+- `[x]` **31.3** Textos auxiliares: `.app-card-hint` ganha espaço próprio quando não vem logo após um título (antes a margem negativa o colava nos campos); o texto do Comparar ativos vira ajuda `?` (`Hint`).
+- `[x]` **31.4** Ações de tabela com ícone (`components/RowActions.tsx`: `IconLink` e `IconButton`, rótulo como nome acessível e dica): editar/excluir em Lançamentos e no ativo, editar conta, editar/revogar chave MCP e remover da observação.
+- `[x]` **31.5** Screener: filtros por classe ARCA (chips) e por setor; nova rota `GET /api/v1/research/sectors` (`catalog_sectors` no domínio) com os setores do catálogo B3.
+- `[x]` **31.6** Testes: `test_research_screener.py` (setores distintos e ordenados), `test_research_flow.py` (rota), `operations.test.tsx` (filtros enviados), `overview.test.tsx` (valor completo e proventos em Desempenho) e `rowActions.test.tsx`.

@@ -6,7 +6,9 @@ import type { AccountDTO, AccountKind } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { IconButton } from "../../components/RowActions";
 import { Async, Spinner } from "../../components/States";
+import { EditIcon } from "../../layout/icons";
 import { ACCOUNT_KIND_LABELS } from "../../utils/labels";
 
 interface Draft {
@@ -141,9 +143,7 @@ export function AccountsPage() {
                         </Badge>
                       </td>
                       <td className="app-row-actions">
-                        <button type="button" className="app-link-button" onClick={() => startEdit(account)}>
-                          Editar
-                        </button>
+                        <IconButton label="Editar" icon={<EditIcon />} onClick={() => startEdit(account)} />
                       </td>
                     </tr>
                   ))}

@@ -64,11 +64,13 @@ describe("home (analytics)", () => {
     renderAt("/home");
     expect(await screen.findByText(/Real Estate está abaixo da banda/)).toBeInTheDocument();
     expect(screen.getByText("Patrimônio")).toBeInTheDocument();
+    expect(screen.getByTitle(/^R\$\s5\.000,00$/)).toBeInTheDocument(); // full value, not "mil"
     expect(await screen.findByText("+5,0%")).toBeInTheDocument(); // TWR from the base-100 curve
     expect(screen.getByText("CDI no período: 0,1%")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Peso atual de cada classe contra a meta" })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Real Estate abaixo da banda" })).toHaveAttribute("href", "/contribute");
     expect(await screen.findByRole("img", { name: /Evolução da carteira/ })).toBeInTheDocument();
+    expect(screen.queryByText("Proventos por mês")).not.toBeInTheDocument(); // lives in Desempenho
 
     fireEvent.click(screen.getByRole("button", { name: "Dispensar" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path === "/alerts/dismissals")).toBe(true));
@@ -103,6 +105,7 @@ describe("performance", () => {
     expect(screen.getByText("Índice de Sharpe")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Drawdown da carteira/ })).toBeInTheDocument();
     expect(await screen.findByText("Por classe")).toBeInTheDocument();
+    expect(screen.getByText("Proventos por mês")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "24 meses" }));
     expect(screen.getByRole("button", { name: "24 meses" })).toHaveAttribute("aria-pressed", "true");
   });

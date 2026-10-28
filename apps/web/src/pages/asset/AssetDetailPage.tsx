@@ -6,6 +6,8 @@ import type { AssetAnalysisResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { IconLink } from "../../components/RowActions";
+import { EditIcon } from "../../layout/icons";
 import { Async, Empty } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, day, money, num, pct, points, quantity } from "../../utils/format";
@@ -279,7 +281,7 @@ function Valuation({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }
             {v.margin !== null && v.margin !== undefined && <> · margem {pct(v.margin, 1, true)}</>}
           </span>
         </div>
-        <p className="app-card-hint" style={{ marginTop: "var(--space-2)" }}>
+        <p className="app-card-hint">
           Perfil {PROFILE_LABELS[v.profile]}. Os preços justos se combinam pela mediana; múltiplos passam ou não nos
           limites da estratégia.
         </p>
@@ -408,9 +410,7 @@ function Ledger({ assetId }: Readonly<{ assetId: number }>) {
                       <td className="app-numeric">{num(t.unit_price)}</td>
                       <td className="app-numeric">{brl(t.total_brl)}</td>
                       <td className="app-row-actions">
-                        <Link className="app-link" to={`/ledger/trades/${t.id}/edit`}>
-                          Editar
-                        </Link>
+                        <IconLink to={`/ledger/trades/${t.id}/edit`} label="Editar" icon={<EditIcon />} />
                       </td>
                     </tr>
                   ))}

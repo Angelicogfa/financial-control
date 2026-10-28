@@ -60,6 +60,11 @@ def run_screener(
     return handler.screener(criteria, below_band=below_band)
 
 
+@research_router.get("/sectors", response_model=list[str])
+def list_sectors(handler: ResearchHandler = Depends(get_research_handler)) -> list[str]:
+    return handler.sectors()
+
+
 @research_router.get("/treasury", response_model=TreasurySearchResponseDTO)
 def list_treasury_bonds(
     q: str | None = Query(default=None, max_length=60),

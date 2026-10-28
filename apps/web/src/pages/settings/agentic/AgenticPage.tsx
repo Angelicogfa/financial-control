@@ -5,8 +5,9 @@ import { api } from "../../../api/endpoints";
 import { errorMessage } from "../../../api/http";
 import type { AgentKeyCreatedDTO, AgentKeyDTO } from "../../../api/types";
 import { PageHeader } from "../../../components/PageHeader";
+import { IconButton, IconLink } from "../../../components/RowActions";
 import { Loading } from "../../../components/States";
-import { PlusIcon } from "../../../layout/icons";
+import { BanIcon, EditIcon, PlusIcon } from "../../../layout/icons";
 import { ExpiryBadge } from "./KeyExpiry";
 import { McpConnection } from "./mcpConnection";
 
@@ -172,16 +173,8 @@ export function AgenticPage() {
                     : "Nunca utilizada"}
                 </td>
                 <td className="app-row-actions">
-                  <Link to={`/settings/agentic/${item.id}`} className="app-link-button">
-                    Editar
-                  </Link>
-                  <button
-                    type="button"
-                    className="app-danger-button"
-                    onClick={() => setConfirmingRevoke(item)}
-                  >
-                    Revogar
-                  </button>
+                  <IconLink to={`/settings/agentic/${item.id}`} label="Editar" icon={<EditIcon />} />
+                  <IconButton label="Revogar" icon={<BanIcon />} danger onClick={() => setConfirmingRevoke(item)} />
                 </td>
               </tr>
             ))}

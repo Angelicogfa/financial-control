@@ -369,6 +369,16 @@ input[type="radio"] {
   color: var(--app-text);
 }
 
+.app-icon-button.is-danger:hover:not(:disabled) {
+  background: var(--app-danger-bg);
+  color: var(--app-danger-text);
+  border-color: var(--app-danger-text);
+}
+
+a.app-icon-button {
+  text-decoration: none;
+}
+
 .app-icon-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -474,9 +484,19 @@ input[type="radio"] {
 }
 
 .app-card-hint {
-  margin: calc(var(--space-2) * -1) 0 var(--space-3);
+  margin: var(--space-3) 0;
   color: var(--app-text-muted);
   font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Right under a heading the hint reads as its subtitle; elsewhere it keeps its own space. */
+.app-card-heading + .app-card-hint {
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.app-card-hint:last-child {
+  margin-bottom: 0;
 }
 
 .app-split {
@@ -652,6 +672,7 @@ input[type="radio"] {
   display: flex;
   gap: var(--space-1);
   justify-content: flex-end;
+  align-items: center;
 }
 
 /* --- badges --- */
@@ -725,6 +746,8 @@ input[type="radio"] {
 .app-field small {
   color: var(--app-text-muted);
   font-size: var(--text-sm);
+  line-height: 1.45;
+  margin-top: 2px;
 }
 
 .app-field-grid {
@@ -1032,7 +1055,15 @@ button:disabled {
 .app-chip-group {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-1);
+}
+
+.app-chip-group-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--app-text-secondary);
+  margin-right: var(--space-1);
 }
 
 .app-chip {
@@ -1199,7 +1230,7 @@ button:disabled {
 
 .home-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: var(--space-3);
 }
 
@@ -1242,10 +1273,29 @@ button:disabled {
   color: var(--app-danger-text);
 }
 
-.home-grid {
+.home-layout {
   display: grid;
   align-items: start;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: var(--space-3);
+}
+
+.home-stack {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (max-width: 1000px) {
+  .home-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.home-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-3);
 }
 

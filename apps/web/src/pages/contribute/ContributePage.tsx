@@ -102,7 +102,7 @@ function AmountStep() {
             <span>{busy ? "Calculando…" : "Sugerir distribuição"}</span>
           </button>
         </div>
-        <p className="app-card-hint" style={{ margin: "var(--space-3) 0 0" }}>
+        <p className="app-card-hint">
           O dinheiro vai primeiro para as classes abaixo da banda e, dentro delas, só para ativos elegíveis.
         </p>
       </form>

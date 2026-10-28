@@ -87,6 +87,7 @@ export interface LedgerFilters {
 export interface ScreenerFilters {
   q?: string;
   asset_type?: AssetType[];
+  arca_class?: ArcaClass[];
   sector?: string[];
   min_volume_brl?: number;
   max_pe?: number;
@@ -156,6 +157,7 @@ export const api = {
   research: {
     screener: (filters: ScreenerFilters) =>
       request<ScreenerResponseDTO>("/research/screener", { query: { ...filters } }),
+    sectors: () => request<string[]>("/research/sectors"),
     treasury: (filters: TreasuryFilters = {}) =>
       request<TreasurySearchResponseDTO>("/research/treasury", { query: { ...filters } }),
     watchlist: () => request<WatchlistItemDTO[]>("/research/watchlist"),

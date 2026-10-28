@@ -229,6 +229,7 @@ describe("research", () => {
     };
     const { calls } = mockApi([
       { path: "/research/screener", reply: result },
+      { path: "/research/sectors", reply: ["Finance", "Utilities"] },
       {
         method: "POST",
         path: "/research/watchlist",
@@ -238,11 +239,17 @@ describe("research", () => {
     renderAt("/research");
     fireEvent.change(screen.getByLabelText("DY mínimo (%)"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: "Fundo imobiliário" }));
+    const classes = screen.getByRole("group", { name: "Classes ARCA" });
+    fireEvent.click(within(classes).getByRole("button", { name: "Ações" }));
+    expect(await screen.findByRole("option", { name: "Finance" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Setor"), { target: { value: "Finance" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("ITUB4")).toBeInTheDocument();
     const query = last(calls, "GET", "/research/screener")?.query;
     expect(query?.get("min_dy")).toBe("0.05");
     expect(query?.getAll("asset_type")).toEqual(["FII"]);
+    expect(query?.getAll("arca_class")).toEqual(["ACOES"]);
+    expect(query?.getAll("sector")).toEqual(["Finance"]);
     expect(screen.getByText(/1 resultado\(s\) de 3 candidato\(s\)/)).toBeInTheDocument();
 
     // "Observar" asks for the ARCA quadrant first, with the suggestion preselected.

@@ -33,7 +33,7 @@ from domain.research.services.comparison import (
     select_indicators,
     statements_missing,
 )
-from domain.research.services.screener import ScreenerCriteria, screen
+from domain.research.services.screener import ScreenerCriteria, catalog_sectors, screen
 from domain.research.services.service import register_researched_asset
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import (
@@ -93,6 +93,11 @@ class ResearchHandler:
             catalog_size=len(catalog),
             catalog_updated_at=max((c.updated_at for c in catalog if c.updated_at), default=None),
         )
+
+    def sectors(self) -> list[str]:
+        """Sectors of the B3 catalog, to offer as screener filters."""
+        with self.uow_factory() as uow:
+            return catalog_sectors(uow.catalog.list_all())
 
     def treasury(
         self,
