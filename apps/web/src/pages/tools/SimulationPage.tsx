@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
@@ -6,6 +6,10 @@ import { errorMessage } from "../../api/http";
 import type {
   BacktestRequest,
   BacktestSummaryDTO,
+  GoalOutcomeDTO,
+  PercentilesDTO,
+  ProjectionDTO,
+  ProjectionRequest,
   RobustnessDTO,
   SimulationResultDTO,
   SimulationRunDetailDTO,
@@ -18,16 +22,17 @@ import { Badge, Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Empty, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brl, day, dateTime, daysAgo, parseDecimal, pct, today } from "../../utils/format";
+import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, points, today } from "../../utils/format";
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 
 type Benchmark = NonNullable<BacktestRequest["benchmarks"]>[number];
-type TabKey = "past" | "robustness";
+type TabKey = "past" | "future" | "robustness";
 
 const TABS: TabSpec<TabKey>[] = [
   { key: "past", label: "Passado" },
+  { key: "future", label: "Futuro" },
   { key: "robustness", label: "Robustez" },
 ];
 
@@ -214,11 +219,23 @@ function BacktestForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationR
 
 // --- runs list --------------------------------------------------------------------------------
 
+function backtestPeriod(run: SimulationRunDTO): string {
+  return `${day(String(run.params?.start ?? ""))} a ${day(String(run.params?.end ?? ""))}`;
+}
+
 function RunList({
   runs,
   selected,
   onSelect,
-}: Readonly<{ runs: SimulationRunDTO[]; selected: number | null; onSelect: (id: number) => void }>) {
+  describe = backtestPeriod,
+  describeLabel = "Período",
+}: Readonly<{
+  runs: SimulationRunDTO[];
+  selected: number | null;
+  onSelect: (id: number) => void;
+  describe?: (run: SimulationRunDTO) => string;
+  describeLabel?: string;
+}>) {
   if (runs.length === 0) return <Empty title="Nenhuma simulação ainda" hint="Preencha o formulário e clique em Simular." />;
   return (
     <div className="app-table-wrap">
@@ -226,7 +243,7 @@ function RunList({
         <thead>
           <tr>
             <th>Simulação</th>
-            <th>Período</th>
+            <th>{describeLabel}</th>
             <th>Status</th>
             <th>Pedida em</th>
           </tr>
@@ -239,9 +256,7 @@ function RunList({
                   {run.label || `Simulação #${run.id}`}
                 </button>
               </td>
-              <td>
-                {day(String(run.params?.start ?? ""))} a {day(String(run.params?.end ?? ""))}
-              </td>
+              <td>{describe(run)}</td>
               <td>
                 <StatusBadge status={run.status} />
               </td>
@@ -554,9 +569,391 @@ function RobustnessTab({ run }: Readonly<{ run: SimulationRunDTO }>) {
   return <Async state={state}>{(data) => <RobustnessView data={data} />}</Async>;
 }
 
+// --- future -----------------------------------------------------------------------------------
+
+type ClassKey = keyof NonNullable<ProjectionRequest["initial_by_class"]>;
+const CLASS_KEYS: ClassKey[] = ["ACOES", "REAL_ESTATE", "ATIVOS_INTERNACIONAIS", "CAIXA"];
+
+interface ProjectionFormState {
+  horizonYears: string;
+  monthly: string;
+  realGrowth: string;
+  wealthGoal: string;
+  incomeGoal: string;
+  rebalance: boolean;
+  fromPortfolio: boolean;
+  initial: Record<ClassKey, string>;
+  cdi: string;
+  ipca: string;
+  label: string;
+}
+
+const INITIAL_PROJECTION: ProjectionFormState = {
+  horizonYears: "20",
+  monthly: "1000",
+  realGrowth: "0",
+  wealthGoal: "",
+  incomeGoal: "",
+  rebalance: false,
+  fromPortfolio: true,
+  initial: { ACOES: "0", REAL_ESTATE: "0", ATIVOS_INTERNACIONAIS: "0", CAIXA: "0" },
+  cdi: "",
+  ipca: "",
+  label: "",
+};
+
+/** A percentage typed by the user ("10,5") as a fraction; null when empty. */
+function percentInput(text: string): number | null {
+  const value = parseDecimal(text);
+  return value === null ? null : value / 100;
+}
+
+/** The API request from the form; null when the horizon or the contribution is invalid. */
+export function toProjectionRequest(form: ProjectionFormState): ProjectionRequest | null {
+  const years = Number.parseInt(form.horizonYears, 10);
+  const monthly = parseDecimal(form.monthly);
+  if (!Number.isFinite(years) || years < 1 || years > 50 || monthly === null || monthly < 0) return null;
+  const positive = (text: string) => {
+    const value = parseDecimal(text);
+    return value !== null && value > 0 ? value : null;
+  };
+  return {
+    horizon_years: years,
+    monthly_contribution: monthly,
+    contribution_real_growth: percentInput(form.realGrowth) ?? 0,
+    wealth_goal: positive(form.wealthGoal),
+    income_goal: positive(form.incomeGoal),
+    rebalance: form.rebalance,
+    initial_by_class: form.fromPortfolio
+      ? null
+      : Object.fromEntries(CLASS_KEYS.map((k) => [k, Math.max(parseDecimal(form.initial[k]) ?? 0, 0)])),
+    cdi_rate: percentInput(form.cdi),
+    ipca_rate: percentInput(form.ipca),
+    label: form.label.trim() || null,
+  };
+}
+
+function projectionHorizon(run: SimulationRunDTO): string {
+  const years = Number(run.params?.horizon_years ?? 0);
+  return `${years} ${years === 1 ? "ano" : "anos"} · ${brl(Number(run.params?.monthly_contribution ?? 0))}/mês`;
+}
+
+function ProjectionForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void }>) {
+  const [form, setForm] = useState<ProjectionFormState>(INITIAL_PROJECTION);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (change: Partial<ProjectionFormState>) => setForm((f) => ({ ...f, ...change }));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const body = toProjectionRequest(form);
+    if (!body) {
+      setError("Informe um horizonte de 1 a 50 anos e um aporte mensal (zero é permitido).");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      onSubmitted(await api.simulations.submitProjection(body));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving} aria-label="Nova projeção">
+      <h2 className="app-card-heading">Nova projeção</h2>
+      <p className="app-card-hint">Valores em R$ de hoje: o aporte acompanha a inflação de cada cenário.</p>
+      {error && (
+        <p className="app-error-banner" role="alert">
+          {error}
+        </p>
+      )}
+      <fieldset className="app-field-grid" disabled={saving}>
+        <div className="app-field">
+          <label htmlFor="proj-years">Horizonte (anos)</label>
+          <input id="proj-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} required />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-monthly">Aporte mensal (R$)</label>
+          <input id="proj-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-growth">Crescimento real do aporte (% a.a.)</label>
+          <input id="proj-growth" inputMode="decimal" value={form.realGrowth} onChange={(e) => set({ realGrowth: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-wealth-goal">Meta de patrimônio (R$)</label>
+          <input id="proj-wealth-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-income-goal">Meta de renda passiva (R$/mês)</label>
+          <input id="proj-income-goal" inputMode="decimal" value={form.incomeGoal} onChange={(e) => set({ incomeGoal: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-cdi">CDI (% a.a., vazio = premissa)</label>
+          <input id="proj-cdi" inputMode="decimal" value={form.cdi} onChange={(e) => set({ cdi: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-ipca">IPCA (% a.a., vazio = premissa)</label>
+          <input id="proj-ipca" inputMode="decimal" value={form.ipca} onChange={(e) => set({ ipca: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="proj-label">Nome (opcional)</label>
+          <input id="proj-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
+        </div>
+      </fieldset>
+      <fieldset className="app-field-grid" disabled={saving}>
+        <legend className="app-card-hint">Ponto de partida</legend>
+        <label className="app-check">
+          <input type="checkbox" checked={form.fromPortfolio} onChange={(e) => set({ fromPortfolio: e.target.checked })} />
+          Partir da carteira de hoje
+        </label>
+        <label className="app-check">
+          <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
+          Rebalancear vendendo o excesso (com IR)
+        </label>
+      </fieldset>
+      {!form.fromPortfolio && (
+        <fieldset className="app-field-grid" disabled={saving}>
+          <legend className="app-card-hint">Valor inicial por classe (R$)</legend>
+          {CLASS_KEYS.map((k) => (
+            <div className="app-field" key={k}>
+              <label htmlFor={`proj-initial-${k}`}>{ARCA_LABELS[k]}</label>
+              <input
+                id={`proj-initial-${k}`}
+                inputMode="decimal"
+                value={form.initial[k]}
+                onChange={(e) => set({ initial: { ...form.initial, [k]: e.target.value } })}
+              />
+            </div>
+          ))}
+        </fieldset>
+      )}
+      <div className="app-form-actions">
+        <button type="submit" className="app-primary-button" disabled={saving}>
+          {saving && <Spinner size="sm" />}
+          <span>{saving ? "Enviando…" : "Projetar"}</span>
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const PERCENTILE_COLUMNS: Array<[keyof PercentilesDTO, string]> = [
+  ["p5", "5% (pessimista)"],
+  ["p25", "25%"],
+  ["p50", "Mediana"],
+  ["p75", "75%"],
+  ["p95", "95% (otimista)"],
+];
+
+function yearsLabel(months: number): string {
+  if (months === 0) return "Hoje";
+  const years = months / 12;
+  return Number.isInteger(years) ? `${years} ${years === 1 ? "ano" : "anos"}` : `${months} meses`;
+}
+
+function GoalLine({ title, goal, money }: Readonly<{ title: string; goal: GoalOutcomeDTO; money: string }>) {
+  return (
+    <div className="app-card app-card-padded">
+      <h3 className="app-card-heading">
+        {title}: {money}
+      </h3>
+      <p>
+        <strong>{pct(goal.probability, 0)}</strong> das trajetórias chegam lá no horizonte{" "}
+        <span className="app-muted">(erro da simulação ± {points(goal.standard_error * 100, 1)} p.p.)</span>
+      </p>
+      {goal.months ? (
+        <p className="app-muted">
+          Quando chegam: em {yearsLabel(Math.round(goal.months.p50))} na mediana, entre {yearsLabel(Math.round(goal.months.p25))} e{" "}
+          {yearsLabel(Math.round(goal.months.p75))} na metade central.
+        </p>
+      ) : (
+        <p className="app-muted">Nenhuma trajetória chega à meta no horizonte.</p>
+      )}
+    </div>
+  );
+}
+
+export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; run: SimulationRunDTO }>) {
+  const scenarios = data.scenarios ?? [];
+  const [key, setKey] = useState(scenarios.find((s) => s.scenario.name === "BASE")?.key ?? scenarios[0]?.key);
+  const current = scenarios.find((s) => s.key === key);
+  if (data.status !== "DONE" || !current) return <Empty title="A projeção aparece quando a simulação terminar" />;
+  const pointsList = current.points ?? [];
+  const labels = pointsList.map((p) => yearsLabel(p.month));
+  const premises = current.premises ?? [];
+  const block = Number(run.params?.mean_block_months ?? 0);
+
+  return (
+    <div className="app-page-stack">
+      <ul className="app-warning-banner" aria-label="Avisos da projeção">
+        {(data.warnings ?? []).map((w) => (
+          <li key={w}>{w}</li>
+        ))}
+      </ul>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Cenário de juros</h2>
+        <div className="app-button-row" role="group" aria-label="Cenários de juros">
+          {scenarios.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              className={s.key === key ? "app-primary-button" : "app-secondary-button"}
+              aria-pressed={s.key === key}
+              onClick={() => setKey(s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <p className="app-muted">
+          CDI {pct(current.scenario.annual_cdi_rate, 2)} a.a. · IPCA {pct(current.scenario.annual_ipca_rate, 2)} a.a. ·{" "}
+          {current.paths} trajetórias de {yearsLabel(current.horizon_months)}
+        </p>
+      </section>
+
+      {(current.wealth_goal || current.income_goal) && (
+        <div className="app-page-stack">
+          {current.wealth_goal && (
+            <GoalLine title="Meta de patrimônio (líquido de IR)" goal={current.wealth_goal} money={brl(current.wealth_goal.target)} />
+          )}
+          {current.income_goal && (
+            <GoalLine title="Meta de renda passiva" goal={current.income_goal} money={`${brl(current.income_goal.target)}/mês`} />
+          )}
+        </div>
+      )}
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Patrimônio em R$ de hoje</h2>
+        <TrendChart
+          title="Faixas prováveis do patrimônio ano a ano"
+          labels={labels}
+          series={[
+            { key: "p50", label: "Mediana", color: "var(--viz-serie-1)", values: pointsList.map((p) => p.wealth.p50) },
+            { key: "contributed", label: "Investido", color: "var(--app-muted, #888)", values: pointsList.map((p) => p.contributed) },
+          ]}
+          bands={[
+            {
+              key: "p5-p95",
+              color: "var(--viz-serie-1)",
+              low: pointsList.map((p) => p.wealth.p5),
+              high: pointsList.map((p) => p.wealth.p95),
+            },
+            {
+              key: "p25-p75",
+              color: "var(--viz-serie-1)",
+              low: pointsList.map((p) => p.wealth.p25),
+              high: pointsList.map((p) => p.wealth.p75),
+            },
+          ]}
+          hint="Faixa clara: 90% das trajetórias; faixa escura: a metade central. A linha é a mediana."
+          format={(v) => brlCompact(v)}
+        />
+      </section>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Ao fim de {yearsLabel(current.horizon_months)}</h2>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Percentis ao fim do horizonte">
+            <thead>
+              <tr>
+                <th>Medida</th>
+                {PERCENTILE_COLUMNS.map(([k, label]) => (
+                  <th key={k} className="app-numeric">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  ["Patrimônio", current.final_wealth, brl],
+                  ["Patrimônio líquido de IR (vendendo tudo)", current.final_net_wealth, brl],
+                  ["Renda passiva mensal", current.final_income, brl],
+                  ["Queda máxima da estratégia", current.max_drawdown, (v: number) => pct(v, 1)],
+                ] as Array<[string, PercentilesDTO, (v: number) => string]>
+              ).map(([label, values, fmt]) => (
+                <tr key={label}>
+                  <td>{label}</td>
+                  {PERCENTILE_COLUMNS.map(([k]) => (
+                    <td key={k} className="app-numeric">
+                      {fmt(values[k])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-muted">
+          Investido no período: {brl(current.contributed)} · custos medianos {brl(current.fees)} · IR mediano de
+          rebalanceamento {brl(current.taxes)}. Na queda máxima, 5% é o pior caso.
+        </p>
+      </section>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Premissas por classe</h2>
+        <p className="app-card-hint">
+          Prêmio e volatilidade medidos de {day(data.sample_start)} a {day(data.sample_end)} ({data.sample_months} meses), sorteados
+          em blocos de {num(block, 0)} meses em média e somados ao CDI do cenário.
+        </p>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Premissas por classe">
+            <thead>
+              <tr>
+                <th>Classe</th>
+                <th>Referência</th>
+                <th className="app-numeric">Meta</th>
+                <th className="app-numeric">Prêmio sobre o CDI a.a.</th>
+                <th className="app-numeric">Volatilidade a.a.</th>
+                <th className="app-numeric">Retorno no cenário a.a.</th>
+                <th className="app-numeric">Renda (DY)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {premises.map((p) => (
+                <tr key={p.arca_class}>
+                  <td>{ARCA_LABELS[p.arca_class as keyof typeof ARCA_LABELS] ?? p.arca_class}</td>
+                  <td>{p.arca_class === "CAIXA" ? "CDI líquido de IR" : p.proxy}</td>
+                  <td className="app-numeric">{points(data.targets?.[p.arca_class], 0)}</td>
+                  <td className="app-numeric">{p.arca_class === "CAIXA" ? "—" : pct(p.excess_annual, 1, true)}</td>
+                  <td className="app-numeric">{p.arca_class === "CAIXA" ? "—" : pct(p.volatility, 1)}</td>
+                  <td className="app-numeric">{pct(p.expected_annual, 1)}</td>
+                  <td className="app-numeric">{pct(p.income_yield, 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-card-hint">
+          A renda do Caixa conta só o rendimento acima da inflação. A probabilidade de meta tem só o erro da simulação; a
+          incerteza dos próprios prêmios entra na camada bayesiana.
+        </p>
+      </section>
+      <Reproducibility run={run} />
+    </div>
+  );
+}
+
+function ProjectionTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
+  const state = useApi(`simulation-projection-${run.id}-${run.status}`, () => api.simulations.projection(run.id));
+  if (run.status !== "DONE") return <RunProblem run={run} />;
+  return <Async state={state}>{(data) => <ProjectionView data={data} run={run} />}</Async>;
+}
+
 // --- page -------------------------------------------------------------------------------------
 
-function SelectedRun({ runId, tab, onStatus }: Readonly<{ runId: number; tab: TabKey; onStatus: () => void }>) {
+function SelectedRun({
+  runId,
+  onStatus,
+  children,
+}: Readonly<{ runId: number; onStatus: () => void; children: (detail: SimulationRunDetailDTO) => ReactNode }>) {
   const [tick, setTick] = useState(0);
   const state = useApi(`simulation-${runId}-${tick}`, () => api.simulations.get(runId));
   const status = state.data?.status;
@@ -572,49 +969,90 @@ function SelectedRun({ runId, tab, onStatus }: Readonly<{ runId: number; tab: Ta
 
   return (
     <Async state={state} lines={6}>
-      {(detail) => (tab === "past" ? <PastTab detail={detail} /> : <RobustnessTab run={detail} />)}
+      {children}
     </Async>
+  );
+}
+
+/** The run chosen in the URL (`param`), or the newest one. */
+function useSelected(param: string, runs: SimulationRunDTO[] | null | undefined): [number | null, (id: number) => void] {
+  const [params, setParams] = useSearchParams();
+  const selected = Number(params.get(param)) || runs?.[0]?.id || null;
+  const select = (id: number) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set(param, String(id));
+        return next;
+      },
+      { replace: true },
+    );
+  return [selected, select];
+}
+
+function BacktestPanel({ tab }: Readonly<{ tab: TabKey }>) {
+  const runs = useApi("simulation-runs", () => api.simulations.list(20, "BACKTEST"));
+  const [selected, select] = useSelected("run", runs.data);
+  return (
+    <>
+      <BacktestForm
+        onSubmitted={(run) => {
+          select(run.id);
+          runs.reload();
+        }}
+      />
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Simulações do passado</h2>
+        <Async state={runs}>{(items) => <RunList runs={items} selected={selected} onSelect={select} />}</Async>
+      </section>
+      {selected !== null && (
+        <SelectedRun key={`${selected}-${tab}`} runId={selected} onStatus={runs.reload}>
+          {(detail) => (tab === "past" ? <PastTab detail={detail} /> : <RobustnessTab run={detail} />)}
+        </SelectedRun>
+      )}
+    </>
+  );
+}
+
+function FuturePanel() {
+  const runs = useApi("simulation-projection-runs", () => api.simulations.list(20, "PROJECTION"));
+  const [selected, select] = useSelected("projection", runs.data);
+  return (
+    <>
+      <ProjectionForm
+        onSubmitted={(run) => {
+          select(run.id);
+          runs.reload();
+        }}
+      />
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Projeções</h2>
+        <Async state={runs}>
+          {(items) => (
+            <RunList runs={items} selected={selected} onSelect={select} describe={projectionHorizon} describeLabel="Horizonte" />
+          )}
+        </Async>
+      </section>
+      {selected !== null && (
+        <SelectedRun key={selected} runId={selected} onStatus={runs.reload}>
+          {(detail) => <ProjectionTab run={detail} />}
+        </SelectedRun>
+      )}
+    </>
   );
 }
 
 export function SimulationPage() {
   const [tab, setTab] = useTab(TABS, "past");
-  const [params, setParams] = useSearchParams();
-  const runs = useApi("simulation-runs", () => api.simulations.list());
-  const selected = Number(params.get("run")) || runs.data?.[0]?.id || null;
-  const select = (id: number) =>
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.set("run", String(id));
-        return next;
-      },
-      { replace: true },
-    );
-
   return (
     <div className="app-page">
       <PageHeader
         title="Simular carteira"
-        subtitle="As suas regras de aporte reaplicadas no passado. Simulação, não recomendação: o resultado descreve o histórico."
+        subtitle="As suas regras de aporte no passado e as faixas prováveis do futuro. Simulação, não recomendação."
       />
       <div className="app-page-stack">
-        <BacktestForm
-          onSubmitted={(run) => {
-            select(run.id);
-            runs.reload();
-          }}
-        />
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Simulações</h2>
-          <Async state={runs}>{(items) => <RunList runs={items} selected={selected} onSelect={select} />}</Async>
-        </section>
-        {selected !== null && (
-          <>
-            <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Visões da simulação" />
-            <SelectedRun key={`${selected}-${tab}`} runId={selected} tab={tab} onStatus={runs.reload} />
-          </>
-        )}
+        <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Visões da simulação" />
+        {tab === "future" ? <FuturePanel /> : <BacktestPanel tab={tab} />}
       </div>
     </div>
   );

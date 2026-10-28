@@ -17,6 +17,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from domain.assets.services.etf_exposure import suggest_arca_class
+from domain.policy.services.assumptions import ProjectionAssumptions
 from domain.policy.services.policy import InvestmentPolicy, current_policy
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, AssetType
@@ -25,6 +26,7 @@ from domain.simulation.data import (
     CDI_KEY,
     IBOV_KEY,
     IFIX_KEY,
+    SIMULATION_HISTORY_START,
     SP500_BRL_KEY,
     build_market_history,
     simulation_universe,
@@ -46,7 +48,17 @@ from domain.simulation.entities import (
 )
 from domain.simulation.market import MarketHistory
 from domain.simulation.robustness import rule_variants, with_band
+from domain.simulation.scenarios import (
+    CLASS_ORDER,
+    ClassSample,
+    ProjectionConfig,
+    ProjectionResult,
+    class_sample,
+    project,
+    projection_warnings,
+)
 from domain.tax.entities import TaxRuleBook
+from domain.tax.services.comparator import default_scenarios
 from domain.tax.services.rules import rule_book
 
 # Stored with every run; the backtest is deterministic, the Monte Carlo layers (33.5+) use it.
@@ -55,6 +67,13 @@ POLICY_VERSIONS_LIMIT = 200
 CASH_TICKER = "CAIXA-CDI"
 STRATEGY_KEY = "strategy"
 BENCHMARK_PREFIX = "benchmark:"
+PROJECTION_PREFIX = "projection:"
+# Income yield of a class without a position to measure it (annual share of the value).
+DEFAULT_INCOME_YIELD: dict[ArcaClass, float] = {
+    ArcaClass.ACOES: 0.05,
+    ArcaClass.ATIVOS_INTERNACIONAIS: 0.015,
+}
+MAX_INCOME_YIELD = 0.30
 
 
 class Universe:
@@ -350,6 +369,224 @@ def to_stored_result(run_id: int, key: str, result: BacktestResult) -> Simulatio
     )
 
 
+@dataclass(frozen=True)
+class ProjectionParams:
+    """What a projection run was asked to do; the starting point and the rates are frozen here.
+
+    The API resolves today's portfolio (value and income yield by class) and the CDI/IPCA
+    premises when the run is requested, so the worker never calls a provider (risk R14) and
+    the parameters hash changes whenever the starting point does.
+    """
+
+    horizon_years: int
+    monthly_contribution: float  # today's money, kept constant in real terms
+    initial_by_class: dict[str, float]
+    income_yield_by_class: dict[str, float]
+    cdi_rate: float
+    ipca_rate: float
+    rate_shift: float = 0.02
+    contribution_real_growth: float = 0.0
+    wealth_goal: float | None = None
+    income_goal: float | None = None
+    rebalance: bool = False
+    paths: int = 5000
+    mean_block_months: float = 12.0
+    fee_rate: float = 0.0003
+    sample_start: date | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["sample_start"] = self.sample_start.isoformat() if self.sample_start else None
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ProjectionParams:
+        start = data.get("sample_start")
+        return cls(
+            horizon_years=int(data["horizon_years"]),
+            monthly_contribution=float(data["monthly_contribution"]),
+            initial_by_class={k: float(v) for k, v in data["initial_by_class"].items()},
+            income_yield_by_class={
+                k: float(v) for k, v in data.get("income_yield_by_class", {}).items()
+            },
+            cdi_rate=float(data["cdi_rate"]),
+            ipca_rate=float(data["ipca_rate"]),
+            rate_shift=float(data.get("rate_shift", 0.02)),
+            contribution_real_growth=float(data.get("contribution_real_growth", 0.0)),
+            wealth_goal=data.get("wealth_goal"),
+            income_goal=data.get("income_goal"),
+            rebalance=bool(data.get("rebalance", False)),
+            paths=int(data.get("paths", 5000)),
+            mean_block_months=float(data.get("mean_block_months", 12.0)),
+            fee_rate=float(data.get("fee_rate", 0.0003)),
+            sample_start=date.fromisoformat(start) if start else None,
+        )
+
+    def class_values(self, data: dict[str, float]) -> dict[ArcaClass, float]:
+        return {ArcaClass(k): v for k, v in data.items()}
+
+
+def new_projection_run(
+    params: ProjectionParams, *, label: str | None = None, seed: int = DEFAULT_SEED
+) -> SimulationRun:
+    return SimulationRun(
+        kind=SimulationKind.PROJECTION,
+        params=params.to_dict(),
+        params_hash=_digest(params.to_dict()),
+        code_version=ENGINE_VERSION,
+        seed=seed,
+        label=label,
+    )
+
+
+def income_yields(
+    values: dict[ArcaClass, float],
+    earnings_12m: dict[ArcaClass, float],
+    assumptions: ProjectionAssumptions,
+) -> dict[ArcaClass, float]:
+    """Trailing 12-month income over value by class; the premise when there is no position."""
+    defaults = {
+        **DEFAULT_INCOME_YIELD,
+        ArcaClass.REAL_ESTATE: assumptions.real_estate_default_yield_rate,
+    }
+    out: dict[ArcaClass, float] = {}
+    for cls in CLASS_ORDER:
+        if cls == ArcaClass.CAIXA:
+            continue  # the cash income follows the scenario CDI
+        value, income = values.get(cls, 0.0), earnings_12m.get(cls, 0.0)
+        measured = income / value if value > 0 and income > 0 else None
+        chosen = measured if measured is not None else defaults[cls]
+        out[cls] = round(min(chosen, MAX_INCOME_YIELD), 6)
+    return out
+
+
+@dataclass(frozen=True)
+class ProjectionInputs:
+    sample: ClassSample
+    policy: InvestmentPolicy
+    data_hash: str = ""
+
+
+def required_classes(params: ProjectionParams, policy: InvestmentPolicy) -> list[ArcaClass]:
+    """Classes the projection can hold: a target above zero or money already there."""
+    initial = params.class_values(params.initial_by_class)
+    return [
+        c for c in CLASS_ORDER if policy.arca.classes[c].target_pct > 0 or initial.get(c, 0.0) > 0
+    ]
+
+
+def load_projection_inputs(
+    uow: AbstractUnitOfWork, params: ProjectionParams, *, today: date | None = None
+) -> ProjectionInputs:
+    policy = current_policy(uow.policies)
+    history = build_market_history(
+        uow.market_series,
+        [],
+        start=params.sample_start or SIMULATION_HISTORY_START,
+        end=today or date.today(),
+    )
+    sample = class_sample(history, required_classes(params, policy), start=params.sample_start)
+    return ProjectionInputs(
+        sample=sample,
+        policy=policy,
+        data_hash=_digest(
+            {"series": _series_fingerprint(history), "policy": repr(policy), "sample": sample.size}
+        ),
+    )
+
+
+def projection_config(params: ProjectionParams, policy: InvestmentPolicy) -> ProjectionConfig:
+    premises = policy.valuation.projections
+    return ProjectionConfig(
+        horizon_months=params.horizon_years * 12,
+        monthly_contribution=params.monthly_contribution,
+        initial_by_class=params.class_values(params.initial_by_class),
+        targets={c: p.target_pct / 100.0 for c, p in policy.arca.classes.items()},
+        bands={c: p.band_pct / 100.0 for c, p in policy.arca.classes.items()},
+        income_yield=params.class_values(params.income_yield_by_class),
+        contribution_real_growth=params.contribution_real_growth,
+        cash_cdi_multiplier=premises.cash_cdi_multiplier,
+        cash_income_tax_rate=premises.cash_income_tax_rate,
+        fee_rate=params.fee_rate,
+        rebalance=params.rebalance,
+        wealth_goal=params.wealth_goal,
+        income_goal=params.income_goal,
+        paths=params.paths,
+        mean_block_months=params.mean_block_months,
+    )
+
+
+def run_projection_params(
+    inputs: ProjectionInputs,
+    params: ProjectionParams,
+    *,
+    seed: int,
+    deadline: Callable[[], bool] | None = None,
+) -> list[ProjectionResult]:
+    """One projection per rate scenario, all with the same seed (common random numbers).
+
+    The same bootstrap draws in every scenario make their differences come from the rates
+    alone, not from sampling noise.
+    """
+    config = projection_config(params, inputs.policy)
+    scenarios = default_scenarios(
+        params.cdi_rate,
+        params.ipca_rate,
+        ProjectionAssumptions(scenario_rate_shift=params.rate_shift),
+    )
+    return [project(inputs.sample, s, config, seed=seed, deadline=deadline) for s in scenarios]
+
+
+def to_stored_projection(
+    run_id: int, result: ProjectionResult, inputs: ProjectionInputs, params: ProjectionParams
+) -> SimulationResult:
+    sample = inputs.sample
+    summary = asdict(result)
+    points = summary.pop("points")
+    summary["scenario"] = {
+        "name": result.scenario.name,
+        "annual_cdi_rate": result.scenario.annual_cdi_rate,
+        "annual_ipca_rate": result.scenario.annual_ipca_rate,
+    }
+    summary["premises"] = [{**p, "arca_class": p["arca_class"].value} for p in summary["premises"]]
+    return SimulationResult(
+        run_id=run_id,
+        key=f"{PROJECTION_PREFIX}{result.scenario.name}",
+        label=result.label,
+        summary=summary,
+        points=points,
+        extra={
+            "sample_start": sample.months[0].isoformat(),
+            "sample_end": sample.months[-1].isoformat(),
+            "sample_months": sample.size,
+            "classes": [c.value for c in sample.classes],
+            "targets": {c.value: p.target_pct for c, p in inputs.policy.arca.classes.items()},
+            "warnings": projection_warnings(sample, projection_config(params, inputs.policy)),
+        },
+    )
+
+
+Compute = Callable[[Callable[[], bool]], list[SimulationResult]]
+
+
+def prepare_run(uow: AbstractUnitOfWork, run: SimulationRun) -> tuple[str, Compute]:
+    """Read the run's inputs and return their hash and the computation (by kind)."""
+    run_id: int = run.id  # type: ignore[assignment]
+    if run.kind == SimulationKind.PROJECTION:
+        projection = ProjectionParams.from_dict(run.params)
+        p_inputs = load_projection_inputs(uow, projection)
+        return p_inputs.data_hash, lambda deadline: [
+            to_stored_projection(run_id, r, p_inputs, projection)
+            for r in run_projection_params(p_inputs, projection, seed=run.seed, deadline=deadline)
+        ]
+    backtest = BacktestParams.from_dict(run.params)
+    b_inputs = load_backtest_inputs(uow, backtest)
+    return b_inputs.data_hash, lambda deadline: [
+        to_stored_result(run_id, k, r)
+        for k, r in run_backtest_params(b_inputs, backtest, deadline=deadline)
+    ]
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -377,10 +614,8 @@ def execute_next_run(
     status, error, digest, reused = SimulationStatus.DONE, None, None, None
     stored: list[SimulationResult] = []
     try:
-        params = BacktestParams.from_dict(run.params)
         with uow_factory() as uow:
-            inputs = load_backtest_inputs(uow, params)
-            digest = inputs.data_hash
+            digest, compute = prepare_run(uow, run)
             previous = uow.simulations.find_done(run.params_hash, digest, run.code_version)
             if previous is not None and previous.id is not None and previous.id != run.id:
                 reused = previous.id
@@ -389,8 +624,7 @@ def execute_next_run(
                     for r in uow.simulations.results(previous.id)
                 ]
         if reused is None:
-            results = run_backtest_params(inputs, params, deadline=lambda: clock() > limit)
-            stored = [to_stored_result(run.id, k, r) for k, r in results]  # type: ignore[arg-type]
+            stored = compute(lambda: clock() > limit)
     except SimulationTimeout:
         status, error = SimulationStatus.TIMEOUT, f"time limit of {timeout_seconds:.0f}s reached"
     except Exception as exc:  # noqa: BLE001 - stored on the run, the worker keeps going

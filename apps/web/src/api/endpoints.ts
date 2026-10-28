@@ -48,9 +48,12 @@ import type {
   PortfolioHealthDTO,
   PortfolioReportResponseDTO,
   SavedContributionPlanDTO,
+  ProjectionDTO,
+  ProjectionRequest,
   RobustnessDTO,
   ScreenerResponseDTO,
   SeriesStatusDTO,
+  SimulationKind,
   SimulationRunDetailDTO,
   SimulationRunDTO,
   SnapshotPointDTO,
@@ -153,11 +156,15 @@ export const api = {
       }),
   },
   simulations: {
-    list: (limit = 20) => request<SimulationRunDTO[]>("/simulations", { query: { limit } }),
+    list: (limit = 20, kind?: SimulationKind) =>
+      request<SimulationRunDTO[]>("/simulations", { query: { limit, kind } }),
     get: (id: number) => request<SimulationRunDetailDTO>(`/simulations/${id}`),
     robustness: (id: number) => request<RobustnessDTO>(`/simulations/${id}/robustness`),
+    projection: (id: number) => request<ProjectionDTO>(`/simulations/${id}/projection`),
     submitBacktest: (body: BacktestRequest) =>
       request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
+    submitProjection: (body: ProjectionRequest) =>
+      request<SimulationRunDTO>("/simulations/projections", { method: "POST", body }),
   },
   tax: {
     rules: () => request<TaxRuleDTO[]>("/tax/rules"),

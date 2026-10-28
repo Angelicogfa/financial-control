@@ -12,7 +12,7 @@
 
 ## Estado do repositório
 - **`main`** (`ae7d40c`): Fases 25, 26, 27, 29 e o desenho inicial da 33 já mergeados (PRs #17, #19, #21, #23).
-- **`feature/simulation`**, à frente da `main` com 33.1 a 33.4 (já enviada ao `origin`, ainda sem PR). Os primeiros commits:
+- **`feature/simulation`**, à frente da `main` com 33.1 a 33.5 (enviada ao `origin` até a 33.4, ainda sem PR). Os primeiros commits:
   - `a82dae3`: desenho revisado (ativos candidatos e lógica bayesiana);
   - `4ff2c70`: motor do backtest (33.2, primeira parte) e decisões provisórias;
   - `7cc630b`: decisões finais com fundamentação e avaliação do PyMC.
@@ -49,7 +49,8 @@ Ferramenta de simulação: backtest da estratégia ARCA (camada A), projeção p
 2. ~~33.2~~ concluída: rebalanceamento com IR, política por data, checklist histórico e selo de sobrevivência (ver o plano).
 3. ~~33.3~~ concluída: `simulation_runs`/`simulation_results` (migração `script_00023`), `domain/simulation/runs.py` (parâmetros, entradas do banco, `data_hash`, reaproveitamento por parâmetros + dados + `ENGINE_VERSION`), limite de tempo de 120 s, job `run_pending_simulations` no worker (fila a cada 15 s), rotas `POST /api/v1/simulations/backtests`, `GET /api/v1/simulations[/{id}]` e MCP `simulation.backtest|get|list`. Limitação conhecida: uma rodada que fica em RUNNING porque o worker caiu no meio não é retomada sozinha.
 4. ~~33.4~~ concluída: `domain/simulation/robustness.py` (crises, choques, variantes contadas, janela reservada de 36 meses, avisos de amostra), rota `GET /api/v1/simulations/{id}/robustness`, MCP `simulation.robustness` e a tela `/tools/simulation` com as abas Passado e Robustez.
-5. **Próxima: 33.5** (simulação prospectiva, camada B) e as demais, na ordem da tabela da seção 9 do desenho.
+5. ~~33.5~~ concluída: `domain/simulation/scenarios.py` (bootstrap estacionário do excesso sobre o CDI, cenários de juros, aporte, rebalanceamento com IR, percentis, metas), tipo `PROJECTION` com ponto de partida congelado no pedido, rotas `POST /api/v1/simulations/projections` e `GET /api/v1/simulations/{id}/projection`, MCP `simulation.project|projection` e a aba Futuro.
+6. **Próxima: 33.6** (camada bayesiana e aba Confiança) e as demais, na ordem da tabela da seção 9 do desenho. A probabilidade de meta hoje só carrega o erro de Monte Carlo; a 33.6 acrescenta a incerteza dos parâmetros (Bayes-Stein, decisão 8).
 
 ## Convenções e preferências do usuário
 - Respostas em **português**; código, commits e identificadores em inglês (ver `AGENTS.md`).

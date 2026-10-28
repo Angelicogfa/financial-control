@@ -3,12 +3,22 @@ import { describe, expect, it } from "vitest";
 
 import type {
   BacktestSummaryDTO,
+  PercentilesDTO,
+  ProjectionDTO,
+  ProjectionScenarioDTO,
   RobustnessDTO,
   SimulationResultDTO,
   SimulationRunDetailDTO,
   SimulationRunDTO,
 } from "../api/types";
-import { RobustnessView, isActive, seriesOf, toBacktestRequest } from "../pages/tools/SimulationPage";
+import {
+  ProjectionView,
+  RobustnessView,
+  isActive,
+  seriesOf,
+  toBacktestRequest,
+  toProjectionRequest,
+} from "../pages/tools/SimulationPage";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -243,5 +253,154 @@ describe("SimulationPage", () => {
     fireEvent.change(screen.getByLabelText("Aporte mensal (R$)"), { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: "Simular" }));
     expect(await screen.findByText("Informe um aporte mensal maior que zero.")).toBeInTheDocument();
+  });
+});
+
+// --- future ------------------------------------------------------------------------------------
+
+const band = (p50: number): PercentilesDTO => ({ p5: p50 * 0.6, p25: p50 * 0.8, p50, p75: p50 * 1.2, p95: p50 * 1.5 });
+
+function scenario(name: string, label: string, overrides: Partial<ProjectionScenarioDTO> = {}): ProjectionScenarioDTO {
+  return {
+    key: `projection:${name}`,
+    label,
+    scenario: { name, annual_cdi_rate: 0.1, annual_ipca_rate: 0.04 },
+    paths: 5000,
+    horizon_months: 24,
+    points: [
+      { month: 0, contributed: 10000, wealth: band(10000), income: band(50) },
+      { month: 12, contributed: 22000, wealth: band(24000), income: band(110) },
+      { month: 24, contributed: 34000, wealth: band(40000), income: band(180) },
+    ],
+    final_wealth: band(40000),
+    final_net_wealth: band(38000),
+    final_income: band(180),
+    max_drawdown: { p5: -0.3, p25: -0.2, p50: -0.15, p75: -0.1, p95: -0.05 },
+    contributed: 34000,
+    wealth_goal: { target: 35000, probability: 0.72, standard_error: 0.0063, months: { p5: 18, p25: 20, p50: 22, p75: 24, p95: 24 } },
+    income_goal: { target: 10000, probability: 0, standard_error: 0, months: null },
+    premises: [
+      { arca_class: "ACOES", proxy: "IBOV", excess_annual: 0.031, volatility: 0.22, expected_annual: 0.134, income_yield: 0.05 },
+      { arca_class: "CAIXA", proxy: "CDI", excess_annual: 0, volatility: 0, expected_annual: 0.085, income_yield: 0.04 },
+    ],
+    fees: 10,
+    taxes: 0,
+    ...overrides,
+  };
+}
+
+function projection(overrides: Partial<ProjectionDTO> = {}): ProjectionDTO {
+  return {
+    run_id: 5,
+    status: "DONE",
+    scenarios: [
+      scenario("LOW", "Juros em queda", { final_wealth: band(30000) }),
+      scenario("BASE", "Juros na premissa"),
+      scenario("HIGH", "Juros em alta", { final_wealth: band(50000) }),
+    ],
+    sample_start: "2010-01-29",
+    sample_end: "2026-09-30",
+    sample_months: 200,
+    classes: ["ACOES", "CAIXA"],
+    targets: { ACOES: 60, CAIXA: 40 },
+    warnings: ["Simulação, não recomendação: teste."],
+    ...overrides,
+  };
+}
+
+const projectionRun = run({
+  id: 5,
+  kind: "PROJECTION",
+  label: "Aposentadoria",
+  params: { horizon_years: 2, monthly_contribution: 1000, mean_block_months: 12 },
+});
+
+describe("projection helpers", () => {
+  const form = {
+    horizonYears: "20",
+    monthly: "1500",
+    realGrowth: "1,5",
+    wealthGoal: "1000000",
+    incomeGoal: "",
+    rebalance: true,
+    fromPortfolio: true,
+    initial: { ACOES: "0", REAL_ESTATE: "0", ATIVOS_INTERNACIONAIS: "0", CAIXA: "0" },
+    cdi: "",
+    ipca: "4,5",
+    label: "",
+  };
+
+  it("converts percentages and leaves the starting point to the server", () => {
+    expect(toProjectionRequest(form)).toEqual({
+      horizon_years: 20,
+      monthly_contribution: 1500,
+      contribution_real_growth: 0.015,
+      wealth_goal: 1_000_000,
+      income_goal: null,
+      rebalance: true,
+      initial_by_class: null,
+      cdi_rate: null,
+      ipca_rate: 0.045,
+      label: null,
+    });
+  });
+
+  it("sends the typed values by class and rejects an invalid horizon", () => {
+    const typed = toProjectionRequest({ ...form, fromPortfolio: false, initial: { ...form.initial, ACOES: "5000", CAIXA: "-1" } });
+    expect(typed?.initial_by_class).toEqual({ ACOES: 5000, REAL_ESTATE: 0, ATIVOS_INTERNACIONAIS: 0, CAIXA: 0 });
+    expect(toProjectionRequest({ ...form, horizonYears: "0" })).toBeNull();
+    expect(toProjectionRequest({ ...form, horizonYears: "51" })).toBeNull();
+    expect(toProjectionRequest({ ...form, monthly: "" })).toBeNull();
+    expect(toProjectionRequest({ ...form, monthly: "0" })?.monthly_contribution).toBe(0);
+  });
+});
+
+describe("ProjectionView", () => {
+  it("shows the base scenario, the goals, the percentiles and the premises", () => {
+    render(<ProjectionView data={projection()} run={projectionRun} />);
+    expect(screen.getByText("Simulação, não recomendação: teste.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Juros na premissa" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("72%")).toBeInTheDocument();
+    expect(screen.getByText(/Nenhuma trajetória chega à meta/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Faixas prováveis do patrimônio ano a ano" })).toBeInTheDocument();
+
+    const table = screen.getByRole("table", { name: "Percentis ao fim do horizonte" });
+    const wealth = within(table).getByText("Patrimônio").closest("tr") as HTMLElement;
+    expect(within(wealth).getByText("R$ 40.000,00")).toBeInTheDocument();
+
+    const premises = screen.getByRole("table", { name: "Premissas por classe" });
+    expect(within(premises).getByText("CDI líquido de IR")).toBeInTheDocument();
+    expect(within(premises).getByText("+3,1%")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Juros em alta" }));
+    expect(within(wealth).getByText("R$ 50.000,00")).toBeInTheDocument();
+  });
+
+  it("waits for an unfinished projection", () => {
+    render(<ProjectionView data={projection({ status: "RUNNING", scenarios: [] })} run={projectionRun} />);
+    expect(screen.getByText("A projeção aparece quando a simulação terminar")).toBeInTheDocument();
+  });
+});
+
+describe("SimulationPage future tab", () => {
+  it("lists projections, shows the selected one and submits a new one", async () => {
+    const { calls } = mockApi([
+      { path: "/simulations", reply: (call: Call) => (call.query.get("kind") === "PROJECTION" ? [projectionRun] : [run()]) },
+      { path: "/simulations/5", reply: { ...projectionRun, results: [] } },
+      { path: "/simulations/5/projection", reply: projection() },
+      { method: "POST", path: "/simulations/projections", reply: { ...projectionRun, id: 6, status: "PENDING" } },
+      { path: "/simulations/6", reply: { ...projectionRun, id: 6, status: "PENDING", results: [] } },
+    ]);
+    renderAt("/tools/simulation?tab=future");
+    expect(await screen.findByRole("button", { name: "Aposentadoria" })).toBeInTheDocument();
+    expect(screen.getByText("2 anos · R$ 1.000,00/mês")).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Percentis ao fim do horizonte" })).toBeInTheDocument();
+    expect(calls.some((c) => c.path === "/simulations" && c.query.get("kind") === "PROJECTION")).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Meta de renda passiva (R$/mês)"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Projetar" }));
+    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
+    const body = last(calls, "POST", "/simulations/projections")?.body as Record<string, unknown>;
+    expect(body).toMatchObject({ horizon_years: 20, monthly_contribution: 1000, income_goal: 5000, initial_by_class: null });
   });
 });

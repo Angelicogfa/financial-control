@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from domain.simulation.entities import SimulationResult, SimulationRun
+from domain.simulation.entities import SimulationKind, SimulationResult, SimulationRun
 
 
 class AbstractSimulationRepository(ABC):
@@ -21,8 +21,10 @@ class AbstractSimulationRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_recent(self, limit: int = 20) -> list[SimulationRun]:
-        """Newest first."""
+    def list_recent(
+        self, limit: int = 20, kind: SimulationKind | None = None
+    ) -> list[SimulationRun]:
+        """Newest first, optionally of one kind."""
         raise NotImplementedError
 
     @abstractmethod

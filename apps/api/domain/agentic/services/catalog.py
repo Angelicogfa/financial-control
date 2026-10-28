@@ -75,9 +75,10 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.requests import BacktestRequest
+from controllers.simulation.requests import BacktestRequest, ProjectionRequest
 from controllers.simulation.responses import (
     CoverageReportDTO,
+    ProjectionDTO,
     RobustnessDTO,
     SimulationRunDetailDTO,
     SimulationRunDTO,
@@ -102,6 +103,7 @@ from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
+from domain.simulation.entities import SimulationKind
 from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
 
@@ -156,6 +158,7 @@ class SimulationIdInput(BaseModel):
 
 class SimulationListInput(BaseModel):
     limit: int = Field(default=20, ge=1, le=100)
+    kind: SimulationKind | None = None
 
 
 class AsOfDateInput(BaseModel):
@@ -420,7 +423,9 @@ class AgenticRuntimeHandlers:
 
     @property
     def simulation(self) -> SimulationHandler:
-        return SimulationHandler(uow_factory=self.uow_factory)
+        return SimulationHandler(
+            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
+        )
 
     @property
     def research(self) -> ResearchHandler:
@@ -1130,12 +1135,41 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, p: h.simulation.robustness(p.run_id),
     ),
     OperationSpec(
+        name="simulation.project",
+        kind="command",
+        description=(
+            "Agenda uma projeção da carteira (camada B): bootstrap em blocos dos retornos "
+            "históricos de Ações, FIIs e Internacional acima do CDI, somados ao CDI dos "
+            "cenários de juros da política (base, queda e alta), com aporte mensal constante "
+            "em termos reais e metas de patrimônio e de renda passiva mensal, tudo em R$ de "
+            "hoje. Sem `initial_by_class`, parte da carteira atual. Roda no worker; acompanhe "
+            "com simulation.projection."
+        ),
+        input_model=ProjectionRequest,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, p: h.simulation.submit_projection(p),
+    ),
+    OperationSpec(
+        name="simulation.projection",
+        kind="query",
+        description=(
+            "Resultado de uma projeção concluída, por cenário de juros: percentis 5, 25, 50, "
+            "75 e 95 do patrimônio e da renda mensal ano a ano, probabilidade de cada meta "
+            "com o erro da simulação, tempo até a meta de renda, queda máxima da estratégia, "
+            "premissas de cada classe (prêmio sobre o CDI, volatilidade, DY) e avisos de "
+            "amostra. Simulação, não recomendação."
+        ),
+        input_model=SimulationIdInput,
+        output_type=ProjectionDTO,
+        invoke=lambda h, p: h.simulation.projection(p.run_id),
+    ),
+    OperationSpec(
         name="simulation.list",
         kind="query",
         description="Simulações solicitadas, mais recentes primeiro, com status e parâmetros.",
         input_model=SimulationListInput,
         output_type=list[SimulationRunDTO],
-        invoke=lambda h, p: h.simulation.list_runs(p.limit),
+        invoke=lambda h, p: h.simulation.list_runs(p.limit, p.kind),
     ),
 )
 

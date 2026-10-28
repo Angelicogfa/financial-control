@@ -164,3 +164,74 @@ class RobustnessDTO(BaseModel):
     trials_in_run: int = 0
     trials_total: int = 0
     warnings: list[str] = Field(default_factory=list)
+
+
+class PercentilesDTO(BaseModel):
+    p5: float
+    p25: float
+    p50: float
+    p75: float
+    p95: float
+
+
+class GoalOutcomeDTO(BaseModel):
+    target: float
+    probability: float
+    # Monte Carlo error of the probability only; parameter uncertainty comes in Phase 33.6.
+    standard_error: float
+    months: PercentilesDTO | None = None
+
+
+class ProjectionPointDTO(BaseModel):
+    month: int
+    contributed: float
+    wealth: PercentilesDTO
+    income: PercentilesDTO
+
+
+class ClassPremiseDTO(BaseModel):
+    arca_class: str
+    proxy: str
+    excess_annual: float
+    volatility: float
+    expected_annual: float
+    income_yield: float
+
+
+class RateScenarioDTO(BaseModel):
+    name: str
+    annual_cdi_rate: float
+    annual_ipca_rate: float
+
+
+class ProjectionScenarioDTO(BaseModel):
+    """One rate scenario; amounts are in today's money (deflated by the scenario IPCA)."""
+
+    key: str
+    label: str
+    scenario: RateScenarioDTO
+    paths: int
+    horizon_months: int
+    points: list[ProjectionPointDTO] = Field(default_factory=list)
+    final_wealth: PercentilesDTO
+    final_net_wealth: PercentilesDTO
+    final_income: PercentilesDTO
+    max_drawdown: PercentilesDTO
+    contributed: float
+    wealth_goal: GoalOutcomeDTO | None = None
+    income_goal: GoalOutcomeDTO | None = None
+    premises: list[ClassPremiseDTO] = Field(default_factory=list)
+    fees: float = 0.0
+    taxes: float = 0.0
+
+
+class ProjectionDTO(BaseModel):
+    run_id: int
+    status: SimulationStatus
+    scenarios: list[ProjectionScenarioDTO] = Field(default_factory=list)
+    sample_start: date | None = None
+    sample_end: date | None = None
+    sample_months: int = 0
+    classes: list[str] = Field(default_factory=list)
+    targets: dict[str, float] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)

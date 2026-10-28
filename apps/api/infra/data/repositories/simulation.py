@@ -8,7 +8,12 @@ from __future__ import annotations
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from domain.simulation.entities import SimulationResult, SimulationRun, SimulationStatus
+from domain.simulation.entities import (
+    SimulationKind,
+    SimulationResult,
+    SimulationRun,
+    SimulationStatus,
+)
 from domain.simulation.repositories import AbstractSimulationRepository
 from infra.data.mappers.simulation import (
     apply_simulation_run,
@@ -45,8 +50,12 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
         model = self.session.get(SimulationRunModel, run_id)
         return to_simulation_run(model) if model is not None else None
 
-    def list_recent(self, limit: int = 20) -> list[SimulationRun]:
+    def list_recent(
+        self, limit: int = 20, kind: SimulationKind | None = None
+    ) -> list[SimulationRun]:
         stmt = select(SimulationRunModel).order_by(SimulationRunModel.id.desc()).limit(limit)
+        if kind is not None:
+            stmt = stmt.where(SimulationRunModel.kind == kind.value)
         return [to_simulation_run(m) for m in self.session.scalars(stmt).all()]
 
     def next_pending(self) -> SimulationRun | None:

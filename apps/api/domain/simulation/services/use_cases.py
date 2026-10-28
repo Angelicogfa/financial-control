@@ -6,11 +6,13 @@ from dataclasses import asdict
 from datetime import date, timedelta
 
 from controllers.shared.dependencies import UoWFactory
-from controllers.simulation.requests import BacktestRequest
+from controllers.simulation.requests import BacktestRequest, ProjectionRequest
 from controllers.simulation.responses import (
     CoverageReportDTO,
     CrisisDTO,
     DistributionDTO,
+    ProjectionDTO,
+    ProjectionScenarioDTO,
     RobustnessDTO,
     SeriesCoverageDTO,
     SeriesRefDTO,
@@ -22,12 +24,18 @@ from controllers.simulation.responses import (
     WindowOutcomeDTO,
 )
 from core.errors import NotFoundError, ValidationError
+from domain.policy.services.assumptions import ProjectionAssumptions
+from domain.policy.services.policy import current_policy
+from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
+from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.enums import ArcaClass, AssetPurpose
+from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.simulation.data import (
     SIMULATION_HISTORY_START,
     coverage_report,
     simulation_universe,
 )
-from domain.simulation.entities import SimulationResult, SimulationRun
+from domain.simulation.entities import SimulationKind, SimulationResult, SimulationRun
 from domain.simulation.robustness import (
     HISTORICAL_CRISES,
     SYNTHETIC_SHOCKS,
@@ -41,7 +49,16 @@ from domain.simulation.robustness import (
     sample_warnings,
     window_outcome,
 )
-from domain.simulation.runs import STRATEGY_KEY, BacktestParams, Universe, new_backtest_run
+from domain.simulation.runs import (
+    PROJECTION_PREFIX,
+    STRATEGY_KEY,
+    BacktestParams,
+    ProjectionParams,
+    Universe,
+    income_yields,
+    new_backtest_run,
+    new_projection_run,
+)
 
 
 def to_run_dto(run: SimulationRun) -> SimulationRunDTO:
@@ -62,9 +79,17 @@ def to_result_dto(result: SimulationResult) -> SimulationResultDTO:
 class SimulationHandler:
     """Application handler for the portfolio simulation."""
 
-    def __init__(self, uow_factory: UoWFactory, *, catalog_top: int = 50) -> None:
+    def __init__(
+        self,
+        uow_factory: UoWFactory,
+        *,
+        catalog_top: int = 50,
+        portfolio_service: PortfolioApplicationService | None = None,
+    ) -> None:
         self.uow_factory = uow_factory
         self.catalog_top = catalog_top
+        # Reads today's portfolio and market rates for a projection's starting point.
+        self.portfolio_service = portfolio_service
 
     def coverage(self, *, start: date | None = None, end: date | None = None) -> CoverageReportDTO:
         """Coverage of the stored series a simulation over the universe would read."""
@@ -112,29 +137,144 @@ class SimulationHandler:
             uow.commit()
         return to_run_dto(run)
 
-    def get_run(self, run_id: int) -> SimulationRunDetailDTO:
+    def submit_projection(self, req: ProjectionRequest) -> SimulationRunDTO:
+        """Queue a forward projection from today's portfolio (starting point frozen now)."""
         with self.uow_factory() as uow:
-            run = uow.simulations.get(run_id)
-            if run is None:
-                raise NotFoundError(f"Simulation run {run_id} not found")
+            assumptions = current_policy(uow.policies).valuation.projections
+            initial, earnings = self._starting_point(uow, req)
+            if sum(initial.values()) <= 0 and req.monthly_contribution <= 0:
+                raise ValidationError(
+                    "nothing to project: no portfolio value and no contribution",
+                    code="EMPTY_PROJECTION",
+                )
+            yields = income_yields(initial, earnings, assumptions)
+            yields.update({ArcaClass(k): v for k, v in (req.income_yield_by_class or {}).items()})
+            cdi, ipca = self._rates(req, assumptions)
+            params = ProjectionParams(
+                horizon_years=req.horizon_years,
+                monthly_contribution=req.monthly_contribution,
+                initial_by_class={c.value: round(v, 2) for c, v in initial.items()},
+                income_yield_by_class={c.value: v for c, v in yields.items()},
+                cdi_rate=cdi,
+                ipca_rate=ipca,
+                rate_shift=assumptions.scenario_rate_shift,
+                contribution_real_growth=req.contribution_real_growth,
+                wealth_goal=req.wealth_goal,
+                income_goal=req.income_goal,
+                rebalance=req.rebalance,
+                paths=req.paths,
+                mean_block_months=req.mean_block_months,
+                fee_rate=req.fee_rate,
+                sample_start=req.sample_start,
+            )
+            run = uow.simulations.add(new_projection_run(params, label=req.label))
+            uow.commit()
+        return to_run_dto(run)
+
+    def _starting_point(
+        self, uow: AbstractUnitOfWork, req: ProjectionRequest
+    ) -> tuple[dict[ArcaClass, float], dict[ArcaClass, float]]:
+        if req.initial_by_class is not None:
+            return {ArcaClass(k): max(v, 0.0) for k, v in req.initial_by_class.items()}, {}
+        if self.portfolio_service is None:
+            raise ValidationError(
+                "initial_by_class is required when the portfolio is not available",
+                code="PORTFOLIO_UNAVAILABLE",
+            )
+        return portfolio_start(self.portfolio_service.build_portfolio_report(uow))
+
+    def _rates(
+        self, req: ProjectionRequest, assumptions: ProjectionAssumptions
+    ) -> tuple[float, float]:
+        cdi = req.cdi_rate if req.cdi_rate is not None else assumptions.projected_cdi_rate
+        ipca = req.ipca_rate if req.ipca_rate is not None else assumptions.projected_ipca_rate
+        if cdi is None or ipca is None:
+            if self.portfolio_service is None:
+                raise ValidationError(
+                    "cdi_rate and ipca_rate are required without market rates",
+                    code="RATES_UNAVAILABLE",
+                )
+            market_cdi, market_ipca = self.portfolio_service.gateway.get_macro_rates()
+            cdi = market_cdi if cdi is None else cdi
+            ipca = market_ipca if ipca is None else ipca
+        return round(cdi, 6), round(ipca, 6)
+
+    def get_run(self, run_id: int) -> SimulationRunDetailDTO:
+        """Status and, for a backtest, its series (a projection's are in `projection`)."""
+        with self.uow_factory() as uow:
+            run = self._get(uow, run_id)
             results = uow.simulations.results(run_id)
+        backtest = run.kind == SimulationKind.BACKTEST
         return SimulationRunDetailDTO(
-            **to_run_dto(run).model_dump(), results=[to_result_dto(r) for r in results]
+            **to_run_dto(run).model_dump(),
+            results=[to_result_dto(r) for r in results] if backtest else [],
         )
 
-    def list_runs(self, limit: int = 20) -> list[SimulationRunDTO]:
+    def list_runs(
+        self, limit: int = 20, kind: SimulationKind | None = None
+    ) -> list[SimulationRunDTO]:
         with self.uow_factory() as uow:
-            return [to_run_dto(r) for r in uow.simulations.list_recent(limit)]
+            return [to_run_dto(r) for r in uow.simulations.list_recent(limit, kind)]
 
     def robustness(self, run_id: int) -> RobustnessDTO:
         """Crises, shocks and rule variants of a finished run (empty while it is not DONE)."""
         with self.uow_factory() as uow:
-            run = uow.simulations.get(run_id)
-            if run is None:
-                raise NotFoundError(f"Simulation run {run_id} not found")
+            run = self._get(uow, run_id, SimulationKind.BACKTEST)
             results = uow.simulations.results(run_id)
             trials_total = uow.simulations.count_results(VARIANT_PREFIX)
         return build_robustness(run, results, trials_total=trials_total)
+
+    def projection(self, run_id: int) -> ProjectionDTO:
+        """Percentiles, goals and premises of a projection (empty while it is not DONE)."""
+        with self.uow_factory() as uow:
+            run = self._get(uow, run_id, SimulationKind.PROJECTION)
+            results = uow.simulations.results(run_id)
+        return build_projection(run, results)
+
+    @staticmethod
+    def _get(
+        uow: AbstractUnitOfWork, run_id: int, kind: SimulationKind | None = None
+    ) -> SimulationRun:
+        run = uow.simulations.get(run_id)
+        if run is None:
+            raise NotFoundError(f"Simulation run {run_id} not found")
+        if kind is not None and run.kind != kind:
+            raise ValidationError(
+                f"simulation run {run_id} is a {run.kind.value}, not a {kind.value}",
+                code="WRONG_SIMULATION_KIND",
+            )
+        return run
+
+
+def portfolio_start(
+    report: ConsolidatedPortfolioReport,
+) -> tuple[dict[ArcaClass, float], dict[ArcaClass, float]]:
+    """Today's value and trailing 12-month income by ARCA class."""
+    values = {a.arca_class: max(a.current_value, 0.0) for a in report.allocations}
+    earnings: dict[ArcaClass, float] = {}
+    for p in report.positions:
+        if p.purpose == AssetPurpose.ARCA:
+            earnings[p.arca_class] = earnings.get(p.arca_class, 0.0) + p.earnings_12m_brl
+    return values, earnings
+
+
+def build_projection(run: SimulationRun, results: list[SimulationResult]) -> ProjectionDTO:
+    rows = [r for r in results if r.key.startswith(PROJECTION_PREFIX)]
+    extra = rows[0].extra if rows else {}
+    return ProjectionDTO(
+        run_id=run.id,  # type: ignore[arg-type]
+        status=run.status,
+        scenarios=[
+            ProjectionScenarioDTO(key=r.key, points=r.points, **r.summary)  # type: ignore[arg-type]
+            for r in rows
+        ],
+        sample_start=extra.get("sample_start"),
+        sample_end=extra.get("sample_end"),
+        sample_months=extra.get("sample_months", 0),
+        classes=extra.get("classes", []),
+        targets=extra.get("targets", {}),
+        warnings=extra.get("warnings", []),
+    )
 
 
 def build_robustness(

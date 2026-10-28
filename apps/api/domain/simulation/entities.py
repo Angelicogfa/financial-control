@@ -18,6 +18,7 @@ class SimulationStatus(StrEnum):
 
 class SimulationKind(StrEnum):
     BACKTEST = "BACKTEST"
+    PROJECTION = "PROJECTION"
 
 
 @dataclass(frozen=True)

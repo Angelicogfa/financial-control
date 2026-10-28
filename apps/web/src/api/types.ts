@@ -416,6 +416,15 @@ export interface ClassPolicyDTO {
   intra_class_strategy?: IntraClassStrategy;
 }
 
+export interface ClassPremiseDTO {
+  arca_class: string;
+  proxy: string;
+  excess_annual: number;
+  volatility: number;
+  expected_annual: number;
+  income_yield: number;
+}
+
 export interface ComparedAssetDTO {
   ticker: string;
   name: string;
@@ -733,6 +742,13 @@ export interface FundamentalSnapshotDTO {
   source?: string | null;
 }
 
+export interface GoalOutcomeDTO {
+  target: number;
+  probability: number;
+  standard_error: number;
+  months?: PercentilesDTO | null;
+}
+
 export interface GrantOptionsDTO {
   contexts: GrantableContextDTO[];
 }
@@ -1044,6 +1060,14 @@ export interface PaginatedResponse_TransactionResponseDTO_ {
   meta: PageMetaDTO;
 }
 
+export interface PercentilesDTO {
+  p5: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p95: number;
+}
+
 export interface PerformanceDetailDTO {
   observations?: number;
   cumulative_return?: number | null;
@@ -1133,6 +1157,62 @@ export interface ProjectionAssumptionsDTO {
   projected_cdi_rate?: number | null;
   projected_ipca_rate?: number | null;
   scenario_rate_shift?: number;
+}
+
+export interface ProjectionDTO {
+  run_id: number;
+  status: SimulationStatus;
+  scenarios?: ProjectionScenarioDTO[];
+  sample_start?: string | null;
+  sample_end?: string | null;
+  sample_months?: number;
+  classes?: string[];
+  targets?: Record<string, number>;
+  warnings?: string[];
+}
+
+export interface ProjectionPointDTO {
+  month: number;
+  contributed: number;
+  wealth: PercentilesDTO;
+  income: PercentilesDTO;
+}
+
+export interface ProjectionRequest {
+  horizon_years?: number;
+  monthly_contribution: number;
+  contribution_real_growth?: number;
+  initial_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  income_yield_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  cdi_rate?: number | null;
+  ipca_rate?: number | null;
+  wealth_goal?: number | null;
+  income_goal?: number | null;
+  rebalance?: boolean;
+  paths?: number;
+  mean_block_months?: number;
+  fee_rate?: number;
+  sample_start?: string | null;
+  label?: string | null;
+}
+
+export interface ProjectionScenarioDTO {
+  key: string;
+  label: string;
+  scenario: RateScenarioDTO;
+  paths: number;
+  horizon_months: number;
+  points?: ProjectionPointDTO[];
+  final_wealth: PercentilesDTO;
+  final_net_wealth: PercentilesDTO;
+  final_income: PercentilesDTO;
+  max_drawdown: PercentilesDTO;
+  contributed: number;
+  wealth_goal?: GoalOutcomeDTO | null;
+  income_goal?: GoalOutcomeDTO | null;
+  premises?: ClassPremiseDTO[];
+  fees?: number;
+  taxes?: number;
 }
 
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
@@ -1315,7 +1395,7 @@ export interface ShockDTO {
   note?: string;
 }
 
-export type SimulationKind = "BACKTEST";
+export type SimulationKind = "BACKTEST" | "PROJECTION";
 
 export interface SimulationResultDTO {
   key: string;
