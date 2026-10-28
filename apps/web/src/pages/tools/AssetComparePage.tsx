@@ -11,6 +11,7 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Empty } from "../../components/States";
 import { brlCompact, money, num, pct } from "../../utils/format";
@@ -93,8 +94,8 @@ function TickerPicker({ tickers, onChange }: Readonly<{ tickers: string[]; onCha
         <button type="submit" className="app-secondary-button" disabled={full || !draft.trim()}>
           Adicionar
         </button>
+        <Hint about="Ativos comparados">De 2 a 5 ativos, cadastrados ou do catálogo da B3. Compare ativos do mesmo perfil.</Hint>
       </div>
-      <p className="app-card-hint">De 2 a 5 ativos, cadastrados ou do catálogo da B3. Compare ativos do mesmo perfil.</p>
     </form>
   );
 }

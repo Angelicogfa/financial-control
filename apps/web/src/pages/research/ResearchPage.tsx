@@ -16,12 +16,15 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { IconButton } from "../../components/RowActions";
+import { TrashIcon } from "../../layout/icons";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Hint } from "../../components/Hint";
 import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points } from "../../utils/format";
 import {
+  ARCA_CLASSES,
   ARCA_LABELS,
   ASSET_TYPE_LABELS,
   LIFECYCLE_LABELS,
@@ -46,6 +49,8 @@ const SCREEN_TYPES: AssetType[] = ["STOCK_BR", "FII", "ETF_BR", "BDR"];
 interface ScreenForm {
   q: string;
   types: AssetType[];
+  arcaClasses: ArcaClass[];
+  sector: string;
   minVolume: string;
   maxPe: string;
   maxPb: string;
@@ -58,6 +63,8 @@ interface ScreenForm {
 const EMPTY_FORM: ScreenForm = {
   q: "",
   types: [],
+  arcaClasses: [],
+  sector: "",
   minVolume: "",
   maxPe: "",
   maxPb: "",
@@ -76,6 +83,8 @@ function toFilters(form: ScreenForm): ScreenerFilters {
   return {
     q: form.q.trim() || undefined,
     asset_type: form.types.length ? form.types : undefined,
+    arca_class: form.arcaClasses.length ? form.arcaClasses : undefined,
+    sector: form.sector ? [form.sector] : undefined,
     min_volume_brl: number(form.minVolume),
     max_pe: number(form.maxPe),
     max_pb: number(form.maxPb),
@@ -236,8 +245,8 @@ function Screener() {
     }
   };
 
-  const toggleType = (type: AssetType) =>
-    set("types", form.types.includes(type) ? form.types.filter((t) => t !== type) : [...form.types, type]);
+  const sectors = useApi("research-sectors", () => api.research.sectors());
+  const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   return (
     <div className="app-page-stack">
@@ -246,6 +255,17 @@ function Screener() {
           <div className="app-field">
             <label htmlFor="screen-q">Nome ou código</label>
             <input id="screen-q" value={form.q} onChange={(e) => set("q", e.target.value)} placeholder="Ex.: banco, ITUB" disabled={loading} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="screen-sector">Setor</label>
+            <select id="screen-sector" value={form.sector} onChange={(e) => set("sector", e.target.value)} disabled={loading}>
+              <option value="">Todos</option>
+              {(sectors.data ?? []).map((sector) => (
+                <option key={sector} value={sector}>
+                  {sector}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="app-field">
             <span className="app-field-label">
@@ -285,6 +305,9 @@ function Screener() {
         </div>
         <div className="app-filter-bar" style={{ marginTop: "var(--space-3)", marginBottom: 0 }}>
           <div className="app-chip-group" role="group" aria-label="Tipos">
+            <span className="app-chip-group-label" aria-hidden="true">
+              Tipo
+            </span>
             {SCREEN_TYPES.map((type) => (
               <button
                 key={type}
@@ -292,9 +315,26 @@ function Screener() {
                 className="app-chip"
                 aria-pressed={form.types.includes(type)}
                 disabled={loading}
-                onClick={() => toggleType(type)}
+                onClick={() => set("types", toggle(form.types, type))}
               >
                 {ASSET_TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+          <div className="app-chip-group" role="group" aria-label="Classes ARCA">
+            <span className="app-chip-group-label" aria-hidden="true">
+              Classe ARCA
+            </span>
+            {ARCA_CLASSES.map((arca) => (
+              <button
+                key={arca}
+                type="button"
+                className="app-chip"
+                aria-pressed={form.arcaClasses.includes(arca)}
+                disabled={loading}
+                onClick={() => set("arcaClasses", toggle(form.arcaClasses, arca))}
+              >
+                {ARCA_LABELS[arca]}
               </button>
             ))}
           </div>
@@ -504,15 +544,14 @@ function Watchlist() {
                       </td>
                       <td className="app-numeric">{item.margin === null || item.margin === undefined ? "—" : pct(item.margin, 1, true)}</td>
                       <td className="app-row-actions">
-                        <button
-                          type="button"
-                          className="app-link-button"
-                          disabled={removingId === item.asset_id}
+                        <IconButton
+                          label="Remover"
+                          busyLabel="Removendo…"
+                          icon={<TrashIcon />}
+                          danger
+                          busy={removingId === item.asset_id}
                           onClick={() => void remove(item)}
-                        >
-                          {removingId === item.asset_id && <Spinner size="sm" />}
-                          <span>{removingId === item.asset_id ? "Removendo…" : "Remover"}</span>
-                        </button>
+                        />
                       </td>
                     </tr>
                   ))}

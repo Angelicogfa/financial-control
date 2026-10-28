@@ -5,10 +5,12 @@ import { api, type LedgerFilters } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import { useApi } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
-import { Async, Empty, Spinner } from "../../components/States";
+import { IconButton, IconLink } from "../../components/RowActions";
+import { Async, Empty } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, day, num, quantity } from "../../utils/format";
 import { EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
+import { EditIcon, TrashIcon } from "../../layout/icons";
 
 type TabKey = "trades" | "earnings" | "events";
 const TABS: TabSpec<TabKey>[] = [
@@ -139,20 +141,16 @@ function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
                       <td className="app-numeric">{brl(t.total_brl)}</td>
                       <td className="app-cell-wrap app-muted">{t.notes}</td>
                       <td className="app-row-actions">
-                        <Link className="app-link" to={`/ledger/trades/${t.id}/edit`}>
-                          Editar
-                        </Link>
-                        <button
-                          type="button"
-                          className="app-link-button"
-                          disabled={removingId === t.id}
+                        <IconLink to={`/ledger/trades/${t.id}/edit`} label="Editar" icon={<EditIcon />} />
+                        <IconButton
+                          label="Excluir"
+                          busyLabel="Excluindo…"
+                          icon={<TrashIcon />}
+                          danger
+                          busy={removingId === t.id}
                           onClick={() =>
-                            void remove(t.id, `a operação de ${t.ticker ?? ""} em ${day(t.trade_date)}`, () => api.ledger.deleteTrade(t.id))
-                          }
-                        >
-                          {removingId === t.id && <Spinner size="sm" />}
-                          <span>{removingId === t.id ? "Excluindo…" : "Excluir"}</span>
-                        </button>
+                            void remove(t.id, `a operação de ${t.ticker ?? ""} em ${day(t.trade_date)}`, () => api.ledger.deleteTrade(t.id))}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -209,18 +207,15 @@ function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
                       <td className="app-numeric">{num(e.withholding_tax)}</td>
                       <td className="app-numeric">{brl(e.net_amount_brl ?? e.net_amount)}</td>
                       <td className="app-row-actions">
-                        <Link className="app-link" to={`/ledger/earnings/${e.id}/edit`}>
-                          Editar
-                        </Link>
-                        <button
-                          type="button"
-                          className="app-link-button"
-                          disabled={removingId === e.id}
+                        <IconLink to={`/ledger/earnings/${e.id}/edit`} label="Editar" icon={<EditIcon />} />
+                        <IconButton
+                          label="Excluir"
+                          busyLabel="Excluindo…"
+                          icon={<TrashIcon />}
+                          danger
+                          busy={removingId === e.id}
                           onClick={() => void remove(e.id, `o provento de ${e.ticker ?? ""}`, () => api.ledger.deleteEarning(e.id))}
-                        >
-                          {removingId === e.id && <Spinner size="sm" />}
-                          <span>{removingId === e.id ? "Excluindo…" : "Excluir"}</span>
-                        </button>
+                        />
                       </td>
                     </tr>
                   ))}
@@ -268,15 +263,14 @@ function Events({ filters }: Readonly<{ filters: LedgerFilters }>) {
                       <td className="app-numeric">{e.kind === "BONUS" ? num(e.unit_cost) : "—"}</td>
                       <td>{e.imported ? "Extrato B3" : "Manual"}</td>
                       <td className="app-row-actions">
-                        <button
-                          type="button"
-                          className="app-link-button"
-                          disabled={removingId === e.id}
+                        <IconButton
+                          label="Excluir"
+                          busyLabel="Excluindo…"
+                          icon={<TrashIcon />}
+                          danger
+                          busy={removingId === e.id}
                           onClick={() => void remove(e.id, `o evento de ${e.ticker ?? ""}`, () => api.ledger.deleteEvent(e.id))}
-                        >
-                          {removingId === e.id && <Spinner size="sm" />}
-                          <span>{removingId === e.id ? "Excluindo…" : "Excluir"}</span>
-                        </button>
+                        />
                       </td>
                     </tr>
                   ))}

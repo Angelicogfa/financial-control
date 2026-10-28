@@ -74,6 +74,10 @@ def _tickers(body: dict[str, Any]) -> list[str]:
 def test_research_flow_from_screener_to_analysis(research: SimpleNamespace) -> None:
     client = research.client
 
+    # Sectors offered as filters come from the catalog.
+    sectors = client.get("/api/v1/research/sectors").json()
+    assert "Finance" in sectors and sectors == sorted(sectors, key=str.casefold)
+
     # Catalog-only filters, in volume order; funds split into FII and ETF.
     banks = client.get("/api/v1/research/screener", params={"sector": "finance"}).json()
     assert banks["catalog_size"] == 7

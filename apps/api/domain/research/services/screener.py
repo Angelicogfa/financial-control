@@ -100,6 +100,16 @@ def prefilter(
     return [item for item in catalog if _matches_catalog(item, criteria, known)]
 
 
+def catalog_sectors(catalog: Iterable[CatalogInstrument]) -> list[str]:
+    """Distinct sectors of the screenable catalog, alphabetical and case-insensitively unique."""
+    seen: dict[str, str] = {}
+    for item in catalog:
+        sector = (item.sector or "").strip()
+        if item.asset_type is not None and sector:
+            seen.setdefault(sector.casefold(), sector)
+    return sorted(seen.values(), key=str.casefold)
+
+
 def passes_fundamentals(f: Fundamentals | None, c: ScreenerCriteria) -> bool:
     """Fundamental criteria; a missing indicator fails the criterion that needs it."""
     if not c.needs_fundamentals:

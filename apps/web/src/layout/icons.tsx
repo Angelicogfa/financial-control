@@ -192,3 +192,10 @@ export const PlusIcon = (p: IconProps) => (
   </Icon>
 );
 
+
+export const BanIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m5.7 5.7 12.6 12.6" />
+  </Icon>
+);

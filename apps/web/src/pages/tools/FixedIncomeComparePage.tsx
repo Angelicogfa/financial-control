@@ -144,7 +144,7 @@ function OfferFields({
           </>
         )}
       </div>
-      {fromPortfolio && <p className="app-muted">Indexador, taxa, vencimento e isenção vêm do cadastro do ativo; o prazo conta a partir de hoje.</p>}
+      {fromPortfolio && <p className="app-card-hint">Indexador, taxa, vencimento e isenção vêm do cadastro do ativo; o prazo conta a partir de hoje.</p>}
       {onRemove && (
         <div className="app-form-actions">
           <button type="button" className="app-secondary-button" onClick={onRemove}>
