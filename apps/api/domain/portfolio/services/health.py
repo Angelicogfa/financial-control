@@ -54,6 +54,7 @@ from domain.portfolio.services.risk_metrics import (
     weighted_returns,
 )
 from domain.shared.enums import ARCA_LABELS, ArcaClass, AssetPurpose, AssetType
+from domain.shared.text import plural
 
 MIN_DRAWDOWN_OBSERVATIONS = 20
 MIN_CONSISTENCY_MONTHS = 6
@@ -475,7 +476,7 @@ def _policy_pillar(
                     title="Quadrantes dentro da banda",
                     status=HealthStatus.CRITICAL if critical else HealthStatus.WARNING,
                     value=deepest / 100.0,
-                    explanation=f"{len(parts)} quadrante(s) fora da banda:",
+                    explanation=f"{plural(len(parts), 'quadrante', 'quadrantes')} fora da banda:",
                     items=parts,
                     action=(
                         "Direcione os próximos aportes para os quadrantes abaixo da banda "
@@ -495,7 +496,8 @@ def _policy_pillar(
             status=HealthStatus.WARNING if ineligible else HealthStatus.OK,
             value=round(weight, 4),
             explanation=(
-                f"{len(ineligible)} ativo(s) fora dos critérios de elegibilidade somam "
+                f"{plural(len(ineligible), 'ativo', 'ativos')} fora dos critérios de "
+                f"elegibilidade {'soma' if len(ineligible) == 1 else 'somam'} "
                 f"{_pct(weight)} da carteira: {', '.join(h.ticker for h in ineligible)}."
                 if ineligible
                 else "Todos os ativos com peso atendem aos critérios de elegibilidade."
@@ -1301,7 +1303,8 @@ def _quality_pillar(
                 value=round(weight, 4),
                 warning_threshold=policy.max_stale_checklist_weight,
                 explanation=(
-                    f"{len(stale)} ativo(s) com respostas manuais vencidas (prazo de validade da "
+                    f"{plural(len(stale), 'ativo', 'ativos')}"
+                    f" com respostas manuais vencidas (prazo de validade da "
                     f"elegibilidade ou demonstrativo anual mais novo) somam {_pct(weight)} da "
                     "carteira" + (f": {', '.join(h.ticker for h in stale)}." if stale else ".")
                 ),
@@ -1322,7 +1325,8 @@ def _quality_pillar(
             status=HealthStatus.WARNING if suspicious else HealthStatus.OK,
             value=round(suspicious_weight, 4),
             explanation=(
-                f"{len(suspicious)} ativo(s) com indicadores fora da faixa plausível ou "
+                f"{plural(len(suspicious), 'ativo', 'ativos')}"
+                f" com indicadores fora da faixa plausível ou "
                 f"divergentes entre fontes somam {_pct(suspicious_weight)} da carteira: "
                 f"{', '.join(h.ticker for h in suspicious)}."
                 if suspicious
@@ -1362,11 +1366,13 @@ def _quality_pillar(
                 status=HealthStatus.WARNING if weak else HealthStatus.OK,
                 value=round(weight, 4),
                 explanation=(
-                    f"{len(weak)} ativo(s) com F-score até {LOW_F_SCORE} ou Z''-score abaixo de "
+                    f"{plural(len(weak), 'ativo', 'ativos')}"
+                    f" com F-score até {LOW_F_SCORE} ou Z''-score abaixo de "
                     f"{_num(Z_DISTRESS, 1)} somam {_pct(weight)} da carteira: "
                     f"{', '.join(h.ticker for h in weak)}."
                     if weak
-                    else f"{len(with_scores)} ativo(s) avaliados sem sinal de fragilidade contábil."
+                    else f"{plural(len(with_scores), 'ativo avaliado', 'ativos avaliados')}"
+                    f" sem sinal de fragilidade contábil."
                 ),
                 action=(
                     "Confira o endividamento e a geração de caixa dessas empresas."
@@ -1460,7 +1466,8 @@ def _liquidity_pillar(
             value=round(maturing, 2),
             unit=HealthUnit.BRL,
             explanation=(
-                f"{len(maturities)} título(s) vencem em 12 meses, somando {_brl(maturing)}"
+                f"{plural(len(maturities), 'título vence', 'títulos vencem')}"
+                f" em 12 meses, somando {_brl(maturing)}"
                 + (
                     f"; o primeiro é {maturities[0].ticker} em "
                     f"{maturities[0].maturity_date.strftime('%d/%m/%Y')}."
@@ -1526,7 +1533,8 @@ def _liquidity_pillar(
             unit=HealthUnit.COUNT,
             warning_threshold=float(policy.bracket_window_days),
             explanation=(
-                f"{len(window)} lote(s) mudam de faixa em até {policy.bracket_window_days} dias; "
+                f"{plural(len(window), 'lote muda', 'lotes mudam')}"
+                f" de faixa em até {policy.bracket_window_days} dias; "
                 f"esperar economiza {_brl(saving)} de IR. O próximo é {window[0].ticker} em "
                 f"{window[0].next_bracket_date.strftime('%d/%m/%Y')} "
                 f"({_pct(window[0].current_rate)} → {_pct(window[0].next_rate)})."

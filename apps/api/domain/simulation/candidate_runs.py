@@ -18,6 +18,7 @@ import numpy as np
 from domain.policy.services.assumptions import ProjectionAssumptions
 from domain.policy.services.policy import InvestmentPolicy, current_policy
 from domain.shared.enums import ArcaClass, AssetType
+from domain.shared.text import plural
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.simulation.candidates import (
     CANDIDATE_PREFIX,
@@ -478,7 +479,8 @@ def candidate_warnings(params: CandidatesParams, outcomes: Sequence[CandidateOut
     out = [
         "Candidatos para investigar, não recomendação de compra: a probabilidade de melhora "
         "vale dado o modelo e os dados até hoje.",
-        f"{len(params.candidates)} candidato(s) comparados nesta rodada (teto {MAX_CANDIDATES}): "
+        f"{plural(len(params.candidates), 'candidato comparado', 'candidatos comparados')} "
+        f"nesta rodada (teto {MAX_CANDIDATES}): "
         "com muitos candidatos, o melhor tende a ser o mais sortudo do histórico.",
     ]
     if any(o.spec.source == CandidateSource.SCREENER for o in outcomes):

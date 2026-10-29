@@ -15,6 +15,7 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { Lead, Notes } from "../../components/Section";
 import { Pagination } from "../../components/Pagination";
 import { IconButton } from "../../components/RowActions";
 import { TrashIcon } from "../../layout/icons";
@@ -23,7 +24,7 @@ import { Hint } from "../../components/Hint";
 import { MultiSelect } from "../../components/MultiSelect";
 import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points } from "../../utils/format";
+import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, plural, points } from "../../utils/format";
 import { usePagedRows } from "../../utils/pagination";
 import {
   ARCA_CLASSES,
@@ -348,13 +349,25 @@ function Screener() {
       )}
       {result && (
         <>
-          <p className="app-muted" style={{ margin: 0 }}>
-            {search.pagination.total} resultado(s) de {result.candidates} candidato(s) no catálogo de {result.catalog_size}{" "}
-            ativos{result.catalog_updated_at ? ` (atualizado em ${dateTime(result.catalog_updated_at)})` : ""}.
-            {result.truncated && " Os indicadores foram buscados só para os mais líquidos: refine os filtros para ver outros."}
-            {result.arca_classes && result.arca_classes.length > 0 &&
-              ` Classes abaixo da banda: ${result.arca_classes.map((c) => ARCA_LABELS[c]).join(", ")}.`}
-          </p>
+          <Lead tone={search.pagination.total === 0 ? "caution" : "neutral"}>
+            <p>
+              {plural(search.pagination.total, "ativo passou", "ativos passaram")} pelos filtros, de{" "}
+              {plural(result.candidates, "candidato", "candidatos")} num catálogo de {num(result.catalog_size, 0)} ativos
+              {result.arca_classes && result.arca_classes.length > 0
+                ? `; as classes abaixo da banda são ${result.arca_classes.map((c) => ARCA_LABELS[c]).join(", ")}`
+                : ""}
+              .
+            </p>
+            <p className="app-meta">
+              {result.catalog_updated_at ? `Catálogo atualizado em ${dateTime(result.catalog_updated_at)}.` : ""}
+            </p>
+          </Lead>
+          {result.truncated && (
+            <Notes
+              tone="caution"
+              items={["Os indicadores foram buscados só para os mais líquidos: refine os filtros para ver outros."]}
+            />
+          )}
           {result.catalog_size === 0 ? (
             <Empty
               title="Catálogo vazio"
@@ -679,7 +692,7 @@ function TreasuryScreener() {
       {result && !result.unavailable_reason && (
         <>
           <p className="app-muted" style={{ margin: 0 }}>
-            {result.results.length} título(s) encontrado(s) no catálogo do Tesouro Transparente
+            {plural(result.results.length, "título encontrado", "títulos encontrados")} no catálogo do Tesouro Transparente
             {result.catalog_size ? ` (${result.catalog_size} títulos vigentes)` : ""}
             {result.catalog_updated_at ? ` · atualizado em ${dateTime(result.catalog_updated_at)}` : ""}.
           </p>

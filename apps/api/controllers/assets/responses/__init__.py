@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -202,3 +202,27 @@ class AssetAnalysisResponseDTO(BaseModel):
     risk_return: RiskReturnSummaryDTO
     benchmark: str
     price_history: list[dict[str, Any]]
+
+
+PriceRange = Literal["6mo", "1y", "2y", "5y", "max"]
+
+
+class PricePointDTO(BaseModel):
+    date: date
+    close: float
+
+
+class DatedPriceDTO(BaseModel):
+    date: date
+    price: float
+
+
+class AssetPriceHistoryDTO(BaseModel):
+    """Closes of one period for the chart (at most 500 points) and its summary."""
+
+    range: PriceRange
+    points: list[PricePointDTO]
+    change: float | None = None
+    high: DatedPriceDTO | None = None
+    low: DatedPriceDTO | None = None
+    dropped_spikes: int = 0

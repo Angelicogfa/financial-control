@@ -423,8 +423,12 @@ describe("ProjectionView", () => {
     render(<ProjectionView data={projection()} run={projectionRun} />);
     expect(screen.getByText("Simulação, não recomendação: teste.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Juros na premissa" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("72%")).toBeInTheDocument();
-    expect(screen.getByText("(64% a 80%)")).toBeInTheDocument();
+    const goal = screen.getByRole("heading", { name: /Meta de patrimônio/ }).closest("div") as HTMLElement;
+    expect(within(goal).getByText("72%")).toBeInTheDocument();
+    expect(within(goal).getByText("(64% a 80%)")).toBeInTheDocument();
+    // The lead and the indicators come first.
+    expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(/chance de chegar à meta .* é de 72%/);
+    expect(within(screen.getByLabelText("Indicadores da projeção")).getByText("72%")).toBeInTheDocument();
     expect(screen.getByText(/Por gerador: Bootstrap em blocos 80% · Normal bayesiana 64%/)).toBeInTheDocument();
     const others = screen.getByRole("list", { name: "Outras chances" });
     expect(within(others).getByText(/Perder mais de 10% nos primeiros 12 meses/)).toHaveTextContent("8% (6% a 11%)");
@@ -560,7 +564,7 @@ describe("SimulationPage confidence tab", () => {
     renderAt("/tools/simulation?tab=confidence");
     expect(await screen.findByText("Ainda não há calibração")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Recalcular agora" }));
-    expect(await screen.findByText(/Calibração na fila do worker/)).toBeInTheDocument();
+    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Recalcular agora/ })).toBeDisabled();
     expect(last(calls, "POST", "/simulations/calibrations")).toBeDefined();
   });

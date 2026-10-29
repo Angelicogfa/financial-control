@@ -6,9 +6,10 @@ import type { ArcaClass, PortfolioReportResponseDTO, ValuedPositionDTO } from ".
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { KpiGrid, Lead, Notes, Section, type Tone } from "../../components/Section";
 import { Async, Empty } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brl, money, points, quantity } from "../../utils/format";
+import { brl, money, plural, points, quantity } from "../../utils/format";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -30,6 +31,67 @@ const TABS: TabSpec<ClassTab>[] = [
 function isPosition(p: ValuedPositionDTO): boolean {
   return p.quantity > 0 || p.invested_value_brl > 0 || p.ledger_status === "INVALID";
 }
+
+/** The portfolio in words: size, result and the class furthest from its target. */
+export function portfolioStory(report: PortfolioReportResponseDTO, onlyClass: ClassTab): { tone: Tone; text: string } {
+  const held = report.positions.filter(isPosition);
+  if (onlyClass !== "ALL") {
+    const a = report.allocations.find((x) => x.arca_class === onlyClass);
+    const count = held.filter((p) => p.arca_class === onlyClass).length;
+    if (!a) return { tone: "neutral", text: `Nenhuma posição em ${ARCA_LABELS[onlyClass]}.` };
+    const band =
+      a.band_status === "BELOW" ? " Está abaixo da banda: recebe os próximos aportes." : a.band_status === "ABOVE" ? " Está acima da banda: fica fora dos próximos aportes." : " Está dentro da banda.";
+    return {
+      tone: a.band_status === "WITHIN" || !a.band_status ? "neutral" : "caution",
+      text: `${a.label} soma ${brl(a.current_value)} em ${plural(count, "ativo", "ativos")}, ${points(a.current_pct)} da carteira para uma meta de ${points(a.target_pct, 0)}.${band}`,
+    };
+  }
+  const off = report.allocations
+    .filter((a) => a.band_status === "BELOW" || a.band_status === "ABOVE")
+    .sort((x, y) => Math.abs(y.deviation_pct) - Math.abs(x.deviation_pct));
+  const result = report.total_consolidated_pnl_brl;
+  let text = `A carteira vale ${brl(report.total_current_value_brl)} em ${plural(held.length, "posição", "posições")}, com resultado consolidado de ${brl(result)} (${points(report.total_consolidated_return_pct, 1, true)}).`;
+  if (off.length > 0) {
+    const worst = off[0];
+    text += ` ${worst.label} está ${worst.band_status === "BELOW" ? "abaixo" : "acima"} da banda: ${points(worst.current_pct)} contra a meta de ${points(worst.target_pct, 0)}.`;
+  } else {
+    text += " Todas as classes estão dentro da banda.";
+  }
+  return { tone: off.length > 0 ? "caution" : result >= 0 ? "positive" : "negative", text };
+}
+
+function PortfolioSummary({ report, onlyClass }: Readonly<{ report: PortfolioReportResponseDTO; onlyClass: ClassTab }>) {
+  const story = portfolioStory(report, onlyClass);
+  return (
+    <>
+      <Lead tone={story.tone}>
+        <p>{story.text}</p>
+      </Lead>
+      {onlyClass === "ALL" && (
+        <KpiGrid
+          label="Indicadores da carteira"
+          items={[
+            { label: "Valor atual", value: brl(report.total_current_value_brl), note: `Investido ${brl(report.total_invested_brl)}` },
+            {
+              label: "Resultado consolidado",
+              value: brl(report.total_consolidated_pnl_brl),
+              tone: report.total_consolidated_pnl_brl >= 0 ? "positive" : "negative",
+              note: points(report.total_consolidated_return_pct, 1, true),
+            },
+            { label: "Proventos em 12 meses", value: brl(report.total_earnings_12m_brl) },
+            { label: "IR estimado", value: brl(report.total_estimated_tax_brl), note: "Se vendesse tudo hoje" },
+          ]}
+        />
+      )}
+    </>
+  );
+}
+
+const PORTFOLIO_NOTES = [
+  "O resultado consolidado soma a variação do preço, as vendas realizadas e os proventos recebidos.",
+  "Peso atual / alvo é o peso do ativo dentro da própria classe; a meta da classe fica na linha do grupo.",
+  "Preços com selo vieram do cache ou de uma fonte alternativa, e não da cotação do dia.",
+];
 
 function checklistCell(p: ValuedPositionDTO) {
   const evaluation = p.cerrado_evaluation;
@@ -138,9 +200,10 @@ function Composition({ report, arcaClass }: Readonly<{ report: PortfolioReportRe
   if (positions.length === 0) return null;
   const scale = Math.max(...positions.map((p) => Math.max(p.class_current_weight_pct, p.class_target_weight_pct)), 1) * 1.1;
   return (
-    <section className="app-card app-card-padded">
-      <h2 className="app-card-heading">Composição de {ARCA_LABELS[arcaClass]}</h2>
-      <p className="app-card-hint">Peso de cada ativo dentro da classe; o traço é o peso alvo pela estratégia da classe.</p>
+    <Section
+      title={`Composição de ${ARCA_LABELS[arcaClass]}`}
+      subtitle="Peso de cada ativo dentro da classe; o traço é o peso alvo pela estratégia da classe."
+    >
       <BarList
         label={`Peso dos ativos em ${ARCA_LABELS[arcaClass]}`}
         bars={positions.map((p) => ({
@@ -151,7 +214,7 @@ function Composition({ report, arcaClass }: Readonly<{ report: PortfolioReportRe
           value: `${points(p.class_current_weight_pct)} · alvo ${points(p.class_target_weight_pct)}`,
         }))}
       />
-    </section>
+    </Section>
   );
 }
 
@@ -194,9 +257,11 @@ export function PortfolioPage() {
         {(data) =>
           data.positions.some(isPosition) ? (
             <div className="app-page-stack">
+              <PortfolioSummary report={data} onlyClass={tab} />
               {tab !== "ALL" && <Composition report={data} arcaClass={tab} />}
               <PositionsTable report={data} onlyClass={tab} />
               {(tab === "ALL" || tab === "CAIXA") && <TreasuryMarketPanel />}
+              <Notes items={PORTFOLIO_NOTES} />
             </div>
           ) : (
             <Empty title="Nenhuma posição ainda" hint="Registre compras em Lançamentos ou importe o extrato da B3.">

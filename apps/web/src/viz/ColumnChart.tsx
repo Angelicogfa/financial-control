@@ -1,10 +1,11 @@
 import { useId, useState } from "react";
 
+import { useChartWidth } from "./useChartWidth";
+
 /** Vertical columns per period (earnings per month, revenue per year). The hovered value is
  *  read in text below; the largest and the last are labeled on the chart. */
 
-const WIDTH = 720;
-const HEIGHT = 180;
+const HEIGHT = 200;
 const PAD = { top: 18, right: 12, bottom: 24, left: 12 };
 
 export interface Column {
@@ -19,6 +20,7 @@ export function ColumnChart({
   format,
 }: Readonly<{ title: string; columns: Column[]; hint: string; format: (value: number) => string }>) {
   const titleId = useId();
+  const [ref, WIDTH] = useChartWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
   if (columns.length === 0) return null;
 
@@ -29,9 +31,11 @@ export function ColumnChart({
   const largest = columns.reduce((best, c, i) => (Math.abs(c.value) > Math.abs(columns[best].value) ? i : best), 0);
 
   return (
-    <div className="viz-grafico">
+    <div className="viz-grafico" ref={ref}>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width={WIDTH}
+        height={HEIGHT}
         className="viz-svg"
         role="img"
         aria-labelledby={titleId}

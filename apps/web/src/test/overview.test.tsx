@@ -65,6 +65,10 @@ describe("home (analytics)", () => {
     expect(await screen.findByText(/Real Estate está abaixo da banda/)).toBeInTheDocument();
     expect(screen.getByText("Patrimônio")).toBeInTheDocument();
     expect(screen.getByTitle(/^R\$\s5\.000,00$/)).toBeInTheDocument(); // full value, not "mil"
+    // Under the total: what trades in Brazil and what is abroad, each with its rise or fall.
+    const split = within(screen.getByLabelText("Patrimônio por mercado"));
+    expect(split.getByText("Bolsa")).toBeInTheDocument();
+    expect(split.getAllByText(/(alta|queda) de .* sobre o investido/).length).toBeGreaterThan(0);
     expect(await screen.findByText("+5,0%")).toBeInTheDocument(); // TWR from the base-100 curve
     expect(screen.getByText("CDI no período: 0,1%")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Peso atual de cada classe contra a meta" })).toBeInTheDocument();

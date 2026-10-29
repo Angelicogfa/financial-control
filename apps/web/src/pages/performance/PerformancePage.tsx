@@ -5,8 +5,9 @@ import type { PortfolioAnalyticsResponseDTO, PortfolioReportResponseDTO } from "
 import { useApi } from "../../api/useApi";
 import { Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { KpiGrid, Lead, Notes, Section, Segmented, type Tone } from "../../components/Section";
 import { Async, Empty } from "../../components/States";
-import { brl, brlCompact, daysAgo, monthLabel, num, pct, points } from "../../utils/format";
+import { brl, brlCompact, daysAgo, monthLabel, num, pct, plural, points } from "../../utils/format";
 import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart } from "../../viz/TrendChart";
 import { alignCurves, curveReturn, lastMonths } from "../home/story";
@@ -41,6 +42,28 @@ const CLASS_BENCHMARK: Record<string, string> = {
   CAIXA: "CDI",
   ATIVOS_INTERNACIONAIS: "SP500",
 };
+
+/** The period in words: return, the gap to the CDI and the worst fall. */
+export function performanceStory(analytics: PortfolioAnalyticsResponseDTO, period: string): { tone: Tone; text: string } {
+  const s = analytics.summary;
+  const cdi = s.benchmarks.find((b) => b.benchmark === "CDI");
+  const best = [...s.benchmarks].sort((a, b) => (b.benchmark_return ?? 0) - (a.benchmark_return ?? 0))[0];
+  const excess = cdi?.excess_return ?? null;
+  let text = `Em ${period}, a carteira rendeu ${pct(s.cumulative_return, 1, true)}`;
+  if (excess !== null) text += `, ${pct(Math.abs(excess), 1)} ${excess >= 0 ? "acima" : "abaixo"} do CDI`;
+  text += `, com queda máxima de ${pct(s.max_drawdown, 1)}.`;
+  if (best && best.benchmark !== "CDI") {
+    text += ` A referência mais forte foi ${LABELS[best.benchmark] ?? best.benchmark} (${pct(best.benchmark_return, 1, true)}).`;
+  }
+  const tone: Tone = excess === null ? "neutral" : excess >= 0 ? "positive" : "negative";
+  return { tone, text };
+}
+
+const PERFORMANCE_NOTES = [
+  "O retorno é ponderado pelo tempo (TWR): aportes e resgates não inflam nem reduzem o resultado.",
+  "Volatilidade, VaR e CVaR vêm dos retornos diários do período; períodos curtos dão números instáveis.",
+  "O resultado por classe é consolidado desde o primeiro lançamento; a referência ao lado é só do período escolhido.",
+];
 
 function dayLabel(iso: string): string {
   return iso.split("-").reverse().join("/");
@@ -125,11 +148,10 @@ function EarningsByMonth({ report }: Readonly<{ report: PortfolioReportResponseD
   const months = lastMonths(report.earnings_by_month);
   const total12 = months.reduce((sum, [, v]) => sum + v, 0);
   return (
-    <section className="app-card app-card-padded">
-      <h2 className="app-card-heading">Proventos por mês</h2>
-      <p className="app-card-hint">
-        Últimos 12 meses: {brl(total12)} líquidos · yield on cost {points(report.portfolio_yield_on_cost_pct, 1)}.
-      </p>
+    <Section
+      title="Proventos por mês"
+      subtitle={`Últimos 12 meses: ${brl(total12)} líquidos · yield on cost ${points(report.portfolio_yield_on_cost_pct, 1)}.`}
+    >
       {total12 > 0 ? (
         <ColumnChart
           title={`Proventos recebidos por mês, total de ${brl(total12)} em 12 meses`}
@@ -140,14 +162,15 @@ function EarningsByMonth({ report }: Readonly<{ report: PortfolioReportResponseD
       ) : (
         <p className="app-muted">Nenhum provento nos últimos 12 meses.</p>
       )}
-    </section>
+    </Section>
   );
 }
 
 function Content({
   analytics,
   report,
-}: Readonly<{ analytics: PortfolioAnalyticsResponseDTO; report: PortfolioReportResponseDTO | null }>) {
+  period,
+}: Readonly<{ analytics: PortfolioAnalyticsResponseDTO; report: PortfolioReportResponseDTO | null; period: string }>) {
   const aligned = alignCurves(analytics.curves, SERIES);
   const portfolio = analytics.curves.PORTFOLIO ?? [];
   const drawdown = analytics.summary.drawdown_curve;
@@ -156,17 +179,41 @@ function Content({
       ? portfolio.slice(1).map((p) => dayLabel(String(p.date)))
       : drawdown.map((_, i) => String(i + 1));
   const insufficient = analytics.status !== "OK";
+  const story = performanceStory(analytics, period);
+  const s = analytics.summary;
 
   return (
     <div className="app-page-stack">
-      {insufficient && (
-        <div className="app-info-banner">
-          Histórico insuficiente para medir a carteira ({analytics.available_points ?? 0} retrato(s) diário(s) no
-          período). As referências aparecem abaixo; a carteira entra quando houver ao menos três retratos.
-        </div>
+      {insufficient ? (
+        <Lead tone="caution">
+          <p>
+            Histórico insuficiente para medir a carteira (
+            {plural(analytics.available_points ?? 0, "retrato diário", "retratos diários")} no período). As referências
+            aparecem abaixo; a carteira entra quando houver ao menos três retratos.
+          </p>
+        </Lead>
+      ) : (
+        <>
+          <Lead tone={story.tone}>
+            <p>{story.text}</p>
+          </Lead>
+          <KpiGrid
+            label="Indicadores do período"
+            items={[
+              {
+                label: "Retorno (TWR)",
+                value: pct(s.cumulative_return, 1, true),
+                tone: (s.cumulative_return ?? 0) >= 0 ? "positive" : "negative",
+              },
+              { label: "Acima do IPCA", value: pct(s.real_return_vs_ipca, 1, true), note: "Retorno real" },
+              { label: "Volatilidade anual", value: pct(s.annualized_volatility, 1) },
+              { label: "Queda máxima", value: pct(s.max_drawdown, 1), tone: "negative" },
+              { label: "Sharpe", value: num(s.sharpe_ratio, 2), note: "Retorno acima do CDI por risco" },
+            ]}
+          />
+        </>
       )}
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Base 100</h2>
+      <Section title="Carteira e referências" subtitle="Base 100 no início do período.">
         {aligned.labels.length >= 2 ? (
           <TrendChart
             title="Carteira e referências em base 100 no período"
@@ -183,16 +230,14 @@ function Content({
         ) : (
           <Empty title="Sem séries no período" hint="Sincronize os dados de mercado em Configuração." />
         )}
-      </section>
+      </Section>
 
       {!insufficient && (
         <div className="app-split">
-          <section>
-            <h2 className="app-card-heading">Risco e retorno</h2>
+          <Section title="Risco e retorno">
             <RiskTable analytics={analytics} />
-          </section>
-          <section>
-            <h2 className="app-card-heading">Contra as referências</h2>
+          </Section>
+          <Section title="Contra as referências" subtitle="Excesso é o retorno da carteira menos o da referência.">
             <div className="app-table-wrap">
               <table className="app-table">
                 <thead>
@@ -227,13 +272,12 @@ function Content({
                 </tbody>
               </table>
             </div>
-          </section>
+          </Section>
         </div>
       )}
 
       {!insufficient && drawdown.length >= 2 && (
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Quedas a partir do topo</h2>
+        <Section title="Quedas a partir do topo" subtitle="Distância de cada dia até o maior valor já atingido.">
           <TrendChart
             title={`Drawdown da carteira; pior queda de ${pct(analytics.summary.max_drawdown, 1)}`}
             labels={drawdownLabels}
@@ -244,21 +288,17 @@ function Content({
               { key: "dd", label: "Queda", color: "var(--viz-negative)", values: drawdown.map((v) => v * 100) },
             ]}
           />
-        </section>
+        </Section>
       )}
 
       {report && (
-        <section>
-          <h2 className="app-card-heading">Por classe</h2>
-          <p className="app-card-hint">
-            Resultado consolidado de cada classe desde o primeiro lançamento, ao lado do retorno da referência da classe
-            no período escolhido.
-          </p>
+        <Section title="Por classe" subtitle="Resultado de cada classe ao lado da referência da classe no período.">
           <ClassTable report={report} analytics={analytics} />
-        </section>
+        </Section>
       )}
 
       {report && <EarningsByMonth report={report} />}
+      <Notes items={PERFORMANCE_NOTES} />
     </div>
   );
 }
@@ -267,6 +307,7 @@ export function PerformancePage() {
   const [period, setPeriod] = useState<PeriodKey>("12m");
   const days = PERIODS.find((p) => p.key === period)?.days ?? 365;
   const since = daysAgo(days);
+  const periodText = period === "all" ? "todo o histórico" : (PERIODS.find((p) => p.key === period)?.label ?? "");
   const analytics = useApi(`performance-${since}`, () => api.portfolio.analytics(since));
   const report = useApi("performance-report", () => api.portfolio.report());
 
@@ -276,17 +317,16 @@ export function PerformancePage() {
         title="Desempenho"
         subtitle="Rentabilidade da carteira no tempo, risco e comparação com as referências."
         actions={
-          <div className="app-segmented" role="group" aria-label="Período">
-            {PERIODS.map((p) => (
-              <button key={p.key} type="button" aria-pressed={period === p.key} onClick={() => setPeriod(p.key)}>
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            options={PERIODS.map((p) => [p.key, p.label] as [PeriodKey, string])}
+            value={period}
+            onChange={setPeriod}
+            label="Período"
+          />
         }
       />
       <Async state={analytics} lines={6}>
-        {(data) => <Content analytics={data} report={report.data} />}
+        {(data) => <Content analytics={data} report={report.data} period={periodText} />}
       </Async>
     </div>
   );

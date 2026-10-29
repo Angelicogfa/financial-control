@@ -1,12 +1,17 @@
 import { useId, useState } from "react";
 
+import { niceTicks, spreadLabels, useChartWidth } from "./useChartWidth";
+
 /** Lines over time, one per series, labeled at the end, with the value of the hovered
  *  point read in text below the chart. Missing points (null) break the line. Optional bands
- *  shade the area between two value lists (e.g. a percentile fan) behind the lines. */
+ *  shade the area between two value lists (e.g. a percentile fan) behind the lines.
+ *  Drawn at the container's pixel width, so the text keeps its size on any screen. */
 
-const WIDTH = 720;
-const HEIGHT = 220;
-const PAD = { top: 14, right: 130, bottom: 26, left: 52 };
+const HEIGHT = 260;
+const PAD = { top: 16, bottom: 30, left: 64 };
+const LABEL_WIDTH = 150;
+const LABEL_GAP = 28; // two lines (name and value) per end label
+const X_TICKS = 5;
 
 export interface TrendSeries {
   key: string;
@@ -28,6 +33,7 @@ export function TrendChart({
   series,
   hint,
   format = (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
+  compact,
   baseline,
   bands = [],
 }: Readonly<{
@@ -36,14 +42,19 @@ export function TrendChart({
   labels: string[];
   series: TrendSeries[];
   hint: string;
+  /** Full value, read under the chart for the hovered point. */
   format?: (value: number) => string;
+  /** Short value for the axis and the end labels (e.g. "R$ 2,1 mi"); defaults to `format`. */
+  compact?: (value: number) => string;
   /** A reference line (e.g. 100 on a base-100 chart). */
   baseline?: number;
   /** Shaded areas between `low` and `high`, drawn under the lines. */
   bands?: TrendBand[];
 }>) {
   const titleId = useId();
+  const [ref, width] = useChartWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
+  const short = compact ?? format;
   const known = [
     ...series.flatMap((s) => s.values.filter((v): v is number => v !== null)),
     ...bands.flatMap((b) => [...b.low, ...b.high]),
@@ -52,14 +63,19 @@ export function TrendChart({
 
   const rawLow = Math.min(...known, baseline ?? Infinity);
   const rawHigh = Math.max(...known, baseline ?? -Infinity);
-  const padding = (rawHigh - rawLow) * 0.08 || Math.abs(rawHigh) * 0.05 || 1;
-  const low = rawLow - padding;
-  const high = rawHigh + padding;
-  const usableX = WIDTH - PAD.left - PAD.right;
+  const padding = (rawHigh - rawLow) * 0.06 || Math.abs(rawHigh) * 0.05 || 1;
+  const ticks = niceTicks(rawLow - padding, rawHigh + padding);
+  const low = Math.min(rawLow - padding, ticks[0] ?? rawLow);
+  const high = Math.max(rawHigh + padding, ticks[ticks.length - 1] ?? rawHigh);
+  const right = width - LABEL_WIDTH;
+  const usableX = right - PAD.left;
   const usableY = HEIGHT - PAD.top - PAD.bottom;
   const x = (i: number) => PAD.left + (usableX * i) / (labels.length - 1);
   const y = (value: number) => PAD.top + usableY - ((value - low) / (high - low)) * usableY;
   const last = labels.length - 1;
+  const xTicks = Array.from(
+    new Set(Array.from({ length: Math.min(X_TICKS, labels.length) }, (_, k) => Math.round((last * k) / Math.max(1, Math.min(X_TICKS, labels.length) - 1)))),
+  );
 
   const pathOf = (values: Array<number | null>) => {
     let started = false;
@@ -81,29 +97,36 @@ export function TrendChart({
       const index = s.values.map((v, i) => (v === null ? -1 : i)).reduce((a, b) => Math.max(a, b), -1);
       return { s, index, value: index >= 0 ? (s.values[index] as number) : null };
     })
-    .filter((e) => e.value !== null)
-    .sort((a, b) => (b.value as number) - (a.value as number));
+    .filter((e): e is { s: TrendSeries; index: number; value: number } => e.value !== null);
+  const labelY = spreadLabels(
+    ends.map((e) => y(e.value) - 4),
+    LABEL_GAP,
+    PAD.top + 8,
+    HEIGHT - PAD.bottom - 12,
+  );
 
   return (
-    <div className="viz-grafico">
+    <div className="viz-grafico" ref={ref}>
       <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        viewBox={`0 0 ${width} ${HEIGHT}`}
+        width={width}
+        height={HEIGHT}
         className="viz-svg"
         role="img"
         aria-labelledby={titleId}
         onMouseLeave={() => setActive(null)}
       >
         <title id={titleId}>{title}</title>
-        {[low + (high - low) * 0.1, (low + high) / 2, high - (high - low) * 0.1].map((tick) => (
+        {ticks.map((tick) => (
           <g key={tick}>
-            <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(tick)} y2={y(tick)} className="viz-grade" />
+            <line x1={PAD.left} x2={right} y1={y(tick)} y2={y(tick)} className="viz-grade" />
             <text x={PAD.left - 8} y={y(tick) + 4} className="viz-tick" textAnchor="end">
-              {format(tick)}
+              {short(tick)}
             </text>
           </g>
         ))}
         {baseline !== undefined && (
-          <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(baseline)} y2={y(baseline)} className="viz-base" />
+          <line x1={PAD.left} x2={right} y1={y(baseline)} y2={y(baseline)} className="viz-base" />
         )}
         {bands.map((b) => (
           <path
@@ -128,31 +151,23 @@ export function TrendChart({
             strokeLinecap="round"
           />
         ))}
-        {ends.map((end, i) => {
-          const natural = y(end.value as number) + 4;
-          const above = i > 0 ? y(ends[i - 1].value as number) + 4 : -Infinity;
-          return (
-            <g key={end.s.key}>
-              <circle
-                cx={x(end.index)}
-                cy={y(end.value as number)}
-                r={4}
-                fill={end.s.color}
-                stroke="var(--viz-surface)"
-                strokeWidth={2}
-              />
-              <text x={WIDTH - PAD.right + 12} y={Math.max(natural, above + 14)} className="viz-direct-label">
-                {end.s.label} {format(end.value as number)}
-              </text>
-            </g>
-          );
-        })}
+        {ends.map((end, i) => (
+          <g key={end.s.key}>
+            <circle cx={x(end.index)} cy={y(end.value)} r={4} fill={end.s.color} stroke="var(--viz-surface)" strokeWidth={2} />
+            <text x={right + 12} y={labelY[i]} className="viz-direct-label">
+              {end.s.label}
+            </text>
+            <text x={right + 12} y={labelY[i] + 13} className="viz-direct-value">
+              {short(end.value)}
+            </text>
+          </g>
+        ))}
         {labels.map((label, i) => (
           <rect
             key={`${label}-${i}`}
-            x={x(i) - usableX / (labels.length - 1) / 2}
+            x={x(i) - usableX / last / 2}
             y={PAD.top}
-            width={usableX / (labels.length - 1)}
+            width={usableX / last}
             height={usableY}
             fill="transparent"
             onMouseEnter={() => setActive(i)}
@@ -161,12 +176,18 @@ export function TrendChart({
         {active !== null && (
           <line x1={x(active)} x2={x(active)} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="viz-cursor" />
         )}
-        <text x={PAD.left} y={HEIGHT - 6} className="viz-tick">
-          {labels[0]}
-        </text>
-        <text x={x(last)} y={HEIGHT - 6} className="viz-tick" textAnchor="end">
-          {labels[last]}
-        </text>
+        <line x1={PAD.left} x2={right} y1={HEIGHT - PAD.bottom} y2={HEIGHT - PAD.bottom} className="viz-axis" />
+        {xTicks.map((i) => (
+          <text
+            key={i}
+            x={x(i)}
+            y={HEIGHT - 10}
+            className="viz-tick"
+            textAnchor={i === 0 ? "start" : i === last ? "end" : "middle"}
+          >
+            {labels[i]}
+          </text>
+        ))}
       </svg>
       <div className="viz-tooltip" role="status">
         {active !== null ? (

@@ -38,6 +38,35 @@ export function patrimonyChange(
   return { value: (currentValue - flows) / base.market_value - 1, days: elapsed };
 }
 
+export interface MarketSplit {
+  key: "B3" | "INTERNATIONAL";
+  label: string;
+  value: number;
+  invested: number;
+  pnl: number;
+  /** Consolidated result over the invested amount; null when nothing was invested. */
+  change: number | null;
+  share: number;
+}
+
+const B3_CLASSES = new Set(["CAIXA", "ACOES", "REAL_ESTATE"]);
+
+/** The portfolio split between what trades in Brazil (Caixa, Ações, Real Estate) and abroad. */
+export function marketSplit(allocations: ClassAllocationDTO[]): MarketSplit[] {
+  const total = allocations.reduce((sum, a) => sum + a.current_value, 0);
+  const group = (key: MarketSplit["key"], label: string, test: (a: ClassAllocationDTO) => boolean): MarketSplit => {
+    const items = allocations.filter(test);
+    const value = items.reduce((sum, a) => sum + a.current_value, 0);
+    const invested = items.reduce((sum, a) => sum + a.invested_value, 0);
+    const pnl = items.reduce((sum, a) => sum + a.consolidated_pnl, 0);
+    return { key, label, value, invested, pnl, change: invested > 0 ? pnl / invested : null, share: total > 0 ? value / total : 0 };
+  };
+  return [
+    group("B3", "Bolsa", (a) => B3_CLASSES.has(a.arca_class)),
+    group("INTERNATIONAL", "Internacional", (a) => !B3_CLASSES.has(a.arca_class)),
+  ];
+}
+
 export function belowBand(allocations: ClassAllocationDTO[]): ClassAllocationDTO[] {
   return allocations
     .filter((a) => a.band_status === "BELOW")

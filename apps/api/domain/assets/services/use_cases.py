@@ -11,7 +11,10 @@ from controllers.assets.requests import AssetCreateRequest, AssetUpdateRequest, 
 from controllers.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
+    AssetPriceHistoryDTO,
     AssetResponseDTO,
+    DatedPriceDTO,
+    PricePointDTO,
 )
 from controllers.assets.serializers import to_asset_analysis_dto, to_asset_dto
 from controllers.shared.dependencies import UoWFactory
@@ -21,6 +24,7 @@ from core.errors import ConflictError, NotFoundError, ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.assets.services.codes import CODE_ASSET_TYPES, generated_asset_code
 from domain.assets.services.etf_exposure import suggest_arca_class
+from domain.market.services.price_chart import PRICE_RANGES
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AssetEntity, ChecklistAnswer, FixedIncomeTermEntity
 from domain.shared.enums import AssetLifecycle, AssetType
@@ -227,6 +231,23 @@ class AssetHandler:
             raw = self.portfolio_service.analyze_single_asset(uow, asset)
             payload = to_asset_analysis_dto(asset, raw)
             return AssetAnalysisResponseDTO(**payload)
+
+    def get_prices(self, asset_id: int, range_period: str) -> AssetPriceHistoryDTO:
+        if range_period not in PRICE_RANGES:
+            raise ValidationError(f"range must be one of {', '.join(PRICE_RANGES)}")
+        with self.uow_factory() as uow:
+            asset = uow.assets.get_by_id(asset_id)
+            if asset is None:
+                raise NotFoundError(f"Asset id={asset_id} not found")
+        chart = self.portfolio_service.price_chart(asset, range_period)
+        return AssetPriceHistoryDTO(
+            range=range_period,
+            points=[PricePointDTO(date=d, close=c) for d, c in chart.points],
+            change=chart.change,
+            high=DatedPriceDTO(date=chart.high[0], price=chart.high[1]) if chart.high else None,
+            low=DatedPriceDTO(date=chart.low[0], price=chart.low[1]) if chart.low else None,
+            dropped_spikes=chart.dropped_spikes,
+        )
 
 
 def _with_lifecycle(

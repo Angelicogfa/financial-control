@@ -12,7 +12,9 @@ from controllers.assets.requests import AssetCreateRequest, AssetUpdateRequest, 
 from controllers.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
+    AssetPriceHistoryDTO,
     AssetResponseDTO,
+    PriceRange,
 )
 from controllers.shared.dependencies import pagination_query
 from controllers.shared.responses import PaginatedResponse
@@ -102,3 +104,12 @@ def get_asset_analysis(
     handler: AssetHandler = Depends(get_asset_handler),
 ) -> AssetAnalysisResponseDTO:
     return handler.get_analysis(asset_id)
+
+
+@assets_router.get("/{asset_id}/prices", response_model=AssetPriceHistoryDTO)
+def get_asset_prices(
+    asset_id: int,
+    range_period: PriceRange = Query(default="1y", alias="range"),
+    handler: AssetHandler = Depends(get_asset_handler),
+) -> AssetPriceHistoryDTO:
+    return handler.get_prices(asset_id, range_period)

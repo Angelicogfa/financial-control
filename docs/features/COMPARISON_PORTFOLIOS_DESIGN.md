@@ -1,6 +1,6 @@
 # Carteiras de Comparação com o Seu Fluxo de Aportes — Proposta e Teste de Estresse
 
-*Status: proposta para revisão, nenhuma linha de código. Data: 2026-10-29. Fase proposta: 35 (ver [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md)). Reaproveita o motor da Fase 33. A Fase 34 (otimização da composição) vira uma das estratégias, e os dados da CVM (Fase 28 e extensão) dão os fundamentos com data de publicação.*
+*Status: proposta para revisão, nenhuma linha de código. Data: 2026-10-29. Fase proposta: 36 (ver [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md)). Reaproveita o motor da Fase 33. A Fase 34 (otimização da composição) vira uma das estratégias, e os dados da CVM (Fase 28 e extensão) dão os fundamentos com data de publicação.*
 
 A ferramenta cria **N carteiras de comparação**. Cada uma segue uma estratégia de regras fixas sobre a base de ativos e recebe **os mesmos aportes e resgates que você fez, nas mesmas datas e nos mesmos valores**. Todas são acompanhadas dia a dia contra a sua carteira real. O histórico delas é também um conjunto de dados para os modelos da Fase 33 entenderem o que explica cada comportamento. A seção 8 ataca a proposta, porque comparar muitas estratégias de uma vez é um dos jeitos mais fáceis de achar uma "vencedora" que só teve sorte.
 
@@ -113,19 +113,19 @@ Nova tela **Comparar carteiras** (Visão geral ou Ferramentas, decisão 9):
   - `comparison_trades`: operações simuladas, para o detalhe e a auditoria.
 - **Worker:** rotina diária `update_comparison_portfolios` depois de `record_daily_snapshot`. Ela aplica o fluxo novo do dia, reconstitui as carteiras quando é a data e grava os retratos. O retroativo roda uma vez na criação, na fila das simulações, com limite de tempo.
 
-## 10. Entregas em etapas (Fase 35)
+## 10. Entregas em etapas (Fase 36)
 
 | Etapa | Entrega | Critério de aceite |
 |---|---|---|
-| 35.0 | Decisões da seção 11 tomadas e esta proposta aprovada | Revisão do usuário |
-| 35.1 | Fluxo espelhado a partir dos lançamentos (alcance ARCA ou total) | O fluxo reconstruído bate com o `net_flow` dos retratos |
-| 35.2 | Motor por eventos com valorização diária, lotes, custos, IR e proventos | Verdade conhecida: a estratégia que replica a sua carteira reproduz a sua curva, a menos de custos e arredondamento de lotes |
-| 35.3 | Interface de estratégia e o catálogo da seção 4 (sem `OPTIMIZED`) | Cada estratégia testada com uma visão point-in-time sintética; nenhuma lê o futuro |
-| 35.4 | Persistência, modos prospectivo e retroativo e a rotina diária do worker | O histórico não muda quando a regra muda (nova versão) |
-| 35.5 | Carteiras aleatórias e a posição da sua carteira na distribuição | Com uma carteira aleatória no lugar da sua, o percentil fica perto de 50% |
-| 35.6 | Métricas, atribuição de Brinson e comparação bayesiana | Atribuição conferida à mão num caso de duas classes |
-| 35.7 | Tela Comparar carteiras, MCP e painel exportável | Testes de UI e integração; `docker compose build` |
-| 35.8 | Estratégia `OPTIMIZED` (depois da Fase 34) e escores point-in-time (depois da extensão da CVM) | Sem look-ahead nos fundamentos |
+| 36.0 | Decisões da seção 11 tomadas e esta proposta aprovada | Revisão do usuário |
+| 36.1 | Fluxo espelhado a partir dos lançamentos (alcance ARCA ou total) | O fluxo reconstruído bate com o `net_flow` dos retratos |
+| 36.2 | Motor por eventos com valorização diária, lotes, custos, IR e proventos | Verdade conhecida: a estratégia que replica a sua carteira reproduz a sua curva, a menos de custos e arredondamento de lotes |
+| 36.3 | Interface de estratégia e o catálogo da seção 4 (sem `OPTIMIZED`) | Cada estratégia testada com uma visão point-in-time sintética; nenhuma lê o futuro |
+| 36.4 | Persistência, modos prospectivo e retroativo e a rotina diária do worker | O histórico não muda quando a regra muda (nova versão) |
+| 36.5 | Carteiras aleatórias e a posição da sua carteira na distribuição | Com uma carteira aleatória no lugar da sua, o percentil fica perto de 50% |
+| 36.6 | Métricas, atribuição de Brinson e comparação bayesiana | Atribuição conferida à mão num caso de duas classes |
+| 36.7 | Tela Comparar carteiras, MCP e painel exportável | Testes de UI e integração; `docker compose build` |
+| 36.8 | Estratégia `OPTIMIZED` (depois da Fase 34) e escores point-in-time (depois da extensão da CVM) | Sem look-ahead nos fundamentos |
 
 ## 11. Decisões que precisam ser tomadas antes de implementar
 
