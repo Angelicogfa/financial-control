@@ -703,3 +703,11 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **34.7** Plano de transição: só com aportes (sem venda) ou com vendas, IR e custos.
 - `[ ]` **34.8** Aba Composição em Simular carteira, MCP `simulation.optimize` e `simulation.composition`, guia de abas atualizado, testes de UI e integração, `docker compose build`.
 - `[ ]` **34.9** Escores point-in-time com os dados da CVM (depois da Fase 28 e da extensão), sem look-ahead nos fundamentos.
+
+## Fase 35 — Paginação das Tabelas de Pesquisa (`[x]` Implementado)
+
+**Objetivo:** toda tela de pesquisa que mostra o resultado em tabela passa a paginar, com a mesma barra de paginação do outro sistema web (itens por página 5/10/50/100, recarregar junto da contagem, faixa "1–10 de 23", "Página 1 de 3" e botões de primeira, anterior, próxima e última página). A barra aparece sempre, mesmo com uma página só, porque é nela que mora a escolha de itens por página.
+
+- `[x]` **35.1** Componente `components/Pagination.tsx` e utilitários `utils/pagination.ts` (`pageCount`, `clampPage`, `paginate`, `usePagination`, `usePagedRows`); estilos `.app-pagination*` no tema. Uma nova busca (filtros diferentes) e uma troca de tamanho voltam à primeira página; repetir a mesma busca (recarregar, observar um ativo, cadastrar um título) mantém a página.
+- `[x]` **35.2** Lançamentos: compras e vendas e proventos paginados pela API (`page`/`page_size`, a contagem vem de `meta.total_items`; uma página esvaziada por exclusão volta à última que ainda tem linhas). Some o aviso "Mostrando 50 de N; use os filtros". Eventos corporativos paginados na tela.
+- `[x]` **35.3** Pesquisar (screener, Tesouro Direto e observação), busca do comparador de ativos e busca de títulos do Tesouro no cadastro de ativo, paginados na tela. O screener e a busca do comparador pedem o máximo que a API devolve numa busca (`limit=100`, antes 50 e 20). Testes em `src/test/pagination.test.tsx`.
