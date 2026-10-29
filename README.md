@@ -123,7 +123,9 @@ docker compose -f docker-compose.prod.yml ps -a
 4. Renda fixa e caixa: **Carteira › Novo ativo**, informando o contrato (indexador, taxa, aplicação e vencimento).
 5. **Aportar:** informe o valor, revise a distribuição e confirme as compras executadas.
 
-O worker sincroniza séries, cotações, catálogo da B3 e demonstrativos sozinho; o andamento aparece em **Configuração › Dados de mercado**.
+O worker sincroniza séries, cotações, catálogo da B3, demonstrativos e os comunicados da CVM sozinho; o andamento aparece em **Configuração › Dados de mercado**, onde também dá para rodar já a carga do histórico da simulação e a dos comunicados.
+
+**Simular carteira** (Ferramentas): antes do primeiro uso, rode a carga do histórico em Dados de mercado (alguns minutos); a calibração entra na fila sozinha ao fim. As abas respondem perguntas diferentes, e cada uma explica a sua no topo: Passado (as suas regras no histórico), Futuro (faixas prováveis e chance de meta), Candidatos (ativos para investigar), Robustez (crises, variantes e a validação estatística), Confiança (se as chances costumam se confirmar) e Laboratório (modelos de regime e risco com portões). É simulação, não recomendação.
 
 ### Dados de demonstração (opcional)
 
@@ -228,3 +230,4 @@ As regras do projeto estão em [`AGENTS.md`](AGENTS.md): código, commits e banc
 - [Decisões de arquitetura (ADRs)](docs/architecture/adr/)
 - [Débitos técnicos](docs/tech-debt/TECH_DEBT.md)
 - [Plano de implementação](docs/todo/IMPLEMENTATION_PLAN.md)
+- Desenhos: [simulação de carteira](docs/features/PORTFOLIO_SIMULATION_DESIGN.md), [otimização da composição (proposta)](docs/features/ASSET_COMPOSITION_OPTIMIZATION_DESIGN.md) e [carteiras de comparação (proposta)](docs/features/COMPARISON_PORTFOLIOS_DESIGN.md)

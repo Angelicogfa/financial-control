@@ -7,7 +7,7 @@ dismissal hides it while the same condition persists and a new condition shows u
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import StrEnum
@@ -15,6 +15,7 @@ from enum import StrEnum
 from core.helpers.calendar import previous_business_day
 from domain.assets.services.cerrado import StaleReason
 from domain.assets.services.valuation import AssetValuation, ValuationVerdict
+from domain.disclosures.entities import CvmDocument
 from domain.market.entities import Fundamentals, QuoteFreshness
 from domain.market.services.series_status import SeriesStatus
 from domain.policy.services.allocation import BAND_ABOVE, BAND_BELOW
@@ -47,6 +48,7 @@ class AlertKind(StrEnum):
     EARLY_SALE_OPPORTUNITY = "EARLY_SALE_OPPORTUNITY"
     SUSPICIOUS_DATA = "SUSPICIOUS_DATA"
     CHECKLIST_EXPIRED = "CHECKLIST_EXPIRED"
+    RELEVANT_FACT = "RELEVANT_FACT"
 
 
 SEVERITY_ORDER = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}
@@ -410,6 +412,38 @@ def early_sale_alerts(valuations: Iterable[TreasuryMarketValuation]) -> list[Ale
                 valuation.explanation,
                 valuation.ticker,
                 f"/asset/{valuation.asset_id}?tab=market" if valuation.asset_id else None,
+            )
+        )
+    return alerts
+
+
+# Unread relevant facts delivered in this many days raise an alert (Phase 28.4).
+RELEVANT_FACT_WINDOW_DAYS = 7
+
+
+def relevant_fact_alerts(
+    documents: Iterable[CvmDocument],
+    tickers_by_cnpj: Mapping[str, Sequence[str]],
+    asset_ids: Mapping[str, int],
+) -> list[Alert]:
+    """One alert per unread relevant fact of a held or followed company."""
+    alerts: list[Alert] = []
+    for doc in documents:
+        if not doc.is_relevant_fact or doc.read_at is not None:
+            continue
+        tickers = list(tickers_by_cnpj.get(doc.cnpj, ()))
+        subject = tickers[0] if tickers else doc.company_name
+        asset_id = next((asset_ids[t] for t in tickers if t in asset_ids), None)
+        alerts.append(
+            Alert(
+                f"fact:{doc.protocol}",
+                AlertKind.RELEVANT_FACT,
+                AlertSeverity.WARNING,
+                f"{subject}: fato relevante em {_day(doc.delivery_date)}",
+                (doc.subject or doc.company_name)
+                + ". Leia o documento na CVM e reveja a tese do ativo, se for o caso.",
+                subject,
+                f"/asset/{asset_id}?tab=disclosures" if asset_id else "/home",
             )
         )
     return alerts

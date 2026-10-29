@@ -31,6 +31,8 @@ from controllers.assets.responses import (
 )
 from controllers.contributions.requests import ContributionConfirmRequest
 from controllers.contributions.responses import SavedContributionPlanDTO
+from controllers.disclosures.requests import MarkReadRequest
+from controllers.disclosures.responses import DisclosureFeedDTO, MarkReadResultDTO
 from controllers.ledger.requests import (
     CorporateEventRequest,
     EarningCreateRequest,
@@ -75,10 +77,12 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.requests import BacktestRequest, ProjectionRequest
+from controllers.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
 from controllers.simulation.responses import (
     CalibrationDTO,
+    CandidatesDTO,
     CoverageReportDTO,
+    LabDTO,
     ProjectionDTO,
     RobustnessDTO,
     SimulationRunDetailDTO,
@@ -92,6 +96,7 @@ from domain.accounts.services.use_cases import AccountHandler
 from domain.alerts.services.use_cases import AlertHandler
 from domain.assets.services.use_cases import AssetHandler
 from domain.contributions.services.use_cases import ContributionHandler
+from domain.disclosures.services.use_cases import DisclosureHandler
 from domain.ledger.services.use_cases.b3_import import ImportHandler
 from domain.ledger.services.use_cases.corporate_events import CorporateEventHandler
 from domain.ledger.services.use_cases.earnings import EarningHandler
@@ -125,6 +130,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "market": "Dados de Mercado",
     "tools": "Ferramentas · Tributação",
     "simulation": "Simulação de carteira",
+    "disclosures": "Comunicados da CVM",
 }
 
 
@@ -153,8 +159,15 @@ class CoveragePeriodInput(BaseModel):
     end: date | None = None
 
 
+class DisclosureListInput(BaseModel):
+    asset_id: int | None = None
+    categories: list[str] = Field(default_factory=list)
+    unread_only: bool = False
+    limit: int = Field(default=50, ge=1, le=200)
+
+
 class JobRequestInput(BaseModel):
-    job_name: Literal["sync_simulation_history"]
+    job_name: Literal["sync_simulation_history", "sync_cvm_documents"]
 
 
 class CalibrationInput(BaseModel):
@@ -438,6 +451,10 @@ class AgenticRuntimeHandlers:
         return SimulationHandler(
             uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
         )
+
+    @property
+    def disclosures(self) -> DisclosureHandler:
+        return DisclosureHandler(uow_factory=self.uow_factory)
 
     @property
     def research(self) -> ResearchHandler:
@@ -1042,10 +1059,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         name="market.request_job",
         kind="command",
         description=(
-            "Pede ao worker que rode agora uma rotina que aceita disparo manual (hoje, "
-            "`sync_simulation_history`: a carga do histórico longo que a simulação de carteira "
-            "usa). O worker atende em até 15 s; acompanhe com market.job_runs. Um pedido que "
-            "ainda espera é devolvido, sem duplicar."
+            "Pede ao worker que rode agora uma rotina que aceita disparo manual: "
+            "`sync_simulation_history` (histórico longo da simulação) ou `sync_cvm_documents` "
+            "(fatos relevantes e comunicados da CVM). O worker atende em até 15 s; acompanhe "
+            "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),
         input_model=JobRequestInput,
         output_type=JobRunDTO,
@@ -1191,6 +1208,59 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, p: h.simulation.projection(p.run_id),
     ),
     OperationSpec(
+        name="simulation.find_candidates",
+        kind="command",
+        description=(
+            "Agenda a avaliação de ativos candidatos fora da carteira (camada D): a watchlist e, "
+            "se pedido, os mais negociados do screener, com os mesmos filtros do aporte real "
+            "(elegibilidade, sem dado suspeito), até 20. Cada um é modelado contra a sua classe "
+            "(α encolhido por Bayes empírico, β para 1, resíduos em blocos, evento de ruptura) "
+            "sobre as trajetórias da projeção. Roda no worker; leia com simulation.candidates."
+        ),
+        input_model=CandidatesRequest,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, p: h.simulation.submit_candidates(p),
+    ),
+    OperationSpec(
+        name="simulation.candidates",
+        kind="query",
+        description=(
+            "Candidatos para investigar (não recomendação): por ativo, a variação do patrimônio "
+            "final, a probabilidade de a melhora ser real com intervalo, a variação da chance "
+            "de meta, do CVaR de 12 meses, da queda, da diversificação e da renda, o α e o β "
+            "antes e depois do encolhimento e a estabilidade do ranking; e os excluídos."
+        ),
+        input_model=SimulationIdInput,
+        output_type=CandidatesDTO,
+        invoke=lambda h, p: h.simulation.candidates(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.run_lab",
+        kind="command",
+        description=(
+            "Agenda o laboratório de ML (só regime e risco): HMM de 2 e 3 estados, mistura "
+            "gaussiana, EWMA e GARCH(1,1) preveem o retorno do mês seguinte da carteira-modelo "
+            "fora da amostra contra a normal simples, com os portões (P de superar ≥ 95%, Sharpe "
+            "deflacionado com todas as tentativas, CSCV e estabilidade). Leia com simulation.lab."
+        ),
+        input_model=EmptyInput,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, _p: h.simulation.submit_lab(),
+    ),
+    OperationSpec(
+        name="simulation.lab",
+        kind="query",
+        description=(
+            "Resultado do laboratório mais recente (ou de `run_id`): por modelo, o ganho de log "
+            "score sobre a referência, a chance de superar, o Sharpe deflacionado, a estabilidade "
+            "e se passou; o PBO do conjunto, as tentativas registradas, o veredito ('nenhum "
+            "modelo passou' é válido) e a probabilidade do regime de estresse mês a mês."
+        ),
+        input_model=CalibrationInput,
+        output_type=LabDTO,
+        invoke=lambda h, p: h.simulation.lab(p.run_id),
+    ),
+    OperationSpec(
         name="simulation.calibrate",
         kind="command",
         description=(
@@ -1223,6 +1293,42 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationListInput,
         output_type=list[SimulationRunDTO],
         invoke=lambda h, p: h.simulation.list_runs(p.limit, p.kind),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 15. CVM disclosures
+    OperationSpec(
+        name="disclosures.list",
+        kind="query",
+        description=(
+            "Fatos relevantes, comunicados ao mercado, avisos aos acionistas e demais documentos "
+            "que as companhias da carteira e da watchlist entregaram à CVM (IPE), do mais "
+            "recente ao mais antigo, com o link do documento e se já foi lido. Filtre por "
+            '`asset_id`, `categories` (ex.: "Fato Relevante") e `unread_only`. FIIs e ETFs '
+            "não publicam no IPE."
+        ),
+        input_model=DisclosureListInput,
+        output_type=DisclosureFeedDTO,
+        invoke=lambda h, p: h.disclosures.feed(
+            asset_id=p.asset_id,
+            categories=p.categories,
+            unread_only=p.unread_only,
+            limit=p.limit,
+        ),
+    ),
+    OperationSpec(
+        name="disclosures.mark_read",
+        kind="command",
+        description=(
+            "Marca documentos da CVM como lidos: por `ids`, ou todos com `all` (de um "
+            "`asset_id` ou de todas as companhias acompanhadas). Some com o alerta de fato "
+            "relevante novo."
+        ),
+        input_model=MarkReadRequest,
+        output_type=MarkReadResultDTO,
+        invoke=lambda h, p: MarkReadResultDTO(updated=h.disclosures.mark_read(p)),
     ),
 )
 

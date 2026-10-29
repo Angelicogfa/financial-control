@@ -358,6 +358,103 @@ export interface CalibrationDTO {
   pending_run_id?: number | null;
 }
 
+export interface CandidateBaseDTO {
+  final_net_wealth_p50: number;
+  cvar_12m: number;
+  drawdown_median: number;
+  diversification: number;
+  goal_probability?: number | null;
+}
+
+export interface CandidateEffectDTO {
+  ticker: string;
+  share_in_class: number;
+  weight: number;
+  delta_final_wealth: number;
+  p_improve: number;
+  p_improve_low: number;
+  p_improve_high: number;
+  delta_goal_probability?: number | null;
+  delta_cvar_12m: number;
+  delta_drawdown: number;
+  delta_diversification: number;
+  delta_income_yield: number;
+  top_k_share?: number;
+  rank?: number;
+}
+
+export interface CandidateFitDTO {
+  months: number;
+  alpha_annual: number;
+  alpha_post_annual: number;
+  alpha_post_sd_annual: number;
+  beta: number;
+  beta_post: number;
+  beta_post_sd: number;
+  shrinkage: number;
+  residual_vol_annual: number;
+}
+
+export interface CandidateResultDTO {
+  ticker: string;
+  name: string;
+  arca_class: string;
+  asset_type: string;
+  source: string;
+  eligible?: boolean | null;
+  valuation_verdict?: string | null;
+  dividend_yield?: number | null;
+  suspicious?: boolean;
+  zone?: string;
+  fit: CandidateFitDTO;
+  effect: CandidateEffectDTO;
+}
+
+export interface CandidatesDTO {
+  run_id: number;
+  status: SimulationStatus;
+  horizon_months?: number;
+  paths?: number;
+  base?: CandidateBaseDTO | null;
+  candidates?: CandidateResultDTO[];
+  excluded?: ExcludedCandidateDTO[];
+  tau_annual?: Record<string, number>;
+  tested?: number;
+  evaluated?: number;
+  weight_mode?: string;
+  rupture_loss?: number;
+  sample_start?: string | null;
+  sample_end?: string | null;
+  calibration_run?: number | null;
+  warnings?: string[];
+}
+
+export interface CandidatesRequest {
+  horizon_years?: number;
+  monthly_contribution?: number;
+  contribution_real_growth?: number;
+  initial_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  income_yield_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  cdi_rate?: number | null;
+  ipca_rate?: number | null;
+  wealth_goal?: number | null;
+  income_goal?: number | null;
+  rebalance?: boolean;
+  paths?: number;
+  mean_block_months?: number;
+  fee_rate?: number;
+  sample_start?: string | null;
+  generator?: "STACKED" | "BOOTSTRAP" | "BAYESIAN_BOOTSTRAP" | "BAYESIAN_NORMAL";
+  label?: string | null;
+  include_screener?: boolean;
+  screener_min_volume?: number;
+  include_ineligible?: boolean;
+  include_suspicious?: boolean;
+  weight_mode?: "NEXT_CONTRIBUTION" | "FIXED";
+  fixed_weight?: number;
+  rupture_stress?: boolean;
+}
+
 export interface CerradoEvaluationDTO {
   profile: ChecklistProfile;
   checklist_version: number;
@@ -574,6 +671,33 @@ export interface CurrentUserDTO {
   expires_at?: string | null;
 }
 
+export interface CvmDocumentDTO {
+  id: number;
+  protocol: string;
+  tickers?: string[];
+  company_name: string;
+  category: string;
+  doc_type?: string;
+  species?: string;
+  subject?: string;
+  reference_date?: string | null;
+  delivery_date: string;
+  version?: number;
+  link?: string;
+  read?: boolean;
+  first_seen_at?: string | null;
+}
+
+export interface DisclosureFeedDTO {
+  items?: CvmDocumentDTO[];
+  unread_count?: number;
+  category_counts?: Record<string, number>;
+  companies?: number;
+  unmapped?: string[];
+  latest_delivery?: string | null;
+  note?: string | null;
+}
+
 export interface DistributionDTO {
   count: number;
   minimum?: number | null;
@@ -682,6 +806,11 @@ export interface EventOutcomeDTO {
   low: number;
   high: number;
   by_generator?: Record<string, number>;
+}
+
+export interface ExcludedCandidateDTO {
+  ticker: string;
+  reason: string;
 }
 
 export interface ExecutionDTO {
@@ -985,6 +1114,39 @@ export interface JobRunDTO {
 
 export type KeyExpiryDays = 30 | 90 | 180 | 365;
 
+export interface LabDTO {
+  run_id?: number | null;
+  status?: SimulationStatus | null;
+  finished_at?: string | null;
+  error?: string | null;
+  months?: number;
+  first_forecast?: string | null;
+  last_forecast?: string | null;
+  trials?: number;
+  pbo?: number | null;
+  loss_probability?: number | null;
+  models?: LabModelDTO[];
+  approved?: string[];
+  regime?: RegimePointDTO[];
+  regime_means?: number[];
+  verdict?: string;
+  warnings?: string[];
+  pending_run_id?: number | null;
+}
+
+export interface LabModelDTO {
+  key: string;
+  label: string;
+  family: string;
+  months: number;
+  mean_gain: number;
+  gate_probability: number;
+  deflated_probability: number;
+  stable: boolean;
+  passed: boolean;
+  reasons?: string[];
+}
+
 export interface LiquidityDetailDTO {
   reserve_brl?: number;
   reserve_months?: number | null;
@@ -1039,6 +1201,16 @@ export interface LotTaxStatusDTO {
   tax_at_next_bracket?: number | null;
   tax_saving_by_waiting?: number | null;
   net_gain_by_waiting?: number | null;
+}
+
+export interface MarkReadRequest {
+  ids?: number[];
+  all?: boolean;
+  asset_id?: number | null;
+}
+
+export interface MarkReadResultDTO {
+  updated: number;
 }
 
 export interface MarketHistoryPointDTO {
@@ -1310,6 +1482,11 @@ export interface ReadinessDTO {
   checks: Record<string, ReadinessCheckDTO>;
 }
 
+export interface RegimePointDTO {
+  month: string;
+  stress_probability: number;
+}
+
 export interface ResolvedOfferDTO {
   label: string;
   asset_id?: number | null;
@@ -1369,6 +1546,7 @@ export interface RobustnessDTO {
   trials_in_run?: number;
   trials_total?: number;
   warnings?: string[];
+  validation?: VariantValidationDTO | null;
 }
 
 export interface RollingPointDTO {
@@ -1469,7 +1647,7 @@ export interface ShockDTO {
   note?: string;
 }
 
-export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION";
+export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION" | "CANDIDATES" | "LAB";
 
 export interface SimulationResultDTO {
   key: string;
@@ -1736,6 +1914,22 @@ export interface VariantDTO {
   summary: BacktestSummaryDTO;
   selection: WindowOutcomeDTO;
   holdout: WindowOutcomeDTO;
+}
+
+export interface VariantValidationDTO {
+  best: string;
+  best_label: string;
+  best_sharpe_annual: number;
+  expected_max_sharpe_annual: number;
+  deflated_probability: number;
+  trials: number;
+  observations: number;
+  pbo?: number | null;
+  pbo_combinations?: number;
+  gate_probability?: number | null;
+  passed: boolean;
+  verdict: string;
+  notes?: string[];
 }
 
 export interface WatchlistAddRequest {

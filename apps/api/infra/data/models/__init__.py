@@ -15,6 +15,7 @@ from infra.data.models.assets import (
     ChecklistEvaluationModel,
     FixedIncomeTermModel,
 )
+from infra.data.models.disclosures import CvmDocumentModel, CvmIssuerTickerModel
 from infra.data.models.jobs import JobRunModel, WorkerRequestErrorModel
 from infra.data.models.ledger import CorporateEventModel, EarningModel, TransactionModel
 from infra.data.models.market import (
@@ -37,6 +38,8 @@ __all__ = [
     "ChecklistEvaluationModel",
     "ContributionPlanModel",
     "CorporateEventModel",
+    "CvmDocumentModel",
+    "CvmIssuerTickerModel",
     "EarningModel",
     "FixedIncomeTermModel",
     "FundamentalSnapshotModel",

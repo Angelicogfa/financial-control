@@ -19,6 +19,7 @@ import { BarList } from "../../viz/BarList";
 import { Sparkline } from "../../viz/Sparkline";
 import { TrendChart } from "../../viz/TrendChart";
 import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange, type Change } from "./story";
+import { DisclosureFeed } from "../disclosures/DisclosureFeed";
 import { DeclaredEarnings } from "./DeclaredEarnings";
 
 function Indicator({
@@ -297,6 +298,7 @@ export function HomePage() {
             onAlertsChange={alerts.reload}
           />
           <DeclaredEarnings />
+          <DisclosureFeed limit={8} />
         </>
       )}
       <ErrorBanner error={alerts.error} onRetry={alerts.reload} />

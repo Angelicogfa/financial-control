@@ -148,6 +148,24 @@ class DistributionDTO(BaseModel):
     maximum: float | None = None
 
 
+class VariantValidationDTO(BaseModel):
+    """Phase 33.8: is the best rule variant better for real, or the luckiest of the trials?"""
+
+    best: str
+    best_label: str
+    best_sharpe_annual: float
+    expected_max_sharpe_annual: float
+    deflated_probability: float
+    trials: int
+    observations: int
+    pbo: float | None = None
+    pbo_combinations: int = 0
+    gate_probability: float | None = None
+    passed: bool
+    verdict: str
+    notes: list[str] = Field(default_factory=list)
+
+
 class RobustnessDTO(BaseModel):
     run_id: int
     status: SimulationStatus
@@ -164,6 +182,7 @@ class RobustnessDTO(BaseModel):
     trials_in_run: int = 0
     trials_total: int = 0
     warnings: list[str] = Field(default_factory=list)
+    validation: VariantValidationDTO | None = None
 
 
 class PercentilesDTO(BaseModel):
@@ -308,4 +327,122 @@ class CalibrationDTO(BaseModel):
     origins: list[OriginForecastDTO] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     # A newer calibration still queued or running.
+    pending_run_id: int | None = None
+
+
+class CandidateFitDTO(BaseModel):
+    months: int
+    alpha_annual: float
+    alpha_post_annual: float
+    alpha_post_sd_annual: float
+    beta: float
+    beta_post: float
+    beta_post_sd: float
+    shrinkage: float
+    residual_vol_annual: float
+
+
+class CandidateEffectDTO(BaseModel):
+    ticker: str
+    share_in_class: float
+    weight: float
+    delta_final_wealth: float
+    p_improve: float
+    p_improve_low: float
+    p_improve_high: float
+    delta_goal_probability: float | None = None
+    delta_cvar_12m: float
+    delta_drawdown: float
+    delta_diversification: float
+    delta_income_yield: float
+    top_k_share: float = 0.0
+    rank: int = 0
+
+
+class CandidateResultDTO(BaseModel):
+    ticker: str
+    name: str
+    arca_class: str
+    asset_type: str
+    source: str
+    eligible: bool | None = None
+    valuation_verdict: str | None = None
+    dividend_yield: float | None = None
+    suspicious: bool = False
+    zone: str = "NO_DATA"
+    fit: CandidateFitDTO
+    effect: CandidateEffectDTO
+
+
+class CandidateBaseDTO(BaseModel):
+    final_net_wealth_p50: float
+    cvar_12m: float
+    drawdown_median: float
+    diversification: float
+    goal_probability: float | None = None
+
+
+class ExcludedCandidateDTO(BaseModel):
+    ticker: str
+    reason: str
+
+
+class CandidatesDTO(BaseModel):
+    """Candidates to investigate, best first; never a purchase order."""
+
+    run_id: int
+    status: SimulationStatus
+    horizon_months: int = 0
+    paths: int = 0
+    base: CandidateBaseDTO | None = None
+    candidates: list[CandidateResultDTO] = Field(default_factory=list)
+    excluded: list[ExcludedCandidateDTO] = Field(default_factory=list)
+    tau_annual: dict[str, float] = Field(default_factory=dict)
+    tested: int = 0
+    evaluated: int = 0
+    weight_mode: str = "NEXT_CONTRIBUTION"
+    rupture_loss: float = 0.55
+    sample_start: date | None = None
+    sample_end: date | None = None
+    calibration_run: int | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+class LabModelDTO(BaseModel):
+    key: str
+    label: str
+    family: str
+    months: int
+    mean_gain: float
+    gate_probability: float
+    deflated_probability: float
+    stable: bool
+    passed: bool
+    reasons: list[str] = Field(default_factory=list)
+
+
+class RegimePointDTO(BaseModel):
+    month: date
+    stress_probability: float
+
+
+class LabDTO(BaseModel):
+    """The latest (or a given) laboratory run; `run_id` is None when none was run."""
+
+    run_id: int | None = None
+    status: SimulationStatus | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+    months: int = 0
+    first_forecast: date | None = None
+    last_forecast: date | None = None
+    trials: int = 0
+    pbo: float | None = None
+    loss_probability: float | None = None
+    models: list[LabModelDTO] = Field(default_factory=list)
+    approved: list[str] = Field(default_factory=list)
+    regime: list[RegimePointDTO] = Field(default_factory=list)
+    regime_means: list[float] = Field(default_factory=list)
+    verdict: str = ""
+    warnings: list[str] = Field(default_factory=list)
     pending_run_id: int | None = None

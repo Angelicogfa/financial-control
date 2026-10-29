@@ -58,3 +58,24 @@ class ProjectionRequest(BaseModel):
     # STACKED: the calibrated mixture of generators; or one generator alone.
     generator: Literal["STACKED", "BOOTSTRAP", "BAYESIAN_BOOTSTRAP", "BAYESIAN_NORMAL"] = "STACKED"
     label: str | None = Field(default=None, max_length=120)
+
+
+class CandidatesRequest(ProjectionRequest):
+    """Candidates outside the portfolio (layer D), measured on the projection paths.
+
+    The watchlist always enters; the screener adds the most traded catalog instruments. The
+    same filters as the real contribution apply (eligibility, suspicious data), up to 20.
+    """
+
+    horizon_years: int = Field(default=5, ge=1, le=30)
+    monthly_contribution: float = Field(default=0.0, ge=0, le=10_000_000)
+    paths: int = Field(default=2000, ge=100, le=5000)
+    include_screener: bool = True
+    screener_min_volume: float = Field(default=1_000_000.0, ge=0)
+    include_ineligible: bool = False
+    include_suspicious: bool = False
+    # NEXT_CONTRIBUTION: an equal share of its class; FIXED: `fixed_weight` of the portfolio.
+    weight_mode: Literal["NEXT_CONTRIBUTION", "FIXED"] = "NEXT_CONTRIBUTION"
+    fixed_weight: float = Field(default=0.05, gt=0, le=0.5)
+    # Loss on the rupture event: 55% (central) or 90% (stress, design 10.4).
+    rupture_stress: bool = False

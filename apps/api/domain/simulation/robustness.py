@@ -18,9 +18,12 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
 
+import numpy as np
+
 from domain.policy.services.policy import ArcaPolicy, InvestmentPolicy
 from domain.shared.enums import ArcaClass
 from domain.simulation.engine import BacktestPoint
+from domain.simulation.validation import ValidationReport, validate_configurations
 
 HOLDOUT_MONTHS = 36
 # Fewer months than this: annual figures and the variant comparison are only indicative.
@@ -251,3 +254,45 @@ def points_from_stored(rows: Sequence[Mapping[str, Any]]) -> list[BacktestPoint]
         )
         for r in rows
     ]
+
+
+# Fewer aligned months than this cannot support the overfitting statistics (Phase 33.8).
+MIN_VALIDATION_MONTHS = 24
+
+
+def variant_validation(
+    points: Mapping[str, Sequence[BacktestPoint]],
+    variant_keys: Sequence[str],
+    *,
+    reference_key: str,
+    cdi_key: str | None,
+    trials_total: int,
+    seed: int = 0,
+) -> ValidationReport | None:
+    """Phase 33.8 on the rule variants: deflated Sharpe of the best (all trials counted),
+    PBO of the set and the Bayesian gate of the best against the current rule.
+
+    Returns are monthly, contributions removed, in excess of the CDI when it was simulated.
+    """
+    keys = [k for k in variant_keys if points.get(k)]
+    if len(keys) < 2 or not points.get(reference_key):
+        return None
+    series = {k: dict(monthly_returns(points[k])) for k in [*keys, reference_key]}
+    cdi = dict(monthly_returns(points[cdi_key])) if cdi_key and points.get(cdi_key) else None
+    common = set.intersection(*(set(v) for v in series.values()))
+    if cdi is not None:
+        common &= set(cdi)
+    months = sorted(common)
+    if len(months) < MIN_VALIDATION_MONTHS:
+        return None
+
+    def excess(key: str) -> np.ndarray:
+        values = np.array([series[key][m] for m in months])
+        return values - np.array([cdi[m] for m in months]) if cdi is not None else values
+
+    return validate_configurations(
+        {k: excess(k) for k in keys},
+        reference=excess(reference_key),
+        n_trials=max(trials_total, len(keys)),
+        seed=seed,
+    )

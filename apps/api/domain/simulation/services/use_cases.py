@@ -6,12 +6,19 @@ from dataclasses import asdict
 from datetime import date, timedelta
 
 from controllers.shared.dependencies import UoWFactory
-from controllers.simulation.requests import BacktestRequest, ProjectionRequest
+from controllers.simulation.requests import (
+    BacktestRequest,
+    CandidatesRequest,
+    ProjectionRequest,
+)
 from controllers.simulation.responses import (
     CalibrationDTO,
+    CandidateResultDTO,
+    CandidatesDTO,
     CoverageReportDTO,
     CrisisDTO,
     DistributionDTO,
+    LabDTO,
     ProjectionDTO,
     ProjectionScenarioDTO,
     RobustnessDTO,
@@ -22,6 +29,7 @@ from controllers.simulation.responses import (
     SimulationRunDetailDTO,
     SimulationRunDTO,
     VariantDTO,
+    VariantValidationDTO,
     WindowOutcomeDTO,
 )
 from core.errors import NotFoundError, ValidationError
@@ -29,14 +37,37 @@ from domain.policy.services.assumptions import ProjectionAssumptions
 from domain.policy.services.policy import current_policy
 from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.research.services.screener import ScreenerCriteria
+from domain.research.services.use_cases import ResearchHandler
 from domain.shared.enums import ArcaClass, AssetPurpose
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.simulation.candidate_runs import (
+    CandidateOption,
+    CandidatesParams,
+    new_candidates_run,
+    select_candidates,
+)
+from domain.simulation.candidates import (
+    CANDIDATE_PREFIX,
+    MAX_CANDIDATES,
+    SUMMARY_KEY,
+    CandidateSource,
+)
 from domain.simulation.data import (
+    CDI_KEY,
     SIMULATION_HISTORY_START,
     coverage_report,
     simulation_universe,
 )
+from domain.simulation.engine import BacktestPoint
 from domain.simulation.entities import SimulationKind, SimulationResult, SimulationRun
+from domain.simulation.ml.runs import (
+    LAB_MODEL_PREFIX,
+    LAB_SUMMARY_KEY,
+    latest_lab,
+    new_lab_run,
+    pending_lab,
+)
 from domain.simulation.robustness import (
     HISTORICAL_CRISES,
     SYNTHETIC_SHOCKS,
@@ -48,10 +79,13 @@ from domain.simulation.robustness import (
     points_from_stored,
     rule_variants,
     sample_warnings,
+    variant_validation,
     window_outcome,
 )
 from domain.simulation.runs import (
+    BENCHMARK_PREFIX,
     CALIBRATION_KEY,
+    DEFAULT_SEED,
     PROJECTION_PREFIX,
     STRATEGY_KEY,
     BacktestParams,
@@ -64,6 +98,7 @@ from domain.simulation.runs import (
     pending_calibration,
     queue_calibration,
 )
+from infra.providers.batch import fetch_market_data
 
 
 def to_run_dto(run: SimulationRun) -> SimulationRunDTO:
@@ -145,37 +180,156 @@ class SimulationHandler:
     def submit_projection(self, req: ProjectionRequest) -> SimulationRunDTO:
         """Queue a forward projection from today's portfolio (starting point frozen now)."""
         with self.uow_factory() as uow:
-            assumptions = current_policy(uow.policies).valuation.projections
-            initial, earnings = self._starting_point(uow, req)
-            if sum(initial.values()) <= 0 and req.monthly_contribution <= 0:
-                raise ValidationError(
-                    "nothing to project: no portfolio value and no contribution",
-                    code="EMPTY_PROJECTION",
-                )
-            yields = income_yields(initial, earnings, assumptions)
-            yields.update({ArcaClass(k): v for k, v in (req.income_yield_by_class or {}).items()})
-            cdi, ipca = self._rates(req, assumptions)
-            params = ProjectionParams(
-                horizon_years=req.horizon_years,
-                monthly_contribution=req.monthly_contribution,
-                initial_by_class={c.value: round(v, 2) for c, v in initial.items()},
-                income_yield_by_class={c.value: v for c, v in yields.items()},
-                cdi_rate=cdi,
-                ipca_rate=ipca,
-                rate_shift=assumptions.scenario_rate_shift,
-                contribution_real_growth=req.contribution_real_growth,
-                wealth_goal=req.wealth_goal,
-                income_goal=req.income_goal,
-                rebalance=req.rebalance,
-                paths=req.paths,
-                mean_block_months=req.mean_block_months,
-                fee_rate=req.fee_rate,
-                sample_start=req.sample_start,
-                generator=req.generator,
-            )
+            params = self._projection_params(uow, req, self._starting_point(uow, req))
             run = uow.simulations.add(new_projection_run(params, label=req.label))
             uow.commit()
         return to_run_dto(run)
+
+    def submit_candidates(self, req: CandidatesRequest) -> SimulationRunDTO:
+        """Queue a candidate run: options selected and filtered now, measured in the worker."""
+        if self.portfolio_service is None:
+            raise ValidationError(
+                "candidates need the portfolio service (watchlist and screener)",
+                code="PORTFOLIO_UNAVAILABLE",
+            )
+        research = ResearchHandler(self.uow_factory, self.portfolio_service)
+        options = self._candidate_options(research, req)
+        with self.uow_factory() as uow:
+            report = self.portfolio_service.build_portfolio_report(uow)
+            held = {p.ticker.upper() for p in report.positions if p.quantity > 0}
+            counts: dict[str, int] = {}
+            for p in report.positions:
+                if p.quantity > 0 and p.purpose == AssetPurpose.ARCA:
+                    counts[p.arca_class.value] = counts.get(p.arca_class.value, 0) + 1
+            start = (
+                self._starting_point(uow, req)
+                if req.initial_by_class is not None
+                else portfolio_start(report)
+            )
+            projection = self._projection_params(uow, req, start, require_money=False)
+            chosen, excluded = select_candidates(
+                options,
+                held=held,
+                include_ineligible=req.include_ineligible,
+                include_suspicious=req.include_suspicious,
+            )
+            if not chosen:
+                raise ValidationError(
+                    "no candidate left after the filters (watchlist empty or all excluded)",
+                    code="NO_CANDIDATES",
+                )
+            params = CandidatesParams(
+                projection=projection,
+                candidates=chosen,
+                class_asset_counts=counts,
+                weight_mode=req.weight_mode,
+                fixed_weight=req.fixed_weight,
+                rupture_stress=req.rupture_stress,
+                excluded=excluded,
+            )
+            run = uow.simulations.add(new_candidates_run(params, label=req.label))
+            uow.commit()
+        return to_run_dto(run)
+
+    def _candidate_options(
+        self, research: ResearchHandler, req: CandidatesRequest
+    ) -> list[CandidateOption]:
+        service = self.portfolio_service
+        assert service is not None
+        options: list[CandidateOption] = []
+        watchlist = research.watchlist()
+        with self.uow_factory() as uow:
+            assets = [
+                a for a in (uow.assets.get_by_id(w.asset_id) for w in watchlist) if a is not None
+            ]
+        fundamentals = fetch_market_data(
+            service.gateway,
+            assets,
+            include_quotes=False,
+            max_workers=service.fetch_workers,
+            timeout_seconds=service.fetch_timeout_seconds,
+        ).fundamentals
+        for item in watchlist:
+            fund = fundamentals.get(item.ticker)
+            options.append(
+                CandidateOption(
+                    ticker=item.ticker,
+                    name=item.name,
+                    arca_class=item.arca_class,
+                    asset_type=item.asset_type,
+                    source=CandidateSource.WATCHLIST,
+                    eligible=item.eligible,
+                    valuation_verdict=item.valuation_verdict,
+                    dividend_yield=fund.dividend_yield if fund else None,
+                    suspicious=bool(fund and fund.suspicious),
+                )
+            )
+        if req.include_screener:
+            found = research.screener(
+                ScreenerCriteria(
+                    min_volume_brl=req.screener_min_volume,
+                    exclude_registered=True,
+                    limit=MAX_CANDIDATES * 2,
+                )
+            )
+            with self.uow_factory() as uow:
+                catalog = {c.ticker: c for c in uow.catalog.list_all()}
+            instruments = [catalog[r.ticker] for r in found.results if r.ticker in catalog]
+            screened = service.catalog_fundamentals(instruments)
+            for row in found.results:
+                fund = screened.get(row.ticker)
+                options.append(
+                    CandidateOption(
+                        ticker=row.ticker,
+                        name=row.name,
+                        arca_class=row.arca_class,
+                        asset_type=row.asset_type,
+                        source=CandidateSource.SCREENER,
+                        eligible=None,
+                        valuation_verdict=row.valuation_verdict,
+                        dividend_yield=row.dividend_yield,
+                        suspicious=bool(fund and fund.suspicious),
+                        volume_brl=row.volume_brl,
+                    )
+                )
+        return options
+
+    def _projection_params(
+        self,
+        uow: AbstractUnitOfWork,
+        req: ProjectionRequest,
+        start: tuple[dict[ArcaClass, float], dict[ArcaClass, float]],
+        *,
+        require_money: bool = True,
+    ) -> ProjectionParams:
+        assumptions = current_policy(uow.policies).valuation.projections
+        initial, earnings = start
+        if require_money and sum(initial.values()) <= 0 and req.monthly_contribution <= 0:
+            raise ValidationError(
+                "nothing to project: no portfolio value and no contribution",
+                code="EMPTY_PROJECTION",
+            )
+        yields = income_yields(initial, earnings, assumptions)
+        yields.update({ArcaClass(k): v for k, v in (req.income_yield_by_class or {}).items()})
+        cdi, ipca = self._rates(req, assumptions)
+        return ProjectionParams(
+            horizon_years=req.horizon_years,
+            monthly_contribution=req.monthly_contribution,
+            initial_by_class={c.value: round(v, 2) for c, v in initial.items()},
+            income_yield_by_class={c.value: v for c, v in yields.items()},
+            cdi_rate=cdi,
+            ipca_rate=ipca,
+            rate_shift=assumptions.scenario_rate_shift,
+            contribution_real_growth=req.contribution_real_growth,
+            wealth_goal=req.wealth_goal,
+            income_goal=req.income_goal,
+            rebalance=req.rebalance,
+            paths=req.paths,
+            mean_block_months=req.mean_block_months,
+            fee_rate=req.fee_rate,
+            sample_start=req.sample_start,
+            generator=req.generator,
+        )
 
     def _starting_point(
         self, uow: AbstractUnitOfWork, req: ProjectionRequest
@@ -262,6 +416,49 @@ class SimulationHandler:
         if result is None:
             return CalibrationDTO(**base)
         return CalibrationDTO(**base, **result.summary, origins=result.points)
+
+    def candidates(self, run_id: int) -> CandidatesDTO:
+        """Candidates to investigate of a finished run (empty while it is not DONE)."""
+        with self.uow_factory() as uow:
+            run = self._get(uow, run_id, SimulationKind.CANDIDATES)
+            results = uow.simulations.results(run_id)
+        return build_candidates(run, results)
+
+    def submit_lab(self) -> SimulationRunDTO:
+        """Queue a laboratory run; one already waiting is returned instead."""
+        with self.uow_factory() as uow:
+            run = pending_lab(uow) or uow.simulations.add(new_lab_run(seed=DEFAULT_SEED))
+            uow.commit()
+        return to_run_dto(run)
+
+    def lab(self, run_id: int | None = None) -> LabDTO:
+        """A laboratory run by id, or the latest finished one (empty when there is none)."""
+        with self.uow_factory() as uow:
+            pending = pending_lab(uow)
+            if run_id is not None:
+                run = self._get(uow, run_id, SimulationKind.LAB)
+                found: tuple[SimulationRun, list[SimulationResult]] | None = (
+                    run,
+                    uow.simulations.results(run_id),
+                )
+            else:
+                found = latest_lab(uow)
+        pending_id = pending.id if pending is not None else None
+        if found is None:
+            return LabDTO(pending_run_id=pending_id)
+        run, results = found
+        base = {
+            "run_id": run.id,
+            "status": run.status,
+            "finished_at": run.finished_at,
+            "error": run.error,
+            "pending_run_id": pending_id if pending_id != run.id else None,
+        }
+        summary = next((r for r in results if r.key == LAB_SUMMARY_KEY), None)
+        if summary is None:
+            return LabDTO(**base)
+        models = [r.summary for r in results if r.key.startswith(LAB_MODEL_PREFIX)]
+        return LabDTO(**base, **summary.summary, models=models, regime=summary.points)
 
     def projection(self, run_id: int) -> ProjectionDTO:
         """Percentiles, goals and premises of a projection (empty while it is not DONE)."""
@@ -387,4 +584,71 @@ def build_robustness(
         trials_in_run=len(variants),
         trials_total=trials_total,
         warnings=sample_warnings(strategy, crisis_outcomes(strategy)) if strategy else [],
+        validation=_variant_validation(results, points, variants, trials_total, run.seed),
+    )
+
+
+def _variant_validation(
+    results: list[SimulationResult],
+    points: dict[str, list[BacktestPoint]],
+    variants: list[VariantDTO],
+    trials_total: int,
+    seed: int,
+) -> VariantValidationDTO | None:
+    report = variant_validation(
+        points,
+        [v.key for v in variants],
+        reference_key=STRATEGY_KEY,
+        cdi_key=f"{BENCHMARK_PREFIX}{CDI_KEY}",
+        trials_total=trials_total,
+        seed=seed,
+    )
+    if report is None:
+        return None
+    labels = {r.key: r.label for r in results}
+    months = 12**0.5
+    return VariantValidationDTO(
+        best=report.best,
+        best_label=labels.get(report.best, report.best),
+        best_sharpe_annual=report.best_sharpe_annual,
+        expected_max_sharpe_annual=round(report.deflated.expected_max * months, 4),
+        deflated_probability=report.deflated.probability,
+        trials=report.deflated.trials,
+        observations=report.deflated.observations,
+        pbo=report.overfitting.pbo if report.overfitting else None,
+        pbo_combinations=report.overfitting.combinations if report.overfitting else 0,
+        gate_probability=report.gate.probability if report.gate else None,
+        passed=report.passed,
+        verdict=report.verdict.replace(report.best, labels.get(report.best, report.best)),
+        notes=report.notes,
+    )
+
+
+def build_candidates(run: SimulationRun, results: list[SimulationResult]) -> CandidatesDTO:
+    summary = next((r.summary for r in results if r.key == SUMMARY_KEY), None)
+    rows = [r for r in results if r.key.startswith(CANDIDATE_PREFIX)]
+    if summary is None:
+        return CandidatesDTO(run_id=run.id, status=run.status)  # type: ignore[arg-type]
+    return CandidatesDTO(
+        run_id=run.id,  # type: ignore[arg-type]
+        status=run.status,
+        horizon_months=summary.get("horizon_months", 0),
+        paths=summary.get("paths", 0),
+        base=summary.get("base"),
+        candidates=[
+            CandidateResultDTO(
+                **r.summary["spec"], fit=r.summary["fit"], effect=r.summary["effect"]
+            )
+            for r in rows
+        ],
+        excluded=summary.get("excluded", []),
+        tau_annual=summary.get("tau_annual", {}),
+        tested=summary.get("tested", 0),
+        evaluated=summary.get("evaluated", 0),
+        weight_mode=summary.get("weight_mode", "NEXT_CONTRIBUTION"),
+        rupture_loss=summary.get("rupture_loss", 0.55),
+        sample_start=summary.get("sample_start"),
+        sample_end=summary.get("sample_end"),
+        calibration_run=summary.get("calibration_run"),
+        warnings=summary.get("warnings", []),
     )

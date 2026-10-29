@@ -308,6 +308,9 @@ class ProjectionResult:
     events: list[EventOutcome] = field(default_factory=list)
     generators: list[GeneratorShare] = field(default_factory=list)
     prior_months: float | None = None  # weight of the prior in equivalent months of data
+    # With `keep_paths` (Phase 33.7): final net wealth and goal hit of every path.
+    final_net_paths: np.ndarray | None = field(default=None, repr=False, compare=False)
+    goal_hits: np.ndarray | None = field(default=None, repr=False, compare=False)
 
 
 def _goal(
@@ -403,6 +406,7 @@ def project(
     labels: np.ndarray | None = None,
     posterior: NiwPosterior | None = None,
     generators: Sequence[GeneratorShare] = (),
+    keep_paths: bool = False,
 ) -> ProjectionResult:
     """Simulate `config.paths` futures of the portfolio under one rate scenario.
 
@@ -571,7 +575,20 @@ def project(
         events=events,
         generators=list(generators),
         prior_months=posterior.prior_months if posterior is not None else None,
+        final_net_paths=net[:, -1].copy() if keep_paths else None,
+        goal_hits=_goal_hits(net, income, config) if keep_paths else None,
     )
+
+
+def _goal_hits(net: np.ndarray, income: np.ndarray, config: ProjectionConfig) -> np.ndarray | None:
+    """Paths that end at the goal (wealth and income when both are set)."""
+    hits: np.ndarray | None = None
+    if config.wealth_goal:
+        hits = net[:, -1] >= config.wealth_goal
+    if config.income_goal:
+        income_hit = income[:, -1] >= config.income_goal
+        hits = income_hit if hits is None else hits & income_hit
+    return hits
 
 
 def projection_warnings(sample: ClassSample, config: ProjectionConfig) -> list[str]:

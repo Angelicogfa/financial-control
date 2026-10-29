@@ -15,6 +15,10 @@ from infra.data.repositories.assets import (
     SqlAlchemyAssetRepository,
     SqlAlchemyChecklistRepository,
 )
+from infra.data.repositories.disclosures import (
+    SqlAlchemyCvmDocumentRepository,
+    SqlAlchemyIssuerTickerRepository,
+)
 from infra.data.repositories.jobs import (
     SqlAlchemyJobRunRepository,
     SqlAlchemyWorkerErrorRepository,
@@ -69,6 +73,8 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.agent_keys = SqlAlchemyAgentKeyRepository(self.session)
         self.tax_rules = SqlAlchemyTaxRuleRepository(self.session)
         self.simulations = SqlAlchemySimulationRepository(self.session)
+        self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)
+        self.cvm_documents = SqlAlchemyCvmDocumentRepository(self.session)
         return self
 
     def __exit__(

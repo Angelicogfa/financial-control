@@ -10,6 +10,7 @@ from domain.assets.services.history import (
     snapshot_from_dict,
     snapshot_to_dict,
 )
+from domain.disclosures.entities import CvmDocument, IssuerTicker
 from domain.market.entities import (
     AnnouncedDistributions,
     AnnouncedEarning,
@@ -29,6 +30,7 @@ from infra.cache.redis_cache import AbstractCacheBackend, InMemoryCache
 from infra.providers.b3_listed import B3ListedProvider
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
+from infra.providers.cvm import CvmOpenDataProvider
 from infra.providers.tesouro import TesouroTransparenteProvider
 from infra.providers.yfinance_provider import YFinanceProvider
 
@@ -44,6 +46,7 @@ class CachedMarketGateway:
         tesouro: TesouroTransparenteProvider | None = None,
         b3: B3ListedProvider | None = None,
         cache: AbstractCacheBackend | None = None,
+        cvm: CvmOpenDataProvider | None = None,
         quote_ttl_seconds: int = 900,
         fundamentals_ttl_seconds: int = 86400,
         history_ttl_seconds: int = 21600,
@@ -55,6 +58,7 @@ class CachedMarketGateway:
         self.bcb = bcb or BcbSgsProvider()
         self.tesouro = tesouro or TesouroTransparenteProvider()
         self.b3 = b3 or B3ListedProvider()
+        self.cvm = cvm or CvmOpenDataProvider()
         self.cache = cache or InMemoryCache()
         self.quote_ttl = quote_ttl_seconds
         self.fundamentals_ttl = fundamentals_ttl_seconds
@@ -215,6 +219,14 @@ class CachedMarketGateway:
         else:
             self._remember_miss(cache_key)
         return fund
+
+    def get_cvm_documents(self, year: int) -> list[CvmDocument]:
+        """IPE documents of `year` (Phase 28; bulk yearly file, not cached)."""
+        return self.cvm.documents(year)
+
+    def get_cvm_issuer_tickers(self, year: int) -> list[IssuerTicker]:
+        """Trading codes of each CNPJ declared in the FCA of `year` (Phase 28)."""
+        return self.cvm.issuer_tickers(year)
 
     def get_distributions(
         self,

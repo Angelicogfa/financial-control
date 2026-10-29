@@ -57,7 +57,7 @@ PRICE_DECIMALS = Decimal("0.00000001")
 # Sales of Brazilian stocks up to this amount in a month are exempt (Lei 11.033/2004).
 STOCK_MONTHLY_EXEMPTION_BRL = 20_000.0
 # Stored with every run: results are reused only for the same engine version (Phase 33.3).
-ENGINE_VERSION = "33.6.0"
+ENGINE_VERSION = "33.9.0"
 
 
 class SimulationTimeout(Exception):

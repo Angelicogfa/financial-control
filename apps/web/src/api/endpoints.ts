@@ -21,6 +21,12 @@ import type {
   AssetUpdateRequest,
   BacktestRequest,
   CalibrationDTO,
+  CandidatesDTO,
+  CandidatesRequest,
+  DisclosureFeedDTO,
+  LabDTO,
+  MarkReadRequest,
+  MarkReadResultDTO,
   CerradoUpdateRequest,
   ContributionConfirmRequest,
   ContributionPlanStatus,
@@ -159,6 +165,14 @@ export const api = {
         query: { ticker, asset_type: assetType },
       }),
   },
+  disclosures: {
+    feed: (params: { assetId?: number; category?: string; unread?: boolean; limit?: number } = {}) =>
+      request<DisclosureFeedDTO>("/disclosures", {
+        query: { asset_id: params.assetId, category: params.category, unread: params.unread, limit: params.limit },
+      }),
+    markRead: (body: MarkReadRequest) =>
+      request<MarkReadResultDTO>("/disclosures/read", { method: "POST", body }),
+  },
   simulations: {
     list: (limit = 20, kind?: SimulationKind) =>
       request<SimulationRunDTO[]>("/simulations", { query: { limit, kind } }),
@@ -170,6 +184,11 @@ export const api = {
     submitCalibration: () => request<SimulationRunDTO>("/simulations/calibrations", { method: "POST" }),
     submitBacktest: (body: BacktestRequest) =>
       request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
+    candidates: (id: number) => request<CandidatesDTO>(`/simulations/${id}/candidates`),
+    lab: (runId?: number) => request<LabDTO>("/simulations/lab", { query: { run_id: runId } }),
+    submitLab: () => request<SimulationRunDTO>("/simulations/lab", { method: "POST" }),
+    submitCandidates: (body: CandidatesRequest) =>
+      request<SimulationRunDTO>("/simulations/candidates", { method: "POST", body }),
     submitProjection: (body: ProjectionRequest) =>
       request<SimulationRunDTO>("/simulations/projections", { method: "POST", body }),
   },

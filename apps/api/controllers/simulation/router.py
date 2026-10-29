@@ -7,10 +7,12 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, status
 
 from controllers.simulation.dependencies import get_simulation_handler
-from controllers.simulation.requests import BacktestRequest, ProjectionRequest
+from controllers.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
 from controllers.simulation.responses import (
     CalibrationDTO,
+    CandidatesDTO,
     CoverageReportDTO,
+    LabDTO,
     ProjectionDTO,
     RobustnessDTO,
     SimulationRunDetailDTO,
@@ -49,6 +51,41 @@ def submit_projection(
     handler: SimulationHandler = Depends(get_simulation_handler),
 ) -> SimulationRunDTO:
     return handler.submit_projection(req)
+
+
+@simulation_router.post(
+    "/candidates", response_model=SimulationRunDTO, status_code=status.HTTP_202_ACCEPTED
+)
+def submit_candidates(
+    req: CandidatesRequest,
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> SimulationRunDTO:
+    return handler.submit_candidates(req)
+
+
+@simulation_router.get("/{run_id}/candidates", response_model=CandidatesDTO)
+def get_candidates(
+    run_id: int,
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> CandidatesDTO:
+    return handler.candidates(run_id)
+
+
+@simulation_router.post(
+    "/lab", response_model=SimulationRunDTO, status_code=status.HTTP_202_ACCEPTED
+)
+def submit_lab(
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> SimulationRunDTO:
+    return handler.submit_lab()
+
+
+@simulation_router.get("/lab", response_model=LabDTO)
+def get_lab(
+    run_id: int | None = Query(default=None),
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> LabDTO:
+    return handler.lab(run_id)
 
 
 @simulation_router.post(

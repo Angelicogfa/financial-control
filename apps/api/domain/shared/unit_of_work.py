@@ -5,6 +5,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from types import TracebackType
 
+from domain.disclosures.repositories import (
+    AbstractCvmDocumentRepository,
+    AbstractIssuerTickerRepository,
+)
 from domain.shared.repositories import (
     AbstractAccountRepository,
     AbstractAgentKeyRepository,
@@ -52,6 +56,8 @@ class AbstractUnitOfWork(ABC):
     agent_keys: AbstractAgentKeyRepository
     tax_rules: AbstractTaxRuleRepository
     simulations: AbstractSimulationRepository
+    cvm_issuers: AbstractIssuerTickerRepository
+    cvm_documents: AbstractCvmDocumentRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

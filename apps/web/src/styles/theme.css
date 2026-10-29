@@ -2187,3 +2187,54 @@ details[open] > summary {
   font-size: var(--text-sm);
   color: var(--app-text-subtle);
 }
+
+/* --- CVM disclosures (Phase 28) --- */
+
+.disclosure-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.disclosure-item {
+  border-left: 3px solid var(--app-primary);
+  padding-left: var(--space-3);
+}
+
+.disclosure-item.is-read {
+  border-left-color: var(--app-border);
+  opacity: 0.8;
+}
+
+.disclosure-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.disclosure-subject {
+  margin: var(--space-1) 0;
+  max-width: 80ch;
+}
+
+/* --- simulation: statistical validation (Phase 33.8) --- */
+
+.simulation-validation {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+}
+
+.simulation-validation dt {
+  font-size: var(--text-sm);
+  color: var(--app-text-secondary);
+}
+
+.simulation-validation dd {
+  margin: var(--space-1) 0 0;
+  font-weight: 600;
+}

@@ -182,6 +182,37 @@ describe("simulation helpers", () => {
   });
 });
 
+describe("RobustnessView validation", () => {
+  it("shows the verdict on the best variant with the three tests", () => {
+    render(
+      <RobustnessView
+        data={robustness({
+          validation: {
+            best: "variant:band5:rebalance",
+            best_label: "Banda 5 p.p., rebalanceando",
+            best_sharpe_annual: 0.42,
+            expected_max_sharpe_annual: 0.61,
+            deflated_probability: 0.31,
+            trials: 40,
+            observations: 120,
+            pbo: 0.58,
+            pbo_combinations: 252,
+            gate_probability: 0.63,
+            passed: false,
+            verdict: "Sem evidência de que a melhor configuração seja melhor de verdade.",
+          },
+        })}
+      />,
+    );
+    const section = screen.getByRole("region", { name: "Validação estatística" });
+    expect(within(section).getByText("Sem evidência")).toBeInTheDocument();
+    expect(within(section).getByText("Banda 5 p.p., rebalanceando")).toBeInTheDocument();
+    expect(within(section).getByText(/40 tentativas/)).toBeInTheDocument();
+    expect(within(section).getByText("58%", { exact: false })).toBeInTheDocument();
+    expect(within(section).getByText(/contra 0,61 esperado do acaso/)).toBeInTheDocument();
+  });
+});
+
 describe("RobustnessView", () => {
   it("shows crises, shocks, every variant, the trial count and the sample warnings", () => {
     render(<RobustnessView data={robustness()} />);
@@ -540,9 +571,33 @@ describe("SimulationPage confidence tab", () => {
     expect(await screen.findAllByText(TAB_GUIDE.confidence.question)).toHaveLength(2);
     const comparison = screen.getByRole("table", { name: "Comparação das abas" });
     const rows = within(comparison).getAllByRole("row").slice(1);
-    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Passado", "Futuro", "Robustez", "Confiança"]);
+    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Passado", "Futuro", "Candidatos", "Robustez", "Confiança", "Laboratório"]);
     expect(within(comparison).getByText(TAB_GUIDE.future.question)).toBeInTheDocument();
-    expect(rows[3]).toHaveAttribute("aria-current", "true");
+    expect(rows[4]).toHaveAttribute("aria-current", "true");
     expect(await screen.findByRole("table", { name: "Calibração dos geradores" })).toBeInTheDocument();
   });
+});
+
+describe("SimulationPage tabs (Phase 33.10)", () => {
+  const empties: Record<string, RegExp> = {
+    past: /Nenhuma simulação ainda/,
+    future: /Nenhuma simulação ainda/,
+    candidates: /Nenhuma simulação ainda/,
+    robustness: /Nenhuma simulação ainda/,
+    confidence: /Ainda não há calibração/,
+    lab: /O laboratório ainda não rodou/,
+  };
+
+  for (const [key, guide] of Object.entries(TAB_GUIDE)) {
+    it(`opens the ${key} tab with its guide and an empty state`, async () => {
+      mockApi([
+        { path: "/simulations", reply: [] },
+        { path: "/simulations/calibration", reply: { run_id: null, pending_run_id: null } },
+        { path: "/simulations/lab", reply: { run_id: null, pending_run_id: null } },
+      ]);
+      renderAt(`/tools/simulation?tab=${key}`);
+      expect((await screen.findAllByText(guide.question)).length).toBeGreaterThan(0);
+      expect(await screen.findByText(empties[key])).toBeInTheDocument();
+    });
+  }
 });

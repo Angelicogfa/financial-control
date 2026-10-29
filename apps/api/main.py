@@ -15,6 +15,7 @@ from controllers.assets.router import assets_router
 from controllers.auth.dependencies import require_user
 from controllers.auth.router import auth_router
 from controllers.contributions.router import contributions_router
+from controllers.disclosures.router import disclosures_router
 from controllers.ledger.router import (
     earnings_router,
     events_router,
@@ -55,6 +56,7 @@ PROTECTED_ROUTERS = (
     agentic_router,
     tax_router,
     simulation_router,
+    disclosures_router,
 )
 
 

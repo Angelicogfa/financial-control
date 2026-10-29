@@ -650,6 +650,8 @@ def to_stored_projection(
     sample = inputs.sample
     summary = asdict(result)
     points = summary.pop("points")
+    summary.pop("final_net_paths", None)
+    summary.pop("goal_hits", None)
     summary["scenario"] = {
         "name": result.scenario.name,
         "annual_cdi_rate": result.scenario.annual_cdi_rate,
@@ -788,6 +790,38 @@ Compute = Callable[[Callable[[], bool]], list[SimulationResult]]
 def prepare_run(uow: AbstractUnitOfWork, run: SimulationRun) -> tuple[str, Compute]:
     """Read the run's inputs and return their hash and the computation (by kind)."""
     run_id: int = run.id  # type: ignore[assignment]
+    if run.kind == SimulationKind.LAB:
+        from domain.simulation.ml.lab import run_lab
+        from domain.simulation.ml.runs import prior_trials, to_stored_lab
+
+        lab_inputs = load_calibration_inputs(uow)
+        trials = prior_trials(uow)
+        min_train = int(run.params.get("min_train_months", 60))
+        return lab_inputs.data_hash, lambda deadline: to_stored_lab(
+            run_id,
+            run_lab(
+                lab_inputs.sample,
+                lab_inputs.targets,
+                prior_trials=trials,
+                seed=run.seed,
+                min_train=min_train,
+                deadline=deadline,
+            ),
+        )
+    if run.kind == SimulationKind.CANDIDATES:
+        # Imported here: candidate_runs builds on this module's projection helpers.
+        from domain.simulation.candidate_runs import (
+            CandidatesParams,
+            load_candidates_inputs,
+            run_candidates,
+            to_stored_candidates,
+        )
+
+        cand_params = CandidatesParams.from_dict(run.params)
+        cand_inputs = load_candidates_inputs(uow, cand_params)
+        return cand_inputs.data_hash, lambda deadline: to_stored_candidates(
+            run_id, *run_candidates(cand_inputs, cand_params, seed=run.seed, deadline=deadline)
+        )
     if run.kind == SimulationKind.CALIBRATION:
         calibration = CalibrationParams.from_dict(run.params)
         c_inputs = load_calibration_inputs(uow)
