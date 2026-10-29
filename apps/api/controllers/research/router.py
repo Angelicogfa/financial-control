@@ -40,7 +40,8 @@ def run_screener(
     min_roe: float | None = Query(default=None, description="Fraction: 0.15 = 15%"),
     below_band: bool = Query(default=False, description="Only ARCA classes below their band"),
     exclude_registered: bool = Query(default=False),
-    limit: int = Query(default=30, ge=1, le=100),
+    limit: int = Query(default=30, ge=1, le=100, description="Page size"),
+    page: int = Query(default=1, ge=1),
     handler: ResearchHandler = Depends(get_research_handler),
 ) -> ScreenerResponseDTO:
     criteria = ScreenerCriteria(
@@ -56,6 +57,7 @@ def run_screener(
         min_roe=min_roe,
         exclude_registered=exclude_registered,
         limit=limit,
+        offset=(page - 1) * limit,
     )
     return handler.screener(criteria, below_band=below_band)
 

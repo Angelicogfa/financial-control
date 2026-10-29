@@ -4,6 +4,9 @@ Catalog-only criteria (type, ARCA class, sector, text, liquidity, size) filter f
 catalog order (highest financial volume first). Fundamental criteria (P/L, P/VP, DY, ROE)
 then need indicators, which are fetched for at most `scan_limit` candidates so a single
 request never fans out over the whole exchange.
+
+Results are paged: `offset` skips the matches of earlier pages and `limit` is the page size.
+A catalog-only search pages over every candidate and loads indicators only for the page.
 """
 
 from __future__ import annotations
@@ -43,6 +46,7 @@ class ScreenerCriteria:
     min_roe: float | None = None
     exclude_registered: bool = False
     limit: int = DEFAULT_LIMIT
+    offset: int = 0
     scan_limit: int = DEFAULT_SCAN_LIMIT
 
     @property
@@ -65,6 +69,8 @@ class ScreenerOutcome:
     candidates: int
     scanned: int
     truncated: bool = False
+    # Matches across all pages (the page itself is `results`).
+    matched: int = 0
     criteria: ScreenerCriteria = field(default_factory=ScreenerCriteria)
 
 
@@ -139,19 +145,32 @@ def screen(
     lifecycles: Mapping[str, AssetLifecycle] | None = None,
     valuation_policy: ValuationPolicy | None = None,
 ) -> ScreenerOutcome:
-    """Run the screener; fundamentals are loaded only for the scanned candidates."""
+    """Run the screener and return one page of the matches.
+
+    Without fundamental criteria every candidate matches, so the page is cut from the
+    candidates and indicators are loaded for that page only. With them, the scanned window is
+    filtered first and the page is cut from what passed.
+    """
     known = registered or {}
     candidates = prefilter(catalog, criteria, known)
-    scanned = candidates[: criteria.scan_limit] if criteria.needs_fundamentals else candidates
-    if not criteria.needs_fundamentals:
-        scanned = scanned[: criteria.limit]
-    fundamentals = load_fundamentals(scanned) if scanned else {}
+    end = criteria.offset + criteria.limit
+    if criteria.needs_fundamentals:
+        scanned = candidates[: criteria.scan_limit]
+        fundamentals = load_fundamentals(scanned) if scanned else {}
+        matches = [
+            item for item in scanned if passes_fundamentals(fundamentals.get(item.ticker), criteria)
+        ]
+        page = matches[criteria.offset : end]
+        matched = len(matches)
+    else:
+        page = candidates[criteria.offset : end]
+        fundamentals = load_fundamentals(page) if page else {}
+        scanned = page
+        matched = len(candidates)
 
     results: list[ScreenerResult] = []
-    for item in scanned:
+    for item in page:
         fund = fundamentals.get(item.ticker)
-        if not passes_fundamentals(fund, criteria):
-            continue
         asset = known.get(item.ticker)
         profile = asset.profile if asset else default_checklist_profile(item.asset_type)  # type: ignore[arg-type]
         results.append(
@@ -163,12 +182,11 @@ def screen(
                 lifecycle_status=(lifecycles or {}).get(item.ticker),
             )
         )
-        if len(results) >= criteria.limit:
-            break
     return ScreenerOutcome(
         results=results,
         candidates=len(candidates),
         scanned=len(scanned),
         truncated=criteria.needs_fundamentals and len(candidates) > criteria.scan_limit,
         criteria=criteria,
+        matched=matched,
     )

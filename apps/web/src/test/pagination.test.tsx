@@ -247,8 +247,8 @@ describe("paged ledger", () => {
 });
 
 describe("paged research", () => {
-  it("asks for the most results and pages the screener table", async () => {
-    const results = Array.from({ length: 12 }, (_, i) => ({
+  it("asks the API for each page of the screener, reaching every match", async () => {
+    const all = Array.from({ length: 2415 }, (_, i) => ({
       ticker: `AAAA${i + 1}`,
       name: `Ativo ${i + 1}`,
       asset_type: "STOCK_BR",
@@ -258,25 +258,52 @@ describe("paged research", () => {
     const { calls } = mockApi([
       {
         path: "/research/screener",
-        reply: { results, candidates: 12, scanned: 12, truncated: false, arca_classes: [], catalog_size: 50 },
+        reply: (call: Call) => {
+          const page = Number(call.query.get("page"));
+          const size = Number(call.query.get("limit"));
+          const results = all.slice((page - 1) * size, page * size);
+          return {
+            results,
+            total: all.length,
+            page,
+            page_size: size,
+            candidates: all.length,
+            scanned: results.length,
+            truncated: false,
+            arca_classes: [],
+            catalog_size: all.length,
+          };
+        },
       },
       { path: "/research/sectors", reply: [] },
     ]);
+    const screenerCalls = () => calls.filter((c) => c.path === "/research/screener");
     renderAt("/research");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("AAAA10")).toBeInTheDocument();
+    expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("1");
+    expect(last(calls, "GET", "/research/screener")?.query.get("limit")).toBe("10");
+    expect(screen.getByText(/2415 resultado\(s\) de 2415 candidato\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText("1–10 de 2415")).toBeInTheDocument();
+    expect(screen.getByText("Página 1 de 242")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Última página" }));
+    expect(await screen.findByText("AAAA2415")).toBeInTheDocument();
+    expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("242");
+    expect(screen.getByText("2411–2415 de 2415")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Itens por página"), { target: { value: "100" } });
+    expect(await screen.findByText("AAAA100")).toBeInTheDocument();
+    expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("1");
     expect(last(calls, "GET", "/research/screener")?.query.get("limit")).toBe("100");
-    expect(screen.queryByText("AAAA11")).not.toBeInTheDocument();
-    expect(screen.getByText("1–10 de 12")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
-    expect(screen.getByText("AAAA12")).toBeInTheDocument();
-    expect(screen.queryByText("AAAA1")).not.toBeInTheDocument();
-
+    expect(await screen.findByText("AAAA200")).toBeInTheDocument();
+    const before = screenerCalls().length;
     fireEvent.click(screen.getByRole("button", { name: "Recarregar" }));
-    await waitFor(() => expect(calls.filter((c) => c.path === "/research/screener").length).toBe(2));
-    // The same search again keeps the page.
-    expect(await screen.findByText("AAAA12")).toBeInTheDocument();
+    await waitFor(() => expect(screenerCalls().length).toBe(before + 1));
+    // Reloading asks for the same page again.
+    expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("2");
   });
 
   it("pages the watchlist", async () => {

@@ -82,6 +82,12 @@ def test_research_flow_from_screener_to_analysis(research: SimpleNamespace) -> N
     banks = client.get("/api/v1/research/screener", params={"sector": "finance"}).json()
     assert banks["catalog_size"] == 7
     assert _tickers(banks) == ["ITUB4", "BBAS3", "TINY3"]
+    assert (banks["total"], banks["page"]) == (3, 1)
+    second = client.get(
+        "/api/v1/research/screener", params={"sector": "finance", "limit": 2, "page": 2}
+    ).json()
+    assert _tickers(second) == ["TINY3"]
+    assert (second["total"], second["page"], second["page_size"]) == (3, 2, 2)
     funds = client.get("/api/v1/research/screener", params={"asset_type": ["FII", "ETF_BR"]}).json()
     assert {r["ticker"]: r["asset_type"] for r in funds["results"]} == {
         "BOVA11": "ETF_BR",
