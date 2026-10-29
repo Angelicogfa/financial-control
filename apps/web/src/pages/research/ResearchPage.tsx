@@ -16,6 +16,7 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { IconButton } from "../../components/RowActions";
 import { TrashIcon } from "../../layout/icons";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
@@ -24,6 +25,7 @@ import { MultiSelect } from "../../components/MultiSelect";
 import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points } from "../../utils/format";
+import { usePagedRows } from "../../utils/pagination";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -93,7 +95,8 @@ function toFilters(form: ScreenForm): ScreenerFilters {
     min_roe: percent(form.minRoe),
     below_band: form.belowBand || undefined,
     exclude_registered: form.excludeRegistered || undefined,
-    limit: 50,
+    // The most the API returns in one search; the table pages through them.
+    limit: 100,
   };
 }
 
@@ -132,9 +135,21 @@ function FollowAction({ item, onFollow, busy }: Readonly<{ item: ScreenerItemDTO
 
 function ResultsTable({
   result,
+  searchKey,
   onFollow,
   following,
-}: Readonly<{ result: ScreenerResponseDTO; onFollow: FollowHandler; following: string | null }>) {
+  onRefresh,
+  refreshing,
+}: Readonly<{
+  result: ScreenerResponseDTO;
+  /** The filters searched: a new search starts on the first page. */
+  searchKey: string;
+  onFollow: FollowHandler;
+  following: string | null;
+  onRefresh: () => void;
+  refreshing: boolean;
+}>) {
+  const { rows, pagination } = usePagedRows(result.results, searchKey);
   if (result.results.length === 0) {
     return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o tipo." />;
   }
@@ -156,7 +171,7 @@ function ResultsTable({
           </tr>
         </thead>
         <tbody>
-          {result.results.map((item) => (
+          {rows.map((item) => (
             <tr key={item.ticker}>
               <td>
                 <span className="app-cell-main">
@@ -201,6 +216,7 @@ function ResultsTable({
           ))}
         </tbody>
       </table>
+      <Pagination {...pagination} onRefresh={onRefresh} refreshing={refreshing} />
     </div>
   );
 }
@@ -208,6 +224,7 @@ function ResultsTable({
 function Screener() {
   const [form, setForm] = useState<ScreenForm>(EMPTY_FORM);
   const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
+  const [searchKey, setSearchKey] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [following, setFollowing] = useState<string | null>(null);
@@ -219,7 +236,9 @@ function Screener() {
     setLoading(true);
     setError(null);
     try {
-      setResult(await api.research.screener(toFilters(form)));
+      const filters = toFilters(form);
+      setResult(await api.research.screener(filters));
+      setSearchKey(JSON.stringify(filters));
     } catch (err) {
       setError(err);
     } finally {
@@ -367,7 +386,14 @@ function Screener() {
               hint="O worker sincroniza a lista de ativos da B3 em dias úteis; confira em Dados de mercado."
             />
           ) : (
-            <ResultsTable result={result} onFollow={(item, arca) => void follow(item, arca)} following={following} />
+            <ResultsTable
+              result={result}
+              searchKey={searchKey}
+              onFollow={(item, arca) => void follow(item, arca)}
+              following={following}
+              onRefresh={() => void run()}
+              refreshing={loading}
+            />
           )}
         </>
       )}
@@ -387,6 +413,7 @@ function Watchlist() {
   const [adding, setAdding] = useState(false);
   const [reclassifyingId, setReclassifyingId] = useState<number | null>(null);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const { rows, pagination } = usePagedRows(watchlist.data ?? []);
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -490,7 +517,7 @@ function Watchlist() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {rows.map((item) => (
                     <tr key={item.asset_id}>
                       <td>
                         <span className="app-cell-main">
@@ -543,6 +570,7 @@ function Watchlist() {
                   ))}
                 </tbody>
               </table>
+              <Pagination {...pagination} onRefresh={watchlist.reload} refreshing={watchlist.loading} />
             </div>
           )
         }
@@ -576,19 +604,17 @@ function TreasuryScreener() {
   const [loading, setLoading] = useState(false);
   const [registering, setRegistering] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [searchKey, setSearchKey] = useState("");
+  const { rows, pagination } = usePagedRows(result?.results ?? [], searchKey);
 
   const run = async (event?: FormEvent) => {
     event?.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      setResult(
-        await api.research.treasury({
-          q: q.trim() || undefined,
-          indexer: indexer || undefined,
-          coupon_type: couponType || undefined,
-        }),
-      );
+      const filters = { q: q.trim() || undefined, indexer: indexer || undefined, coupon_type: couponType || undefined };
+      setResult(await api.research.treasury(filters));
+      setSearchKey(JSON.stringify(filters));
     } catch (err) {
       setError(err);
     } finally {
@@ -707,7 +733,7 @@ function TreasuryScreener() {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.results.map((bond) => (
+                  {rows.map((bond) => (
                     <tr key={bond.symbol}>
                       <td>
                         <span className="app-cell-main">
@@ -751,6 +777,7 @@ function TreasuryScreener() {
                   ))}
                 </tbody>
               </table>
+              <Pagination {...pagination} onRefresh={() => void run()} refreshing={loading} />
             </div>
           )}
         </>

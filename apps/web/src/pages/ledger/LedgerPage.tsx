@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type LedgerFilters } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
-import { useApi } from "../../api/useApi";
+import type { PageMetaDTO } from "../../api/types";
+import { useApi, type ApiState } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { IconButton, IconLink } from "../../components/RowActions";
 import { Async, Empty } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, day, num, quantity } from "../../utils/format";
 import { EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
+import { clampPage, usePagedRows, usePagination, type PaginationState } from "../../utils/pagination";
 import { EditIcon, TrashIcon } from "../../layout/icons";
 
 type TabKey = "trades" | "earnings" | "events";
@@ -99,15 +102,55 @@ function useRemove(reload: () => void) {
   return { error, remove, removingId };
 }
 
+/**
+ * One page of a ledger list, paged by the API. A new filter starts on the first page; a page
+ * left empty by a removal moves back to the last page that still has rows.
+ */
+function useLedgerPage<T>(
+  name: string,
+  filters: LedgerFilters,
+  load: (filters: LedgerFilters) => Promise<{ items: T[]; meta: PageMetaDTO }>,
+): { state: ApiState<{ items: T[]; meta: PageMetaDTO }>; pager: PaginationState } {
+  const pager = usePagination(JSON.stringify(filters));
+  const query = { ...filters, page: pager.page + 1, page_size: pager.pageSize };
+  const state = useApi(`${name}-${JSON.stringify(query)}`, () => load(query));
+  const { data } = state;
+  const { page, pageSize, setPage } = pager;
+  useEffect(() => {
+    if (data && data.items.length === 0 && data.meta.total_items > 0) {
+      setPage(clampPage(page, data.meta.total_items, pageSize));
+    }
+  }, [data, page, pageSize, setPage]);
+  return { state, pager };
+}
+
+function LedgerPagination({
+  pager,
+  state,
+  total,
+}: Readonly<{ pager: PaginationState; state: ApiState<unknown>; total: number }>) {
+  return (
+    <Pagination
+      page={pager.page}
+      pageSize={pager.pageSize}
+      total={total}
+      onChange={pager.setPage}
+      onPageSizeChange={pager.setPageSize}
+      onRefresh={state.reload}
+      refreshing={state.loading}
+    />
+  );
+}
+
 function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
-  const trades = useApi(`trades-${JSON.stringify(filters)}`, () => api.ledger.trades(filters));
+  const { state: trades, pager } = useLedgerPage("trades", filters, api.ledger.trades);
   const { error, remove, removingId } = useRemove(trades.reload);
   return (
     <>
       {error && <p className="app-error-banner">{error}</p>}
       <Async state={trades} lines={5}>
         {(page) =>
-          page.items.length === 0 ? (
+          page.meta.total_items === 0 ? (
             <Empty title="Nenhuma compra ou venda" hint="Registre uma operação ou importe o extrato da B3." />
           ) : (
             <div className="app-table-wrap">
@@ -156,11 +199,7 @@ function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
                   ))}
                 </tbody>
               </table>
-              {page.meta.total_items > page.items.length && (
-                <p className="app-muted" style={{ padding: "var(--space-2) var(--space-4)" }}>
-                  Mostrando {page.items.length} de {page.meta.total_items}; use os filtros para ver as demais.
-                </p>
-              )}
+              <LedgerPagination pager={pager} state={trades} total={page.meta.total_items} />
             </div>
           )
         }
@@ -170,14 +209,14 @@ function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
 }
 
 function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
-  const earnings = useApi(`earnings-${JSON.stringify(filters)}`, () => api.ledger.earnings(filters));
+  const { state: earnings, pager } = useLedgerPage("earnings", filters, api.ledger.earnings);
   const { error, remove, removingId } = useRemove(earnings.reload);
   return (
     <>
       {error && <p className="app-error-banner">{error}</p>}
       <Async state={earnings} lines={5}>
         {(page) =>
-          page.items.length === 0 ? (
+          page.meta.total_items === 0 ? (
             <Empty title="Nenhum provento" hint="Registre um provento ou importe a Movimentação da B3." />
           ) : (
             <div className="app-table-wrap">
@@ -221,6 +260,7 @@ function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
                   ))}
                 </tbody>
               </table>
+              <LedgerPagination pager={pager} state={earnings} total={page.meta.total_items} />
             </div>
           )
         }
@@ -232,6 +272,7 @@ function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
 function Events({ filters }: Readonly<{ filters: LedgerFilters }>) {
   const events = useApi(`events-${filters.asset_id ?? "all"}`, () => api.ledger.events(filters.asset_id));
   const { error, remove, removingId } = useRemove(events.reload);
+  const paged = usePagedRows(events.data ?? [], String(filters.asset_id ?? "all"));
   return (
     <>
       {error && <p className="app-error-banner">{error}</p>}
@@ -254,7 +295,7 @@ function Events({ filters }: Readonly<{ filters: LedgerFilters }>) {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((e) => (
+                  {paged.rows.map((e) => (
                     <tr key={e.id}>
                       <td>{day(e.ex_date)}</td>
                       <td>{e.ticker}</td>
@@ -276,6 +317,7 @@ function Events({ filters }: Readonly<{ filters: LedgerFilters }>) {
                   ))}
                 </tbody>
               </table>
+              <Pagination {...paged.pagination} onRefresh={events.reload} refreshing={events.loading} />
             </div>
           )
         }

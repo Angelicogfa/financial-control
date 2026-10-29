@@ -16,8 +16,10 @@ import { Badge } from "../../components/Badge";
 import { Hint } from "../../components/Hint";
 import { MultiSelect } from "../../components/MultiSelect";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { Async, Empty, ErrorBanner, Spinner } from "../../components/States";
 import { brlCompact, money, num, pct } from "../../utils/format";
+import { usePagedRows } from "../../utils/pagination";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -124,15 +126,28 @@ export function searchFilters(form: SearchForm): ScreenerFilters {
     q: form.q.trim() || undefined,
     sector: form.sector ? [form.sector] : undefined,
     arca_class: form.arcaClasses.length ? form.arcaClasses : undefined,
-    limit: 20,
+    // The most the API returns in one search; the table pages through them.
+    limit: 100,
   };
 }
 
 function SearchResults({
   result,
+  searchKey,
   tickers,
   onAdd,
-}: Readonly<{ result: ScreenerResponseDTO; tickers: string[]; onAdd: (ticker: string) => void }>) {
+  onRefresh,
+  refreshing,
+}: Readonly<{
+  result: ScreenerResponseDTO;
+  /** The filters searched: a new search starts on the first page. */
+  searchKey: string;
+  tickers: string[];
+  onAdd: (ticker: string) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
+}>) {
+  const { rows, pagination } = usePagedRows(result.results, searchKey);
   if (result.results.length === 0) {
     return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o setor." />;
   }
@@ -151,7 +166,7 @@ function SearchResults({
           </tr>
         </thead>
         <tbody>
-          {result.results.map((item) => {
+          {rows.map((item) => {
             const added = tickers.includes(item.ticker);
             return (
               <tr key={item.ticker}>
@@ -184,6 +199,7 @@ function SearchResults({
           })}
         </tbody>
       </table>
+      <Pagination {...pagination} onRefresh={onRefresh} refreshing={refreshing} />
     </div>
   );
 }
@@ -192,17 +208,20 @@ function SearchResults({
 function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (ticker: string) => void }>) {
   const [form, setForm] = useState<SearchForm>(EMPTY_SEARCH);
   const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
+  const [searchKey, setSearchKey] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const sectors = useApi("research-sectors", () => api.research.sectors());
   const set = <K extends keyof SearchForm>(key: K, value: SearchForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  const run = async (event: FormEvent) => {
-    event.preventDefault();
+  const run = async (event?: FormEvent) => {
+    event?.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      setResult(await api.research.screener(searchFilters(form)));
+      const filters = searchFilters(form);
+      setResult(await api.research.screener(filters));
+      setSearchKey(JSON.stringify(filters));
     } catch (err) {
       setError(err);
     } finally {
@@ -260,7 +279,14 @@ function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (t
       <ErrorBanner error={error} />
       {result && (
         <div style={{ marginTop: "var(--space-3)" }}>
-          <SearchResults result={result} tickers={tickers} onAdd={onAdd} />
+          <SearchResults
+            result={result}
+            searchKey={searchKey}
+            tickers={tickers}
+            onAdd={onAdd}
+            onRefresh={() => void run()}
+            refreshing={loading}
+          />
         </div>
       )}
     </section>
