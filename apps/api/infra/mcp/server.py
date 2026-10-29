@@ -106,6 +106,13 @@ Tributação:
 e o IR estimado resgatando hoje × na próxima faixa; para renda variável, o regime do tipo.
 - `tools.fixed_income_compare` compara títulos tributados e isentos (valor e taxa líquidos, \
 taxas equivalentes por faixa, ponto de empate); `tools.tax_rules` lista as alíquotas com vigência.
+merge
+Simulação, Projeção e Calibração:
+- Cobertura de histórico e disparos: `simulation.coverage`, `market.request_job`.
+- Backtests da estratégia e robustez a crises: `simulation.backtest`, `simulation.robustness`.
+- Projeção probabilística de longo prazo e cenários: `simulation.project`, `simulation.projection`.
+- Calibração bayesiana walk-forward: `simulation.calibrate`, `simulation.calibration`.
+- Consulta geral de execuções: `simulation.list`, `simulation.get`.
 
 Repetição segura (Idempotência):
 - Ferramentas de comando aceitam `idempotency_key` opcional. Após um timeout de rede, repita \
