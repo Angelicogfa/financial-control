@@ -1,21 +1,31 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { api } from "../../api/endpoints";
+import { api, type ScreenerFilters } from "../../api/endpoints";
 import type {
+  ArcaClass,
   AssetComparisonDTO,
   ComparedAssetDTO,
   ComparisonRowDTO,
   IndicatorGroup,
   IndicatorUnit,
+  ScreenerResponseDTO,
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { Hint } from "../../components/Hint";
+import { MultiSelect } from "../../components/MultiSelect";
 import { PageHeader } from "../../components/PageHeader";
-import { Async, Empty } from "../../components/States";
+import { Async, Empty, ErrorBanner, Spinner } from "../../components/States";
 import { brlCompact, money, num, pct } from "../../utils/format";
-import { PROFILE_LABELS, RECOMMENDATION_LABELS, VERDICT_LABELS, VERDICT_TONES } from "../../utils/labels";
+import {
+  ARCA_CLASSES,
+  ARCA_LABELS,
+  PROFILE_LABELS,
+  RECOMMENDATION_LABELS,
+  VERDICT_LABELS,
+  VERDICT_TONES,
+} from "../../utils/labels";
 import { TrendChart } from "../../viz/TrendChart";
 
 export const MAX_COMPARED = 5;
@@ -97,6 +107,163 @@ function TickerPicker({ tickers, onChange }: Readonly<{ tickers: string[]; onCha
         <Hint about="Ativos comparados">De 2 a 5 ativos, cadastrados ou do catálogo da B3. Compare ativos do mesmo perfil.</Hint>
       </div>
     </form>
+  );
+}
+
+export interface SearchForm {
+  q: string;
+  sector: string;
+  arcaClasses: ArcaClass[];
+}
+
+const EMPTY_SEARCH: SearchForm = { q: "", sector: "", arcaClasses: [] };
+
+/** Screener filters for the comparator search: name or code, sector and ARCA class. */
+export function searchFilters(form: SearchForm): ScreenerFilters {
+  return {
+    q: form.q.trim() || undefined,
+    sector: form.sector ? [form.sector] : undefined,
+    arca_class: form.arcaClasses.length ? form.arcaClasses : undefined,
+    limit: 20,
+  };
+}
+
+function SearchResults({
+  result,
+  tickers,
+  onAdd,
+}: Readonly<{ result: ScreenerResponseDTO; tickers: string[]; onAdd: (ticker: string) => void }>) {
+  if (result.results.length === 0) {
+    return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o setor." />;
+  }
+  const full = tickers.length >= MAX_COMPARED;
+  return (
+    <div className="app-table-wrap">
+      <table className="app-table" aria-label="Resultados da busca">
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th>Classe</th>
+            <th className="app-numeric">Preço</th>
+            <th className="app-numeric">P/L</th>
+            <th className="app-numeric">DY</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {result.results.map((item) => {
+            const added = tickers.includes(item.ticker);
+            return (
+              <tr key={item.ticker}>
+                <td>
+                  <span className="app-cell-main">
+                    <strong>{item.ticker}</strong>
+                    <small>
+                      {item.name}
+                      {item.sector ? ` · ${item.sector}` : ""}
+                    </small>
+                  </span>
+                </td>
+                <td>{ARCA_LABELS[item.arca_class]}</td>
+                <td className="app-numeric">{num(item.close)}</td>
+                <td className="app-numeric">{num(item.price_to_earnings, 1)}</td>
+                <td className="app-numeric">{pct(item.dividend_yield)}</td>
+                <td className="app-row-actions">
+                  <button
+                    type="button"
+                    className="app-secondary-button"
+                    aria-label={`Adicionar ${item.ticker}`}
+                    disabled={added || full}
+                    onClick={() => onAdd(item.ticker)}
+                  >
+                    {added ? "Adicionado" : "Adicionar"}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Finds candidates in the B3 catalog by name, sector and ARCA class, like the screener. */
+function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (ticker: string) => void }>) {
+  const [form, setForm] = useState<SearchForm>(EMPTY_SEARCH);
+  const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+  const sectors = useApi("research-sectors", () => api.research.sectors());
+  const set = <K extends keyof SearchForm>(key: K, value: SearchForm[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  const run = async (event: FormEvent) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      setResult(await api.research.screener(searchFilters(form)));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="app-card app-card-padded">
+      <h2 className="app-card-heading">Buscar ativos</h2>
+      <form onSubmit={run} aria-busy={loading} aria-label="Buscar ativos para comparar">
+        <div className="app-field-grid">
+          <div className="app-field">
+            <label htmlFor="compare-q">Nome ou código</label>
+            <input
+              id="compare-q"
+              value={form.q}
+              onChange={(e) => set("q", e.target.value)}
+              placeholder="Ex.: banco, ITUB"
+              disabled={loading}
+            />
+          </div>
+          <div className="app-field">
+            <label htmlFor="compare-sector">Setor</label>
+            <select id="compare-sector" value={form.sector} onChange={(e) => set("sector", e.target.value)} disabled={loading}>
+              <option value="">Todos</option>
+              {(sectors.data ?? []).map((sector) => (
+                <option key={sector} value={sector}>
+                  {sector}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="app-field">
+            <label htmlFor="compare-arca">Classe ARCA</label>
+            <MultiSelect
+              id="compare-arca"
+              options={ARCA_CLASSES.map((arca) => ({ value: arca, label: ARCA_LABELS[arca] }))}
+              value={form.arcaClasses}
+              onChange={(arcaClasses) => set("arcaClasses", arcaClasses)}
+              disabled={loading}
+            />
+          </div>
+        </div>
+        <div className="app-button-row" style={{ marginTop: "var(--space-3)" }}>
+          <button type="submit" className="app-primary-button" disabled={loading}>
+            {loading && <Spinner size="sm" />}
+            <span>{loading ? "Buscando…" : "Buscar"}</span>
+          </button>
+          <button type="button" className="app-link-button" disabled={loading} onClick={() => setForm(EMPTY_SEARCH)}>
+            Limpar filtros
+          </button>
+        </div>
+      </form>
+      <ErrorBanner error={error} />
+      {result && (
+        <div style={{ marginTop: "var(--space-3)" }}>
+          <SearchResults result={result} tickers={tickers} onAdd={onAdd} />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -325,12 +492,13 @@ export function AssetComparePage() {
       />
       <div className="app-page-stack">
         <TickerPicker tickers={tickers} onChange={change} />
+        <AssetSearch tickers={tickers} onAdd={(ticker) => change(parseTickers([...tickers, ticker].join(",")))} />
         {ready ? (
           <Async state={comparison} lines={8}>
             {(data) => <Comparison data={data} />}
           </Async>
         ) : (
-          <Empty title="Escolha ao menos dois ativos" hint="Adicione tickers acima ou use “Comparar” na Pesquisa, na Carteira ou no ativo." />
+          <Empty title="Escolha ao menos dois ativos" hint="Adicione tickers, busque por setor e classe ARCA ou use “Comparar” na Pesquisa, na Carteira ou no ativo." />
         )}
       </div>
     </div>
