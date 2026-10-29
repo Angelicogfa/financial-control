@@ -96,13 +96,11 @@ describe("asset comparator", () => {
       q: undefined,
       sector: undefined,
       arca_class: undefined,
-      limit: 100,
     });
     expect(searchFilters({ q: " banco ", sector: "Finance", arcaClasses: ["ACOES"] })).toEqual({
       q: "banco",
       sector: ["Finance"],
       arca_class: ["ACOES"],
-      limit: 100,
     });
   });
 

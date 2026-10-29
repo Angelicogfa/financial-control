@@ -8,7 +8,6 @@ import type {
   AssetType,
   FixedIncomeIndexer,
   ScreenerItemDTO,
-  ScreenerResponseDTO,
   TreasuryBondDTO,
   TreasurySearchResponseDTO,
   WatchlistItemDTO,
@@ -39,6 +38,7 @@ import {
 } from "../../utils/labels";
 import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
 import { compareLink } from "../tools/AssetComparePage";
+import { useScreenerSearch, type ScreenerSearch } from "./useScreenerSearch";
 
 type TabKey = "screener" | "treasury" | "watchlist";
 const TABS: TabSpec<TabKey>[] = [
@@ -95,8 +95,6 @@ function toFilters(form: ScreenForm): ScreenerFilters {
     min_roe: percent(form.minRoe),
     below_band: form.belowBand || undefined,
     exclude_registered: form.excludeRegistered || undefined,
-    // The most the API returns in one search; the table pages through them.
-    limit: 100,
   };
 }
 
@@ -134,23 +132,12 @@ function FollowAction({ item, onFollow, busy }: Readonly<{ item: ScreenerItemDTO
 }
 
 function ResultsTable({
-  result,
-  searchKey,
+  search,
   onFollow,
   following,
-  onRefresh,
-  refreshing,
-}: Readonly<{
-  result: ScreenerResponseDTO;
-  /** The filters searched: a new search starts on the first page. */
-  searchKey: string;
-  onFollow: FollowHandler;
-  following: string | null;
-  onRefresh: () => void;
-  refreshing: boolean;
-}>) {
-  const { rows, pagination } = usePagedRows(result.results, searchKey);
-  if (result.results.length === 0) {
+}: Readonly<{ search: ScreenerSearch; onFollow: FollowHandler; following: string | null }>) {
+  const rows = search.result?.results ?? [];
+  if (search.pagination.total === 0) {
     return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o tipo." />;
   }
   return (
@@ -216,34 +203,22 @@ function ResultsTable({
           ))}
         </tbody>
       </table>
-      <Pagination {...pagination} onRefresh={onRefresh} refreshing={refreshing} />
+      <Pagination {...search.pagination} onRefresh={() => void search.refresh()} refreshing={search.loading} />
     </div>
   );
 }
 
 function Screener() {
   const [form, setForm] = useState<ScreenForm>(EMPTY_FORM);
-  const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
-  const [searchKey, setSearchKey] = useState("");
-  const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(false);
+  const search = useScreenerSearch();
+  const { result, error, loading } = search;
   const [following, setFollowing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const set = <K extends keyof ScreenForm>(key: K, value: ScreenForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const run = async (event?: FormEvent) => {
     event?.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const filters = toFilters(form);
-      setResult(await api.research.screener(filters));
-      setSearchKey(JSON.stringify(filters));
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
+    await search.search(toFilters(form));
   };
 
   const follow = async (item: ScreenerItemDTO, arcaClass: ArcaClass) => {
@@ -257,7 +232,7 @@ function Screener() {
         arca_class: arcaClass,
       });
       setNotice(`${added.ticker} está em observação em ${ARCA_LABELS[added.arca_class]}.`);
-      await run();
+      await search.refresh();
     } catch (err) {
       setNotice(errorMessage(err));
     } finally {
@@ -363,7 +338,7 @@ function Screener() {
         </div>
       </form>
       {notice && <p className="app-info-banner">{notice}</p>}
-      <ErrorBanner error={error} onRetry={() => void run()} />
+      <ErrorBanner error={error} onRetry={() => void (result ? search.refresh() : run())} />
       {loading && !result && <Loading lines={5} />}
       {loading && result && (
         <div className="app-busy-overlay" role="status" aria-live="polite">
@@ -374,7 +349,7 @@ function Screener() {
       {result && (
         <>
           <p className="app-muted" style={{ margin: 0 }}>
-            {result.results.length} resultado(s) de {result.candidates} candidato(s) no catálogo de {result.catalog_size}{" "}
+            {search.pagination.total} resultado(s) de {result.candidates} candidato(s) no catálogo de {result.catalog_size}{" "}
             ativos{result.catalog_updated_at ? ` (atualizado em ${dateTime(result.catalog_updated_at)})` : ""}.
             {result.truncated && " Os indicadores foram buscados só para os mais líquidos: refine os filtros para ver outros."}
             {result.arca_classes && result.arca_classes.length > 0 &&
@@ -386,14 +361,7 @@ function Screener() {
               hint="O worker sincroniza a lista de ativos da B3 em dias úteis; confira em Dados de mercado."
             />
           ) : (
-            <ResultsTable
-              result={result}
-              searchKey={searchKey}
-              onFollow={(item, arca) => void follow(item, arca)}
-              following={following}
-              onRefresh={() => void run()}
-              refreshing={loading}
-            />
+            <ResultsTable search={search} onFollow={(item, arca) => void follow(item, arca)} following={following} />
           )}
         </>
       )}

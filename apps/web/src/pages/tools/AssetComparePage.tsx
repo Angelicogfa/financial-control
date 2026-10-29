@@ -9,7 +9,6 @@ import type {
   ComparisonRowDTO,
   IndicatorGroup,
   IndicatorUnit,
-  ScreenerResponseDTO,
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
@@ -19,7 +18,6 @@ import { PageHeader } from "../../components/PageHeader";
 import { Pagination } from "../../components/Pagination";
 import { Async, Empty, ErrorBanner, Spinner } from "../../components/States";
 import { brlCompact, money, num, pct } from "../../utils/format";
-import { usePagedRows } from "../../utils/pagination";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -29,6 +27,7 @@ import {
   VERDICT_TONES,
 } from "../../utils/labels";
 import { TrendChart } from "../../viz/TrendChart";
+import { useScreenerSearch, type ScreenerSearch } from "../research/useScreenerSearch";
 
 export const MAX_COMPARED = 5;
 
@@ -126,29 +125,16 @@ export function searchFilters(form: SearchForm): ScreenerFilters {
     q: form.q.trim() || undefined,
     sector: form.sector ? [form.sector] : undefined,
     arca_class: form.arcaClasses.length ? form.arcaClasses : undefined,
-    // The most the API returns in one search; the table pages through them.
-    limit: 100,
   };
 }
 
 function SearchResults({
-  result,
-  searchKey,
+  search,
   tickers,
   onAdd,
-  onRefresh,
-  refreshing,
-}: Readonly<{
-  result: ScreenerResponseDTO;
-  /** The filters searched: a new search starts on the first page. */
-  searchKey: string;
-  tickers: string[];
-  onAdd: (ticker: string) => void;
-  onRefresh: () => void;
-  refreshing: boolean;
-}>) {
-  const { rows, pagination } = usePagedRows(result.results, searchKey);
-  if (result.results.length === 0) {
+}: Readonly<{ search: ScreenerSearch; tickers: string[]; onAdd: (ticker: string) => void }>) {
+  const rows = search.result?.results ?? [];
+  if (search.pagination.total === 0) {
     return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o setor." />;
   }
   const full = tickers.length >= MAX_COMPARED;
@@ -199,7 +185,7 @@ function SearchResults({
           })}
         </tbody>
       </table>
-      <Pagination {...pagination} onRefresh={onRefresh} refreshing={refreshing} />
+      <Pagination {...search.pagination} onRefresh={() => void search.refresh()} refreshing={search.loading} />
     </div>
   );
 }
@@ -207,26 +193,14 @@ function SearchResults({
 /** Finds candidates in the B3 catalog by name, sector and ARCA class, like the screener. */
 function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (ticker: string) => void }>) {
   const [form, setForm] = useState<SearchForm>(EMPTY_SEARCH);
-  const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
-  const [searchKey, setSearchKey] = useState("");
-  const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(false);
+  const search = useScreenerSearch();
+  const { result, error, loading } = search;
   const sectors = useApi("research-sectors", () => api.research.sectors());
   const set = <K extends keyof SearchForm>(key: K, value: SearchForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  const run = async (event?: FormEvent) => {
-    event?.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const filters = searchFilters(form);
-      setResult(await api.research.screener(filters));
-      setSearchKey(JSON.stringify(filters));
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
+  const run = async (event: FormEvent) => {
+    event.preventDefault();
+    await search.search(searchFilters(form));
   };
 
   return (
@@ -279,14 +253,7 @@ function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (t
       <ErrorBanner error={error} />
       {result && (
         <div style={{ marginTop: "var(--space-3)" }}>
-          <SearchResults
-            result={result}
-            searchKey={searchKey}
-            tickers={tickers}
-            onAdd={onAdd}
-            onRefresh={() => void run()}
-            refreshing={loading}
-          />
+          <SearchResults search={search} tickers={tickers} onAdd={onAdd} />
         </div>
       )}
     </section>

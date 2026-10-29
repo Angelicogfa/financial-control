@@ -152,3 +152,40 @@ def test_screen_limits_scan_and_annotates_results() -> None:
     assert [r.instrument.ticker for r in quick.results] == ["ITUB4"]
     assert quick.scanned == 1 and not quick.truncated
     assert screen([], ScreenerCriteria(), load_fundamentals=loader).results == []
+
+
+def test_screen_pages_every_catalog_candidate() -> None:
+    loaded: list[list[str]] = []
+
+    def loader(items: list[CatalogInstrument]) -> dict[str, Fundamentals]:
+        loaded.append([i.ticker for i in items])
+        return {}
+
+    first = screen(CATALOG, ScreenerCriteria(limit=3), load_fundamentals=loader)
+    assert [r.instrument.ticker for r in first.results] == ["ITUB4", "HGLG11", "AAPL34"]
+    assert (first.matched, first.candidates) == (4, 4)
+
+    second = screen(CATALOG, ScreenerCriteria(limit=3, offset=3), load_fundamentals=loader)
+    assert [r.instrument.ticker for r in second.results] == ["TINY3"]
+    assert second.matched == 4
+    # Without fundamental criteria, indicators are loaded only for the page shown.
+    assert loaded == [["ITUB4", "HGLG11", "AAPL34"], ["TINY3"]]
+
+    beyond = screen(CATALOG, ScreenerCriteria(limit=3, offset=9), load_fundamentals=loader)
+    assert beyond.results == [] and beyond.matched == 4
+
+
+def test_screen_pages_the_fundamental_matches() -> None:
+    def loader(items: list[CatalogInstrument]) -> dict[str, Fundamentals]:
+        # HGLG11 fails the criterion, so the second page starts after the third match.
+        return {
+            i.ticker: Fundamentals(
+                symbol=i.ticker, dividend_yield=0.01 if i.ticker == "HGLG11" else 0.07
+            )
+            for i in items
+        }
+
+    criteria = ScreenerCriteria(min_dy=0.05, limit=2, offset=2)
+    outcome = screen(CATALOG, criteria, load_fundamentals=loader)
+    assert [r.instrument.ticker for r in outcome.results] == ["TINY3"]
+    assert (outcome.matched, outcome.scanned, outcome.truncated) == (3, 4, False)

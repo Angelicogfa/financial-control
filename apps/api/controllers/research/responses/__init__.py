@@ -45,6 +45,10 @@ class ScreenerItemDTO(BaseModel):
 
 class ScreenerResponseDTO(BaseModel):
     results: list[ScreenerItemDTO]
+    # Matches across all pages; `results` is the requested page.
+    total: int = 0
+    page: int = 1
+    page_size: int = 30
     candidates: int
     scanned: int
     truncated: bool
