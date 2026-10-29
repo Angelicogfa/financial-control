@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     # watchlist on the slower one; screens read the stored values.
     quote_refresh_minutes: int = Field(default=5, ge=1)
     watchlist_refresh_minutes: int = Field(default=60, ge=1)
+    # Phase 39: declared distributions every few hours; price history and the catalog
+    # indicators once a day after the catalog sync (`catalog_sync_cron_hour`).
+    distributions_refresh_hours: int = Field(default=6, ge=1)
     bcb_sync_cron_hour: int = Field(default=18, ge=0, le=23)
     bcb_sync_cron_minute: int = Field(default=0, ge=0, le=59)
     snapshot_cron_hour: int = Field(default=18, ge=0, le=23)

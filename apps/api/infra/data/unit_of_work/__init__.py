@@ -34,6 +34,7 @@ from infra.data.repositories.market import (
     SqlAlchemyFundamentalsRepository,
     SqlAlchemyMarketDataRepository,
     SqlAlchemyMarketSeriesRepository,
+    SqlAlchemyPriceHistoryRepository,
     SqlAlchemyTreasuryCatalogRepository,
 )
 from infra.data.repositories.policy import SqlAlchemyPolicyRepository
@@ -77,6 +78,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)
         self.cvm_documents = SqlAlchemyCvmDocumentRepository(self.session)
         self.market_data = SqlAlchemyMarketDataRepository(self.session)
+        self.price_history = SqlAlchemyPriceHistoryRepository(self.session)
         return self
 
     def __exit__(

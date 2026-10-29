@@ -114,6 +114,7 @@ def fetch_histories(
     range_period: str = "2y",
     max_workers: int = 8,
     timeout_seconds: float = 20.0,
+    bypass_cache: bool = False,
 ) -> dict[str, list[PricePoint]]:
     """Daily price histories of market-traded assets, fetched concurrently with one deadline.
 
@@ -127,7 +128,10 @@ def fetch_histories(
         executor.submit(
             copy_context().run,
             lambda a=asset: gateway.get_history(
-                a.ticker, range_period=range_period, asset_type=a.asset_type
+                a.ticker,
+                range_period=range_period,
+                asset_type=a.asset_type,
+                bypass_cache=bypass_cache,
             ),
         ): asset.ticker
         for asset in tradable
@@ -159,6 +163,7 @@ def fetch_distributions(
     *,
     max_workers: int = 8,
     timeout_seconds: float = 20.0,
+    bypass_cache: bool = False,
 ) -> dict[str, AnnouncedDistributions]:
     """Declared dividends and stock events of B3 assets, fetched concurrently."""
     tradable = [a for a in assets if a.market not in OFFLINE_MARKETS]
@@ -168,7 +173,9 @@ def fetch_distributions(
     futures: dict[Future, str] = {
         executor.submit(
             copy_context().run,
-            lambda a=asset: gateway.get_distributions(a.ticker, asset_type=a.asset_type),
+            lambda a=asset: gateway.get_distributions(
+                a.ticker, asset_type=a.asset_type, bypass_cache=bypass_cache
+            ),
         ): asset.ticker
         for asset in tradable
     }

@@ -98,7 +98,7 @@ from domain.simulation.runs import (
     pending_calibration,
     queue_calibration,
 )
-from infra.providers.stored import stored_market_data
+from infra.providers.stored import stored_macro_rates, stored_market_data
 
 
 def to_run_dto(run: SimulationRun) -> SimulationRunDTO:
@@ -355,7 +355,8 @@ class SimulationHandler:
                     "cdi_rate and ipca_rate are required without market rates",
                     code="RATES_UNAVAILABLE",
                 )
-            market_cdi, market_ipca = self.portfolio_service.gateway.get_macro_rates()
+            with self.uow_factory() as uow:
+                market_cdi, market_ipca = stored_macro_rates(uow, self.portfolio_service.gateway)
             cdi = market_cdi if cdi is None else cdi
             ipca = market_ipca if ipca is None else ipca
         return round(cdi, 6), round(ipca, 6)

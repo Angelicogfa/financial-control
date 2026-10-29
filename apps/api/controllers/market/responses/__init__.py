@@ -54,6 +54,17 @@ class QuoteStatusDTO(BaseModel):
     stale_minutes: int
 
 
+class QuoteDayDTO(BaseModel):
+    """The last stored quote of a ticker on a day (audit trail, Phase 39.1)."""
+
+    day: date
+    price: float
+    currency: str
+    provider: str | None = None
+    freshness: str
+    fetched_at: datetime
+
+
 class WorkerRequestErrorDTO(BaseModel):
     """Detailed log entry for a failed upstream request made during a background worker job."""
 

@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
-from domain.market.entities import Fundamentals, Quote, StoredMarketData, TreasuryBond
+from domain.market.entities import (
+    Fundamentals,
+    PricePoint,
+    Quote,
+    QuoteDay,
+    StoredMarketData,
+    TreasuryBond,
+    distributions_from_dict,
+)
 from domain.shared.entities import (
     CatalogInstrument,
     MarketSeriesPoint,
@@ -16,9 +24,11 @@ from domain.shared.enums import (
     SeriesUnit,
 )
 from infra.data.models.market import (
+    AssetPriceHistoryModel,
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
     MarketDataModel,
+    MarketQuoteHistoryModel,
     MarketSeriesModel,
     TreasuryCatalogModel,
 )
@@ -95,4 +105,35 @@ def to_stored_market_data(model: MarketDataModel) -> StoredMarketData:
         quote_fetched_at=model.quote_fetched_at,
         fundamentals=Fundamentals.from_dict(model.fundamentals) if model.fundamentals else None,
         fundamentals_fetched_at=model.fundamentals_fetched_at,
+        distributions=(
+            distributions_from_dict(model.distributions)
+            if model.distributions is not None
+            else None
+        ),
+        distributions_fetched_at=model.distributions_fetched_at,
+        history_loaded_at=model.history_loaded_at,
+    )
+
+
+def to_quote_day(model: MarketQuoteHistoryModel) -> QuoteDay:
+    return QuoteDay(
+        ticker=model.ticker,
+        day=model.day,
+        price=model.price,
+        currency=model.currency,
+        provider=model.provider,
+        freshness=model.freshness,
+        fetched_at=model.fetched_at,
+    )
+
+
+def to_price_point(model: AssetPriceHistoryModel) -> PricePoint:
+    return PricePoint(
+        date=model.day,
+        close=model.close,
+        open=model.open,
+        high=model.high,
+        low=model.low,
+        adj_close=model.adj_close,
+        volume=model.volume,
     )

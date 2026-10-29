@@ -60,7 +60,7 @@ from domain.simulation.data import (
     tr_symbol,
 )
 from domain.simulation.runs import execute_next_run, queue_calibration
-from infra.providers.batch import fetch_market_data
+from infra.providers.batch import fetch_distributions, fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
 from infra.providers.stored import refresh_stored_market_data, refresh_stored_usd_brl
 
@@ -279,6 +279,145 @@ def refresh_watchlist_quotes_job(
         timeout_seconds=timeout_seconds,
         now=now,
     )
+
+
+# Asset types whose declared distributions the B3 publishes (the Home earnings agenda).
+DISTRIBUTION_TYPES = frozenset({AssetType.STOCK_BR, AssetType.BDR, AssetType.FII})
+# A stored history older than this is loaded again in full instead of extended.
+HISTORY_GAP = timedelta(days=25)
+
+
+def _market_assets(uow: AbstractUnitOfWork) -> list[AssetEntity]:
+    return [
+        a
+        for a in uow.assets.list_all(active_only=True)
+        if a.market not in (Market.MANUAL, Market.FIXED_INCOME_CURVE)
+    ]
+
+
+def sync_price_history_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    max_workers: int = 8,
+    timeout_seconds: float = 900.0,
+    now: datetime | None = None,
+) -> dict[str, int]:
+    """Store the daily closes of the active assets (Phase 39.2).
+
+    A ticker loaded for the first time (or after a long gap) gets its whole history; the others
+    get the last month, which also corrects late adjustments of the provider.
+    """
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        assets = _market_assets(uow)
+        stored = uow.market_data.get_many(a.ticker for a in assets)
+        last = uow.price_history.last_dates(a.ticker for a in assets)
+        full = [
+            a
+            for a in assets
+            if (data := stored.get(a.ticker)) is None
+            or data.history_loaded_at is None
+            or a.ticker not in last
+            or last[a.ticker] < at.date() - HISTORY_GAP
+        ]
+        full_tickers = {a.ticker for a in full}
+        recent = [a for a in assets if a.ticker not in full_tickers]
+        loaded = fetch_histories(
+            gateway,
+            full,
+            range_period="max",
+            max_workers=max_workers,
+            timeout_seconds=timeout_seconds,
+            bypass_cache=True,
+        )
+        extended = fetch_histories(
+            gateway,
+            recent,
+            range_period="1mo",
+            max_workers=max_workers,
+            timeout_seconds=timeout_seconds,
+            bypass_cache=True,
+        )
+        for ticker, points in {**loaded, **extended}.items():
+            uow.price_history.upsert(ticker, points, fetched_at=at)
+        uow.market_data.mark_history_loaded(loaded, loaded_at=at)
+        uow.commit()
+    return {"full": len(loaded), "recent": len(extended)}
+
+
+def refresh_distributions_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    max_workers: int = 8,
+    timeout_seconds: float = 600.0,
+    now: datetime | None = None,
+) -> int:
+    """Store the declared distributions of the B3 assets (Phase 39.3).
+
+    An empty answer replaces nothing already stored: a provider that is down would otherwise
+    wipe the agenda; an old declaration left behind is harmless, the agenda filters by date.
+    """
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        assets = [a for a in _market_assets(uow) if a.asset_type in DISTRIBUTION_TYPES]
+        stored = uow.market_data.get_many(a.ticker for a in assets)
+        found = fetch_distributions(
+            gateway,
+            assets,
+            max_workers=max_workers,
+            timeout_seconds=timeout_seconds,
+            bypass_cache=True,
+        )
+        kept = {
+            ticker: value
+            for ticker, value in found.items()
+            if value.cash
+            or value.stock
+            or (data := stored.get(ticker)) is None
+            or data.distributions is None
+        }
+        uow.market_data.save_distributions(kept, fetched_at=at)
+        uow.commit()
+    return len(kept)
+
+
+def refresh_catalog_fundamentals_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    max_workers: int = 8,
+    timeout_seconds: float = 3000.0,
+    now: datetime | None = None,
+) -> int:
+    """Store the indicators of the B3 catalog read by the screener (Phase 39.5)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        probes = [
+            AssetEntity(ticker=i.ticker, name=i.name, asset_type=i.asset_type)
+            for i in uow.catalog.list_all()
+            if i.asset_type is not None
+        ]
+        stored = uow.market_data.get_many(p.ticker for p in probes)
+        stale = [
+            p
+            for p in probes
+            if (data := stored.get(p.ticker)) is None
+            or data.fundamentals_fetched_at is None
+            or _as_utc(data.fundamentals_fetched_at) < at - FUNDAMENTALS_MAX_AGE
+        ]
+        fetched = refresh_stored_market_data(
+            uow,
+            gateway,
+            quotes_for=(),
+            fundamentals_for=stale,
+            max_workers=max_workers,
+            timeout_seconds=timeout_seconds,
+            now=at,
+        )
+        uow.commit()
+    return len(fetched.fundamentals)
 
 
 def refresh_fundamentals_job(

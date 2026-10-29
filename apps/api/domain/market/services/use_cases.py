@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from controllers.market.responses import (
     JobRunDTO,
+    QuoteDayDTO,
     QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
@@ -29,6 +30,9 @@ MANUAL_JOBS: dict[str, str] = {
     "sync_simulation_history": "Carga do histórico longo usado pela simulação de carteira",
     "sync_cvm_documents": "Carga dos fatos relevantes e comunicados da CVM",
     "warm_portfolio_quotes": "Atualização das cotações das posições",
+    "sync_price_history": "Carga do histórico diário de preços dos ativos",
+    "refresh_distributions": "Atualização dos proventos declarados na B3",
+    "refresh_catalog_fundamentals": "Atualização dos indicadores do catálogo da B3 (screener)",
 }
 
 
@@ -89,6 +93,24 @@ class MarketDataHandler:
             stale=len(held) - sum(1 for t in times if t >= limit),
             stale_minutes=QUOTE_STALE_MINUTES,
         )
+
+    def quote_history(
+        self, ticker: str, *, date_from: date | None = None, date_to: date | None = None
+    ) -> list[QuoteDayDTO]:
+        """The last stored quote of each day: where each price came from and when."""
+        with self.uow_factory() as uow:
+            days = uow.market_data.quote_history(ticker, date_from=date_from, date_to=date_to)
+        return [
+            QuoteDayDTO(
+                day=d.day,
+                price=d.price,
+                currency=d.currency,
+                provider=d.provider,
+                freshness=d.freshness,
+                fetched_at=d.fetched_at,
+            )
+            for d in days
+        ]
 
     def job_runs(self) -> list[JobRunDTO]:
         """Latest execution of each worker job (data freshness indicator)."""

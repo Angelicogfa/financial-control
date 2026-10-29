@@ -239,7 +239,7 @@ class AssetHandler:
             asset = uow.assets.get_by_id(asset_id)
             if asset is None:
                 raise NotFoundError(f"Asset id={asset_id} not found")
-        chart = self.portfolio_service.price_chart(asset, range_period)
+            chart = self.portfolio_service.price_chart(uow, asset, range_period)
         return AssetPriceHistoryDTO(
             range=range_period,
             points=[PricePointDTO(date=d, close=c) for d, c in chart.points],
