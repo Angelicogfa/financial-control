@@ -73,17 +73,23 @@ describe("portfolio health", () => {
 
     const pillars = await screen.findAllByRole("region");
     const titles = pillars.map((p) => p.getAttribute("aria-label"));
-    expect(titles).toEqual(["Resumo", "Concentração", "Risco", "Liquidez, renda e tributos"]);
+    expect(titles).toEqual(["Concentração", "Risco", "Liquidez, renda e tributos"]);
 
-    const concentration = within(pillars[1]);
+    const concentration = within(pillars[0]);
     expect(concentration.getAllByText("Crítico").length).toBeGreaterThan(0);
     expect(concentration.getByText("120,0%")).toBeInTheDocument();
     expect(concentration.getByText("Distribua entre outras instituições.")).toBeInTheDocument();
     expect(concentration.getByText(/Limites: atenção 90,0% · crítico 100,0%/)).toBeInTheDocument();
 
-    expect(within(pillars[2]).getByText(/Janela mínima: 60 \(há 12\)/)).toBeInTheDocument();
-    expect(within(pillars[3]).getByText("7,5 meses")).toBeInTheDocument();
-    expect(screen.getByText(/1 crítico\(s\), 0 em atenção, 1 ok e 1 sem dados suficientes/)).toBeInTheDocument();
+    expect(within(pillars[1]).getByText(/Janela mínima: 60 \(há 12\)/)).toBeInTheDocument();
+    expect(within(pillars[2]).getByText("7,5 meses")).toBeInTheDocument();
+    // The conclusion comes first, naming the worst check and its pillar.
+    const lead = screen.getByRole("note", { name: "Em resumo" });
+    expect(lead).toHaveClass("is-negative");
+    expect(lead).toHaveTextContent(/tem 1 ponto crítico: Exposição por instituição \(FGC\) \(Concentração\)/);
+    expect(lead).toHaveTextContent("1 checagem ainda não tem dados suficientes.");
+    const kpis = within(screen.getByLabelText("Checagens por situação"));
+    expect(kpis.getByText("Críticas").nextSibling).toHaveTextContent("1");
     expect(screen.getByText("Caixa")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "BANCO A" })).toBeInTheDocument();
   });
@@ -113,13 +119,14 @@ describe("portfolio health", () => {
     };
     mockApi([{ path: "/portfolio/health", reply: report }]);
     renderAt("/health");
-    const pillar = (await screen.findAllByRole("region"))[1];
+    const pillar = (await screen.findAllByRole("region"))[0];
     const items = within(pillar).getAllByRole("listitem").filter((li) => li.closest(".health-check-items"));
     expect(items.map((li) => li.textContent)).toEqual([
       "Ações Brasil: 60% do peso e 90% do risco",
       "Caixa & Renda Fixa: 40% do peso e 10% do risco",
     ]);
     const note = within(pillar).getByRole("note");
+    expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(/não tem pontos críticos, mas 1 checagem pede atenção/);
     expect(note).toHaveTextContent("Dado suspeito");
     expect(note).toHaveTextContent(/XPML11: preço do provedor fora de escala/);
   });

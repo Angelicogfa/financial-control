@@ -18,7 +18,16 @@ import { SEVERITY_TONES } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { Sparkline } from "../../viz/Sparkline";
 import { TrendChart } from "../../viz/TrendChart";
-import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange, type Change } from "./story";
+import {
+  alignCurves,
+  curveReturn,
+  headline,
+  lastMonths,
+  marketSplit,
+  patrimonyChange,
+  type Change,
+  type MarketSplit,
+} from "./story";
 import { DisclosureFeed } from "../disclosures/DisclosureFeed";
 import { DeclaredEarnings } from "./DeclaredEarnings";
 
@@ -27,7 +36,8 @@ function Indicator({
   value,
   note,
   trend,
-}: Readonly<{ label: string; value: string; note?: ReactNode; trend?: ReactNode }>) {
+  detail,
+}: Readonly<{ label: string; value: string; note?: ReactNode; trend?: ReactNode; detail?: ReactNode }>) {
   return (
     <div className="home-kpi">
       <span className="home-kpi-label">{label}</span>
@@ -36,7 +46,39 @@ function Indicator({
       </strong>
       {note && <span className="home-kpi-note">{note}</span>}
       {trend}
+      {detail}
     </div>
+  );
+}
+
+/** Bolsa (Caixa, Ações, Real Estate) and Internacional under the total, each with its rise or fall. */
+function SplitList({ groups }: Readonly<{ groups: MarketSplit[] }>) {
+  const shown = groups.filter((g) => g.value > 0 || g.invested > 0);
+  if (shown.length === 0) return null;
+  return (
+    <dl className="home-split" aria-label="Patrimônio por mercado">
+      {shown.map((g) => {
+        const up = (g.change ?? 0) >= 0;
+        return (
+          <div key={g.key} className="home-split-row">
+            <dt>
+              {g.label} <span className="app-muted">{pct(g.share, 0)}</span>
+            </dt>
+            <dd>
+              <span className="home-split-value">{brl(g.value)}</span>
+              {g.change !== null && (
+                <span
+                  className={`home-delta ${up ? "is-up" : "is-down"}`}
+                  title={`Resultado consolidado de ${brl(g.pnl)} sobre ${brl(g.invested)} investidos`}
+                >
+                  <span aria-hidden="true">{up ? "▲" : "▼"}</span> {up ? "alta" : "queda"} de {pct(Math.abs(g.change), 1)} sobre o investido
+                </span>
+              )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 
@@ -86,6 +128,7 @@ function KpiAct({
           value={brl(report.total_current_value_brl)}
           note={<Delta change={change} />}
           trend={<Sparkline values={snapshots.map((s) => s.market_value)} />}
+          detail={<SplitList groups={marketSplit(report.allocations)} />}
         />
         <Indicator
           label="Resultado consolidado"
@@ -288,7 +331,7 @@ export function HomePage() {
       <ErrorBanner error={report.error} onRetry={report.reload} />
       {report.loading && !report.data && <Loading lines={4} />}
       {report.data && (
-        <>
+        <div className="app-page-stack">
           <KpiAct report={report.data} snapshots={snapshots.data ?? []} analytics={analytics.data} />
           <AllocationAct
             report={report.data}
@@ -299,7 +342,7 @@ export function HomePage() {
           />
           <DeclaredEarnings />
           <DisclosureFeed limit={8} />
-        </>
+        </div>
       )}
       <ErrorBanner error={alerts.error} onRetry={alerts.reload} />
     </div>

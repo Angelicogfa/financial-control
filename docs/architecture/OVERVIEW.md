@@ -137,7 +137,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00024`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00025`):
 
 ```mermaid
 erDiagram
@@ -303,7 +303,7 @@ flowchart TD
 ```
 
 ### 4.4 Pesquisa fundamentalista
-`instrument_catalog` (lista B3 diária) → `GET /research/screener` (filtros de catálogo; paginado por `page`/`limit` com `total`; indicadores só para a página ou para a janela varrida) → `POST /research/watchlist` (ativo `WATCHLIST`, cadastrado por `register_researched_asset` no quadrante ARCA escolhido ou sugerido; `PUT /research/watchlist/{id}/classification` reclassifica) → demonstrativos buscados logo após o cadastro e depois toda semana, checklist e valuation em `GET /assets/{id}/analysis` → `ELIGIBLE` quando nota e cobertura atendem a política → recebe aporte.
+`instrument_catalog` (lista B3 diária) → `GET /research/screener` (filtros de catálogo; paginado por `page`/`limit` com `total`; indicadores só para a página ou para a janela varrida) → `POST /research/watchlist` (ativo `WATCHLIST`, cadastrado por `register_researched_asset` no quadrante ARCA escolhido ou sugerido; `PUT /research/watchlist/{id}/classification` reclassifica) → demonstrativos buscados logo após o cadastro e depois toda semana, checklist e valuation em `GET /assets/{id}/analysis` (preço por período em `GET /assets/{id}/prices?range=6mo|1y|2y|5y|max`) → `ELIGIBLE` quando nota e cobertura atendem a política → recebe aporte.
 
 ### 4.5 Importação B3
 Planilhas da Área do Investidor (Negociação e Movimentação) → pré-visualização por linha (`NEW`, `DUPLICATE`, `UNKNOWN_ASSET`, `IGNORED`, `INVALID`) → tickers desconhecidos cadastrados pelo mesmo `register_researched_asset` da Pesquisa, com o tipo e o quadrante ARCA escolhidos na pré-visualização (`new_assets`) e demonstrativos buscados em seguida → linhas desmarcadas pelo usuário (`skip_lines`) ficam `IGNORED` e vendas/resgates sem saldo ficam `INVALID`, sem bloquear o restante → gravação tudo-ou-nada das linhas novas (hash de conteúdo + ocorrência), com eventos corporativos cujo fator sai da posição do dia anterior.
@@ -324,7 +324,7 @@ Tela Ferramentas › Simular carteira, desenho em [PORTFOLIO_SIMULATION_DESIGN.m
 | Laboratório | `LAB` | modelos de regime e de risco fora da amostra contra a referência simples, com portões; "nenhum modelo passou" é válido |
 
 ### 4.8 Comunicados da CVM (Fase 28)
-Rotina diária `sync_cvm_documents`: FCA dos últimos 3 anos → mapa ticker → CNPJ; IPE do ano → só os documentos das ações brasileiras da carteira e da watchlist (FIIs e ETFs não publicam no IPE) → `cvm_documents`. `GET /disclosures` (filtros por ativo, categoria e não lidos) alimenta a aba Comunicados do ativo e o cartão do Início; `POST /disclosures/read` marca como lido e tira o alerta de fato relevante.
+Rotina diária `sync_cvm_documents`: FCA dos últimos 3 anos → mapa ticker → CNPJ; IPE do ano → só os documentos das ações brasileiras da carteira e da watchlist (FIIs e ETFs não publicam no IPE) → `cvm_documents`. `GET /disclosures` (filtros por ativo, categoria e não lidos) alimenta a aba Comunicados do ativo e o cartão do Início; `POST /disclosures/read` marca como lido e tira o alerta de fato relevante. Documento entregue mais de 30 dias antes de chegar aqui entra já lido (a primeira carga traz dois anos de arquivos; `script_00025` aplicou a regra às linhas antigas).
 
 ---
 

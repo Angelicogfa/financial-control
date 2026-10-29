@@ -55,7 +55,7 @@ describe("DisclosureFeed", () => {
       "https://www.rad.cvm.gov.br/doc/1",
     );
     expect(within(items[1]).queryByRole("button", { name: "Marcar como lido" })).toBeNull();
-    expect(screen.getByText("1 não lido(s)")).toBeInTheDocument();
+    expect(screen.getByText("1 não lido")).toBeInTheDocument();
     expect(screen.getByText(/Sem CNPJ no cadastro da CVM ainda: ITSA4/)).toBeInTheDocument();
     expect(screen.getByText("FIIs e ETFs não são companhias abertas.")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Assembleia (3)" })).toBeInTheDocument();

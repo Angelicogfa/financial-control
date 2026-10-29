@@ -194,7 +194,7 @@ def test_band_deviation_beyond_twice_the_band_is_critical() -> None:
     check = _check(report, "band_adherence")
 
     assert check.status == HealthStatus.CRITICAL
-    assert check.explanation == "2 quadrante(s) fora da banda:"
+    assert check.explanation == "2 quadrantes fora da banda:"
     assert any("há 40 dias" in item for item in check.items)
     mild = diagnose(
         HealthInputs(

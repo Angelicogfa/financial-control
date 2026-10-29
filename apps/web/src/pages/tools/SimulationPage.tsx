@@ -27,9 +27,10 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { KpiGrid, Lead, Notes, Section, Segmented, type KpiSpec, type Tone } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, points, today } from "../../utils/format";
+import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, plural, points, today } from "../../utils/format";
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { ColumnChart } from "../../viz/ColumnChart";
@@ -105,14 +106,22 @@ export const TAB_GUIDE: Record<TabKey, { question: string; method: string; use: 
 function TabGuide({ tab }: Readonly<{ tab: TabKey }>) {
   const guide = TAB_GUIDE[tab];
   return (
-    <section className="app-card app-card-padded" aria-label="Sobre esta aba">
-      <p>
-        <strong>{guide.question}</strong>
-      </p>
-      <p className="app-card-hint">{guide.method}</p>
-      <p className="app-muted">{guide.use}</p>
+    <section className="app-card app-card-padded app-guide" aria-label="Sobre esta aba">
+      <span className="app-eyebrow">A pergunta desta aba</span>
+      <h2 className="app-guide-question">{guide.question}</h2>
+      <p className="app-guide-method">{guide.method}</p>
+      <dl className="app-guide-facts">
+        <div>
+          <dt>Parte de:</dt>
+          <dd>{guide.from}</dd>
+        </div>
+        <div>
+          <dt>Quando usar:</dt>
+          <dd>{guide.use}</dd>
+        </div>
+      </dl>
       <details>
-        <summary>O que diferencia Passado, Futuro, Robustez e Confiança</summary>
+        <summary>Comparar as seis abas</summary>
         <div className="app-table-wrap">
           <table className="app-table" aria-label="Comparação das abas">
             <thead>
@@ -127,9 +136,9 @@ function TabGuide({ tab }: Readonly<{ tab: TabKey }>) {
               {TABS.map((t) => (
                 <tr key={t.key} aria-current={t.key === tab ? "true" : undefined}>
                   <td>{t.label}</td>
-                  <td>{TAB_GUIDE[t.key].question}</td>
-                  <td>{TAB_GUIDE[t.key].from}</td>
-                  <td>{TAB_GUIDE[t.key].use}</td>
+                  <td className="app-cell-wrap">{TAB_GUIDE[t.key].question}</td>
+                  <td className="app-cell-wrap">{TAB_GUIDE[t.key].from}</td>
+                  <td className="app-cell-wrap">{TAB_GUIDE[t.key].use}</td>
                 </tr>
               ))}
             </tbody>
@@ -137,6 +146,24 @@ function TabGuide({ tab }: Readonly<{ tab: TabKey }>) {
         </div>
       </details>
     </section>
+  );
+}
+
+/** A form that folds once there are results, so the result leads the page. */
+function FormCard({
+  title,
+  hint,
+  open,
+  children,
+}: Readonly<{ title: string; hint?: string; open: boolean; children: ReactNode }>) {
+  return (
+    <details className="app-card app-disclosure" open={open}>
+      <summary>
+        {title}
+        {hint && <small>{hint}</small>}
+      </summary>
+      <div className="app-disclosure-body">{children}</div>
+    </details>
   );
 }
 
@@ -217,7 +244,10 @@ export function toBacktestRequest(form: FormState): BacktestRequest | null {
   };
 }
 
-function BacktestForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void }>) {
+function BacktestForm({
+  onSubmitted,
+  open = true,
+}: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void; open?: boolean }>) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,80 +274,81 @@ function BacktestForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationR
   };
 
   return (
-    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving} aria-label="Nova simulação">
-      <h2 className="app-card-heading">Nova simulação</h2>
-      {error && (
-        <p className="app-error-banner" role="alert">
-          {error}
-        </p>
-      )}
-      <fieldset className="app-field-grid" disabled={saving}>
-        <div className="app-field">
-          <label htmlFor="sim-start">Início</label>
-          <input id="sim-start" type="date" value={form.start} max={today()} onChange={(e) => set({ start: e.target.value })} required />
-        </div>
-        <div className="app-field">
-          <label htmlFor="sim-end">Fim</label>
-          <input id="sim-end" type="date" value={form.end} max={today()} onChange={(e) => set({ end: e.target.value })} required />
-        </div>
-        <div className="app-field">
-          <label htmlFor="sim-monthly">Aporte mensal (R$)</label>
-          <input id="sim-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
-        </div>
-        <div className="app-field">
-          <label htmlFor="sim-initial">Aporte inicial (R$)</label>
-          <input id="sim-initial" inputMode="decimal" value={form.initial} onChange={(e) => set({ initial: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="sim-universe">Ativos</label>
-          <select id="sim-universe" value={form.universe} onChange={(e) => set({ universe: e.target.value as FormState["universe"] })}>
-            <option value="REGISTERED">Carteira e watchlist</option>
-            <option value="REGISTERED_AND_CATALOG">Carteira, watchlist e mais negociados da B3 (viés de sobrevivência)</option>
-          </select>
-        </div>
-        <div className="app-field">
-          <label htmlFor="sim-policy">Política</label>
-          <select id="sim-policy" value={form.policyMode} onChange={(e) => set({ policyMode: e.target.value as FormState["policyMode"] })}>
-            <option value="CURRENT">Regras atuais em todo o período</option>
-            <option value="AS_OF">Versão vigente em cada data</option>
-          </select>
-        </div>
-        <div className="app-field">
-          <label htmlFor="sim-label">Nome (opcional)</label>
-          <input id="sim-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
-        </div>
-      </fieldset>
-      <fieldset className="app-field-grid" disabled={saving}>
-        <legend className="app-card-hint">Regras</legend>
-        <label className="app-check">
-          <input type="checkbox" checked={form.correctByIpca} onChange={(e) => set({ correctByIpca: e.target.checked })} />
-          Corrigir o aporte pelo IPCA
-        </label>
-        <label className="app-check">
-          <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
-          Rebalancear vendendo o excesso (com IR)
-        </label>
-        <label className="app-check">
-          <input type="checkbox" checked={form.variants} onChange={(e) => set({ variants: e.target.checked })} />
-          Testar variantes de banda e rebalanceamento
-        </label>
-      </fieldset>
-      <fieldset className="app-field-grid" disabled={saving}>
-        <legend className="app-card-hint">Comparar com o mesmo fluxo de aportes em</legend>
-        {(Object.keys(BENCHMARK_LABELS) as Benchmark[]).map((key) => (
-          <label key={key} className="app-check">
-            <input type="checkbox" checked={form.benchmarks.includes(key)} onChange={() => toggleBenchmark(key)} />
-            {BENCHMARK_LABELS[key]}
+    <FormCard title="Nova simulação" hint="Período, aporte, regras e referências" open={open}>
+      <form onSubmit={submit} aria-busy={saving} aria-label="Nova simulação">
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
+        <fieldset className="app-field-grid" disabled={saving}>
+          <div className="app-field">
+            <label htmlFor="sim-start">Início</label>
+            <input id="sim-start" type="date" value={form.start} max={today()} onChange={(e) => set({ start: e.target.value })} required />
+          </div>
+          <div className="app-field">
+            <label htmlFor="sim-end">Fim</label>
+            <input id="sim-end" type="date" value={form.end} max={today()} onChange={(e) => set({ end: e.target.value })} required />
+          </div>
+          <div className="app-field">
+            <label htmlFor="sim-monthly">Aporte mensal (R$)</label>
+            <input id="sim-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
+          </div>
+          <div className="app-field">
+            <label htmlFor="sim-initial">Aporte inicial (R$)</label>
+            <input id="sim-initial" inputMode="decimal" value={form.initial} onChange={(e) => set({ initial: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="sim-universe">Ativos</label>
+            <select id="sim-universe" value={form.universe} onChange={(e) => set({ universe: e.target.value as FormState["universe"] })}>
+              <option value="REGISTERED">Carteira e watchlist</option>
+              <option value="REGISTERED_AND_CATALOG">Carteira, watchlist e mais negociados da B3 (viés de sobrevivência)</option>
+            </select>
+          </div>
+          <div className="app-field">
+            <label htmlFor="sim-policy">Política</label>
+            <select id="sim-policy" value={form.policyMode} onChange={(e) => set({ policyMode: e.target.value as FormState["policyMode"] })}>
+              <option value="CURRENT">Regras atuais em todo o período</option>
+              <option value="AS_OF">Versão vigente em cada data</option>
+            </select>
+          </div>
+          <div className="app-field">
+            <label htmlFor="sim-label">Nome (opcional)</label>
+            <input id="sim-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
+          </div>
+        </fieldset>
+        <fieldset className="app-field-grid" disabled={saving}>
+          <legend>Regras</legend>
+          <label className="app-check">
+            <input type="checkbox" checked={form.correctByIpca} onChange={(e) => set({ correctByIpca: e.target.checked })} />
+            Corrigir o aporte pelo IPCA
           </label>
-        ))}
-      </fieldset>
-      <div className="app-form-actions">
-        <button type="submit" className="app-primary-button" disabled={saving}>
-          {saving && <Spinner size="sm" />}
-          <span>{saving ? "Enviando…" : "Simular"}</span>
-        </button>
-      </div>
-    </form>
+          <label className="app-check">
+            <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
+            Rebalancear vendendo o excesso (com IR)
+          </label>
+          <label className="app-check">
+            <input type="checkbox" checked={form.variants} onChange={(e) => set({ variants: e.target.checked })} />
+            Testar variantes de banda e rebalanceamento
+          </label>
+        </fieldset>
+        <fieldset className="app-field-grid" disabled={saving}>
+          <legend>Comparar com o mesmo fluxo de aportes em</legend>
+          {(Object.keys(BENCHMARK_LABELS) as Benchmark[]).map((key) => (
+            <label key={key} className="app-check">
+              <input type="checkbox" checked={form.benchmarks.includes(key)} onChange={() => toggleBenchmark(key)} />
+              {BENCHMARK_LABELS[key]}
+            </label>
+          ))}
+        </fieldset>
+        <div className="app-form-actions">
+          <button type="submit" className="app-primary-button" disabled={saving}>
+            {saving && <Spinner size="sm" />}
+            <span>{saving ? "Enviando…" : "Simular"}</span>
+          </button>
+        </div>
+      </form>
+    </FormCard>
   );
 }
 
@@ -356,9 +387,15 @@ function RunList({
           {runs.map((run) => (
             <tr key={run.id} aria-selected={run.id === selected}>
               <td>
-                <button type="button" className="app-link-button" onClick={() => onSelect(run.id)}>
+                <button
+                  type="button"
+                  className="app-link-button"
+                  aria-current={run.id === selected ? "true" : undefined}
+                  onClick={() => onSelect(run.id)}
+                >
                   {run.label || `Simulação #${run.id}`}
                 </button>
+                {run.id === selected && <span className="app-muted"> · em exibição</span>}
               </td>
               <td>{describe(run)}</td>
               <td>
@@ -455,6 +492,42 @@ function RunProblem({ run }: Readonly<{ run: SimulationRunDTO }>) {
   );
 }
 
+/** What the past says, in words: where the money ended against the same flow in the CDI. */
+export function pastStory(series: SimulationResultDTO[]): { tone: Tone; lines: string[]; cashShare: number } {
+  const strategy = series.find((r) => r.key === "strategy");
+  const points = strategy?.points ?? [];
+  const last = points[points.length - 1];
+  if (!strategy || !last) return { tone: "neutral", lines: [], cashShare: 0 };
+  const s = strategy.summary;
+  const cdi = series.find((r) => r.key === "benchmark:CDI");
+  const cashShare = last.market_value > 0 ? ((last.by_class?.CAIXA ?? 0) + last.cash) / last.market_value : 0;
+  const lines = [
+    `De ${day(points[0].day)} a ${day(last.day)}, com ${brl(s.contributed)} aportados no total, a estratégia ` +
+      `chegou a ${brl(s.final_value)}` +
+      (cdi
+        ? `, ${brl(Math.abs(s.final_value - cdi.summary.final_value))} ${
+            s.final_value >= cdi.summary.final_value ? "acima" : "abaixo"
+          } do mesmo fluxo aplicado no CDI.`
+        : "."),
+  ];
+  const others = series.filter((r) => r.key !== "strategy");
+  const best = [...others].sort((a, b) => b.summary.final_value - a.summary.final_value)[0];
+  const facts = [`TIR de ${pct(s.money_weighted_return, 2)} a.a.`, `queda máxima de ${pct(s.max_drawdown, 1)}`];
+  if (best && best.summary.final_value > s.final_value) {
+    facts.push(`a melhor referência foi ${best.label} (${brlCompact(best.summary.final_value)})`);
+  }
+  lines.push(`${facts.join(", ").replace(/^./, (c) => c.toUpperCase())}.`);
+  if (cashShare > 0.9) {
+    lines.push(
+      `${pct(cashShare, 0)} do patrimônio terminou em Caixa: os aportes quase não foram para ações, FIIs ou ` +
+        "exterior. Isso costuma acontecer quando os ativos não passam na elegibilidade nas datas simuladas; " +
+        "um checklist respondido há pouco só vale a partir da data da resposta.",
+    );
+  }
+  const tone: Tone = cashShare > 0.9 ? "caution" : cdi ? (s.final_value >= cdi.summary.final_value ? "positive" : "negative") : "neutral";
+  return { tone, lines, cashShare };
+}
+
 function PastTab({ detail }: Readonly<{ detail: SimulationRunDetailDTO }>) {
   if (detail.status !== "DONE") return <RunProblem run={detail} />;
   const series = seriesOf(detail.results ?? []);
@@ -472,43 +545,67 @@ function PastTab({ detail }: Readonly<{ detail: SimulationRunDetailDTO }>) {
       color: SERIES_COLORS[i % SERIES_COLORS.length],
       values: (r.points ?? []).map((p) => p.market_value),
     })),
-    { key: "contributed", label: "Investido", color: "var(--app-muted, #888)", values: points.map((p) => p.contributed) },
+    { key: "contributed", label: "Investido", color: "var(--app-text-subtle)", values: points.map((p) => p.contributed) },
   ];
   const last = points[points.length - 1];
+  const story = pastStory(series);
+  const s = strategy.summary;
+  const kpis: KpiSpec[] = [
+    { label: "Patrimônio final", value: brlCompact(s.final_value), note: `${brlCompact(s.contributed)} aportados` },
+    {
+      label: "Ganho",
+      value: brlCompact(s.gain),
+      tone: s.gain >= 0 ? "positive" : "negative",
+      note: `${pct(s.contributed > 0 ? s.gain / s.contributed : 0, 1, true)} sobre o aportado`,
+    },
+    { label: "TIR dos aportes", value: `${pct(s.money_weighted_return, 2)} a.a.`, note: `TWR ${pct(s.annual_twr, 2)} a.a.` },
+    { label: "Queda máxima", value: pct(s.max_drawdown, 1), note: `volatilidade ${pct(s.volatility, 1)} a.a.` },
+    { label: "Custos e IR", value: brlCompact(s.fees + (s.taxes ?? 0)), note: plural(s.trades, "operação", "operações") },
+  ];
+  const notes = [
+    ...(strategy.survivorship_bias
+      ? [
+          "Inclui ativos do catálogo atual da B3: só as empresas que sobreviveram até hoje aparecem, e o passado " +
+            "parece melhor do que foi (viés de sobrevivência).",
+        ]
+      : []),
+    ...(unavailable.length > 0 ? [`Sem preço no período, ficaram de fora: ${unavailable.join(", ")}.`] : []),
+    "Todas as linhas recebem os mesmos aportes nas mesmas datas; a diferença é só onde o dinheiro foi aplicado.",
+    "Descreve o que teria acontecido com as regras escolhidas; não diz nada sobre o futuro.",
+  ];
   return (
     <div className="app-page-stack">
-      {strategy.survivorship_bias && (
-        <p className="app-warning-banner" role="note">
-          Inclui ativos do catálogo atual da B3: só as empresas que sobreviveram até hoje aparecem, e o passado parece melhor
-          do que foi (viés de sobrevivência).
-        </p>
-      )}
-      {unavailable.length > 0 && (
-        <p className="app-muted">Sem preço no período (ficaram de fora): {unavailable.join(", ")}.</p>
-      )}
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Patrimônio com o mesmo fluxo de aportes</h2>
+      <Lead tone={story.tone}>
+        {story.lines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </Lead>
+      <KpiGrid items={kpis} label="Indicadores da estratégia" />
+      <Section title="Patrimônio com o mesmo fluxo de aportes" subtitle="Mês a mês, estratégia e referências.">
         <TrendChart
           title="Patrimônio da estratégia e das referências mês a mês"
           labels={labels}
           series={lines}
-          hint="Todas as linhas recebem os mesmos aportes nas mesmas datas; a diferença é só onde o dinheiro foi aplicado."
+          hint="Passe o mouse para ler o patrimônio de cada linha no mês."
           format={(v) => brl(v)}
+          compact={brlCompact}
         />
-      </section>
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Resumo</h2>
+      </Section>
+      <Section title="Estratégia contra as referências" subtitle="As mesmas métricas para cada destino do mesmo fluxo de aportes.">
         <SummaryTable results={series} />
+      </Section>
+      <Section title="Onde o dinheiro terminou" subtitle={`Alocação por classe em ${day(last.day)}.`}>
         <BarList
           label="Alocação final por classe"
           bars={Object.entries(last.by_class ?? {}).map(([cls, value]) => ({
             id: cls,
             label: ARCA_LABELS[cls as keyof typeof ARCA_LABELS] ?? cls,
             share: last.market_value > 0 ? value / last.market_value : 0,
-            value: brl(value),
+            value: `${brl(value)} · ${pct(last.market_value > 0 ? value / last.market_value : 0, 0)}`,
           }))}
         />
-      </section>
+      </Section>
+      <Notes items={notes} tone={strategy.survivorship_bias ? "caution" : "neutral"} />
       <Reproducibility run={detail} />
     </div>
   );
@@ -531,13 +628,30 @@ export function RobustnessView({ data }: Readonly<{ data: RobustnessDTO }>) {
   const { series = [], crises = [], shocks = [], variants = [], warnings = [] } = data;
   const twr = variants.map((v) => v.summary.annual_twr);
   const top = Math.max(...twr.map((v) => Math.abs(v)), 0.0001);
+  const worst = crises
+    .map((c) => ({ c, o: c.outcomes?.strategy }))
+    .filter((x) => x.o?.covered)
+    .sort((a, b) => (a.o?.return_rate ?? 0) - (b.o?.return_rate ?? 0))[0];
+  const spread = variants.length > 1 ? (data.annual_twr_distribution.maximum ?? 0) - (data.annual_twr_distribution.minimum ?? 0) : null;
   return (
     <div className="app-page-stack">
-      <ul className="app-warning-banner" aria-label="Avisos de amostra">
-        {warnings.map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </ul>
+      <Lead tone={data.validation ? (data.validation.passed ? "positive" : "neutral") : "neutral"}>
+        <p>
+          {worst
+            ? `A pior crise dentro do período foi ${worst.c.label}, com ${pct(worst.o?.return_rate, 1, true)} para a estratégia e queda máxima de ${pct(worst.o?.max_drawdown, 1)}.`
+            : "Nenhuma crise histórica conhecida cai dentro do período simulado."}
+        </p>
+        <p>
+          {spread !== null
+            ? `As ${variants.length} variantes de regra ficaram entre ${pct(data.annual_twr_distribution.minimum, 2)} e ${pct(data.annual_twr_distribution.maximum, 2)} a.a. (${pct(spread, 2)} de diferença). `
+            : ""}
+          {data.validation
+            ? data.validation.passed
+              ? "A melhor variante passou nos testes contra a sorte."
+              : "Não há evidência de que a melhor variante seja melhor por mérito, e não por sorte."
+            : ""}
+        </p>
+      </Lead>
 
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Crises históricas</h2>
@@ -671,6 +785,7 @@ export function RobustnessView({ data }: Readonly<{ data: RobustnessDTO }>) {
           </>
         )}
       </section>
+      <Notes items={warnings} label="Avisos de amostra" tone="neutral" />
       {data.validation && <VariantValidation validation={data.validation} />}
     </div>
   );
@@ -813,7 +928,10 @@ function projectionHorizon(run: SimulationRunDTO): string {
   return `${years} ${years === 1 ? "ano" : "anos"} · ${brl(Number(run.params?.monthly_contribution ?? 0))}/mês`;
 }
 
-function ProjectionForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void }>) {
+function ProjectionForm({
+  onSubmitted,
+  open = true,
+}: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void; open?: boolean }>) {
   const [form, setForm] = useState<ProjectionFormState>(INITIAL_PROJECTION);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -838,96 +956,97 @@ function ProjectionForm({ onSubmitted }: Readonly<{ onSubmitted: (run: Simulatio
   };
 
   return (
-    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving} aria-label="Nova projeção">
-      <h2 className="app-card-heading">Nova projeção</h2>
-      <p className="app-card-hint">Valores em R$ de hoje: o aporte acompanha a inflação de cada cenário.</p>
-      {error && (
-        <p className="app-error-banner" role="alert">
-          {error}
-        </p>
-      )}
-      <fieldset className="app-field-grid" disabled={saving}>
-        <div className="app-field">
-          <label htmlFor="proj-years">Horizonte (anos)</label>
-          <input id="proj-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} required />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-monthly">Aporte mensal (R$)</label>
-          <input id="proj-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-growth">Crescimento real do aporte (% a.a.)</label>
-          <input id="proj-growth" inputMode="decimal" value={form.realGrowth} onChange={(e) => set({ realGrowth: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-wealth-goal">Meta de patrimônio (R$)</label>
-          <input id="proj-wealth-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-income-goal">Meta de renda passiva (R$/mês)</label>
-          <input id="proj-income-goal" inputMode="decimal" value={form.incomeGoal} onChange={(e) => set({ incomeGoal: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-cdi">CDI (% a.a., vazio = premissa)</label>
-          <input id="proj-cdi" inputMode="decimal" value={form.cdi} onChange={(e) => set({ cdi: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-ipca">IPCA (% a.a., vazio = premissa)</label>
-          <input id="proj-ipca" inputMode="decimal" value={form.ipca} onChange={(e) => set({ ipca: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-generator">Gerador de cenários</label>
-          <select
-            id="proj-generator"
-            value={form.generator}
-            onChange={(e) => set({ generator: e.target.value as ProjectionFormState["generator"] })}
-          >
-            {GENERATOR_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="app-field">
-          <label htmlFor="proj-label">Nome (opcional)</label>
-          <input id="proj-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
-        </div>
-      </fieldset>
-      <fieldset className="app-field-grid" disabled={saving}>
-        <legend className="app-card-hint">Ponto de partida</legend>
-        <label className="app-check">
-          <input type="checkbox" checked={form.fromPortfolio} onChange={(e) => set({ fromPortfolio: e.target.checked })} />
-          Partir da carteira de hoje
-        </label>
-        <label className="app-check">
-          <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
-          Rebalancear vendendo o excesso (com IR)
-        </label>
-      </fieldset>
-      {!form.fromPortfolio && (
+    <FormCard title="Nova projeção" hint="Horizonte, aporte, metas e juros" open={open}>
+      <form onSubmit={submit} aria-busy={saving} aria-label="Nova projeção">
+        <p className="app-card-hint">Valores em R$ de hoje: o aporte acompanha a inflação de cada cenário.</p>
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
         <fieldset className="app-field-grid" disabled={saving}>
-          <legend className="app-card-hint">Valor inicial por classe (R$)</legend>
-          {CLASS_KEYS.map((k) => (
-            <div className="app-field" key={k}>
-              <label htmlFor={`proj-initial-${k}`}>{ARCA_LABELS[k]}</label>
-              <input
-                id={`proj-initial-${k}`}
-                inputMode="decimal"
-                value={form.initial[k]}
-                onChange={(e) => set({ initial: { ...form.initial, [k]: e.target.value } })}
-              />
-            </div>
-          ))}
+          <div className="app-field">
+            <label htmlFor="proj-years">Horizonte (anos)</label>
+            <input id="proj-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} required />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-monthly">Aporte mensal (R$)</label>
+            <input id="proj-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-growth">Crescimento real do aporte (% a.a.)</label>
+            <input id="proj-growth" inputMode="decimal" value={form.realGrowth} onChange={(e) => set({ realGrowth: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-wealth-goal">Meta de patrimônio (R$)</label>
+            <input id="proj-wealth-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-income-goal">Meta de renda passiva (R$/mês)</label>
+            <input id="proj-income-goal" inputMode="decimal" value={form.incomeGoal} onChange={(e) => set({ incomeGoal: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-cdi">CDI (% a.a., vazio = premissa)</label>
+            <input id="proj-cdi" inputMode="decimal" value={form.cdi} onChange={(e) => set({ cdi: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-ipca">IPCA (% a.a., vazio = premissa)</label>
+            <input id="proj-ipca" inputMode="decimal" value={form.ipca} onChange={(e) => set({ ipca: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-generator">Gerador de cenários</label>
+            <select
+              id="proj-generator"
+              value={form.generator}
+              onChange={(e) => set({ generator: e.target.value as ProjectionFormState["generator"] })}
+            >
+              {GENERATOR_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="app-field">
+            <label htmlFor="proj-label">Nome (opcional)</label>
+            <input id="proj-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
+          </div>
         </fieldset>
-      )}
-      <div className="app-form-actions">
-        <button type="submit" className="app-primary-button" disabled={saving}>
-          {saving && <Spinner size="sm" />}
-          <span>{saving ? "Enviando…" : "Projetar"}</span>
-        </button>
-      </div>
-    </form>
+        <fieldset className="app-field-grid" disabled={saving}>
+          <legend>Ponto de partida</legend>
+          <label className="app-check">
+            <input type="checkbox" checked={form.fromPortfolio} onChange={(e) => set({ fromPortfolio: e.target.checked })} />
+            Partir da carteira de hoje
+          </label>
+          <label className="app-check">
+            <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
+            Rebalancear vendendo o excesso (com IR)
+          </label>
+        </fieldset>
+        {!form.fromPortfolio && (
+          <fieldset className="app-field-grid" disabled={saving}>
+            <legend>Valor inicial por classe (R$)</legend>
+            {CLASS_KEYS.map((k) => (
+              <div className="app-field" key={k}>
+                <label htmlFor={`proj-initial-${k}`}>{ARCA_LABELS[k]}</label>
+                <input
+                  id={`proj-initial-${k}`}
+                  inputMode="decimal"
+                  value={form.initial[k]}
+                  onChange={(e) => set({ initial: { ...form.initial, [k]: e.target.value } })}
+                />
+              </div>
+            ))}
+          </fieldset>
+        )}
+        <div className="app-form-actions">
+          <button type="submit" className="app-primary-button" disabled={saving}>
+            {saving && <Spinner size="sm" />}
+            <span>{saving ? "Enviando…" : "Projetar"}</span>
+          </button>
+        </div>
+      </form>
+    </FormCard>
   );
 }
 
@@ -1014,30 +1133,61 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
   const labels = pointsList.map((p) => yearsLabel(p.month));
   const premises = current.premises ?? [];
   const block = Number(run.params?.mean_block_months ?? 0);
+  const horizon = yearsLabel(current.horizon_months);
+  const kpis: KpiSpec[] = [
+    {
+      label: `Patrimônio em ${horizon} (mediana)`,
+      value: brlCompact(current.final_wealth.p50),
+      note: `em R$ de hoje; ${brlCompact(current.contributed)} aportados`,
+    },
+    {
+      label: "Faixa de 90%",
+      value: `${brlCompact(current.final_wealth.p5)} a ${brlCompact(current.final_wealth.p95)}`,
+      note: "5% das trajetórias ficam abaixo",
+    },
+    { label: "Renda passiva mensal (mediana)", value: brlCompact(current.final_income.p50), note: "ao fim do horizonte" },
+    ...(current.wealth_goal
+      ? [
+          {
+            label: "Chance da meta de patrimônio",
+            value: pct(current.wealth_goal.probability, 0),
+            note: `${pct(current.wealth_goal.low, 0)} a ${pct(current.wealth_goal.high, 0)} · meta ${brlCompact(current.wealth_goal.target)}`,
+            tone: (current.wealth_goal.probability >= 0.7 ? "positive" : current.wealth_goal.probability < 0.4 ? "negative" : "caution") as Tone,
+          },
+        ]
+      : []),
+    { label: "Pior queda (5% dos casos)", value: pct(current.max_drawdown.p5, 1), note: "queda máxima no caminho" },
+  ];
 
   return (
     <div className="app-page-stack">
-      <ul className="app-warning-banner" aria-label="Avisos da projeção">
-        {(data.warnings ?? []).map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </ul>
+      <Lead>
+        <p>
+          No cenário {current.label.toLowerCase()}, a carteira chega a <strong>{brlCompact(current.final_wealth.p50)}</strong>{" "}
+          em {horizon} na mediana, em reais de hoje, com 90% das trajetórias entre {brlCompact(current.final_wealth.p5)} e{" "}
+          {brlCompact(current.final_wealth.p95)}.
+        </p>
+        <p>
+          {current.wealth_goal
+            ? `A chance de chegar à meta de ${brlCompact(current.wealth_goal.target)} é de ${pct(current.wealth_goal.probability, 0)} (entre ${pct(current.wealth_goal.low, 0)} e ${pct(current.wealth_goal.high, 0)}). `
+            : ""}
+          Faixas, não promessa: o futuro pode ter prêmios menores e crises mais longas que o histórico amostrado.
+        </p>
+      </Lead>
+      <KpiGrid items={kpis} label="Indicadores da projeção" />
 
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Cenário de juros</h2>
-        <div className="app-button-row" role="group" aria-label="Cenários de juros">
-          {scenarios.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={s.key === key ? "app-primary-button" : "app-secondary-button"}
-              aria-pressed={s.key === key}
-              onClick={() => setKey(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+      <Section
+        title="Cenário de juros"
+        subtitle="Os três cenários usam as mesmas trajetórias de prêmio; muda só o CDI e o IPCA."
+        actions={
+          <Segmented
+            options={scenarios.map((s) => [s.key, s.label] as [string, string])}
+            value={key ?? ""}
+            onChange={setKey}
+            label="Cenários de juros"
+          />
+        }
+      >
         <p className="app-muted">
           CDI {pct(current.scenario.annual_cdi_rate, 2)} a.a. · IPCA {pct(current.scenario.annual_ipca_rate, 2)} a.a. ·{" "}
           {current.paths} trajetórias de {yearsLabel(current.horizon_months)}
@@ -1051,7 +1201,7 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
               ` O prior conservador pesa o equivalente a ${num(current.prior_months, 0)} meses de dados.`}
           </p>
         )}
-      </section>
+      </Section>
 
       {(current.wealth_goal || current.income_goal) && (
         <div className="app-page-stack">
@@ -1073,7 +1223,7 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
           labels={labels}
           series={[
             { key: "p50", label: "Mediana", color: "var(--viz-serie-1)", values: pointsList.map((p) => p.wealth.p50) },
-            { key: "contributed", label: "Investido", color: "var(--app-muted, #888)", values: pointsList.map((p) => p.contributed) },
+            { key: "contributed", label: "Investido", color: "var(--app-text-subtle)", values: pointsList.map((p) => p.contributed) },
           ]}
           bands={[
             {
@@ -1090,7 +1240,8 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
             },
           ]}
           hint="Faixa clara: 90% das trajetórias; faixa escura: a metade central. A linha é a mediana."
-          format={(v) => brlCompact(v)}
+          format={(v) => brl(v)}
+          compact={brlCompact}
         />
       </section>
 
@@ -1181,6 +1332,7 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
           sorteia os prêmios em torno dele em cada trajetória.
         </p>
       </section>
+      <Notes items={(data.warnings ?? [])} label="Avisos da projeção" tone="neutral" />
       <Reproducibility run={run} />
     </div>
   );
@@ -1204,13 +1356,23 @@ export function CalibrationView({ data }: Readonly<{ data: CalibrationDTO }>) {
   const generators = data.generators ?? [];
   const stacked = generators.find((g) => g.key === "STACKED");
   const origins = data.origins ?? [];
+  const calibrated = generators.filter((g) => g.key !== "STACKED" && g.status === "CALIBRATED").length;
+  const total = generators.filter((g) => g.key !== "STACKED").length;
   return (
     <div className="app-page-stack">
-      <ul className="app-warning-banner" aria-label="Avisos da calibração">
-        {(data.warnings ?? []).map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </ul>
+      <Lead tone={stacked?.status === "CALIBRATED" ? "positive" : stacked?.status === "MISCALIBRATED" ? "negative" : "caution"}>
+        <p>
+          {stacked
+            ? `O intervalo de 90% da combinação conteve o realizado em ${pct(stacked.coverage, 0)} das ${data.windows} previsões de 12 meses (o esperado é 90%): ${CALIBRATION_STATUS[stacked.status].label.toLowerCase()}.`
+            : `${data.windows} previsões de 12 meses comparadas com o realizado.`}
+        </p>
+        <p>
+          {`${plural(calibrated, "gerador calibrado", "geradores calibrados")} de ${total}. `}
+          {stacked?.status === "INCONCLUSIVE"
+            ? "Com cerca de " + num(data.effective_windows, 0) + " janelas independentes, o histórico ainda não separa um gerador bom de um ruim; use as chances do Futuro com folga."
+            : "As chances do Futuro herdam essa calibração."}
+        </p>
+      </Lead>
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Geradores de cenário</h2>
         <p className="app-card-hint">
@@ -1305,6 +1467,7 @@ export function CalibrationView({ data }: Readonly<{ data: CalibrationDTO }>) {
           />
         </section>
       )}
+      <Notes items={(data.warnings ?? [])} label="Avisos da calibração" tone="neutral" />
     </div>
   );
 }
@@ -1337,14 +1500,16 @@ function ConfidencePanel() {
 
   return (
     <>
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Calibração</h2>
-        {error && (
-          <p className="app-error-banner" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="app-form-actions">
+      <Section
+        title="Calibração"
+        subtitle={
+          pending !== null
+            ? "Na fila do worker; a página atualiza sozinha."
+            : state.data?.finished_at
+              ? `Calculada em ${dateTime(state.data.finished_at)}. Roda sozinha toda semana e após cada carga do histórico.`
+              : "Roda sozinha toda semana e após cada carga do histórico."
+        }
+        actions={
           <button
             type="button"
             className="app-primary-button"
@@ -1354,16 +1519,14 @@ function ConfidencePanel() {
             {(requesting || pending !== null) && <Spinner size="sm" />}
             <span>Recalcular agora</span>
           </button>
-          {pending !== null && (
-            <span className="app-muted" role="status">
-              Calibração na fila do worker; a página atualiza sozinha.
-            </span>
-          )}
-          {state.data?.finished_at && (
-            <span className="app-muted">Última: {dateTime(state.data.finished_at)}</span>
-          )}
-        </div>
-      </section>
+        }
+      >
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
+      </Section>
       <Async state={state}>
         {(data) =>
           data.run_id === null || data.run_id === undefined ? (
@@ -1429,6 +1592,7 @@ function BacktestPanel({ tab }: Readonly<{ tab: "past" | "robustness" }>) {
   return (
     <>
       <BacktestForm
+        open={(runs.data ?? []).length === 0}
         onSubmitted={(run) => {
           select(run.id);
           runs.reload();
@@ -1436,6 +1600,7 @@ function BacktestPanel({ tab }: Readonly<{ tab: "past" | "robustness" }>) {
       />
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Simulações do passado</h2>
+        <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
         <Async state={runs}>{(items) => <RunList runs={items} selected={selected} onSelect={select} />}</Async>
       </section>
       {selected !== null && (
@@ -1453,6 +1618,7 @@ function FuturePanel() {
   return (
     <>
       <ProjectionForm
+        open={(runs.data ?? []).length === 0}
         onSubmitted={(run) => {
           select(run.id);
           runs.reload();
@@ -1460,6 +1626,7 @@ function FuturePanel() {
       />
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Projeções</h2>
+        <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
         <Async state={runs}>
           {(items) => (
             <RunList runs={items} selected={selected} onSelect={select} describe={projectionHorizon} describeLabel="Horizonte" />
@@ -1483,19 +1650,16 @@ export function LabView({ data }: Readonly<{ data: LabDTO }>) {
   const approved = data.approved ?? [];
   return (
     <div className="app-page-stack">
-      <ul className="app-warning-banner" aria-label="Avisos do laboratório">
-        {(data.warnings ?? []).map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </ul>
       <section className="app-card app-card-padded" aria-label="Veredito do laboratório">
         <div className="health-pillar-head">
           <h2 className="app-card-heading">Veredito</h2>
           <Badge tone={approved.length ? "success" : "neutral"}>
-            {approved.length ? `${approved.length} modelo(s) passaram` : "Nenhum modelo passou"}
+            {approved.length
+              ? plural(approved.length, "modelo passou", "modelos passaram")
+              : "Nenhum modelo passou"}
           </Badge>
         </div>
-        <p>{data.verdict}</p>
+        <p className="app-lead-text">{data.verdict}</p>
         <p className="app-muted">
           Previsões de {day(data.first_forecast)} a {day(data.last_forecast)} · {data.trials} tentativas registradas · PBO do
           conjunto {data.pbo == null ? "—" : pct(data.pbo, 0)} · escolhido perde para a referência em{" "}
@@ -1558,6 +1722,7 @@ export function LabView({ data }: Readonly<{ data: LabDTO }>) {
           />
         </section>
       )}
+      <Notes items={(data.warnings ?? [])} label="Avisos do laboratório" tone="neutral" />
     </div>
   );
 }
@@ -1590,26 +1755,28 @@ function LabPanel() {
 
   return (
     <>
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Laboratório de ML</h2>
+      <Section
+        title="Laboratório de ML"
+        subtitle={
+          pending !== null
+            ? "Na fila do worker; a página atualiza sozinha."
+            : state.data?.finished_at
+              ? `Última rodada em ${dateTime(state.data.finished_at)}. Leva alguns segundos.`
+              : "Leva alguns segundos."
+        }
+        actions={
+          <button type="button" className="app-primary-button" disabled={requesting || pending !== null} onClick={run}>
+            {(requesting || pending !== null) && <Spinner size="sm" />}
+            <span>Rodar o laboratório</span>
+          </button>
+        }
+      >
         {error && (
           <p className="app-error-banner" role="alert">
             {error}
           </p>
         )}
-        <div className="app-form-actions">
-          <button type="button" className="app-primary-button" disabled={requesting || pending !== null} onClick={run}>
-            {(requesting || pending !== null) && <Spinner size="sm" />}
-            <span>Rodar o laboratório</span>
-          </button>
-          {pending !== null && (
-            <span className="app-muted" role="status">
-              Laboratório na fila do worker; a página atualiza sozinha.
-            </span>
-          )}
-          {state.data?.finished_at && <span className="app-muted">Última: {dateTime(state.data.finished_at)}</span>}
-        </div>
-      </section>
+      </Section>
       <Async state={state}>
         {(data) =>
           data.run_id === null || data.run_id === undefined ? (
@@ -1671,7 +1838,10 @@ export function toCandidatesRequest(form: CandidatesFormState): CandidatesReques
   };
 }
 
-function CandidatesForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void }>) {
+function CandidatesForm({
+  onSubmitted,
+  open = true,
+}: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void; open?: boolean }>) {
   const [form, setForm] = useState<CandidatesFormState>(INITIAL_CANDIDATES);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1696,70 +1866,71 @@ function CandidatesForm({ onSubmitted }: Readonly<{ onSubmitted: (run: Simulatio
   };
 
   return (
-    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving} aria-label="Nova avaliação de candidatos">
-      <h2 className="app-card-heading">Avaliar candidatos</h2>
-      <p className="app-card-hint">
-        Entram a watchlist e, se marcado, os mais negociados do screener, com os filtros do aporte real (até 20). Cada um é
-        posto na carteira de hoje.
-      </p>
-      {error && (
-        <p className="app-error-banner" role="alert">
-          {error}
+    <FormCard title="Avaliar candidatos" hint="Horizonte, aporte e de onde vêm os candidatos" open={open}>
+      <form onSubmit={submit} aria-busy={saving} aria-label="Nova avaliação de candidatos">
+        <p className="app-card-hint">
+          Entram a watchlist e, se marcado, os mais negociados do screener, com os filtros do aporte real (até 20). Cada um é
+          posto na carteira de hoje.
         </p>
-      )}
-      <fieldset className="app-field-grid" disabled={saving}>
-        <div className="app-field">
-          <label htmlFor="cand-years">Horizonte (anos)</label>
-          <input id="cand-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="cand-monthly">Aporte mensal (R$)</label>
-          <input id="cand-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="cand-goal">Meta de patrimônio (R$, opcional)</label>
-          <input id="cand-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
-        </div>
-        <div className="app-field">
-          <label htmlFor="cand-volume">Volume mínimo no screener (R$/dia)</label>
-          <input id="cand-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set({ minVolume: e.target.value })} />
-        </div>
-        {form.fixedWeight && (
-          <div className="app-field">
-            <label htmlFor="cand-weight">Peso do candidato na carteira (%)</label>
-            <input id="cand-weight" inputMode="decimal" value={form.weightPct} onChange={(e) => set({ weightPct: e.target.value })} />
-          </div>
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
         )}
-        <div className="app-field">
-          <label htmlFor="cand-label">Nome (opcional)</label>
-          <input id="cand-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
+        <fieldset className="app-field-grid" disabled={saving}>
+          <div className="app-field">
+            <label htmlFor="cand-years">Horizonte (anos)</label>
+            <input id="cand-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="cand-monthly">Aporte mensal (R$)</label>
+            <input id="cand-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="cand-goal">Meta de patrimônio (R$, opcional)</label>
+            <input id="cand-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
+          </div>
+          <div className="app-field">
+            <label htmlFor="cand-volume">Volume mínimo no screener (R$/dia)</label>
+            <input id="cand-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set({ minVolume: e.target.value })} />
+          </div>
+          {form.fixedWeight && (
+            <div className="app-field">
+              <label htmlFor="cand-weight">Peso do candidato na carteira (%)</label>
+              <input id="cand-weight" inputMode="decimal" value={form.weightPct} onChange={(e) => set({ weightPct: e.target.value })} />
+            </div>
+          )}
+          <div className="app-field">
+            <label htmlFor="cand-label">Nome (opcional)</label>
+            <input id="cand-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
+          </div>
+        </fieldset>
+        <div className="app-check-row">
+          <label className="app-check">
+            <input type="checkbox" checked={form.includeScreener} onChange={(e) => set({ includeScreener: e.target.checked })} />
+            Incluir os mais negociados do screener
+          </label>
+          <label className="app-check">
+            <input type="checkbox" checked={form.includeIneligible} onChange={(e) => set({ includeIneligible: e.target.checked })} />
+            Incluir os fora da elegibilidade (marcados)
+          </label>
+          <label className="app-check">
+            <input type="checkbox" checked={form.fixedWeight} onChange={(e) => set({ fixedWeight: e.target.checked })} />
+            Usar um peso fixo (em vez da parte que o próximo aporte daria)
+          </label>
+          <label className="app-check">
+            <input type="checkbox" checked={form.ruptureStress} onChange={(e) => set({ ruptureStress: e.target.checked })} />
+            Ruptura em estresse (perda de 90% em vez de 55%)
+          </label>
         </div>
-      </fieldset>
-      <div className="app-check-row">
-        <label className="app-check">
-          <input type="checkbox" checked={form.includeScreener} onChange={(e) => set({ includeScreener: e.target.checked })} />
-          Incluir os mais negociados do screener
-        </label>
-        <label className="app-check">
-          <input type="checkbox" checked={form.includeIneligible} onChange={(e) => set({ includeIneligible: e.target.checked })} />
-          Incluir os fora da elegibilidade (marcados)
-        </label>
-        <label className="app-check">
-          <input type="checkbox" checked={form.fixedWeight} onChange={(e) => set({ fixedWeight: e.target.checked })} />
-          Usar um peso fixo (em vez da parte que o próximo aporte daria)
-        </label>
-        <label className="app-check">
-          <input type="checkbox" checked={form.ruptureStress} onChange={(e) => set({ ruptureStress: e.target.checked })} />
-          Ruptura em estresse (perda de 90% em vez de 55%)
-        </label>
-      </div>
-      <div className="app-form-actions">
-        <button type="submit" className="app-primary-button" disabled={saving}>
-          {saving && <Spinner size="sm" />}
-          <span>Avaliar candidatos</span>
-        </button>
-      </div>
-    </form>
+        <div className="app-form-actions">
+          <button type="submit" className="app-primary-button" disabled={saving}>
+            {saving && <Spinner size="sm" />}
+            <span>Avaliar candidatos</span>
+          </button>
+        </div>
+      </form>
+    </FormCard>
   );
 }
 
@@ -1772,13 +1943,25 @@ export function CandidatesView({ data, run }: Readonly<{ data: CandidatesDTO; ru
   const candidates = data.candidates ?? [];
   const excluded = data.excluded ?? [];
   const base = data.base;
+  const top = candidates[0];
+  const byReason = excluded.reduce<Record<string, string[]>>((groups, e) => {
+    (groups[e.reason] ??= []).push(e.ticker);
+    return groups;
+  }, {});
   return (
     <div className="app-page-stack">
-      <ul className="app-warning-banner" aria-label="Avisos dos candidatos">
-        {(data.warnings ?? []).map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </ul>
+      <Lead tone={top && top.effect.p_improve >= 0.7 ? "positive" : "neutral"}>
+        <p>
+          {top
+            ? `Entre ${plural(data.evaluated ?? candidates.length, "candidato avaliado", "candidatos avaliados")}, ${top.ticker} é o mais promissor: ${pct(top.effect.p_improve, 0)} de chance de melhorar o patrimônio final (${pct(top.effect.p_improve_low, 0)} a ${pct(top.effect.p_improve_high, 0)}), ${signedBrl(top.effect.delta_final_wealth)} na mediana.`
+            : "Nenhum candidato tinha histórico suficiente para a avaliação."}
+        </p>
+        {excluded.length > 0 && (
+          <p>
+            {`${plural(excluded.length, "ativo ficou", "ativos ficaram")} de fora; o motivo de cada um está no fim da página.`}
+          </p>
+        )}
+      </Lead>
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Candidatos para investigar</h2>
         <p className="app-card-hint">
@@ -1861,17 +2044,29 @@ export function CandidatesView({ data, run }: Readonly<{ data: CandidatesDTO; ru
         </p>
       </section>
       {excluded.length > 0 && (
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Fora da avaliação</h2>
-          <ul aria-label="Candidatos excluídos">
-            {excluded.map((e) => (
-              <li key={e.ticker}>
-                <strong>{e.ticker}</strong>: {e.reason}
-              </li>
+        <Section
+          title="Fora da avaliação"
+          subtitle="Os filtros são os mesmos do aporte real; marque “Incluir os fora da elegibilidade” para avaliá-los mesmo assim."
+        >
+          <dl className="app-tag-groups" aria-label="Candidatos excluídos">
+            {Object.entries(byReason).map(([reason, tickers]) => (
+              <div key={reason}>
+                <dt>
+                  {reason} ({tickers.length})
+                </dt>
+                <dd>
+                  {tickers.map((t) => (
+                    <span key={t} className="app-tag">
+                      {t}
+                    </span>
+                  ))}
+                </dd>
+              </div>
             ))}
-          </ul>
-        </section>
+          </dl>
+        </Section>
       )}
+      <Notes items={(data.warnings ?? [])} label="Avisos dos candidatos" tone="neutral" />
       <Reproducibility run={run} />
     </div>
   );
@@ -1885,7 +2080,7 @@ function CandidatesTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
 
 function candidatesDescription(run: SimulationRunDTO): string {
   const count = Array.isArray(run.params?.candidates) ? (run.params?.candidates as unknown[]).length : 0;
-  return `${count} candidato(s)`;
+  return plural(count, "candidato", "candidatos");
 }
 
 function CandidatesPanel() {
@@ -1894,6 +2089,7 @@ function CandidatesPanel() {
   return (
     <>
       <CandidatesForm
+        open={(runs.data ?? []).length === 0}
         onSubmitted={(run) => {
           select(run.id);
           runs.reload();
@@ -1901,6 +2097,7 @@ function CandidatesPanel() {
       />
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Avaliações</h2>
+        <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
         <Async state={runs}>
           {(items) => (
             <RunList runs={items} selected={selected} onSelect={select} describe={candidatesDescription} describeLabel="Candidatos" />

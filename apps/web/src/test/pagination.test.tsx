@@ -283,7 +283,9 @@ describe("paged research", () => {
     expect(await screen.findByText("AAAA10")).toBeInTheDocument();
     expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("1");
     expect(last(calls, "GET", "/research/screener")?.query.get("limit")).toBe("10");
-    expect(screen.getByText(/2415 resultado\(s\) de 2415 candidato\(s\)/)).toBeInTheDocument();
+    expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(
+      /2\.415 ativos passaram pelos filtros, de 2\.415 candidatos/,
+    );
     expect(screen.getByText("1–10 de 2415")).toBeInTheDocument();
     expect(screen.getByText("Página 1 de 242")).toBeInTheDocument();
 
@@ -304,7 +306,7 @@ describe("paged research", () => {
     await waitFor(() => expect(screenerCalls().length).toBe(before + 1));
     // Reloading asks for the same page again.
     expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("2");
-  });
+  }, 20_000); // renders 2,415 rows' worth of pages; slow when the whole suite runs in parallel
 
   it("pages the watchlist", async () => {
     const watched = Array.from({ length: 6 }, (_, i) => ({

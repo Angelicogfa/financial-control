@@ -13,6 +13,7 @@ import type {
   ArcaClass,
   ArcaSuggestionDTO,
   AssetAnalysisResponseDTO,
+  AssetPriceHistoryDTO,
   AssetComparisonDTO,
   AssetCreateRequest,
   AssetResponseDTO,
@@ -154,6 +155,8 @@ export const api = {
       }),
     get: (id: number) => request<AssetResponseDTO>(`/assets/${id}`),
     analysis: (id: number) => request<AssetAnalysisResponseDTO>(`/assets/${id}/analysis`),
+    prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>
+      request<AssetPriceHistoryDTO>(`/assets/${id}/prices`, { query: { range } }),
     create: (body: AssetCreateRequest) => request<AssetResponseDTO>("/assets", { method: "POST", body }),
     update: (id: number, body: AssetUpdateRequest) =>
       request<AssetResponseDTO>(`/assets/${id}`, { method: "PUT", body }),

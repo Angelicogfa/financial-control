@@ -127,7 +127,10 @@ describe("CandidatesView", () => {
     expect(first.getByText(/\+8,0% → \+1,0%/)).toBeInTheDocument();
     expect(first.getByText("90%")).toBeInTheDocument();
     expect(within(rows[1]).getByText(/screener/)).toBeInTheDocument();
-    expect(within(screen.getByRole("list", { name: "Candidatos excluídos" })).getByText(/Menos de 36 meses/)).toBeInTheDocument();
+    const excluded = screen.getByLabelText("Candidatos excluídos");
+    expect(within(excluded).getByText(/Menos de 36 meses/)).toBeInTheDocument();
+    // The lead tells the conclusion before the table.
+    expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(/WEGE3 é o mais promissor: 64%/);
     expect(screen.getByText(/chance de meta de 55%/)).toBeInTheDocument();
   });
 
@@ -152,7 +155,7 @@ describe("SimulationPage candidates tab", () => {
     ]);
     renderAt("/tools/simulation?tab=candidates");
     expect(await screen.findByRole("table", { name: "Candidatos" })).toBeInTheDocument();
-    expect(screen.getByText("2 candidato(s)")).toBeInTheDocument();
+    expect(screen.getByText("2 candidatos")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Avaliar candidatos" }));
     expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
     const body = [...calls].reverse().find((c) => c.method === "POST")?.body as Record<string, unknown>;

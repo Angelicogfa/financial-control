@@ -6,6 +6,7 @@ import type { AssetAnalysisResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { Lead } from "../../components/Section";
 import { IconLink } from "../../components/RowActions";
 import { EditIcon } from "../../layout/icons";
 import { Async, Empty } from "../../components/States";
@@ -24,9 +25,9 @@ import {
   VERDICT_TONES,
 } from "../../utils/labels";
 import { ColumnChart } from "../../viz/ColumnChart";
-import { TrendChart } from "../../viz/TrendChart";
 import { ChecklistTab } from "./ChecklistTab";
 import { MarketTab } from "./MarketTab";
+import { PriceHistory } from "./PriceHistory";
 import { TaxTab } from "./TaxTab";
 import { compareLink } from "../tools/AssetComparePage";
 
@@ -65,12 +66,28 @@ function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>)
   const p = analysis.position;
   const prices = analysis.price_history as Array<{ date?: string; close?: number }>;
   const risk = analysis.risk_return;
+  const held = Boolean(p && (p.quantity > 0 || p.invested_value_brl > 0));
   return (
     <div className="app-page-stack">
+      {held && p && (
+        <Lead tone={p.consolidated_pnl_brl > 0 ? "positive" : p.consolidated_pnl_brl < 0 ? "negative" : "neutral"}>
+          <p>
+            A posição vale <strong>{brl(p.current_value_brl)}</strong>, com resultado de{" "}
+            <Signed value={p.consolidated_pnl_brl}>
+              {brl(p.consolidated_pnl_brl)} ({points(p.consolidated_return_pct, 1, true)})
+            </Signed>{" "}
+            sobre {brl(p.invested_value_brl)} investidos
+            {p.received_earnings_brl > 0 ? `; recebeu ${brl(p.received_earnings_brl)} em proventos` : ""}.
+          </p>
+          <p>
+            Pesa {points(p.class_current_weight_pct)} da classe, para uma meta de {points(p.class_target_weight_pct)}.
+          </p>
+        </Lead>
+      )}
       <div className="app-split">
         <section className="app-card app-card-padded">
           <h2 className="app-card-heading">Posição</h2>
-          {p && (p.quantity > 0 || p.invested_value_brl > 0) ? (
+          {held && p ? (
             <dl className="app-definition-list">
               <dt>Quantidade</dt>
               <dd>{quantity(p.quantity)}</dd>
@@ -131,23 +148,12 @@ function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>)
         </section>
       </div>
       {prices.length >= 2 && (
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Preço em 12 meses</h2>
-          <TrendChart
-            title={`Preço de ${analysis.asset.ticker} nos últimos 12 meses`}
-            labels={prices.map((pt) => day(pt.date))}
-            hint="Passe o mouse para ler o fechamento."
-            format={(v) => num(v, 2)}
-            series={[
-              {
-                key: "close",
-                label: analysis.asset.ticker,
-                color: "var(--viz-serie-1)",
-                values: prices.map((pt) => (typeof pt.close === "number" ? pt.close : null)),
-              },
-            ]}
-          />
-        </section>
+        <PriceHistory
+          assetId={analysis.asset.id}
+          ticker={analysis.asset.ticker}
+          currency={analysis.asset.currency || "BRL"}
+          fallback={prices}
+        />
       )}
     </div>
   );

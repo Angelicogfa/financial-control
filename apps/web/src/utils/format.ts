@@ -55,6 +55,11 @@ export function num(value: number | string | null | undefined, digits = 2): stri
   return number.toLocaleString("pt-BR", { maximumFractionDigits: digits });
 }
 
+/** "1 modelo passou" / "3 modelos passaram": the count with the right noun, never "modelo(s)". */
+export function plural(count: number, one: string, many: string): string {
+  return `${count.toLocaleString("pt-BR")} ${count === 1 ? one : many}`;
+}
+
 export function quantity(value: number | string | null | undefined): string {
   const number = finite(value);
   if (number === null) return "—";

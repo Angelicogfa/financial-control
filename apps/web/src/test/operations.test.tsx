@@ -252,7 +252,7 @@ describe("research", () => {
     expect(query?.getAll("asset_type")).toEqual(["FII"]);
     expect(query?.getAll("arca_class")).toEqual(["ACOES"]);
     expect(query?.getAll("sector")).toEqual(["Finance"]);
-    expect(screen.getByText(/1 resultado\(s\) de 3 candidato\(s\)/)).toBeInTheDocument();
+    expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(/1 ativo passou pelos filtros, de 3 candidatos/);
 
     // "Observar" asks for the ARCA quadrant first, with the suggestion preselected.
     fireEvent.click(screen.getByRole("button", { name: "Observar" }));
@@ -447,12 +447,14 @@ describe("contribute", () => {
     ]);
     renderAt("/contribute/7");
     expect(await screen.findByRole("list", { name: "Peso de cada classe antes e depois do aporte" })).toBeInTheDocument();
-    expect(screen.getByText(/ficam sem destino/)).toBeInTheDocument();
+    expect(screen.getByText(/ficam sem destino: a classe/)).toBeInTheDocument();
+    // The lead says where the money goes before the bars.
+    expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(/em 1 compra sugerida\. R\$\s40,00 ficam sem destino\./);
     fireEvent.change(screen.getByLabelText("Quantidade de HGLG11"), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText("Preço de HGLG11"), { target: { value: "158,5" } });
     await screen.findByRole("option", { name: "XP" });
     fireEvent.change(screen.getByLabelText("Conta"), { target: { value: "1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar 1 compra(s)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar 1 compra" }));
     expect(await screen.findByText(/Plano confirmado/)).toBeInTheDocument();
     expect(last(calls, "POST", "/contributions/7/confirm")?.body).toMatchObject({
       account_id: 1,
@@ -468,7 +470,7 @@ describe("contribute", () => {
     ]);
     renderAt("/contribute/7");
     fireEvent.click(await screen.findByLabelText("Comprar HGLG11"));
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar 0 compra(s)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar 0 compras" }));
     expect(await screen.findByText("Escolha ao menos um ativo com quantidade maior que zero.")).toBeInTheDocument();
   });
 });

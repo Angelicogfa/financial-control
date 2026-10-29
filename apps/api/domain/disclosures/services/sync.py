@@ -6,13 +6,16 @@
    not companies and have no IPE filings (28.5).
 3. Download the IPE of the current year (and the previous one on the first run and in
    January, for late filings) and keep only the documents of those companies.
+4. A document delivered more than `STALE_DAYS` before it is first seen here is stored as read:
+   it is old news (the first run brings two years of filings), and the unread count and the
+   relevant-fact alert should measure what is new.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from dataclasses import dataclass, field, replace
+from datetime import UTC, date, datetime, timedelta
 
 from domain.disclosures.entities import CvmDocument, IssuerTicker
 from domain.shared.entities import AssetEntity
@@ -23,6 +26,7 @@ UoWFactory = Callable[[], AbstractUnitOfWork]
 COMPANY_TYPES = frozenset({AssetType.STOCK_BR})
 FCA_YEARS = 3
 MAX_LISTED_UNMAPPED = 20
+STALE_DAYS = 30
 
 
 def company_assets(assets: Sequence[AssetEntity]) -> list[AssetEntity]:
@@ -98,6 +102,11 @@ def sync_documents(
     if wanted:
         for year in years:
             found.extend(d for d in fetch_documents(year) if d.cnpj in wanted)
+    stale_before = day - timedelta(days=STALE_DAYS)
+    found = [
+        replace(d, read_at=seen_at) if d.delivery_date < stale_before and d.read_at is None else d
+        for d in found
+    ]
     new = 0
     if found:
         with uow_factory() as uow:
