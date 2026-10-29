@@ -9,6 +9,7 @@ import type {
   CalibrationDTO,
   CandidatesDTO,
   CandidatesRequest,
+  LabDTO,
   EventOutcomeDTO,
   GeneratorCalibrationDTO,
   GoalOutcomeDTO,
@@ -36,7 +37,7 @@ import { compareLink } from "./AssetComparePage";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 
 type Benchmark = NonNullable<BacktestRequest["benchmarks"]>[number];
-type TabKey = "past" | "future" | "candidates" | "robustness" | "confidence";
+type TabKey = "past" | "future" | "candidates" | "robustness" | "confidence" | "lab";
 
 const TABS: TabSpec<TabKey>[] = [
   { key: "past", label: "Passado" },
@@ -44,6 +45,7 @@ const TABS: TabSpec<TabKey>[] = [
   { key: "candidates", label: "Candidatos" },
   { key: "robustness", label: "Robustez" },
   { key: "confidence", label: "Confiança" },
+  { key: "lab", label: "Laboratório" },
 ];
 
 /** What sets each view apart: the question, how it is computed and when to use it. */
@@ -88,6 +90,15 @@ export const TAB_GUIDE: Record<TabKey, { question: string; method: string; use: 
       "previsão é comparada com o que aconteceu (cobertura, PIT, Brier, log score) e define os pesos da combinação.",
     use: "Para saber quanto confiar nas probabilidades do Futuro. Roda sozinha toda semana.",
     from: "Todo o histórico guardado, mês a mês",
+  },
+  lab: {
+    question: "Algum modelo de regime ou de risco prevê o mês seguinte melhor que uma regra simples?",
+    method:
+      "Modelos de regime (HMM, mistura gaussiana) e de risco (EWMA, GARCH) preveem o retorno do mês seguinte, " +
+      "sempre só com o passado, contra a média e a volatilidade históricas; só passa quem vence com folga, " +
+      "descontado o número de tentativas e estável quando a data de corte muda.",
+    use: "Para saber se vale condicionar a simulação a regimes. 'Nenhum modelo passou' é um resultado válido.",
+    from: "O histórico da carteira-modelo, mês a mês",
   },
 };
 
@@ -1464,6 +1475,154 @@ function FuturePanel() {
   );
 }
 
+// --- laboratory -------------------------------------------------------------------------------
+
+export function LabView({ data }: Readonly<{ data: LabDTO }>) {
+  const models = data.models ?? [];
+  const regime = data.regime ?? [];
+  const approved = data.approved ?? [];
+  return (
+    <div className="app-page-stack">
+      <ul className="app-warning-banner" aria-label="Avisos do laboratório">
+        {(data.warnings ?? []).map((w) => (
+          <li key={w}>{w}</li>
+        ))}
+      </ul>
+      <section className="app-card app-card-padded" aria-label="Veredito do laboratório">
+        <div className="health-pillar-head">
+          <h2 className="app-card-heading">Veredito</h2>
+          <Badge tone={approved.length ? "success" : "neutral"}>
+            {approved.length ? `${approved.length} modelo(s) passaram` : "Nenhum modelo passou"}
+          </Badge>
+        </div>
+        <p>{data.verdict}</p>
+        <p className="app-muted">
+          Previsões de {day(data.first_forecast)} a {day(data.last_forecast)} · {data.trials} tentativas registradas · PBO do
+          conjunto {data.pbo == null ? "—" : pct(data.pbo, 0)} · escolhido perde para a referência em{" "}
+          {data.loss_probability == null ? "—" : pct(data.loss_probability, 0)} das divisões
+        </p>
+      </section>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Modelos</h2>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Modelos do laboratório">
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th className="app-numeric">Ganho de log score por mês</th>
+                <th className="app-numeric">Chance de superar a referência</th>
+                <th className="app-numeric">Sharpe deflacionado</th>
+                <th>Estável</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((m) => (
+                <tr key={m.key}>
+                  <td>{m.label}</td>
+                  <td className="app-numeric">{num(m.mean_gain, 4)}</td>
+                  <td className="app-numeric">{pct(m.gate_probability, 0)}</td>
+                  <td className="app-numeric">{pct(m.deflated_probability, 0)}</td>
+                  <td>{m.stable ? "Sim" : "Não"}</td>
+                  <td>
+                    <Badge tone={m.passed ? "success" : "warning"}>{m.passed ? "Passou" : "Não passou"}</Badge>
+                    {(m.reasons ?? []).length > 0 && <div className="app-muted">{(m.reasons ?? []).join("; ")}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-card-hint">
+          Ganho positivo = a densidade prevista pelo modelo explica melhor o mês seguinte que a normal com a média e a
+          volatilidade históricas. Para passar: chance de superar de 95% ou mais, Sharpe deflacionado de 95% ou mais,
+          escolhido perdendo fora da amostra em menos de 20% das divisões e resultado estável com o corte deslocado.
+        </p>
+      </section>
+      {regime.length > 1 && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Probabilidade do regime de estresse (HMM de 2 estados)</h2>
+          <TrendChart
+            title="Probabilidade do regime de estresse mês a mês"
+            labels={regime.map((p) => day(p.month))}
+            series={[
+              {
+                key: "stress",
+                label: "Estresse",
+                color: "var(--viz-serie-2)",
+                values: regime.map((p) => p.stress_probability),
+              },
+            ]}
+            hint="Probabilidade filtrada: usa só os meses até cada data. Descreve o passado; não é previsão de queda."
+            format={(v) => pct(v, 0)}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function LabPanel() {
+  const [tick, setTick] = useState(0);
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const state = useApi(`simulation-lab-${tick}`, () => api.simulations.lab());
+  const pending = state.data?.pending_run_id ?? null;
+
+  useEffect(() => {
+    if (pending === null) return undefined;
+    const timer = setTimeout(() => setTick((t) => t + 1), POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pending, tick]);
+
+  const run = async () => {
+    setRequesting(true);
+    setError(null);
+    try {
+      await api.simulations.submitLab();
+      setTick((t) => t + 1);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Laboratório de ML</h2>
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="app-form-actions">
+          <button type="button" className="app-primary-button" disabled={requesting || pending !== null} onClick={run}>
+            {(requesting || pending !== null) && <Spinner size="sm" />}
+            <span>Rodar o laboratório</span>
+          </button>
+          {pending !== null && (
+            <span className="app-muted" role="status">
+              Laboratório na fila do worker; a página atualiza sozinha.
+            </span>
+          )}
+          {state.data?.finished_at && <span className="app-muted">Última: {dateTime(state.data.finished_at)}</span>}
+        </div>
+      </section>
+      <Async state={state}>
+        {(data) =>
+          data.run_id === null || data.run_id === undefined ? (
+            <Empty title="O laboratório ainda não rodou" hint="Clique em Rodar o laboratório (leva alguns segundos)." />
+          ) : (
+            <LabView data={data} />
+          )
+        }
+      </Async>
+    </>
+  );
+}
+
 // --- candidates -------------------------------------------------------------------------------
 
 interface CandidatesFormState {
@@ -1771,6 +1930,7 @@ export function SimulationPage() {
         {tab === "future" && <FuturePanel />}
         {tab === "confidence" && <ConfidencePanel />}
         {tab === "candidates" && <CandidatesPanel />}
+        {tab === "lab" && <LabPanel />}
         {(tab === "past" || tab === "robustness") && <BacktestPanel tab={tab} />}
       </div>
     </div>

@@ -571,7 +571,7 @@ describe("SimulationPage confidence tab", () => {
     expect(await screen.findAllByText(TAB_GUIDE.confidence.question)).toHaveLength(2);
     const comparison = screen.getByRole("table", { name: "Comparação das abas" });
     const rows = within(comparison).getAllByRole("row").slice(1);
-    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Passado", "Futuro", "Candidatos", "Robustez", "Confiança"]);
+    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Passado", "Futuro", "Candidatos", "Robustez", "Confiança", "Laboratório"]);
     expect(within(comparison).getByText(TAB_GUIDE.future.question)).toBeInTheDocument();
     expect(rows[4]).toHaveAttribute("aria-current", "true");
     expect(await screen.findByRole("table", { name: "Calibração dos geradores" })).toBeInTheDocument();

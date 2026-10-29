@@ -24,6 +24,7 @@ import type {
   CandidatesDTO,
   CandidatesRequest,
   DisclosureFeedDTO,
+  LabDTO,
   MarkReadRequest,
   MarkReadResultDTO,
   CerradoUpdateRequest,
@@ -181,6 +182,8 @@ export const api = {
     submitBacktest: (body: BacktestRequest) =>
       request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
     candidates: (id: number) => request<CandidatesDTO>(`/simulations/${id}/candidates`),
+    lab: (runId?: number) => request<LabDTO>("/simulations/lab", { query: { run_id: runId } }),
+    submitLab: () => request<SimulationRunDTO>("/simulations/lab", { method: "POST" }),
     submitCandidates: (body: CandidatesRequest) =>
       request<SimulationRunDTO>("/simulations/candidates", { method: "POST", body }),
     submitProjection: (body: ProjectionRequest) =>

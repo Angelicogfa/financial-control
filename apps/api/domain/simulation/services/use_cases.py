@@ -18,6 +18,7 @@ from controllers.simulation.responses import (
     CoverageReportDTO,
     CrisisDTO,
     DistributionDTO,
+    LabDTO,
     ProjectionDTO,
     ProjectionScenarioDTO,
     RobustnessDTO,
@@ -60,6 +61,13 @@ from domain.simulation.data import (
 )
 from domain.simulation.engine import BacktestPoint
 from domain.simulation.entities import SimulationKind, SimulationResult, SimulationRun
+from domain.simulation.ml.runs import (
+    LAB_MODEL_PREFIX,
+    LAB_SUMMARY_KEY,
+    latest_lab,
+    new_lab_run,
+    pending_lab,
+)
 from domain.simulation.robustness import (
     HISTORICAL_CRISES,
     SYNTHETIC_SHOCKS,
@@ -77,6 +85,7 @@ from domain.simulation.robustness import (
 from domain.simulation.runs import (
     BENCHMARK_PREFIX,
     CALIBRATION_KEY,
+    DEFAULT_SEED,
     PROJECTION_PREFIX,
     STRATEGY_KEY,
     BacktestParams,
@@ -414,6 +423,42 @@ class SimulationHandler:
             run = self._get(uow, run_id, SimulationKind.CANDIDATES)
             results = uow.simulations.results(run_id)
         return build_candidates(run, results)
+
+    def submit_lab(self) -> SimulationRunDTO:
+        """Queue a laboratory run; one already waiting is returned instead."""
+        with self.uow_factory() as uow:
+            run = pending_lab(uow) or uow.simulations.add(new_lab_run(seed=DEFAULT_SEED))
+            uow.commit()
+        return to_run_dto(run)
+
+    def lab(self, run_id: int | None = None) -> LabDTO:
+        """A laboratory run by id, or the latest finished one (empty when there is none)."""
+        with self.uow_factory() as uow:
+            pending = pending_lab(uow)
+            if run_id is not None:
+                run = self._get(uow, run_id, SimulationKind.LAB)
+                found: tuple[SimulationRun, list[SimulationResult]] | None = (
+                    run,
+                    uow.simulations.results(run_id),
+                )
+            else:
+                found = latest_lab(uow)
+        pending_id = pending.id if pending is not None else None
+        if found is None:
+            return LabDTO(pending_run_id=pending_id)
+        run, results = found
+        base = {
+            "run_id": run.id,
+            "status": run.status,
+            "finished_at": run.finished_at,
+            "error": run.error,
+            "pending_run_id": pending_id if pending_id != run.id else None,
+        }
+        summary = next((r for r in results if r.key == LAB_SUMMARY_KEY), None)
+        if summary is None:
+            return LabDTO(**base)
+        models = [r.summary for r in results if r.key.startswith(LAB_MODEL_PREFIX)]
+        return LabDTO(**base, **summary.summary, models=models, regime=summary.points)
 
     def projection(self, run_id: int) -> ProjectionDTO:
         """Percentiles, goals and premises of a projection (empty while it is not DONE)."""

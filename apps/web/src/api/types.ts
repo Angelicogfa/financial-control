@@ -1114,6 +1114,39 @@ export interface JobRunDTO {
 
 export type KeyExpiryDays = 30 | 90 | 180 | 365;
 
+export interface LabDTO {
+  run_id?: number | null;
+  status?: SimulationStatus | null;
+  finished_at?: string | null;
+  error?: string | null;
+  months?: number;
+  first_forecast?: string | null;
+  last_forecast?: string | null;
+  trials?: number;
+  pbo?: number | null;
+  loss_probability?: number | null;
+  models?: LabModelDTO[];
+  approved?: string[];
+  regime?: RegimePointDTO[];
+  regime_means?: number[];
+  verdict?: string;
+  warnings?: string[];
+  pending_run_id?: number | null;
+}
+
+export interface LabModelDTO {
+  key: string;
+  label: string;
+  family: string;
+  months: number;
+  mean_gain: number;
+  gate_probability: number;
+  deflated_probability: number;
+  stable: boolean;
+  passed: boolean;
+  reasons?: string[];
+}
+
 export interface LiquidityDetailDTO {
   reserve_brl?: number;
   reserve_months?: number | null;
@@ -1449,6 +1482,11 @@ export interface ReadinessDTO {
   checks: Record<string, ReadinessCheckDTO>;
 }
 
+export interface RegimePointDTO {
+  month: string;
+  stress_probability: number;
+}
+
 export interface ResolvedOfferDTO {
   label: string;
   asset_id?: number | null;
@@ -1606,7 +1644,7 @@ export interface ShockDTO {
   note?: string;
 }
 
-export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION" | "CANDIDATES";
+export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION" | "CANDIDATES" | "LAB";
 
 export interface SimulationResultDTO {
   key: string;

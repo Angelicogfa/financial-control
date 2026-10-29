@@ -175,6 +175,8 @@ class OverfittingProbability:
     combinations: int
     blocks: int
     logits: list[float] = field(default_factory=list, repr=False)
+    # P(the in-sample best has a mean <= 0 out of sample), the CSCV probability of loss.
+    loss_probability: float = 0.0
 
 
 def pbo_cscv(performance: np.ndarray, *, blocks: int = CSCV_BLOCKS) -> OverfittingProbability:
@@ -206,6 +208,7 @@ def pbo_cscv(performance: np.ndarray, *, blocks: int = CSCV_BLOCKS) -> Overfitti
         return mean / np.sqrt(var)
 
     logits: list[float] = []
+    losses = 0
     every = set(range(blocks))
     for chosen in itertools.combinations(range(blocks), blocks // 2):
         is_sr = sharpe_of(chosen)
@@ -214,12 +217,14 @@ def pbo_cscv(performance: np.ndarray, *, blocks: int = CSCV_BLOCKS) -> Overfitti
         rank = int((oos_sr < oos_sr[best]).sum()) + 1  # 1 = worst out of sample
         omega = rank / (n + 1)
         logits.append(math.log(omega / (1.0 - omega)))
+        losses += int(oos_sr[best] <= 0)
     arr = np.array(logits)
     return OverfittingProbability(
         pbo=round(float((arr <= 0).mean()), 4),
         combinations=len(logits),
         blocks=blocks,
         logits=[round(v, 4) for v in logits],
+        loss_probability=round(losses / len(logits), 4),
     )
 
 

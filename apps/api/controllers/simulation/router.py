@@ -12,6 +12,7 @@ from controllers.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
     CoverageReportDTO,
+    LabDTO,
     ProjectionDTO,
     RobustnessDTO,
     SimulationRunDetailDTO,
@@ -68,6 +69,23 @@ def get_candidates(
     handler: SimulationHandler = Depends(get_simulation_handler),
 ) -> CandidatesDTO:
     return handler.candidates(run_id)
+
+
+@simulation_router.post(
+    "/lab", response_model=SimulationRunDTO, status_code=status.HTTP_202_ACCEPTED
+)
+def submit_lab(
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> SimulationRunDTO:
+    return handler.submit_lab()
+
+
+@simulation_router.get("/lab", response_model=LabDTO)
+def get_lab(
+    run_id: int | None = Query(default=None),
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> LabDTO:
+    return handler.lab(run_id)
 
 
 @simulation_router.post(

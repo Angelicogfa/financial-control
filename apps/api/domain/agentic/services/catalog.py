@@ -82,6 +82,7 @@ from controllers.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
     CoverageReportDTO,
+    LabDTO,
     ProjectionDTO,
     RobustnessDTO,
     SimulationRunDetailDTO,
@@ -1227,6 +1228,32 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationIdInput,
         output_type=CandidatesDTO,
         invoke=lambda h, p: h.simulation.candidates(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.run_lab",
+        kind="command",
+        description=(
+            "Agenda o laboratório de ML (só regime e risco): HMM de 2 e 3 estados, mistura "
+            "gaussiana, EWMA e GARCH(1,1) preveem o retorno do mês seguinte da carteira-modelo "
+            "fora da amostra contra a normal simples, com os portões (P de superar ≥ 95%, Sharpe "
+            "deflacionado com todas as tentativas, CSCV e estabilidade). Leia com simulation.lab."
+        ),
+        input_model=EmptyInput,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, _p: h.simulation.submit_lab(),
+    ),
+    OperationSpec(
+        name="simulation.lab",
+        kind="query",
+        description=(
+            "Resultado do laboratório mais recente (ou de `run_id`): por modelo, o ganho de log "
+            "score sobre a referência, a chance de superar, o Sharpe deflacionado, a estabilidade "
+            "e se passou; o PBO do conjunto, as tentativas registradas, o veredito ('nenhum "
+            "modelo passou' é válido) e a probabilidade do regime de estresse mês a mês."
+        ),
+        input_model=CalibrationInput,
+        output_type=LabDTO,
+        invoke=lambda h, p: h.simulation.lab(p.run_id),
     ),
     OperationSpec(
         name="simulation.calibrate",

@@ -406,3 +406,43 @@ class CandidatesDTO(BaseModel):
     sample_end: date | None = None
     calibration_run: int | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class LabModelDTO(BaseModel):
+    key: str
+    label: str
+    family: str
+    months: int
+    mean_gain: float
+    gate_probability: float
+    deflated_probability: float
+    stable: bool
+    passed: bool
+    reasons: list[str] = Field(default_factory=list)
+
+
+class RegimePointDTO(BaseModel):
+    month: date
+    stress_probability: float
+
+
+class LabDTO(BaseModel):
+    """The latest (or a given) laboratory run; `run_id` is None when none was run."""
+
+    run_id: int | None = None
+    status: SimulationStatus | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+    months: int = 0
+    first_forecast: date | None = None
+    last_forecast: date | None = None
+    trials: int = 0
+    pbo: float | None = None
+    loss_probability: float | None = None
+    models: list[LabModelDTO] = Field(default_factory=list)
+    approved: list[str] = Field(default_factory=list)
+    regime: list[RegimePointDTO] = Field(default_factory=list)
+    regime_means: list[float] = Field(default_factory=list)
+    verdict: str = ""
+    warnings: list[str] = Field(default_factory=list)
+    pending_run_id: int | None = None
