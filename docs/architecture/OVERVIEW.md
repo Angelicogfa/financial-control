@@ -107,6 +107,11 @@ Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e nova
 | `sync_instrument_catalog` | dias úteis (`CATALOG_SYNC_CRON_HOUR`) | catálogo de ativos B3 para o screener |
 | `refresh_fundamentals` | semanal (`FUNDAMENTALS_CRON_*`) | demonstrativos anuais das empresas em carteira e em observação |
 | `record_checklist_evaluations` | semanal | reavalia os checklists e registra a nota quando muda |
+| `sync_treasury_catalog` / `sync_treasury_prices` | dias úteis e na partida | catálogo e PU diário do Tesouro Direto (marcação a mercado, Fase 26) |
+| `sync_simulation_history` | semanal (e sob pedido) | histórico longo do Yahoo para a simulação (`SIM:*`, Fase 33.1) e, ao terminar, enfileira a calibração |
+| `run_pending_simulations` | a cada `SIMULATION_POLL_SECONDS` | executa a fila de `simulation_runs`: backtest, projeção, calibração, candidatos e laboratório (limite `SIMULATION_TIMEOUT_SECONDS`) |
+| `sync_cvm_documents` | diário (`CVM_SYNC_CRON_HOUR`, e sob pedido) | fatos relevantes e comunicados da CVM (IPE) das ações acompanhadas e o mapa ticker → CNPJ (FCA), Fase 28 |
+| `manual_<rotina>` | a cada `SIMULATION_POLL_SECONDS` | atende os pedidos de "rodar agora" (`job_runs` com status `REQUESTED`, Fase 33.5.1) |
 
 Além da rotina semanal, a API busca os demonstrativos de um ativo **logo após cadastrá-lo** pela Pesquisa ou pela importação B3 (`StatementRefresher`, em `BackgroundTasks`, sem atrasar a resposta).
 
@@ -132,7 +137,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00015`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00024`):
 
 ```mermaid
 erDiagram
@@ -247,7 +252,7 @@ erDiagram
     }
 ```
 
-Também: `fixed_income_terms` (indexador, taxa contratada, emissão/vencimento, isenção), `job_runs` (execuções do worker) e `alert_dismissals` (alertas dispensados).
+Também: `fixed_income_terms` (indexador, taxa contratada, emissão/vencimento, isenção), `job_runs` (execuções do worker e pedidos `REQUESTED`), `alert_dismissals` (alertas dispensados), `simulation_runs` e `simulation_results` (rodadas da simulação com parâmetros, `params_hash`, `data_hash`, versão do motor e semente; uma linha de resultado por série, cenário, candidato ou modelo), `cvm_documents` (documentos do IPE, protocolo único, lido ou não) e `cvm_issuer_tickers` (ticker → CNPJ do FCA).
 
 ---
 
@@ -304,7 +309,22 @@ flowchart TD
 Planilhas da Área do Investidor (Negociação e Movimentação) → pré-visualização por linha (`NEW`, `DUPLICATE`, `UNKNOWN_ASSET`, `IGNORED`, `INVALID`) → tickers desconhecidos cadastrados pelo mesmo `register_researched_asset` da Pesquisa, com o tipo e o quadrante ARCA escolhidos na pré-visualização (`new_assets`) e demonstrativos buscados em seguida → linhas desmarcadas pelo usuário (`skip_lines`) ficam `IGNORED` e vendas/resgates sem saldo ficam `INVALID`, sem bloquear o restante → gravação tudo-ou-nada das linhas novas (hash de conteúdo + ocorrência), com eventos corporativos cujo fator sai da posição do dia anterior.
 
 ### 4.6 Alertas
-`GET /alerts` combina carteira (livro inválido, classe fora da banda, ativo em revisão, cotação em fallback), valuation (abaixo do preço justo) e dados (série desatualizada, retrato ausente, rotina com falha); cada alerta tem chave estável e rota de ação, e pode ser dispensado por N dias.
+`GET /alerts` combina carteira (livro inválido, classe fora da banda, ativo em revisão, cotação em fallback), valuation (abaixo do preço justo), dados (série desatualizada, retrato ausente, rotina com falha, dado suspeito, checklist vencido), calendário (data com, vencimento, faixa de IR, venda antecipada do Tesouro) e fatos relevantes não lidos da última semana (`RELEVANT_FACT`, Fase 28); cada alerta tem chave estável e rota de ação, e pode ser dispensado por N dias.
+
+### 4.7 Simulação de carteira (Fase 33)
+Tela Ferramentas › Simular carteira, desenho em [PORTFOLIO_SIMULATION_DESIGN.md](../features/PORTFOLIO_SIMULATION_DESIGN.md). Toda rodada é pedida pela API (`POST /simulations/...`, status `PENDING`), executada pelo worker só com o que está no banco (o ponto de partida e as taxas ficam congelados no pedido) e reaproveitada quando parâmetros, dados e `ENGINE_VERSION` são os mesmos. Simulação, nunca recomendação: nada muda a política nem dispara aportes.
+
+| Aba | Tipo da rodada | O que faz |
+|---|---|---|
+| Passado | `BACKTEST` | as regras reais de aporte reaplicadas mês a mês no histórico, com custos e IR, contra CDI, Ibovespa, IFIX e S&P 500 com o mesmo fluxo |
+| Futuro | `PROJECTION` | trajetórias da carteira de hoje (mistura calibrada de bootstrap em blocos, bootstrap bayesiano e normal bayesiana sobre o excesso ao CDI, mais três cenários de juros), percentis, metas e chances com intervalo de 90% |
+| Candidatos | `CANDIDATES` | ativos da watchlist e do screener modelados contra a classe (α encolhido, β para 1, ruptura) nas mesmas trajetórias, com P(melhora) e estabilidade do ranking |
+| Robustez | (do `BACKTEST`) | crises, choques, variantes de regra contadas e a validação estatística da melhor (Sharpe deflacionado, PBO, portão bayesiano) |
+| Confiança | `CALIBRATION` | calibração walk-forward dos geradores (PIT, cobertura, Brier, log score) e os pesos do stacking usados no Futuro |
+| Laboratório | `LAB` | modelos de regime e de risco fora da amostra contra a referência simples, com portões; "nenhum modelo passou" é válido |
+
+### 4.8 Comunicados da CVM (Fase 28)
+Rotina diária `sync_cvm_documents`: FCA dos últimos 3 anos → mapa ticker → CNPJ; IPE do ano → só os documentos das ações brasileiras da carteira e da watchlist (FIIs e ETFs não publicam no IPE) → `cvm_documents`. `GET /disclosures` (filtros por ativo, categoria e não lidos) alimenta a aba Comunicados do ativo e o cartão do Início; `POST /disclosures/read` marca como lido e tira o alerta de fato relevante.
 
 ---
 

@@ -51,7 +51,12 @@ Ferramenta de simulação: backtest da estratégia ARCA (camada A), projeção p
 4. ~~33.4~~ concluída: `domain/simulation/robustness.py` (crises, choques, variantes contadas, janela reservada de 36 meses, avisos de amostra), rota `GET /api/v1/simulations/{id}/robustness`, MCP `simulation.robustness` e a tela `/tools/simulation` com as abas Passado e Robustez.
 5. ~~33.5~~ concluída: `domain/simulation/scenarios.py` (bootstrap estacionário do excesso sobre o CDI, cenários de juros, aporte, rebalanceamento com IR, percentis, metas), tipo `PROJECTION` com ponto de partida congelado no pedido, rotas `POST /api/v1/simulations/projections` e `GET /api/v1/simulations/{id}/projection`, MCP `simulation.project|projection` e a aba Futuro.
 6. ~~33.6~~ concluída: `bayes.py` (Bayes-Stein, normal-inverso-Wishart sobre o log do excesso, sorteios, Beta, stacking), `generators.py` (bootstrap, bootstrap bayesiano, normal bayesiana e a mistura), `calibration.py` (walk-forward, PIT, cobertura com Beta, Brier, log score, status), tipo `CALIBRATION` enfileirado após cada carga de histórico, intervalos de 90% em toda chance do Futuro, aba Confiança e o guia das quatro abas. PyMC não entrou (oráculo numérico no lugar).
-7. **Próxima: 33.7** (ativos candidatos, camada D) e as demais, na ordem da tabela da seção 9 do desenho.
+7. ~~33.7~~ concluída: candidatos da watchlist e do screener com os filtros do aporte real, modelo de fator com α e β encolhidos, ruptura, efeitos pareados nas trajetórias, P(melhora) e estabilidade do ranking; aba Candidatos.
+8. ~~33.8~~ concluída: `validation.py` (walk-forward com purga, Sharpe deflacionado, PBO por CSCV, portão bayesiano), aplicada às variantes da Robustez.
+9. ~~33.9~~ concluída: laboratório de regime (HMM, mistura) e risco (EWMA, GARCH) em numpy, com os portões; aba Laboratório.
+10. ~~33.10~~ concluída: MCP, documentação, teste de ponta a ponta e de UI. **A Fase 33 está completa.**
+
+Próximos passos fora da Fase 33: as propostas das Fases 34 (otimização da composição) e 35 (carteiras de comparação), que dependem das decisões de cada desenho; a Fase 28 (comunicados da CVM) foi implementada junto.
 
 ## Convenções e preferências do usuário
 - Respostas em **português**; código, commits e identificadores em inglês (ver `AGENTS.md`).

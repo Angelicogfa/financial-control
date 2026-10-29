@@ -577,3 +577,27 @@ describe("SimulationPage confidence tab", () => {
     expect(await screen.findByRole("table", { name: "Calibração dos geradores" })).toBeInTheDocument();
   });
 });
+
+describe("SimulationPage tabs (Phase 33.10)", () => {
+  const empties: Record<string, RegExp> = {
+    past: /Nenhuma simulação ainda/,
+    future: /Nenhuma simulação ainda/,
+    candidates: /Nenhuma simulação ainda/,
+    robustness: /Nenhuma simulação ainda/,
+    confidence: /Ainda não há calibração/,
+    lab: /O laboratório ainda não rodou/,
+  };
+
+  for (const [key, guide] of Object.entries(TAB_GUIDE)) {
+    it(`opens the ${key} tab with its guide and an empty state`, async () => {
+      mockApi([
+        { path: "/simulations", reply: [] },
+        { path: "/simulations/calibration", reply: { run_id: null, pending_run_id: null } },
+        { path: "/simulations/lab", reply: { run_id: null, pending_run_id: null } },
+      ]);
+      renderAt(`/tools/simulation?tab=${key}`);
+      expect((await screen.findAllByText(guide.question)).length).toBeGreaterThan(0);
+      expect(await screen.findByText(empties[key])).toBeInTheDocument();
+    });
+  }
+});

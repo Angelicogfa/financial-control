@@ -1,6 +1,13 @@
 # Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana — Desenho e Teste de Estresse
 
-*Status: desenho em revisão, nenhuma linha de código. Data: 2026-10-28 (revisão 2: ativos candidatos e lógica bayesiana). Fase proposta: 33 (ver [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md)).*
+*Status: implementado (Fase 33, etapas 33.1 a 33.10, concluída em 2026-10-29). Desenho de 2026-10-28 (revisão 2: ativos candidatos e lógica bayesiana). O que foi feito em cada etapa, com os desvios deste desenho, está no [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md), Fase 33.*
+
+**Desvios principais da implementação** (detalhes no plano):
+- só numpy: PyMC, scikit-learn, hmmlearn e arch não entraram; o oráculo dos testes bayesianos é uma integração numérica;
+- a renda passiva usa o DY dos últimos 12 meses da carteira, não o DY normalizado da Fase 25;
+- no laboratório, o PBO do conjunto é mostrado e o portão usa a probabilidade de perda da mesma CSCV;
+- nenhum modelo do laboratório alimenta a camada B ainda: a ligação fica para quando um passar com os dados reais;
+- a parte do candidato na classe é a de um ativo a mais (ou um peso fixo), não o `plan_contribution` exato.
 
 Este documento descreve a ferramenta e, na seção 8, ataca o próprio desenho: cada premissa é testada contra o que pode dar errado com os dados, a estatística e o uso. As decisões da seção 10 foram tomadas em 2026-10-28 (10.1 a 10.4).
 
