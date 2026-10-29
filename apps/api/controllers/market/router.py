@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from controllers.market.dependencies import get_market_data_handler
 from controllers.market.responses import (
     JobRunDTO,
+    QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
@@ -36,6 +37,14 @@ def request_job(
 ) -> JobRunDTO:
     """Ask the worker to run a job now (only the jobs allowed to run by hand)."""
     return handler.request_job(job_name)
+
+
+@market_router.get("/quotes/status", response_model=QuoteStatusDTO)
+def get_quote_status(
+    handler: MarketDataHandler = Depends(get_market_data_handler),
+) -> QuoteStatusDTO:
+    """How old the stored quotes of the holdings are (refresh: job `warm_portfolio_quotes`)."""
+    return handler.quote_status()
 
 
 @market_router.get("/series-status", response_model=list[SeriesStatusDTO])

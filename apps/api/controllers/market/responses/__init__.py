@@ -39,6 +39,21 @@ class SeriesStatusDTO(BaseModel):
     missing_business_days: int
 
 
+class QuoteStatusDTO(BaseModel):
+    """How old the stored quotes are (Phase 38): screens read them, the worker refreshes them."""
+
+    holdings: int = Field(description="Assets with trades priced from the market.")
+    stored: int = Field(description="How many of them have a stored quote.")
+    oldest_at: datetime | None = Field(
+        default=None, description="Fetch time of the oldest stored quote among the holdings."
+    )
+    newest_at: datetime | None = Field(
+        default=None, description="Fetch time of the newest stored quote among the holdings."
+    )
+    stale: int = Field(description="Holdings whose quote is missing or older than `stale_minutes`.")
+    stale_minutes: int
+
+
 class WorkerRequestErrorDTO(BaseModel):
     """Detailed log entry for a failed upstream request made during a background worker job."""
 

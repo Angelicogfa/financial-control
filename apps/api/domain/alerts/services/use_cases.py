@@ -37,7 +37,7 @@ from domain.shared.entities import AssetEntity
 from domain.shared.enums import AssetLifecycle
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.tax.services.status import asset_tax_status
-from infra.providers.batch import fetch_market_data
+from infra.providers.stored import stored_market_data
 
 VALUED_STATUSES = frozenset({AssetLifecycle.HELD, AssetLifecycle.ELIGIBLE})
 
@@ -87,7 +87,8 @@ class AlertHandler:
                 for t, s in lifecycles.items()
                 if s == AssetLifecycle.REVIEW and t in assets
             ]
-            fundamentals = fetch_market_data(
+            fundamentals = stored_market_data(
+                uow,
                 service.gateway,
                 [*valued, *reviewed],
                 include_quotes=False,

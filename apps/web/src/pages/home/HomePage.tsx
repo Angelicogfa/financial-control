@@ -30,6 +30,7 @@ import {
 } from "./story";
 import { DisclosureFeed } from "../disclosures/DisclosureFeed";
 import { DeclaredEarnings } from "./DeclaredEarnings";
+import { QuoteClock } from "./QuoteClock";
 
 function Indicator({
   label,
@@ -127,10 +128,12 @@ function KpiAct({
   report,
   snapshots,
   analytics,
+  onQuotesRefreshed,
 }: Readonly<{
   report: PortfolioReportResponseDTO;
   snapshots: SnapshotPointDTO[];
   analytics: PortfolioAnalyticsResponseDTO | null;
+  onQuotesRefreshed: () => void;
 }>) {
   const change = patrimonyChange(snapshots, report.total_current_value_brl);
   const twr = analytics?.status === "OK" ? curveReturn(analytics.curves.PORTFOLIO) : null;
@@ -163,7 +166,10 @@ function KpiAct({
         <h2 id="act-figures" className="home-act-title">
           Indicadores
         </h2>
-        <span className="app-muted">Posição em {report.as_of_date.split("-").reverse().join("/")}</span>
+        <span className="home-act-meta">
+          <span className="app-muted">Posição em {report.as_of_date.split("-").reverse().join("/")}</span>
+          <QuoteClock onRefreshed={onQuotesRefreshed} />
+        </span>
       </div>
       <div className="home-kpis">
         <Indicator
@@ -390,7 +396,12 @@ export function HomePage() {
       {report.loading && !report.data && <Loading lines={4} />}
       {report.data && (
         <div className="app-page-stack">
-          <KpiAct report={report.data} snapshots={snapshots.data ?? []} analytics={analytics.data} />
+          <KpiAct
+            report={report.data}
+            snapshots={snapshots.data ?? []}
+            analytics={analytics.data}
+            onQuotesRefreshed={report.reload}
+          />
           <AllocationAct
             report={report.data}
             analytics={analytics.data}

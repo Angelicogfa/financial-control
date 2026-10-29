@@ -126,6 +126,20 @@ class Fundamentals:
         return cls(**{k: v for k, v in data.items() if k in valid_fields})
 
 
+@dataclass(frozen=True)
+class StoredMarketData:
+    """The last quote and fundamentals the worker saved for a ticker (Phase 38).
+
+    Screens read these instead of calling the providers; each part carries when it was fetched.
+    """
+
+    ticker: str
+    quote: Quote | None = None
+    quote_fetched_at: datetime | None = None
+    fundamentals: Fundamentals | None = None
+    fundamentals_fetched_at: datetime | None = None
+
+
 def financial_volume(volume_shares: float | None, price: float | None) -> float | None:
     """Average financial volume (shares traded x price) used by liquidity rules (I-10)."""
     if volume_shares is None or price is None or price <= 0:

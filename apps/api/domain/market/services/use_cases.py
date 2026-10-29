@@ -5,10 +5,11 @@ Scope: market data jobs and series freshness.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from controllers.market.responses import (
     JobRunDTO,
+    QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
     WorkerRequestErrorDTO,
@@ -17,13 +18,17 @@ from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError, ValidationError
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
 from domain.shared.entities import JobRunEntity
-from domain.shared.enums import JobRunStatus
+from domain.shared.enums import JobRunStatus, Market
+
+# A stored quote of a holding older than this is shown as out of date (Phase 38).
+QUOTE_STALE_MINUTES = 30
 
 # Jobs that may be run by hand (Market data screen, MCP and `python -m worker.run_now`);
 # the worker serves a request within its polling interval. Name -> what it does.
 MANUAL_JOBS: dict[str, str] = {
     "sync_simulation_history": "Carga do histórico longo usado pela simulação de carteira",
     "sync_cvm_documents": "Carga dos fatos relevantes e comunicados da CVM",
+    "warm_portfolio_quotes": "Atualização das cotações das posições",
 }
 
 
@@ -58,6 +63,32 @@ class MarketDataHandler:
                 )
                 for symbol in TRACKED_SERIES
             ]
+
+    def quote_status(self, *, now: datetime | None = None) -> QuoteStatusDTO:
+        """How old the stored quotes of the holdings are."""
+        at = now or datetime.now(UTC)
+        with self.uow_factory() as uow:
+            traded = uow.transactions.traded_asset_ids()
+            held = [
+                a
+                for a in uow.assets.list_all(active_only=True)
+                if a.id in traded and a.market not in (Market.MANUAL, Market.FIXED_INCOME_CURVE)
+            ]
+            stored = uow.market_data.get_many(a.ticker for a in held)
+        times = [
+            t if t.tzinfo else t.replace(tzinfo=UTC)
+            for t in (d.quote_fetched_at for d in stored.values() if d.quote is not None)
+            if t is not None
+        ]
+        limit = at - timedelta(minutes=QUOTE_STALE_MINUTES)
+        return QuoteStatusDTO(
+            holdings=len(held),
+            stored=len(times),
+            oldest_at=min(times, default=None),
+            newest_at=max(times, default=None),
+            stale=len(held) - sum(1 for t in times if t >= limit),
+            stale_minutes=QUOTE_STALE_MINUTES,
+        )
 
     def job_runs(self) -> list[JobRunDTO]:
         """Latest execution of each worker job (data freshness indicator)."""

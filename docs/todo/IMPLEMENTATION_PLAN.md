@@ -740,3 +740,28 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **37.5** Comunicados da CVM: filtro na largura do conteúdo, espaço entre os cartões do Início e documentos entregues há mais de 30 dias chegando já lidos (migração `script_00025` para a primeira carga).
 - `[x]` **37.6** Padrão aplicado às demais telas: Saúde (pior checagem e pilar no resumo, contagem por situação, pilares como seções), Desempenho (retorno, distância do CDI e queda máxima, indicadores do período), Carteira (valor, resultado e a classe mais fora da banda; resumo por classe em cada aba), Aportar (como funciona e para onde vai o dinheiro do plano), Estratégia (regras em vigor num parágrafo) e Pesquisar (quantos passaram pelos filtros); plural no lugar de "(s)".
 - `[x]` **37.7** Início: o cartão Patrimônio separa Bolsa (Caixa, Ações e Real Estate) de Internacional, com o peso, o valor e a alta ou queda de cada um sobre o investido.
+- `[x]` **37.8** Início: os demais cartões trazem a composição do número (resultado em valorização, vendas e proventos; rentabilidade contra CDI e Ibovespa; média mensal e último mês de proventos; peso da reserva), alinhados no pé do cartão.
+
+## Fase 38 — Cotações Persistidas: o Worker Atualiza, as Telas Leem do Banco (`[x]` Concluída)
+
+**Objetivo:** nenhuma tela espera um provedor de mercado. Com 2.424 ativos cadastrados (lista de observação inflada por um agente), o relatório levava de 50 a 120 s e os alertas 200 s, porque cada requisição cotava todos os ativos ao vivo e o cache do Redis (5 min) expirava antes de o worker terminar a passada (de 24 a 50 min). Agora o worker grava as cotações no banco e as telas só leem.
+
+- `[x]` **38.1** Tabela `market_data` (migração `script_00026`): última cotação e últimos fundamentos por ticker, cada parte com a hora da busca; repositório `market_data` na Unit of Work; `transactions.traded_asset_ids()` separa posições da observação.
+- `[x]` **38.2** Worker: `warm_portfolio_quotes` grava as cotações dos ativos com lançamento a cada 5 min (também na partida do worker e sob pedido) e `refresh_watchlist_quotes` as da observação a cada 60 min; fundamentos só quando têm mais de 24 h; uma falha do provedor mantém o valor anterior.
+- `[x]` **38.3** Leitura pelo banco (`infra/providers/stored.py`) no relatório, ciclo de vida/elegibilidade, saúde, alertas, observação e candidatos; só um ticker nunca gravado vai ao provedor, uma vez. Comparador e screener do catálogo continuam ao vivo (tickers fora do cadastro).
+- `[x]` **38.4** `GET /api/v1/market/quotes/status` e MCP `market.quote_status` (idade das cotações das posições, quantas defasadas além de 30 min); `warm_portfolio_quotes` entra nos jobs sob pedido (`POST /market/job-runs/warm_portfolio_quotes/request`, MCP `market.request_job`).
+- `[x]` **38.5** Início: "Cotações de HH:MM" com as posições defasadas e o botão "Atualizar", que pede a rotina ao worker e recarrega quando chegam cotações novas.
+- `[x]` **38.6** Câmbio USD/BRL gravado com as posições (`USDBRL=X` em `market_data`) e fundamentos de um ativo (checklist e análise) lidos do banco.
+
+## Fase 39 — Todo Dado Exibido Sai de Tabela Própria (`[ ]` Pendente)
+
+**Regra (pedido do usuário):** todo dado mostrado na aplicação tem tabela de persistência, para carregamento rápido, auditoria (de onde veio, quando e o que mudou) e acesso sem depender do provedor. O worker é o único que fala com os provedores; as telas leem do banco. O que ainda sai do provedor ou do Redis:
+
+- `[ ]` **39.1** Auditoria das cotações: `market_quote_history` com uma linha por ticker e dia (último preço do dia, fonte, hora), além da última em `market_data`.
+- `[ ]` **39.2** Histórico diário de preço dos ativos (gráfico do ativo, risco da análise, saúde, comparador, simulação): hoje no Redis por 6 h; tabela própria com carga incremental pelo worker.
+- `[ ]` **39.3** Agenda de proventos declarados (B3, empresa por empresa, a cada abertura do Início): tabela de proventos anunciados atualizada pelo worker.
+- `[ ]` **39.4** Taxas anuais de CDI e IPCA usadas no relatório, nos impostos e na simulação: hoje do BCB com Redis; calcular das séries já guardadas em `market_series`.
+- `[ ]` **39.5** Indicadores do screener sobre o catálogo e cotações do comparador para tickers fora do cadastro: tabela de fundamentos do catálogo atualizada pelo worker; o comparador usa o banco e só busca ao vivo o que nunca foi gravado.
+- `[ ]` **39.6** Títulos do Tesouro na busca da Pesquisa: ler de `treasury_catalog`, já mantido pelo worker.
+- `[ ]` **39.7** Câmbio na confirmação de aporte (hoje ao vivo): usar o gravado, com a hora da cotação registrada no lançamento.
+

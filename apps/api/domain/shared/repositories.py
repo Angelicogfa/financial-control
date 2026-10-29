@@ -100,6 +100,11 @@ class AbstractTransactionRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def traded_asset_ids(self) -> set[int]:
+        """Assets with at least one trade: the holdings whose quotes refresh most often."""
+        raise NotImplementedError
+
+    @abstractmethod
     def list_paginated(
         self,
         params: PaginationParams,

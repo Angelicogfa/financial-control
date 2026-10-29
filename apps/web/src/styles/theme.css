@@ -1493,6 +1493,16 @@ ul.app-info-banner li + li {
   margin-bottom: var(--space-3);
 }
 
+.home-act-meta,
+.home-quote-clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
 .home-act-title {
   margin: 0;
   font-size: var(--text-strong);

@@ -59,6 +59,29 @@ class FundamentalSnapshotModel(Base):
     )
 
 
+class MarketDataModel(Base):
+    """Last quote and fundamentals of a ticker as the worker fetched them (Phase 38).
+
+    `quote` and `fundamentals` hold the provider-neutral payloads (`Quote.to_dict()`,
+    `Fundamentals.to_dict()`); each has its own fetch time because they refresh apart.
+    """
+
+    __tablename__ = "market_data"
+
+    ticker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    quote: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    quote_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    fundamentals: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    fundamentals_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class InstrumentCatalogModel(Base):
     """Listed B3 instruments refreshed daily; feeds the screener and the watchlist."""
 

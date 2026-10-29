@@ -24,6 +24,7 @@ from worker.jobs import (
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
     refresh_fundamentals_job,
+    refresh_watchlist_quotes_job,
     run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_cvm_documents_job,
@@ -70,6 +71,9 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
             sync_simulation_history_job, catalog_top=cfg.simulation_catalog_top
         ),
         "sync_cvm_documents": sync_cvm_documents_job,
+        "warm_portfolio_quotes": partial(
+            warm_portfolio_quotes_job, max_workers=cfg.market_fetch_workers
+        ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
 
@@ -104,10 +108,24 @@ def create_scheduler(
 
     scheduler = BlockingScheduler(timezone=cfg.tz)
     scheduler.add_job(
-        guard("warm_portfolio_quotes", warm_portfolio_quotes_job),
+        guard(
+            "warm_portfolio_quotes",
+            partial(warm_portfolio_quotes_job, max_workers=cfg.market_fetch_workers),
+        ),
         trigger="interval",
         minutes=cfg.quote_refresh_minutes,
         id="warm_portfolio_quotes",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "refresh_watchlist_quotes",
+            partial(refresh_watchlist_quotes_job, max_workers=cfg.market_fetch_workers),
+        ),
+        trigger="interval",
+        minutes=cfg.watchlist_refresh_minutes,
+        id="refresh_watchlist_quotes",
         replace_existing=True,
         **defaults,
     )
@@ -263,12 +281,17 @@ def run_startup_jobs(
     uow_factory: UoWFactory = SqlAlchemyUnitOfWork,
     lock: JobLock | None = None,
 ) -> None:
-    """Bring series and snapshots up to date before the schedule starts."""
+    """Store the holdings quotes and bring series and snapshots up to date before the schedule."""
     job_lock = lock or build_job_lock(settings.redis_url)
     policy = RetryPolicy(
         settings.job_max_retries, settings.job_retry_backoff_seconds, settings.job_lock_ttl_seconds
     )
     for name, job in (
+        # First, so the screens have stored quotes as soon as the worker is up (Phase 38).
+        (
+            "warm_portfolio_quotes",
+            partial(warm_portfolio_quotes_job, max_workers=settings.market_fetch_workers),
+        ),
         ("sync_bcb_and_benchmarks", sync_bcb_and_benchmarks_job),
         ("sync_treasury_catalog", sync_treasury_catalog_job),
         ("sync_treasury_prices", sync_treasury_prices_job),
