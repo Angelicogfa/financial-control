@@ -6,7 +6,7 @@ import type { CvmDocumentDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
-import { day } from "../../utils/format";
+import { day, plural } from "../../utils/format";
 
 /** The categories of most interest first; the others come from what the companies filed. */
 export const MAIN_CATEGORIES = ["Fato Relevante", "Comunicado ao Mercado", "Aviso aos Acionistas"];
@@ -87,14 +87,14 @@ export function DisclosureFeed({
     <section className="app-card app-card-padded" aria-label={title}>
       <div className="health-pillar-head">
         <h2 className="app-card-heading">{title}</h2>
-        {unread > 0 && <Badge tone="info">{unread} não lido(s)</Badge>}
+        {unread > 0 && <Badge tone="info">{plural(unread, "não lido", "não lidos")}</Badge>}
       </div>
       {error && (
         <p className="app-error-banner" role="alert">
           {error}
         </p>
       )}
-      <div className="app-field-grid">
+      <div className="app-filter-bar">
         <div className="app-field">
           <label htmlFor={`disclosure-category-${assetId ?? "all"}`}>Categoria</label>
           <select
@@ -111,8 +111,6 @@ export function DisclosureFeed({
             ))}
           </select>
         </div>
-      </div>
-      <div className="app-check-row">
         <label className="app-check">
           <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} />
           Só os não lidos

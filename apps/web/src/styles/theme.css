@@ -20,7 +20,11 @@
   --text-body: 14px;
   --text-strong: 16px;
   --text-title: 20px;
+  --text-display: 24px;
   --text-hero: 30px;
+
+  /* Vertical rhythm between the blocks of a page (cards, tables, notes). */
+  --block-gap: var(--space-5);
 
   --control-padding: 6px 10px;
 
@@ -80,6 +84,7 @@
 
   --app-radius-sm: 6px;
   --app-radius: 8px;
+  --app-radius-lg: 12px;
   --app-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --app-shadow-rgb: 15 23 42;
   --app-overlay-rgb: 15 23 42;
@@ -190,6 +195,32 @@ input[type="radio"] {
   height: 16px;
   padding: 0;
   accent-color: var(--app-primary);
+}
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+fieldset > legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-muted);
+}
+
+/* A legend is not a grid item: it would take a column of the field grid. */
+fieldset.app-field-grid > legend {
+  grid-column: 1 / -1;
+}
+
+fieldset + fieldset {
+  margin-top: var(--space-4);
 }
 
 /* --- shell --- */
@@ -450,20 +481,42 @@ a.app-icon-button {
 }
 
 .app-page-title {
-  font-size: var(--text-title);
+  font-size: var(--text-display);
   font-weight: 650;
+  letter-spacing: -0.01em;
   margin: 0 0 var(--space-1);
 }
 
 .app-page-subtitle {
   color: var(--app-text-muted);
   margin: 0;
+  max-width: 80ch;
+  line-height: 1.5;
 }
 
 .app-page-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--block-gap);
+}
+
+.app-page-stack > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Blocks that follow each other outside a stack keep the same rhythm (the Home cards, the
+   tabs of the asset). Zero specificity: a stack, a grid or a split wins. */
+:where(.app-card, .app-section, .app-table-wrap, .app-notes, .app-lead, .app-kpis, .home-act)
+  + :where(.app-card, .app-section, .app-table-wrap, .app-notes, .app-lead, .app-kpis, .home-act) {
+  margin-top: var(--block-gap);
+}
+
+.app-split > *,
+.app-field-grid > *,
+.home-layout > *,
+.home-stack > * {
+  margin-top: 0;
 }
 
 .app-card {
@@ -474,13 +527,19 @@ a.app-icon-button {
 }
 
 .app-card-padded {
-  padding: var(--space-4);
+  padding: var(--space-5);
 }
 
 .app-card-heading {
   margin: 0 0 var(--space-3);
   font-size: var(--text-strong);
   font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.app-card > .app-table-wrap,
+.app-section-body > .app-table-wrap {
+  box-shadow: none;
 }
 
 .app-card-hint {
@@ -1065,6 +1124,19 @@ button:disabled {
   border: 1px solid var(--app-danger-border);
 }
 
+ul.app-warning-banner,
+ul.app-info-banner {
+  display: block;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) calc(var(--space-4) + 18px);
+  line-height: 1.5;
+}
+
+ul.app-warning-banner li + li,
+ul.app-info-banner li + li {
+  margin-top: var(--space-1);
+}
+
 .app-warning-banner {
   background: var(--app-warning-bg);
   color: var(--app-warning-text);
@@ -1143,7 +1215,7 @@ button:disabled {
   border: none;
   background: transparent;
   color: var(--app-text-muted);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   font-size: var(--text-body);
   font-weight: 500;
   font-family: inherit;
@@ -1167,8 +1239,18 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* A filter is as wide as its options, not the whole card. */
+.app-filter-bar > .app-field {
+  flex: 0 1 280px;
+}
+
+.app-filter-bar > .app-check {
+  align-self: center;
+  padding-bottom: 2px;
 }
 
 .app-chip-group {
@@ -1454,6 +1536,35 @@ button:disabled {
   color: var(--app-text-muted);
 }
 
+.home-split {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--app-border);
+  font-size: var(--text-sm);
+}
+
+.home-split-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--space-2);
+}
+
+.home-split-row dt {
+  font-weight: 600;
+}
+
+.home-split-row dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .home-delta.is-up {
   color: var(--app-success-text);
 }
@@ -1658,13 +1769,21 @@ button:disabled {
 }
 
 .viz-tick,
-.viz-direct-label {
+.viz-direct-label,
+.viz-direct-value {
   fill: var(--app-text-muted);
   font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
 }
 
 .viz-direct-label {
   fill: var(--app-text);
+  font-weight: 600;
+}
+
+.viz-axis {
+  stroke: var(--app-border-strong);
+  stroke-width: 1;
 }
 
 .viz-column {
@@ -2237,4 +2356,378 @@ details[open] > summary {
 .simulation-validation dd {
   margin: var(--space-1) 0 0;
   font-weight: 600;
+}
+
+/* --- report building blocks: section, lead, indicators, notes (components/Section.tsx) --- */
+
+.app-section {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-sm);
+  min-width: 0;
+}
+
+.app-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+}
+
+.app-section-head:not(:last-child) {
+  border-bottom: 1px solid var(--app-border-subtle);
+}
+
+.app-section-titles {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.app-section-title {
+  margin: 0;
+  font-size: var(--text-strong);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.app-section-subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--app-text-muted);
+  max-width: 90ch;
+}
+
+.app-section-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.app-section-body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.app-section-body > * {
+  margin: 0;
+}
+
+.app-section-body > .app-table-wrap {
+  margin-inline: calc(var(--space-5) * -1);
+  border-radius: 0;
+  border-inline: none;
+}
+
+.app-section-body > .app-table-wrap:last-child {
+  margin-bottom: calc(var(--space-5) * -1);
+  border-bottom: none;
+  border-radius: 0 0 var(--app-radius) var(--app-radius);
+}
+
+.app-section-body > .app-table-wrap .app-table th:first-child,
+.app-section-body > .app-table-wrap .app-table td:first-child {
+  padding-left: var(--space-5);
+}
+
+.app-section-body > .app-table-wrap .app-table th:last-child,
+.app-section-body > .app-table-wrap .app-table td:last-child {
+  padding-right: var(--space-5);
+}
+
+.app-eyebrow {
+  display: block;
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-text-muted);
+}
+
+.app-lead {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-left: 4px solid var(--app-primary);
+  border-radius: var(--app-radius);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.app-lead.is-positive {
+  border-left-color: var(--viz-positive);
+}
+
+.app-lead.is-negative {
+  border-left-color: var(--viz-negative);
+}
+
+.app-lead.is-caution {
+  border-left-color: var(--viz-warning);
+}
+
+.app-lead-text {
+  margin-top: var(--space-2);
+  font-size: var(--text-strong);
+  line-height: 1.55;
+  color: var(--app-text);
+  max-width: 95ch;
+}
+
+.app-lead-text p {
+  margin: 0;
+}
+
+.app-lead-text p + p {
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--app-text-secondary);
+}
+
+.app-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.app-kpi {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  padding: var(--space-3) var(--space-4);
+  min-width: 0;
+  box-shadow: var(--app-shadow-sm);
+}
+
+.app-kpi-label {
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}
+
+.app-kpi-value {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-title);
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text);
+  overflow-wrap: anywhere;
+}
+
+.app-kpi.is-positive .app-kpi-value {
+  color: var(--app-success-text);
+}
+
+.app-kpi.is-negative .app-kpi-value {
+  color: var(--app-danger-text);
+}
+
+.app-kpi.is-caution .app-kpi-value {
+  color: var(--app-warning-text);
+}
+
+.app-kpi-note {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--app-text-muted);
+}
+
+.app-notes {
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  padding: var(--space-4) var(--space-5);
+}
+
+.app-notes.is-caution {
+  background: var(--app-warning-bg);
+  border-color: var(--app-warning-border);
+}
+
+.app-notes-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--app-text-secondary);
+}
+
+.app-notes.is-caution .app-notes-title {
+  color: var(--app-warning-text);
+}
+
+.app-notes-list {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--app-text-secondary);
+  max-width: 110ch;
+}
+
+.app-notes-list:last-child {
+  margin-bottom: 0;
+}
+
+.app-notes-list li + li {
+  margin-top: var(--space-1);
+}
+
+/* The meta line of an action (last run, queued): next to the button, never under it. */
+.app-meta {
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}
+
+/* A selectable run row in the history tables. */
+.app-table tbody tr[aria-selected="true"] td {
+  background: var(--app-primary-subtle);
+}
+
+.app-table tbody tr[aria-selected="true"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--app-primary);
+}
+
+/* Tags grouped by reason (assets left out, unavailable series). */
+.app-tag-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.app-tag-groups dt {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--app-text-secondary);
+}
+
+.app-tag-groups dd {
+  margin: var(--space-1) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.app-tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text-secondary);
+}
+
+/* The question a tab answers, as its header. */
+.app-guide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.app-guide-question {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.app-guide-method {
+  margin: 0;
+  color: var(--app-text-secondary);
+  line-height: 1.55;
+  max-width: 100ch;
+}
+
+.app-guide-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+}
+
+.app-guide-facts div {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.app-guide-facts dt {
+  color: var(--app-text-muted);
+}
+
+.app-guide-facts dd {
+  margin: 0;
+  color: var(--app-text-secondary);
+}
+
+/* A form that folds once there are results: the result is the protagonist. */
+.app-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  font-weight: 600;
+  font-size: var(--text-strong);
+}
+
+.app-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-disclosure > summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--app-text-muted);
+  border-bottom: 2px solid var(--app-text-muted);
+  transform: rotate(45deg);
+  transition: transform 120ms ease;
+  flex: none;
+}
+
+.app-disclosure[open] > summary {
+  border-bottom: 1px solid var(--app-border-subtle);
+}
+
+.app-disclosure[open] > summary::after {
+  transform: rotate(-135deg);
+}
+
+.app-disclosure-body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.app-disclosure > summary small {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--app-text-muted);
+}
+
+/* Price chart: the period picker beside the summary. */
+.price-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}
+
+.price-summary strong {
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
 }

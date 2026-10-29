@@ -74,7 +74,8 @@ drawdown e comparação com CDI, IPCA e IBOV) e `portfolio.snapshots` para a evo
 Ativos e Análise Fundamentalista:
 - Use `assets.list` para buscar ativos cadastrados e `assets.get` para detalhes de um ativo.
 - Chame `assets.analysis` para ver múltiplos fundamentalistas históricos, valuation (Graham, \
-Bazin, P/VP) e avaliação do Diagrama do Cerrado.
+Bazin, P/VP) e avaliação do Diagrama do Cerrado; `assets.prices` dá os fechamentos de 6 \
+meses, 1, 2 ou 5 anos, ou de todo o histórico.
 - Use `assets.create`, `assets.update`, `assets.checklist` e `assets.archive` para gerenciar o \
 cadastro e o checklist fundamentalista.
 

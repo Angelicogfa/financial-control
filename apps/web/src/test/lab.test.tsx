@@ -59,7 +59,7 @@ describe("LabView", () => {
   it("shows the verdict, each model's gates and the regime probability", () => {
     render(<LabView data={lab()} />);
     const verdict = screen.getByRole("region", { name: "Veredito do laboratório" });
-    expect(within(verdict).getByText("1 modelo(s) passaram")).toBeInTheDocument();
+    expect(within(verdict).getByText("1 modelo passou")).toBeInTheDocument();
     expect(within(verdict).getByText(/12 tentativas registradas · PBO do conjunto 41%/)).toBeInTheDocument();
     const rows = within(screen.getByRole("table", { name: "Modelos do laboratório" })).getAllByRole("row").slice(1);
     expect(within(rows[0]).getByText("Passou")).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("SimulationPage laboratory tab", () => {
     renderAt("/tools/simulation?tab=lab");
     expect(await screen.findByText("O laboratório ainda não rodou")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Rodar o laboratório" }));
-    expect(await screen.findByText(/Laboratório na fila do worker/)).toBeInTheDocument();
+    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
     expect(calls.some((c) => c.method === "POST" && c.path === "/simulations/lab")).toBe(true);
   });
 });

@@ -12,8 +12,9 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { KpiGrid, Lead, Notes, Section, type Tone } from "../../components/Section";
 import { Async } from "../../components/States";
-import { brl, day, num, pct } from "../../utils/format";
+import { brl, day, num, pct, plural } from "../../utils/format";
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 
@@ -108,17 +109,18 @@ function CheckRow({ check }: Readonly<{ check: HealthCheckDTO }>) {
 
 function PillarCard({ pillar }: Readonly<{ pillar: HealthPillarDTO }>) {
   return (
-    <section className="app-card app-card-padded" aria-label={pillar.title}>
-      <div className="health-pillar-head">
-        <h2 className="app-card-heading">{pillar.title}</h2>
-        <Badge tone={STATUS_TONES[pillar.status]}>{STATUS_LABELS[pillar.status]}</Badge>
-      </div>
+    <Section
+      label={pillar.title}
+      title={pillar.title}
+      subtitle={plural(pillar.checks.length, "checagem", "checagens")}
+      actions={<Badge tone={STATUS_TONES[pillar.status]}>{STATUS_LABELS[pillar.status]}</Badge>}
+    >
       <ul className="health-checks">
         {pillar.checks.map((check) => (
           <CheckRow key={check.key} check={check} />
         ))}
       </ul>
-    </section>
+    </Section>
   );
 }
 
@@ -331,26 +333,62 @@ function Details({ data }: Readonly<{ data: PortfolioHealthDTO }>) {
   );
 }
 
+/** The diagnosis in words: what is worst, where, and how much is still unmeasured. */
+export function healthStory(data: PortfolioHealthDTO): { tone: Tone; text: string } {
+  const checks = data.pillars.flatMap((p) => p.checks.map((c) => ({ check: c, pillar: p.title })));
+  const of = (status: HealthStatus) => checks.filter((c) => c.check.status === status);
+  const critical = of("CRITICAL");
+  const warning = of("WARNING");
+  const unmeasured = of("INSUFFICIENT_DATA").length;
+  const where = (items: typeof checks) =>
+    items
+      .slice(0, 3)
+      .map((c) => `${c.check.title} (${c.pillar})`)
+      .join(", ");
+  const tail = unmeasured > 0 ? ` ${plural(unmeasured, "checagem ainda não tem", "checagens ainda não têm")} dados suficientes.` : "";
+  const base = `A carteira de ${brl(data.total_value_brl)} em ${day(data.as_of_date)}`;
+  if (critical.length > 0) {
+    return {
+      tone: "negative",
+      text: `${base} tem ${plural(critical.length, "ponto crítico", "pontos críticos")}: ${where(critical)}. Resolva estes antes dos demais.${tail}`,
+    };
+  }
+  if (warning.length > 0) {
+    return {
+      tone: "caution",
+      text: `${base} não tem pontos críticos, mas ${plural(warning.length, "checagem pede", "checagens pedem")} atenção: ${where(warning)}.${tail}`,
+    };
+  }
+  return { tone: "positive", text: `${base} está dentro de todos os limites medidos.${tail}` };
+}
+
 function Summary({ data }: Readonly<{ data: PortfolioHealthDTO }>) {
   const checks = data.pillars.flatMap((p) => p.checks);
   const count = (status: HealthStatus) => checks.filter((c) => c.status === status).length;
+  const story = healthStory(data);
   return (
-    <section className="app-card app-card-padded health-summary" aria-label="Resumo">
-      <div className="health-pillar-head">
-        <h2 className="app-card-heading">Diagnóstico geral</h2>
-        <Badge tone={STATUS_TONES[data.status]}>{STATUS_LABELS[data.status]}</Badge>
-      </div>
-      <p>
-        {count("CRITICAL")} crítico(s), {count("WARNING")} em atenção, {count("OK")} ok e {count("INSUFFICIENT_DATA")}{" "}
-        sem dados suficientes, sobre {brl(data.total_value_brl)} em {day(data.as_of_date)}. O pilar em pior estado vem
-        primeiro; não há média que esconda um crítico.
-      </p>
-      <p className="app-muted">
-        Os limites ficam na <Link to="/settings/strategy">Estratégia</Link>.
-      </p>
-    </section>
+    <>
+      <Lead tone={story.tone}>
+        <p>{story.text}</p>
+      </Lead>
+      <KpiGrid
+        label="Checagens por situação"
+        items={[
+          { label: "Críticas", value: num(count("CRITICAL"), 0), tone: count("CRITICAL") ? "negative" : "neutral" },
+          { label: "Em atenção", value: num(count("WARNING"), 0), tone: count("WARNING") ? "caution" : "neutral" },
+          { label: "Ok", value: num(count("OK"), 0), tone: "positive" },
+          { label: "Sem dados suficientes", value: num(count("INSUFFICIENT_DATA"), 0), note: "Entram quando houver histórico." },
+        ]}
+      />
+    </>
   );
 }
+
+const HEALTH_NOTES = [
+  "Os pilares aparecem do pior para o melhor; não há média que esconda um crítico.",
+  "Cada checagem compara um número da carteira com os limites de atenção e crítico definidos na Estratégia.",
+  "Métricas de risco e desempenho exigem uma janela mínima de pregões; antes disso ficam como “dados insuficientes”.",
+];
 
 export function HealthPage() {
   const health = useApi("portfolio-health", () => api.portfolio.health());
@@ -368,6 +406,10 @@ export function HealthPage() {
               <PillarCard key={pillar.pillar} pillar={pillar} />
             ))}
             <Details data={data} />
+            <Notes items={HEALTH_NOTES} />
+            <p className="app-meta">
+              Os limites ficam na <Link to="/settings/strategy">Estratégia</Link>.
+            </p>
           </div>
         )}
       </Async>

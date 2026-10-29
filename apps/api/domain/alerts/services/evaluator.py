@@ -24,6 +24,7 @@ from domain.portfolio.services.earnings_agenda import AgendaStatus, EarningsAgen
 from domain.portfolio.services.mark_to_market import MarketStatus, TreasuryMarketValuation
 from domain.shared.entities import JobRunEntity
 from domain.shared.enums import AssetLifecycle, JobRunStatus
+from domain.shared.text import plural
 from domain.tax.services.status import AssetTaxStatus
 
 
@@ -281,7 +282,8 @@ def checklist_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                 AlertKind.CHECKLIST_EXPIRED,
                 AlertSeverity.WARNING,
                 f"{position.ticker}: checklist vencido",
-                f"{evaluation.stale} resposta(s) manual(is) {' e '.join(why)}. "
+                f"{plural(evaluation.stale, 'resposta manual', 'respostas manuais')}"
+                f" {' e '.join(why)}. "
                 "Revise o checklist para manter o ativo elegível a aportes.",
                 position.ticker,
                 f"/asset/{position.asset_id}?tab=checklist",
@@ -357,7 +359,7 @@ def maturity_alerts(items: Iterable[MaturityItem], *, today: date) -> list[Alert
                 f"maturity:{item.ticker}:{item.maturity_date.isoformat()}",
                 AlertKind.FIXED_INCOME_MATURITY,
                 AlertSeverity.INFO,
-                f"{item.ticker} vence em {days} dia(s)",
+                f"{item.ticker} vence em {plural(days, 'dia', 'dias')}",
                 f"Vencimento em {_day(item.maturity_date)}, com cerca de {_brl(item.value_brl)}. "
                 "Planeje o reinvestimento para o dinheiro não ficar parado.",
                 item.ticker,
@@ -384,7 +386,7 @@ def tax_bracket_alerts(
                     f"{lot.next_bracket_date.isoformat()}",
                     AlertKind.TAX_BRACKET_SOON,
                     AlertSeverity.INFO,
-                    f"{status.ticker}: IR cai em {lot.days_to_next_bracket} dia(s)",
+                    f"{status.ticker}: IR cai em {plural(lot.days_to_next_bracket, 'dia', 'dias')}",
                     f"O lote de {_day(lot.start_date)} passa de "
                     f"{_pct(lot.income_tax_rate * 100)} para "
                     f"{_pct((lot.next_income_tax_rate or 0) * 100)} em "

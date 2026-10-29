@@ -12,12 +12,33 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { KpiGrid, Lead, Notes, Section } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
-import { brl, dateTime, num, parseDecimal, points, quantity, today } from "../../utils/format";
+import { brl, dateTime, num, parseDecimal, plural, points, quantity, today } from "../../utils/format";
 import { ARCA_LABELS, PLAN_STATUS_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 
 const STEPS = ["Valor", "Classes", "Ativos", "Confirmar"];
+
+/** Where the money goes, in words: the classes that receive it, the buys and what is left over. */
+export function planStory(saved: SavedContributionPlanDTO): string {
+  const plan = saved.plan;
+  const byClass = Object.entries(plan.by_class_allocated_brl)
+    .filter(([, value]) => value > 0.009)
+    .sort(([, a], [, b]) => b - a)
+    .map(([key, value]) => `${brl(value)} para ${ARCA_LABELS[key as keyof typeof ARCA_LABELS] ?? key}`);
+  const buys = plan.orders.filter((o) => o.recommended_quantity > 0).length;
+  let text = `Dos ${brl(plan.contribution_amount_brl)} do aporte, `;
+  text += byClass.length > 0 ? `${byClass.join(", ")}, em ${plural(buys, "compra sugerida", "compras sugeridas")}.` : "nenhum valor encontrou destino.";
+  if (plan.unallocated_cash_brl > 0.009) text += ` ${brl(plan.unallocated_cash_brl)} ficam sem destino.`;
+  return text;
+}
+
+const PLAN_NOTES = [
+  "As classes abaixo da banda recebem primeiro; dentro delas, só ativos elegíveis pela Estratégia.",
+  "Quantidades são arredondadas para unidades inteiras; o que não compra uma unidade fica sem destino.",
+  "Ajuste quantidade e preço ao que foi executado na corretora antes de confirmar.",
+];
 
 function Steps({ current }: Readonly<{ current: number }>) {
   return (
@@ -66,6 +87,12 @@ function AmountStep() {
   return (
     <div className="app-page-stack">
       <Steps current={0} />
+      <Lead eyebrow="Como funciona">
+        <p>
+          Informe o valor e o sistema divide o aporte pelas classes ARCA mais distantes da meta, sugerindo os ativos e as
+          quantidades. Nada é registrado até você confirmar as compras.
+        </p>
+      </Lead>
       <form className="app-card app-card-padded" onSubmit={submit} aria-busy={busy}>
         {error && <p className="app-error-banner">{error}</p>}
         <div className="app-field-grid">
@@ -107,8 +134,7 @@ function AmountStep() {
         </p>
       </form>
 
-      <section>
-        <h2 className="app-card-heading">Planos salvos</h2>
+      <Section title="Planos salvos">
         <Async state={plans}>
           {(list) =>
             list.length === 0 ? (
@@ -149,7 +175,7 @@ function AmountStep() {
             )
           }
         </Async>
-      </section>
+      </Section>
     </div>
   );
 }
@@ -162,9 +188,7 @@ function ClassesStep({
   const before = new Map((current ?? []).map((a) => [a.arca_class, a.current_pct]));
   const scale = Math.max(10, ...projected.map((a) => Math.max(a.current_pct, a.target_pct, before.get(a.arca_class) ?? 0))) * 1.1;
   return (
-    <section className="app-card app-card-padded">
-      <h2 className="app-card-heading">Distribuição por classe</h2>
-      <p className="app-card-hint">Barra azul: peso hoje. Barra laranja: peso depois do aporte. Traço: meta.</p>
+    <Section title="Distribuição por classe" subtitle="Barra azul: peso hoje. Barra laranja: peso depois do aporte. Traço: meta.">
       <BarList
         label="Peso de cada classe antes e depois do aporte"
         bars={projected.map((a) => ({
@@ -183,7 +207,7 @@ function ClassesStep({
           o valor não compra uma unidade. Cadastre ou pesquise ativos para ela.
         </p>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -270,14 +294,27 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
   return (
     <div className="app-page-stack">
       <Steps current={chosen.length > 0 ? 2 : 1} />
+      <Lead tone={saved.plan.unallocated_cash_brl > 0.009 ? "caution" : "neutral"}>
+        <p>{planStory(saved)}</p>
+      </Lead>
+      <KpiGrid
+        label="Indicadores do plano"
+        items={[
+          { label: "Aporte", value: brl(saved.plan.contribution_amount_brl) },
+          { label: "Compras escolhidas", value: brl(total), note: plural(chosen.length, "ativo", "ativos") },
+          {
+            label: "Sem destino",
+            value: brl(saved.plan.unallocated_cash_brl),
+            tone: saved.plan.unallocated_cash_brl > 0.009 ? "caution" : "neutral",
+          },
+        ]}
+      />
       <ClassesStep saved={saved} current={report.data?.allocations ?? null} />
 
-      <section>
-        <h2 className="app-card-heading">Ativos</h2>
-        <p className="app-card-hint">
-          Ajuste quantidade e preço para o que executar de fato na corretora. Preços de ativos em dólar ficam em R$ aqui;
-          a conversão usa o câmbio do dia.
-        </p>
+      <Section
+        title="Ativos"
+        subtitle="Ajuste quantidade e preço ao que executar na corretora. Ativos em dólar aparecem em R$, ao câmbio do dia."
+      >
         {orders.length === 0 ? (
           <Empty title="Nenhum ativo elegível nas classes que recebem o aporte" />
         ) : (
@@ -355,10 +392,9 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
             </table>
           </div>
         )}
-      </section>
+      </Section>
 
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Confirmar</h2>
+      <Section title="Confirmar">
         {error && <p className="app-error-banner">{error}</p>}
         <div className="app-field-grid">
           <div className="app-field">
@@ -397,14 +433,15 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
         <div className="app-form-actions">
           <button type="button" className="app-primary-button" onClick={() => void confirm()} disabled={busy || discarding}>
             {busy && <Spinner size="sm" />}
-            <span>{busy ? "Registrando…" : `Confirmar ${chosen.length} compra(s)`}</span>
+            <span>{busy ? "Registrando…" : `Confirmar ${plural(chosen.length, "compra", "compras")}`}</span>
           </button>
           <button type="button" className="app-danger-button" onClick={() => void discard()} disabled={busy || discarding}>
             {discarding && <Spinner size="sm" />}
             <span>{discarding ? "Descartando…" : "Descartar plano"}</span>
           </button>
         </div>
-      </section>
+      </Section>
+      <Notes items={PLAN_NOTES} />
     </div>
   );
 }
@@ -414,7 +451,7 @@ function ClosedPlan({ saved }: Readonly<{ saved: SavedContributionPlanDTO }>) {
     <div className="app-page-stack">
       <div className={saved.status === "CONFIRMED" ? "app-success-banner" : "app-info-banner"}>
         {saved.status === "CONFIRMED"
-          ? `Plano confirmado em ${dateTime(saved.confirmed_at)}: ${saved.transaction_ids?.length ?? 0} compra(s) registradas.`
+          ? `Plano confirmado em ${dateTime(saved.confirmed_at)}: ${plural(saved.transaction_ids?.length ?? 0, "compra registrada", "compras registradas")}.`
           : `Plano descartado em ${dateTime(saved.discarded_at)}.`}
         <span className="app-button-row">
           {saved.status === "CONFIRMED" && (

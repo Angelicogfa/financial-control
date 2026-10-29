@@ -6,8 +6,9 @@ import type { ArcaClass, IntraClassStrategy, PolicyDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
+import { Lead } from "../../components/Section";
 import { Async, Spinner } from "../../components/States";
-import { dateTime, parseDecimal } from "../../utils/format";
+import { dateTime, parseDecimal, plural } from "../../utils/format";
 import { ARCA_CLASSES, ARCA_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 
 /** Fields edited as percentages but stored as fractions (ADR 0006). */
@@ -434,6 +435,19 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
   );
 }
 
+/** The current rules in one paragraph, so the form below reads as the detail. */
+export function strategyStory(policy: PolicyDTO): string {
+  const targets = ARCA_CLASSES.map((c) => {
+    const row = policy.arca.find((a) => a.arca_class === c);
+    return `${ARCA_LABELS[c]} ${row?.target_pct ?? 0}% (±${row?.band_pct ?? 5} p.p.)`;
+  }).join(", ");
+  const eligibility = policy.eligibility ?? {};
+  const rule = eligibility.require_evaluation
+    ? `Só ativos com checklist respondido e nota mínima ${eligibility.min_score ?? 1} recebem aportes`
+    : "Ativos sem checklist respondido também podem receber aportes";
+  return `Metas: ${targets}. ${rule}; as respostas valem ${plural(eligibility.answer_validity_months ?? 12, "mês", "meses")}.`;
+}
+
 export function StrategyPage() {
   const [saved, setSaved] = useState(false);
   const policy = useApi("policy", () => api.policy.current());
@@ -451,7 +465,11 @@ export function StrategyPage() {
       )}
       <Async state={policy} lines={8}>
         {(data) => (
-          <StrategyForm
+          <div className="app-page-stack">
+            <Lead eyebrow={`Versão ${data.version ?? "padrão"} em vigor`}>
+              <p>{strategyStory(data)}</p>
+            </Lead>
+            <StrategyForm
             key={data.version ?? 0}
             policy={data}
             onSaved={() => {
@@ -460,6 +478,7 @@ export function StrategyPage() {
               versions.reload();
             }}
           />
+          </div>
         )}
       </Async>
       <details className="app-card app-card-padded" style={{ marginTop: "var(--space-4)" }}>

@@ -5,6 +5,23 @@ import { BarList } from "../viz/BarList";
 import { ColumnChart } from "../viz/ColumnChart";
 import { Sparkline } from "../viz/Sparkline";
 import { TrendChart } from "../viz/TrendChart";
+import { niceTicks, spreadLabels } from "../viz/useChartWidth";
+
+describe("chart scale", () => {
+  it("ticks land on round numbers", () => {
+    expect(niceTicks(79_215, 2_069_674)).toEqual([500_000, 1_000_000, 1_500_000, 2_000_000]);
+    expect(niceTicks(0, 1)).toEqual([0, 0.25, 0.5, 0.75, 1]);
+  });
+
+  it("end labels never overlap and stay inside the chart", () => {
+    // Three lines ending almost together (the CDI, IFIX and the strategy) and one far above.
+    const placed = spreadLabels([100, 102, 101, 20], 28, 10, 150);
+    const sorted = [...placed].sort((a, b) => a - b);
+    sorted.slice(1).forEach((y, i) => expect(y - sorted[i]).toBeGreaterThanOrEqual(28));
+    expect(placed[3]).toBe(20); // the far one keeps its place
+    expect(Math.max(...spreadLabels([148, 149, 150], 28, 10, 150))).toBeLessThanOrEqual(150);
+  });
+});
 
 describe("Sparkline", () => {
   it("needs two points and is decorative", () => {
@@ -32,7 +49,8 @@ describe("TrendChart", () => {
     expect(band?.getAttribute("d")).toMatch(/^M.* Z$/);
     expect(band).toHaveAttribute("fill-opacity", "0.18");
     // The band's top (40) sets the scale: the line ends below the top of the chart.
-    expect(screen.getByText("Mediana 14")).toBeInTheDocument();
+    expect(screen.getByText("Mediana")).toBeInTheDocument();
+    expect(container.querySelector(".viz-direct-value")).toHaveTextContent("14");
   });
 
   it("titles the chart, labels the line ends and reads the hovered point", () => {
@@ -49,7 +67,8 @@ describe("TrendChart", () => {
       />,
     );
     expect(screen.getByRole("img", { name: "Carteira contra CDI" })).toBeInTheDocument();
-    expect(screen.getByText("Carteira 104")).toBeInTheDocument();
+    expect(screen.getByText("Carteira")).toBeInTheDocument();
+    expect([...container.querySelectorAll(".viz-direct-value")].map((t) => t.textContent)).toContain("104");
     expect(screen.getByText("Passe o mouse")).toBeInTheDocument();
     const zones = container.querySelectorAll("rect");
     fireEvent.mouseEnter(zones[1]);

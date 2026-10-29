@@ -27,6 +27,7 @@ from controllers.assets.requests import (
 from controllers.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
+    AssetPriceHistoryDTO,
     AssetResponseDTO,
 )
 from controllers.contributions.requests import ContributionConfirmRequest
@@ -205,6 +206,11 @@ class AssetListInput(BaseModel):
 
 class AssetIdInput(BaseModel):
     asset_id: int
+
+
+class AssetPricesInput(BaseModel):
+    asset_id: int
+    range: Literal["6mo", "1y", "2y", "5y", "max"] = "1y"
 
 
 class AssetTaxStatusInput(BaseModel):
@@ -593,6 +599,18 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AssetIdInput,
         output_type=AssetAnalysisResponseDTO,
         invoke=lambda h, p: h.assets.get_analysis(p.asset_id),
+    ),
+    OperationSpec(
+        name="assets.prices",
+        kind="query",
+        description=(
+            "Fechamentos de um ativo no período (6mo, 1y, 2y, 5y ou max), sem os erros "
+            "pontuais de cotação e com até 500 pontos, e o resumo: variação no período, "
+            "máxima e mínima com as datas."
+        ),
+        input_model=AssetPricesInput,
+        output_type=AssetPriceHistoryDTO,
+        invoke=lambda h, p: h.assets.get_prices(p.asset_id, p.range),
     ),
     OperationSpec(
         name="assets.tax_status",

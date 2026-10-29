@@ -22,6 +22,7 @@ from domain.assets.services.history import HistoricalMetrics, historical_metrics
 from domain.assets.services.questions import STATEMENT_PROFILES
 from domain.assets.services.valuation import AssetValuation, value_asset
 from domain.market.entities import Fundamentals
+from domain.market.services.price_chart import PriceChart, price_chart
 from domain.market.services.treasury_prices import (
     RATE_SUFFIX,
     asset_price_symbol,
@@ -510,6 +511,13 @@ class PortfolioApplicationService:
             "benchmark": benchmark_symbol,
             "price_history": [p.to_dict() for p in history],
         }
+
+    def price_chart(self, asset: AssetEntity, range_period: str) -> PriceChart:
+        """Closes of one period for the asset chart, cleaned and thinned."""
+        history = self.gateway.get_history(
+            asset.ticker, range_period=range_period, asset_type=asset.asset_type
+        )
+        return price_chart(range_period, history)
 
     def catalog_fundamentals(self, instruments: list[CatalogInstrument]) -> dict[str, Fundamentals]:
         """Current indicators of catalog instruments (cached by the gateway)."""

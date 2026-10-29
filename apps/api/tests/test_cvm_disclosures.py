@@ -245,7 +245,9 @@ def test_feed_filters_and_mark_read(api: SimpleNamespace) -> None:
     _sync(api)
     feed = api.client.get("/api/v1/disclosures").json()
     assert [i["protocol"] for i in feed["items"]] == ["W1", "W2", "W3"]
-    assert feed["items"][0]["tickers"] == ["WEGE3"] and feed["unread_count"] == 3
+    # W3 was delivered 40 days ago: old news arrives already read.
+    assert feed["items"][0]["tickers"] == ["WEGE3"] and feed["unread_count"] == 2
+    assert [i["read"] for i in feed["items"]] == [False, False, True]
     assert feed["category_counts"] == {
         "Fato Relevante": 1,
         "Comunicado ao Mercado": 1,
@@ -264,9 +266,9 @@ def test_feed_filters_and_mark_read(api: SimpleNamespace) -> None:
     done = api.client.post("/api/v1/disclosures/read", json={"ids": [feed["items"][1]["id"]]})
     assert done.json() == {"updated": 1}
     unread = api.client.get("/api/v1/disclosures", params={"unread": True}).json()
-    assert [i["protocol"] for i in unread["items"]] == ["W1", "W3"]
+    assert [i["protocol"] for i in unread["items"]] == ["W1"]
     everything = api.client.post("/api/v1/disclosures/read", json={"all": True}).json()
-    assert everything == {"updated": 2}
+    assert everything == {"updated": 1}
     assert api.client.get("/api/v1/disclosures").json()["unread_count"] == 0
 
 
@@ -314,9 +316,40 @@ def test_worker_job_and_mcp(api: SimpleNamespace) -> None:
     assert [i.protocol for i in feed.items] == ["W1"]
     mark = CATALOG_BY_NAME["disclosures.mark_read"]
     assert mark.kind == "command"
-    assert mark.invoke(handlers, mark.input_model(all=True)).updated == 3
+    assert mark.invoke(handlers, mark.input_model(all=True)).updated == 2  # W3 arrived read
     request = CATALOG_BY_NAME["market.request_job"]
     assert (
         request.invoke(handlers, request.input_model(job_name="sync_cvm_documents")).status
         == "REQUESTED"
     )
+
+
+def test_migration_marks_old_documents_of_the_first_load_as_read(tmp_path) -> None:  # noqa: ANN001
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, text
+
+    from tests.conftest import API_DIR
+
+    url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
+    cfg = Config(str(API_DIR / "alembic.ini"))
+    cfg.set_main_option("script_location", str(API_DIR / "infra" / "data" / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", url)
+    command.upgrade(cfg, "script_00024")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        for protocol, delivered in (("OLD", "2026-08-01"), ("NEW", "2026-10-20")):
+            conn.execute(
+                text(
+                    "INSERT INTO cvm_documents (protocol, version, cnpj, company_name, category,"
+                    " doc_type, species, subject, delivery_date, link, cvm_code, first_seen_at)"
+                    " VALUES (:p, 1, '1', 'X', 'Fato Relevante', '', '', '', :d, '', '',"
+                    " '2026-10-29 09:00:00')"
+                ),
+                {"p": protocol, "d": delivered},
+            )
+    command.upgrade(cfg, "script_00025")
+    with engine.connect() as conn:
+        rows = dict(conn.execute(text("SELECT protocol, read_at FROM cvm_documents")).all())
+    engine.dispose()
+    assert rows["OLD"] is not None and rows["NEW"] is None

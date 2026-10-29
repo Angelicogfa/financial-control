@@ -79,6 +79,7 @@ class SqlAlchemyCvmDocumentRepository(AbstractCvmDocumentRepository):
             if model is None:
                 created = apply_cvm_document(CvmDocumentModel(), doc)
                 created.first_seen_at = seen_at
+                created.read_at = doc.read_at  # old news arrives read (see sync_documents)
                 self.session.add(created)
                 new += 1
             elif doc.version > model.version:

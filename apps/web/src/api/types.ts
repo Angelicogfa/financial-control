@@ -192,6 +192,15 @@ export interface AssetHistoryDTO {
 
 export type AssetLifecycle = "WATCHLIST" | "ELIGIBLE" | "HELD" | "REVIEW" | "ARCHIVED";
 
+export interface AssetPriceHistoryDTO {
+  range: "6mo" | "1y" | "2y" | "5y" | "max";
+  points: PricePointDTO[];
+  change?: number | null;
+  high?: DatedPriceDTO | null;
+  low?: DatedPriceDTO | null;
+  dropped_spikes?: number;
+}
+
 export type AssetPurpose = "ARCA" | "EMERGENCY_RESERVE" | "OTHER";
 
 export interface AssetResponseDTO {
@@ -686,6 +695,11 @@ export interface CvmDocumentDTO {
   link?: string;
   read?: boolean;
   first_seen_at?: string | null;
+}
+
+export interface DatedPriceDTO {
+  date: string;
+  price: number;
 }
 
 export interface DisclosureFeedDTO {
@@ -1384,6 +1398,11 @@ export interface PortfolioReportResponseDTO {
   total_fx_pnl_brl?: number;
   projection_assumptions?: Record<string, number | null>;
   value_by_purpose_brl?: Record<string, number>;
+}
+
+export interface PricePointDTO {
+  date: string;
+  close: number;
 }
 
 export interface ProjectionAssumptionsDTO {
