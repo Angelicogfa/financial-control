@@ -86,6 +86,9 @@ class ResearchHandler:
             )
         return ScreenerResponseDTO(
             results=[to_screener_item_dto(r) for r in outcome.results],
+            total=outcome.matched,
+            page=criteria.offset // criteria.limit + 1,
+            page_size=criteria.limit,
             candidates=outcome.candidates,
             scanned=outcome.scanned,
             truncated=outcome.truncated,

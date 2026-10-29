@@ -8,7 +8,6 @@ import type {
   AssetType,
   FixedIncomeIndexer,
   ScreenerItemDTO,
-  ScreenerResponseDTO,
   TreasuryBondDTO,
   TreasurySearchResponseDTO,
   WatchlistItemDTO,
@@ -16,6 +15,7 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { IconButton } from "../../components/RowActions";
 import { TrashIcon } from "../../layout/icons";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
@@ -24,6 +24,7 @@ import { MultiSelect } from "../../components/MultiSelect";
 import { Async, Empty, ErrorBanner, Loading, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { brl, brlCompact, dateTime, day, num, pct, parseDecimal, points } from "../../utils/format";
+import { usePagedRows } from "../../utils/pagination";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -37,6 +38,7 @@ import {
 } from "../../utils/labels";
 import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
 import { compareLink } from "../tools/AssetComparePage";
+import { useScreenerSearch, type ScreenerSearch } from "./useScreenerSearch";
 
 type TabKey = "screener" | "treasury" | "watchlist";
 const TABS: TabSpec<TabKey>[] = [
@@ -93,7 +95,6 @@ function toFilters(form: ScreenForm): ScreenerFilters {
     min_roe: percent(form.minRoe),
     below_band: form.belowBand || undefined,
     exclude_registered: form.excludeRegistered || undefined,
-    limit: 50,
   };
 }
 
@@ -131,11 +132,12 @@ function FollowAction({ item, onFollow, busy }: Readonly<{ item: ScreenerItemDTO
 }
 
 function ResultsTable({
-  result,
+  search,
   onFollow,
   following,
-}: Readonly<{ result: ScreenerResponseDTO; onFollow: FollowHandler; following: string | null }>) {
-  if (result.results.length === 0) {
+}: Readonly<{ search: ScreenerSearch; onFollow: FollowHandler; following: string | null }>) {
+  const rows = search.result?.results ?? [];
+  if (search.pagination.total === 0) {
     return <Empty title="Nenhum ativo com esses critérios" hint="Afrouxe os filtros ou mude o tipo." />;
   }
   return (
@@ -156,7 +158,7 @@ function ResultsTable({
           </tr>
         </thead>
         <tbody>
-          {result.results.map((item) => (
+          {rows.map((item) => (
             <tr key={item.ticker}>
               <td>
                 <span className="app-cell-main">
@@ -201,30 +203,22 @@ function ResultsTable({
           ))}
         </tbody>
       </table>
+      <Pagination {...search.pagination} onRefresh={() => void search.refresh()} refreshing={search.loading} />
     </div>
   );
 }
 
 function Screener() {
   const [form, setForm] = useState<ScreenForm>(EMPTY_FORM);
-  const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(false);
+  const search = useScreenerSearch();
+  const { result, error, loading } = search;
   const [following, setFollowing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const set = <K extends keyof ScreenForm>(key: K, value: ScreenForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const run = async (event?: FormEvent) => {
     event?.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      setResult(await api.research.screener(toFilters(form)));
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
+    await search.search(toFilters(form));
   };
 
   const follow = async (item: ScreenerItemDTO, arcaClass: ArcaClass) => {
@@ -238,7 +232,7 @@ function Screener() {
         arca_class: arcaClass,
       });
       setNotice(`${added.ticker} está em observação em ${ARCA_LABELS[added.arca_class]}.`);
-      await run();
+      await search.refresh();
     } catch (err) {
       setNotice(errorMessage(err));
     } finally {
@@ -344,7 +338,7 @@ function Screener() {
         </div>
       </form>
       {notice && <p className="app-info-banner">{notice}</p>}
-      <ErrorBanner error={error} onRetry={() => void run()} />
+      <ErrorBanner error={error} onRetry={() => void (result ? search.refresh() : run())} />
       {loading && !result && <Loading lines={5} />}
       {loading && result && (
         <div className="app-busy-overlay" role="status" aria-live="polite">
@@ -355,7 +349,7 @@ function Screener() {
       {result && (
         <>
           <p className="app-muted" style={{ margin: 0 }}>
-            {result.results.length} resultado(s) de {result.candidates} candidato(s) no catálogo de {result.catalog_size}{" "}
+            {search.pagination.total} resultado(s) de {result.candidates} candidato(s) no catálogo de {result.catalog_size}{" "}
             ativos{result.catalog_updated_at ? ` (atualizado em ${dateTime(result.catalog_updated_at)})` : ""}.
             {result.truncated && " Os indicadores foram buscados só para os mais líquidos: refine os filtros para ver outros."}
             {result.arca_classes && result.arca_classes.length > 0 &&
@@ -367,7 +361,7 @@ function Screener() {
               hint="O worker sincroniza a lista de ativos da B3 em dias úteis; confira em Dados de mercado."
             />
           ) : (
-            <ResultsTable result={result} onFollow={(item, arca) => void follow(item, arca)} following={following} />
+            <ResultsTable search={search} onFollow={(item, arca) => void follow(item, arca)} following={following} />
           )}
         </>
       )}
@@ -387,6 +381,7 @@ function Watchlist() {
   const [adding, setAdding] = useState(false);
   const [reclassifyingId, setReclassifyingId] = useState<number | null>(null);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const { rows, pagination } = usePagedRows(watchlist.data ?? []);
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -490,7 +485,7 @@ function Watchlist() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {rows.map((item) => (
                     <tr key={item.asset_id}>
                       <td>
                         <span className="app-cell-main">
@@ -543,6 +538,7 @@ function Watchlist() {
                   ))}
                 </tbody>
               </table>
+              <Pagination {...pagination} onRefresh={watchlist.reload} refreshing={watchlist.loading} />
             </div>
           )
         }
@@ -576,19 +572,17 @@ function TreasuryScreener() {
   const [loading, setLoading] = useState(false);
   const [registering, setRegistering] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [searchKey, setSearchKey] = useState("");
+  const { rows, pagination } = usePagedRows(result?.results ?? [], searchKey);
 
   const run = async (event?: FormEvent) => {
     event?.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      setResult(
-        await api.research.treasury({
-          q: q.trim() || undefined,
-          indexer: indexer || undefined,
-          coupon_type: couponType || undefined,
-        }),
-      );
+      const filters = { q: q.trim() || undefined, indexer: indexer || undefined, coupon_type: couponType || undefined };
+      setResult(await api.research.treasury(filters));
+      setSearchKey(JSON.stringify(filters));
     } catch (err) {
       setError(err);
     } finally {
@@ -707,7 +701,7 @@ function TreasuryScreener() {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.results.map((bond) => (
+                  {rows.map((bond) => (
                     <tr key={bond.symbol}>
                       <td>
                         <span className="app-cell-main">
@@ -751,6 +745,7 @@ function TreasuryScreener() {
                   ))}
                 </tbody>
               </table>
+              <Pagination {...pagination} onRefresh={() => void run()} refreshing={loading} />
             </div>
           )}
         </>

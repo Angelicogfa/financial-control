@@ -1594,6 +1594,9 @@ export interface ScreenerItemDTO {
 
 export interface ScreenerResponseDTO {
   results: ScreenerItemDTO[];
+  total?: number;
+  page?: number;
+  page_size?: number;
   candidates: number;
   scanned: number;
   truncated: boolean;

@@ -322,7 +322,10 @@ class ScreenerToolInput(BaseModel):
     min_roe: float | None = None
     below_band: bool = False
     exclude_registered: bool = False
-    limit: int = Field(default=30, ge=1, le=100)
+    limit: int = Field(default=30, ge=1, le=100, description="Tamanho da página.")
+    page: int = Field(
+        default=1, ge=1, description="Página dos resultados; `total` diz quantos existem."
+    )
 
 
 class WatchlistClassifyToolInput(BaseModel):
@@ -871,7 +874,8 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         kind="query",
         description=(
             "Executa o screener fundamentalista no catálogo da B3 filtrando por tipo, "
-            "quadrante ARCA, setor, liquidez, P/L, P/VP, Dividend Yield e ROE."
+            "quadrante ARCA, setor, liquidez, P/L, P/VP, Dividend Yield e ROE. Paginado: "
+            "`page` e `limit` escolhem a página e `total` diz quantos ativos atendem."
         ),
         input_model=ScreenerToolInput,
         output_type=ScreenerResponseDTO,
@@ -889,6 +893,7 @@ OPERATIONS: tuple[OperationSpec, ...] = (
                 min_roe=p.min_roe,
                 exclude_registered=p.exclude_registered,
                 limit=p.limit,
+                offset=(p.page - 1) * p.limit,
             ),
             below_band=p.below_band,
         ),

@@ -558,6 +558,105 @@ a.app-icon-button {
   white-space: nowrap;
 }
 
+/* --- pagination: the bar under a paged table (same layout as the other web app) --- */
+
+.app-pagination {
+  /* Inside a table that scrolls sideways, the bar stays put. */
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--app-border);
+}
+
+.app-pagination-range {
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+  white-space: nowrap;
+}
+
+.app-pagination-size select {
+  padding: 4px 6px;
+  font-size: var(--text-sm);
+  min-height: 32px;
+}
+
+/* Where you are in pages, not only in rows: "Página 3 de 9" answers how much is left. */
+.app-pagination-page {
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.app-pagination-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+  color: var(--app-text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.app-pagination-icon:hover:not(:disabled) {
+  background: var(--app-surface-hover);
+  border-color: var(--app-border-hover);
+}
+
+.app-pagination-icon:disabled {
+  color: var(--app-text-subtle);
+  cursor: default;
+}
+
+/* Reload sits next to the count: that is what changes. */
+.app-pagination-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-pagination-refreshing svg {
+  animation: app-pagination-spin 0.8s linear infinite;
+}
+
+@keyframes app-pagination-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-pagination-refreshing svg {
+    animation: none;
+  }
+}
+
 .app-table thead th {
   text-align: left;
   font-size: var(--text-micro);

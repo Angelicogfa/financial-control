@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetComparisonDTO } from "../api/types";
-import { compareLink, formatIndicator, parseTickers } from "../pages/tools/AssetComparePage";
+import { compareLink, formatIndicator, parseTickers, searchFilters } from "../pages/tools/AssetComparePage";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -91,6 +91,19 @@ describe("asset comparator", () => {
     expect(formatIndicator(null, "MULTIPLE")).toBe("—");
   });
 
+  it("builds screener filters from the search form", () => {
+    expect(searchFilters({ q: "  ", sector: "", arcaClasses: [] })).toEqual({
+      q: undefined,
+      sector: undefined,
+      arca_class: undefined,
+    });
+    expect(searchFilters({ q: " banco ", sector: "Finance", arcaClasses: ["ACOES"] })).toEqual({
+      q: "banco",
+      sector: ["Finance"],
+      arca_class: ["ACOES"],
+    });
+  });
+
   it("asks for two tickers before calling the API", async () => {
     const { calls } = mockApi([]);
     renderAt("/tools/compare?tickers=WEGE3");
@@ -134,5 +147,45 @@ describe("asset comparator", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remover HGLG11" }));
     expect(await screen.findByText("Escolha ao menos dois ativos")).toBeInTheDocument();
+  });
+
+  it("searches by sector and ARCA class and adds a result to the comparison", async () => {
+    const screener = {
+      results: [
+        { ticker: "ITUB4", name: "Itaú", asset_type: "STOCK_BR", arca_class: "ACOES", sector: "Finance", close: 32 },
+        { ticker: "WEGE3", name: "WEG", asset_type: "STOCK_BR", arca_class: "ACOES", sector: "Industrials", close: 40 },
+      ],
+      candidates: 2,
+      scanned: 2,
+      truncated: false,
+      catalog_size: 7,
+    };
+    const { calls } = mockApi([
+      { path: "/research/screener", reply: screener },
+      { path: "/research/sectors", reply: ["Finance", "Industrials"] },
+      { path: "/research/compare", reply: comparison },
+    ]);
+    renderAt("/tools/compare?tickers=WEGE3");
+
+    expect(await screen.findByRole("option", { name: "Finance" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Setor"), { target: { value: "Finance" } });
+    fireEvent.click(screen.getByLabelText("Classe ARCA"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Ações" }));
+    fireEvent.change(screen.getByLabelText("Nome ou código"), { target: { value: "ita" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+
+    const results = await screen.findByRole("table", { name: "Resultados da busca" });
+    const query = calls.find((c) => c.path === "/research/screener")?.query;
+    expect(query?.getAll("sector")).toEqual(["Finance"]);
+    expect(query?.getAll("arca_class")).toEqual(["ACOES"]);
+    expect(query?.get("q")).toBe("ita");
+    expect(within(results).getByText(/Itaú · Finance/)).toBeInTheDocument();
+    expect(within(results).getByRole("button", { name: "Adicionar WEGE3" })).toBeDisabled();
+
+    fireEvent.click(within(results).getByRole("button", { name: "Adicionar ITUB4" }));
+    await waitFor(() =>
+      expect(calls.find((c) => c.path === "/research/compare")?.query.get("tickers")).toBe("WEGE3,ITUB4"),
+    );
+    expect(screen.getByRole("button", { name: "Remover ITUB4" })).toBeInTheDocument();
   });
 });

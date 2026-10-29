@@ -18,8 +18,10 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { Async, Spinner } from "../../components/States";
 import { brl, day, parseDecimal } from "../../utils/format";
+import { usePagedRows } from "../../utils/pagination";
 import {
   ARCA_CLASSES,
   ARCA_LABELS,
@@ -123,14 +125,18 @@ const CODE_GENERATED: AssetType[] = ["FIXED_INCOME", "TREASURY", "CASH"];
 function TreasuryPicker({ onSelect }: Readonly<{ onSelect: (bond: TreasuryBondDTO) => void }>) {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<TreasurySearchResponseDTO | null>(null);
+  const [searchKey, setSearchKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { rows, pagination } = usePagedRows(result?.results ?? [], searchKey);
 
   const search = async () => {
     setLoading(true);
     setError(null);
     try {
-      setResult(await api.research.treasury({ q: query.trim() || undefined }));
+      const q = query.trim() || undefined;
+      setResult(await api.research.treasury({ q }));
+      setSearchKey(q ?? "");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -181,7 +187,7 @@ function TreasuryPicker({ onSelect }: Readonly<{ onSelect: (bond: TreasuryBondDT
               </tr>
             </thead>
             <tbody>
-              {result.results.map((bond) => (
+              {rows.map((bond) => (
                 <tr key={bond.symbol}>
                   <td>
                     <span className="app-cell-main">
@@ -206,6 +212,7 @@ function TreasuryPicker({ onSelect }: Readonly<{ onSelect: (bond: TreasuryBondDT
               ))}
             </tbody>
           </table>
+          <Pagination {...pagination} onRefresh={() => void search()} refreshing={loading} />
         </div>
       )}
     </fieldset>

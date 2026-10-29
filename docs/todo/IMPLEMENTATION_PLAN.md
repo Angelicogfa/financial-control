@@ -612,6 +612,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **27.3** Histórico anual (receita, lucro, ROE e DY) em gráfico com seletor; DY anual estimado pelos proventos pagos sobre o valor de mercado no último pregão do ano (número de ações de hoje). Veredito de valuation e nota do checklist por ativo no topo da tabela.
 - `[x]` **27.4** Rota `GET /api/v1/research/compare?tickers=A,B&indicators=...`, operação MCP `research.compare` e tela `/tools/compare` (menu Ferramentas · Comparar ativos); link "Comparar" na Pesquisa (resultados e watchlist), na Carteira e no detalhe do ativo.
 - `[x]` **27.5** Testes: `tests/test_asset_comparison.py` (normalização, seleção, melhor por linha, indicadores dos demonstrativos, DY anual, avisos, rota, catálogo com busca sob demanda, MCP) e `src/test/compare.test.tsx`.
+- `[x]` **27.6** Busca de ativos na tela de comparação: cartão "Buscar ativos" com nome ou código, setor e classe ARCA (mesmos filtros do Screener, via `GET /research/screener` e `/research/sectors`); cada resultado tem "Adicionar", desabilitado quando o ativo já está na comparação ou o limite de 5 foi atingido. Testes em `src/test/compare.test.tsx`.
 
 ## Fase 28 — Fatos Relevantes pelos Dados Abertos da CVM (`[x]` Implementado)
 
@@ -704,7 +705,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **34.9** Escores point-in-time com os dados da CVM (depois da Fase 28 e da extensão), sem look-ahead nos fundamentos.
 
 ## Fase 35 — Carteiras de Comparação com o Seu Fluxo de Aportes (`[ ]` Proposta)
-
+### Necessita revisão sistemica. Ajuste para passar o PR
 **Objetivo:** criar N carteiras de comparação, cada uma com uma estratégia de regras fixas sobre a base de ativos, que recebem **os mesmos aportes e resgates da carteira real, nas mesmas datas e valores**, e acompanhá-las dia a dia contra ela. Responde se a carteira vence o acaso (carteiras aleatórias com as mesmas regras ARCA), quanto a diferença vem da divisão entre classes ou da escolha dos ativos (Brinson) e que estratégias vão melhor em que regime, e gera um painel de dados para os modelos da Fase 33. Simulação, não recomendação: nada muda a política nem dispara compras. Desenho completo e teste de estresse (12 riscos) em [COMPARISON_PORTFOLIOS_DESIGN.md](../features/COMPARISON_PORTFOLIOS_DESIGN.md).
 
 **Depende de:** Fase 33 (motor de backtest com lotes, custos, IR e visão point-in-time; camada bayesiana; validação da 33.8; laboratório da 33.9). **Ganha insumos com:** a Fase 34 (a composição otimizada vira a estratégia `OPTIMIZED`) e a Fase 28 com a extensão da CVM (fundamentos com data de publicação e cadastro com cancelamentos, que tiram o look-ahead e reduzem o viés de sobrevivência do modo retroativo).
@@ -718,3 +719,11 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **35.6** Métricas (TWR com Dietz modificado, TIR sobre o mesmo fluxo, risco, renda, custos), atribuição de Brinson e P(estratégia > carteira real) com intervalo.
 - `[ ]` **35.7** Tela Comparar carteiras, MCP (`comparison.list|create|get|compare`), painel diário exportável, testes de UI e integração, `docker compose build`.
 - `[ ]` **35.8** Estratégia `OPTIMIZED` (depois da Fase 34) e escores point-in-time (depois da extensão da CVM).
+## Fase 35 — Paginação das Tabelas de Pesquisa (`[x]` Implementado)
+
+**Objetivo:** toda tela de pesquisa que mostra o resultado em tabela passa a paginar, com a mesma barra de paginação do outro sistema web (itens por página 5/10/50/100, recarregar junto da contagem, faixa "1–10 de 23", "Página 1 de 3" e botões de primeira, anterior, próxima e última página). A barra aparece sempre, mesmo com uma página só, porque é nela que mora a escolha de itens por página.
+
+- `[x]` **35.1** Componente `components/Pagination.tsx` e utilitários `utils/pagination.ts` (`pageCount`, `clampPage`, `paginate`, `usePagination`, `usePagedRows`); estilos `.app-pagination*` no tema. Uma nova busca (filtros diferentes) e uma troca de tamanho voltam à primeira página; repetir a mesma busca (recarregar, observar um ativo, cadastrar um título) mantém a página.
+- `[x]` **35.2** Lançamentos: compras e vendas e proventos paginados pela API (`page`/`page_size`, a contagem vem de `meta.total_items`; uma página esvaziada por exclusão volta à última que ainda tem linhas). Some o aviso "Mostrando 50 de N; use os filtros". Eventos corporativos paginados na tela.
+- `[x]` **35.3** Pesquisar (screener, Tesouro Direto e observação), busca do comparador de ativos e busca de títulos do Tesouro no cadastro de ativo, paginados na tela (o screener e a busca do comparador passaram para a API na 35.4). Testes em `src/test/pagination.test.tsx`.
+- `[x]` **35.4** Screener paginado pela API: `GET /api/v1/research/screener` e a operação MCP `research.screener` aceitam `page` (o `limit` vira o tamanho da página, até 100) e devolvem `total`, `page` e `page_size`. Busca só com filtros do catálogo pagina todos os candidatos (os 2.415 do catálogo inteiro, por exemplo) e carrega indicadores só da página; com filtros fundamentalistas, pagina o que passou na janela varrida (`scan_limit`, segue o aviso de truncado). A tela Pesquisar e a busca do comparador pedem uma página por vez (`pages/research/useScreenerSearch.ts`); antes só os 100 primeiros chegavam. Testes: `tests/test_research_screener.py`, `tests/test_research_flow.py` e `src/test/pagination.test.tsx`.

@@ -110,7 +110,10 @@ export interface ScreenerFilters {
   min_roe?: number;
   below_band?: boolean;
   exclude_registered?: boolean;
+  /** Page size. */
   limit?: number;
+  /** One-based page of the matches; the reply's `total` says how many there are. */
+  page?: number;
 }
 
 export interface TreasuryFilters {
