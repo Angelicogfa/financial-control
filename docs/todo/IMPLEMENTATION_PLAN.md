@@ -702,3 +702,19 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **34.7** Plano de transição: só com aportes (sem venda) ou com vendas, IR e custos.
 - `[ ]` **34.8** Aba Composição em Simular carteira, MCP `simulation.optimize` e `simulation.composition`, guia de abas atualizado, testes de UI e integração, `docker compose build`.
 - `[ ]` **34.9** Escores point-in-time com os dados da CVM (depois da Fase 28 e da extensão), sem look-ahead nos fundamentos.
+
+## Fase 35 — Carteiras de Comparação com o Seu Fluxo de Aportes (`[ ]` Proposta)
+
+**Objetivo:** criar N carteiras de comparação, cada uma com uma estratégia de regras fixas sobre a base de ativos, que recebem **os mesmos aportes e resgates da carteira real, nas mesmas datas e valores**, e acompanhá-las dia a dia contra ela. Responde se a carteira vence o acaso (carteiras aleatórias com as mesmas regras ARCA), quanto a diferença vem da divisão entre classes ou da escolha dos ativos (Brinson) e que estratégias vão melhor em que regime, e gera um painel de dados para os modelos da Fase 33. Simulação, não recomendação: nada muda a política nem dispara compras. Desenho completo e teste de estresse (12 riscos) em [COMPARISON_PORTFOLIOS_DESIGN.md](../features/COMPARISON_PORTFOLIOS_DESIGN.md).
+
+**Depende de:** Fase 33 (motor de backtest com lotes, custos, IR e visão point-in-time; camada bayesiana; validação da 33.8; laboratório da 33.9). **Ganha insumos com:** a Fase 34 (a composição otimizada vira a estratégia `OPTIMIZED`) e a Fase 28 com a extensão da CVM (fundamentos com data de publicação e cadastro com cancelamentos, que tiram o look-ahead e reduzem o viés de sobrevivência do modo retroativo).
+
+- `[ ]` **35.0** Decisões da seção 11 do desenho: estratégias iniciais e número de carteiras aleatórias, universo, alcance do fluxo (só ARCA ou tudo), patrimônio de partida, modo retroativo, proventos, reconstituição, rebalanceamento, local da tela e tempo mínimo de registro antes do veredito.
+- `[ ]` **35.1** Fluxo espelhado a partir dos lançamentos (o `net_flow` dos retratos), com o alcance escolhido.
+- `[ ]` **35.2** Motor por eventos do fluxo real com valorização diária, lotes inteiros, custos, IR nas vendas e proventos datados, reaproveitando o motor da 33.2.
+- `[ ]` **35.3** Interface de estratégia e o catálogo inicial (`POLICY_EQUAL`, `POLICY_BROAD`, `INDEX_ARCA`, `DIVIDENDS`, `VALUE`, `QUALITY`, `LOW_VOL`, `CDI`, `SIXTY_FORTY`), sem leitura do futuro.
+- `[ ]` **35.4** Persistência (`comparison_portfolios`, `comparison_snapshots`, `comparison_trades`, migração sequencial), modos prospectivo e retroativo (rotulado) e a rotina diária `update_comparison_portfolios` no worker; mudar a regra cria uma nova versão.
+- `[ ]` **35.5** Carteiras aleatórias com sementes fixas e a posição da carteira real na distribuição delas.
+- `[ ]` **35.6** Métricas (TWR com Dietz modificado, TIR sobre o mesmo fluxo, risco, renda, custos), atribuição de Brinson e P(estratégia > carteira real) com intervalo.
+- `[ ]` **35.7** Tela Comparar carteiras, MCP (`comparison.list|create|get|compare`), painel diário exportável, testes de UI e integração, `docker compose build`.
+- `[ ]` **35.8** Estratégia `OPTIMIZED` (depois da Fase 34) e escores point-in-time (depois da extensão da CVM).
