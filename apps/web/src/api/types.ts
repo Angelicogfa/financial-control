@@ -574,6 +574,33 @@ export interface CurrentUserDTO {
   expires_at?: string | null;
 }
 
+export interface CvmDocumentDTO {
+  id: number;
+  protocol: string;
+  tickers?: string[];
+  company_name: string;
+  category: string;
+  doc_type?: string;
+  species?: string;
+  subject?: string;
+  reference_date?: string | null;
+  delivery_date: string;
+  version?: number;
+  link?: string;
+  read?: boolean;
+  first_seen_at?: string | null;
+}
+
+export interface DisclosureFeedDTO {
+  items?: CvmDocumentDTO[];
+  unread_count?: number;
+  category_counts?: Record<string, number>;
+  companies?: number;
+  unmapped?: string[];
+  latest_delivery?: string | null;
+  note?: string | null;
+}
+
 export interface DistributionDTO {
   count: number;
   minimum?: number | null;
@@ -1039,6 +1066,16 @@ export interface LotTaxStatusDTO {
   tax_at_next_bracket?: number | null;
   tax_saving_by_waiting?: number | null;
   net_gain_by_waiting?: number | null;
+}
+
+export interface MarkReadRequest {
+  ids?: number[];
+  all?: boolean;
+  asset_id?: number | null;
+}
+
+export interface MarkReadResultDTO {
+  updated: number;
 }
 
 export interface MarketHistoryPointDTO {

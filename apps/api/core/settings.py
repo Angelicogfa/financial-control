@@ -62,6 +62,8 @@ class Settings(BaseSettings):
         "df56aa42-484a-4a59-8184-7676580c81e3/resource/"
         "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/PrecoTaxaTesouroDireto.csv"
     )
+    # CVM open data (Phase 28): IPE disclosures and FCA trading codes.
+    cvm_open_data_base_url: str = "https://dados.cvm.gov.br/dados"
     market_fetch_workers: int = Field(default=8, ge=1, le=32)
     market_fetch_timeout_seconds: float = Field(default=20.0, gt=0)
 
@@ -85,6 +87,8 @@ class Settings(BaseSettings):
     fundamentals_cron_day_of_week: str = "sun"
     fundamentals_cron_hour: int = Field(default=6, ge=0, le=23)
     catalog_sync_cron_hour: int = Field(default=19, ge=0, le=23)
+    # Phase 28: daily load of the CVM disclosures of held and followed companies.
+    cvm_sync_cron_hour: int = Field(default=7, ge=0, le=23)
     # Simulation (Phase 33.1): most traded catalog instruments loaded besides the
     # portfolio and the watchlist (0 = none).
     simulation_catalog_top: int = Field(default=50, ge=0, le=500)

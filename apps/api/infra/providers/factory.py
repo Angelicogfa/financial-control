@@ -7,6 +7,7 @@ from typing import Protocol
 from infra.cache.redis_cache import build_cache_backend
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
+from infra.providers.cvm import DEFAULT_CVM_BASE_URL, CvmOpenDataProvider
 from infra.providers.gateway import CachedMarketGateway
 from infra.providers.tesouro import (
     DEFAULT_TESOURO_CSV_URL,
@@ -45,6 +46,9 @@ def build_market_gateway(settings: MarketSettings) -> CachedMarketGateway:
             base_url=settings.bcb_sgs_base_url,
             default_cdi_annual=settings.risk_free_rate,
             default_ipca_annual=settings.default_annual_ipca,
+        ),
+        cvm=CvmOpenDataProvider(
+            base_url=getattr(settings, "cvm_open_data_base_url", "") or DEFAULT_CVM_BASE_URL
         ),
         tesouro=TesouroTransparenteProvider(
             csv_url=csv_url,

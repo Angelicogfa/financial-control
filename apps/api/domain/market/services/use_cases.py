@@ -23,6 +23,7 @@ from domain.shared.enums import JobRunStatus
 # the worker serves a request within its polling interval. Name -> what it does.
 MANUAL_JOBS: dict[str, str] = {
     "sync_simulation_history": "Carga do histórico longo usado pela simulação de carteira",
+    "sync_cvm_documents": "Carga dos fatos relevantes e comunicados da CVM",
 }
 
 

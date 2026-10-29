@@ -12,6 +12,7 @@ from controllers.alerts.requests import AlertDismissRequest
 from controllers.alerts.responses import AlertDTO, AlertsResponseDTO
 from controllers.shared.dependencies import UoWFactory
 from domain.alerts.services.evaluator import (
+    RELEVANT_FACT_WINDOW_DAYS,
     Alert,
     AlertDismissal,
     MaturityItem,
@@ -22,10 +23,13 @@ from domain.alerts.services.evaluator import (
     early_sale_alerts,
     maturity_alerts,
     portfolio_alerts,
+    relevant_fact_alerts,
     tax_bracket_alerts,
     valuation_alerts,
     visible_alerts,
 )
+from domain.disclosures.entities import RELEVANT_FACT
+from domain.disclosures.services.sync import base_ticker, company_assets
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
 from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
 from domain.portfolio.services.service import PortfolioApplicationService
@@ -36,6 +40,28 @@ from domain.tax.services.status import asset_tax_status
 from infra.providers.batch import fetch_market_data
 
 VALUED_STATUSES = frozenset({AssetLifecycle.HELD, AssetLifecycle.ELIGIBLE})
+
+
+def _disclosure_alerts(
+    uow: AbstractUnitOfWork, assets: dict[str, AssetEntity], today: date
+) -> list[Alert]:
+    """Unread relevant facts of the followed companies delivered in the last week."""
+    companies = company_assets(list(assets.values()))
+    cnpj_by_ticker = uow.cvm_issuers.cnpjs_for([base_ticker(a.ticker) for a in companies])
+    if not cnpj_by_ticker:
+        return []
+    tickers_by_cnpj: dict[str, list[str]] = {}
+    for ticker, cnpj in sorted(cnpj_by_ticker.items()):
+        tickers_by_cnpj.setdefault(cnpj, []).append(ticker)
+    documents = uow.cvm_documents.list(
+        sorted(tickers_by_cnpj),
+        categories=[RELEVANT_FACT],
+        unread_only=True,
+        since=today - timedelta(days=RELEVANT_FACT_WINDOW_DAYS),
+        limit=50,
+    )
+    ids = {base_ticker(a.ticker): a.id for a in companies if a.id is not None}
+    return relevant_fact_alerts(documents, tickers_by_cnpj, ids)
 
 
 class AlertHandler:
@@ -94,6 +120,7 @@ class AlertHandler:
                 ),
             ]
             alerts.extend(self._calendar_alerts(uow, report, assets, reference))
+            alerts.extend(_disclosure_alerts(uow, assets, reference))
             dismissals = uow.alert_dismissals.list_all()
         shown = visible_alerts(alerts, dismissals, today=reference)
         return AlertsResponseDTO(

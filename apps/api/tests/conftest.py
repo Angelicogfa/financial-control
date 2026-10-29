@@ -48,6 +48,7 @@ from infra.data.unit_of_work import SqlAlchemyUnitOfWork
 from infra.providers.b3_listed import B3ListedProvider
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
+from infra.providers.cvm import CvmOpenDataProvider
 from infra.providers.gateway import CachedMarketGateway
 from infra.providers.yfinance_provider import YFinanceProvider
 from main import create_app
@@ -76,6 +77,9 @@ def offline_gateway() -> CachedMarketGateway:
         yfinance=YFinanceProvider(ticker_factory=_OfflineTicker),
         bcb=BcbSgsProvider(client=httpx.Client(transport=empty_bcb)),
         b3=B3ListedProvider(client=httpx.Client(transport=empty_bcb)),
+        cvm=CvmOpenDataProvider(
+            client=httpx.Client(transport=httpx.MockTransport(lambda _r: httpx.Response(404)))
+        ),
         cache=InMemoryCache(),
     )
 

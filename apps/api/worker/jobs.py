@@ -17,6 +17,7 @@ from domain.assets.services.cerrado import (
     record_if_changed,
 )
 from domain.assets.services.history import STATEMENT_TYPES
+from domain.disclosures.services.sync import sync_documents
 from domain.market.entities import Quote, QuoteFreshness
 from domain.market.services.treasury_prices import (
     RATE_SUFFIX,
@@ -550,6 +551,26 @@ def backfill_and_record_snapshot_job(
     """
     backfill_snapshots_job(uow_factory, gateway)
     return record_daily_snapshot_job(uow_factory, gateway)
+
+
+def sync_cvm_documents_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    as_of_date: date | None = None,
+) -> dict[str, object]:
+    """Load the CVM disclosures of the held and followed companies (Phase 28.3).
+
+    Provider failures are captured by the job runner into the worker error log (Phase 19).
+    """
+    result = sync_documents(
+        uow_factory,
+        fetch_tickers=gateway.get_cvm_issuer_tickers,
+        fetch_documents=gateway.get_cvm_documents,
+        today=as_of_date,
+    )
+    logger.info("CVM disclosures synced", extra={"job": "sync_cvm_documents", "new": result.new})
+    return result.as_details()
 
 
 def sync_simulation_history_job(

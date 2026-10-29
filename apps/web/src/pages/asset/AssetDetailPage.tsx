@@ -10,6 +10,7 @@ import { IconLink } from "../../components/RowActions";
 import { EditIcon } from "../../layout/icons";
 import { Async, Empty } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
+import { DisclosureFeed } from "../disclosures/DisclosureFeed";
 import { brl, brlCompact, day, money, num, pct, points, quantity } from "../../utils/format";
 import {
   ASSET_TYPE_LABELS,
@@ -37,7 +38,16 @@ const BENCHMARK_LABELS: Record<string, string> = {
   IPCA: "IPCA",
 };
 
-type TabKey = "summary" | "market" | "fundamentals" | "valuation" | "checklist" | "tax" | "earnings" | "ledger";
+type TabKey =
+  | "summary"
+  | "market"
+  | "fundamentals"
+  | "valuation"
+  | "checklist"
+  | "tax"
+  | "earnings"
+  | "ledger"
+  | "disclosures";
 const TABS: TabSpec<TabKey>[] = [
   { key: "summary", label: "Resumo" },
   { key: "fundamentals", label: "Fundamentos" },
@@ -46,6 +56,7 @@ const TABS: TabSpec<TabKey>[] = [
   { key: "tax", label: "Tributação" },
   { key: "earnings", label: "Proventos" },
   { key: "ledger", label: "Lançamentos" },
+  { key: "disclosures", label: "Comunicados" },
 ];
 /** Treasury bonds also show the curve versus the redemption price (Phase 26). */
 const TREASURY_TABS: TabSpec<TabKey>[] = [TABS[0], { key: "market", label: "Mercado" }, ...TABS.slice(1)];
@@ -547,6 +558,7 @@ export function AssetDetailPage() {
               {tab === "tax" && <TaxTab assetId={assetId} />}
               {tab === "earnings" && <Earnings assetId={assetId} />}
               {tab === "ledger" && <Ledger assetId={assetId} />}
+              {tab === "disclosures" && <DisclosureFeed assetId={assetId} title="Comunicados à CVM" />}
             </>
           );
         }}

@@ -25,6 +25,7 @@ const JOB_LABELS: Record<string, string> = {
   record_checklist_evaluations: "Reavaliação dos checklists",
   sync_instrument_catalog: "Catálogo de ativos B3",
   sync_simulation_history: "Histórico longo da simulação",
+  sync_cvm_documents: "Comunicados da CVM",
   run_pending_simulations: "Simulações na fila",
 };
 
@@ -44,6 +45,13 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Baixa do Yahoo o histórico longo dos ativos, do Ibovespa, do S&P 500 e do dólar que a simulação de carteira usa. " +
       "Roda sozinha uma vez por semana; use aqui para não esperar. Pode levar alguns minutos.",
+  },
+  {
+    name: "sync_cvm_documents",
+    action: "Carregar os comunicados da CVM",
+    hint:
+      "Baixa da CVM os fatos relevantes, comunicados e avisos das ações da carteira e da watchlist. " +
+      "Roda sozinha todo dia; use aqui para ver já os documentos de hoje.",
   },
 ];
 const JOB_POLL_MS = 5000;
