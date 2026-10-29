@@ -20,8 +20,8 @@ Prices are total-return series in BRL, so there is no separate dividend credit (
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
-from datetime import date
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime
 from decimal import Decimal
 
 from domain.market.entities import Quote
@@ -100,6 +100,8 @@ class BacktestConfig:
     fee_rate: float = 0.0003  # B3 trading fees (emolumentos) on each purchase
     cash_symbol: str | None = "CDI"  # uninvested cash follows this index (None = 0%)
     rebalance: bool = False  # sell above-band classes back to target every month
+    # Phase 41: today's checklist answers count on every simulated date (decision P8).
+    answers_today: bool = False
 
 
 @dataclass(frozen=True)
@@ -224,8 +226,25 @@ def _summary(points: Sequence[BacktestPoint], trades: int, sales: int = 0) -> Ba
     )
 
 
-def answers_on(asset: SimulatedAsset, day: date) -> dict[str, ChecklistAnswer]:
-    """The manual answer in force for each question at the close of `day`."""
+def answers_on(
+    asset: SimulatedAsset, day: date, *, today_for_all: bool = False
+) -> dict[str, ChecklistAnswer]:
+    """The manual answer in force for each question at the close of `day`.
+
+    `today_for_all` applies the latest answers on every date, dated that day so they are fresh
+    there: it uses information that did not exist then, which the study labels (Phase 41).
+    """
+    if today_for_all:
+        latest = answers_on(asset, date.max)
+        return {
+            key: replace(
+                answer,
+                answered_at=datetime(
+                    day.year, day.month, day.day, tzinfo=answer.answered_at.tzinfo
+                ),  # type: ignore[union-attr]
+            )
+            for key, answer in latest.items()
+        }
     current: dict[str, ChecklistAnswer] = {}
     for answer in sorted(
         (a for a in asset.answers if a.answered_at is not None),
@@ -406,7 +425,7 @@ def run_backtest(
                 currency="BRL",
                 use_cerrado=a.use_cerrado,
                 checklist_profile=a.checklist_profile,
-                cerrado_answers=answers_on(a, day),
+                cerrado_answers=answers_on(a, day, today_for_all=config.answers_today),
                 transactions=tuple(holdings[a.ticker].transactions),
             )
             for a in live

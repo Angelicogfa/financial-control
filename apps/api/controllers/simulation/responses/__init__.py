@@ -408,6 +408,11 @@ class CandidatesDTO(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class GainPointDTO(BaseModel):
+    month: date
+    value: float
+
+
 class LabModelDTO(BaseModel):
     key: str
     label: str
@@ -419,6 +424,9 @@ class LabModelDTO(BaseModel):
     stable: bool
     passed: bool
     reasons: list[str] = Field(default_factory=list)
+    # Gain over the simple reference accumulated month by month (Phase 41.1); empty in runs
+    # made before it was stored.
+    cumulative_gain: list[GainPointDTO] = Field(default_factory=list)
 
 
 class RegimePointDTO(BaseModel):
@@ -446,3 +454,108 @@ class LabDTO(BaseModel):
     verdict: str = ""
     warnings: list[str] = Field(default_factory=list)
     pending_run_id: int | None = None
+
+
+class StudySealDTO(BaseModel):
+    """'Quanto confiar': 0 (not measured) to 4, with a fixed label and the reason."""
+
+    level: int
+    label: str
+    text: str
+
+
+class StudyActionDTO(BaseModel):
+    """A next step the conclusion offers."""
+
+    kind: Literal["VARIATION", "COMPARE_ASSET", "CONTRIBUTE", "SET_GOAL"]
+    label: str
+    ticker: str | None = None
+    changes: dict[str, Any] = Field(default_factory=dict)
+
+
+class StudyChapterDTO(BaseModel):
+    key: Literal["PAST", "FUTURE", "IMPROVE"]
+    number: int
+    title: str
+    question: str
+    run_id: int | None = None
+    status: SimulationStatus | None = None
+    error: str | None = None
+    lead: str | None = None
+    tone: str = "neutral"
+    seal: StudySealDTO | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class StudyDTO(BaseModel):
+    """A study with its chapters, the conclusion once they finish and its next steps."""
+
+    id: int
+    label: str
+    question: str
+    question_label: str
+    premises: dict[str, Any]
+    version: int
+    origin_id: int | None = None
+    variation_of: int | None = None
+    created_at: datetime | None = None
+    status: Literal["PENDING", "RUNNING", "DONE", "PARTIAL", "FAILED"]
+    chapters: list[StudyChapterDTO]
+    conclusion: str | None = None
+    actions: list[StudyActionDTO] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    goal_probability: float | None = None
+    goal_target: float | None = None
+
+
+class StudySummaryDTO(BaseModel):
+    """A row of the studies list (and the Home card)."""
+
+    id: int
+    label: str
+    question: str
+    question_label: str
+    version: int
+    variation_of: int | None = None
+    created_at: datetime | None = None
+    status: Literal["PENDING", "RUNNING", "DONE", "PARTIAL", "FAILED"]
+    chapters_done: int
+    chapters_total: int
+    headline: str | None = None
+    goal_probability: float | None = None
+    goal_target: float | None = None
+    goal_change: float | None = Field(
+        default=None, description="Change of the goal probability since the previous version."
+    )
+
+
+class StudyVersionDTO(BaseModel):
+    id: int
+    version: int
+    created_at: datetime | None = None
+    status: str
+    goal_probability: float | None = None
+
+
+class StudyDifferenceDTO(BaseModel):
+    key: str
+    label: str
+    a: Any = None
+    b: Any = None
+
+
+class StudyComparisonRowDTO(BaseModel):
+    chapter: Literal["PAST", "FUTURE", "IMPROVE"]
+    label: str
+    a: str
+    b: str
+    difference: str
+    tone: str = "neutral"
+
+
+class StudyComparisonDTO(BaseModel):
+    a: StudyDTO
+    b: StudyDTO
+    headline: str
+    differences: list[StudyDifferenceDTO] = Field(default_factory=list)
+    rows: list[StudyComparisonRowDTO] = Field(default_factory=list)

@@ -106,7 +106,10 @@ export function daysAgo(days: number): string {
 export function parseDecimal(text: string): number | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
-  const normalized = trimmed.includes(",") ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed;
+  // "1.200.000" (two or more groups of three) is thousands; a single dot stays a decimal point.
+  const thousands = /^-?\d{1,3}(\.\d{3}){2,}$/.test(trimmed);
+  const normalized =
+    trimmed.includes(",") || thousands ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed;
   const number = Number(normalized);
   return Number.isFinite(number) ? number : null;
 }

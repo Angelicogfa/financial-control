@@ -42,7 +42,10 @@ from infra.data.repositories.portfolio import (
     SqlAlchemyContributionPlanRepository,
     SqlAlchemyPortfolioSnapshotRepository,
 )
-from infra.data.repositories.simulation import SqlAlchemySimulationRepository
+from infra.data.repositories.simulation import (
+    SqlAlchemySimulationRepository,
+    SqlAlchemySimulationStudyRepository,
+)
 from infra.data.repositories.tax import SqlAlchemyTaxRuleRepository
 
 
@@ -75,6 +78,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.agent_keys = SqlAlchemyAgentKeyRepository(self.session)
         self.tax_rules = SqlAlchemyTaxRuleRepository(self.session)
         self.simulations = SqlAlchemySimulationRepository(self.session)
+        self.simulation_studies = SqlAlchemySimulationStudyRepository(self.session)
         self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)
         self.cvm_documents = SqlAlchemyCvmDocumentRepository(self.session)
         self.market_data = SqlAlchemyMarketDataRepository(self.session)

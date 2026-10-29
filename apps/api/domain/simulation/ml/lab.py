@@ -67,6 +67,8 @@ class LabResult:
     regime_means: list[float]
     verdict: str
     warnings: list[str]
+    # Phase 41.1: each model's gain over the reference, accumulated month by month.
+    cumulative_gains: dict[str, list[tuple[date, float]]] = field(default_factory=dict)
 
 
 def portfolio_series(sample: ClassSample, targets: Mapping[ArcaClass, float]) -> np.ndarray:
@@ -180,4 +182,11 @@ def run_lab(
         regime_means=[round(float(m), 6) for m in hmm.means],
         verdict=verdict,
         warnings=warnings,
+        cumulative_gains={
+            key: [
+                (m, round(float(v), 5))
+                for m, v in zip(sample.months[start:], np.cumsum(g), strict=False)
+            ]
+            for key, g in gains.items()
+        },
     )

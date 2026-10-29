@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { LabDTO } from "../api/types";
-import { LabView } from "../pages/tools/SimulationPage";
+import { LabView } from "../pages/simulation/views";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -56,45 +56,54 @@ function lab(overrides: Partial<LabDTO> = {}): LabDTO {
 }
 
 describe("LabView", () => {
-  it("shows the verdict, each model's gates and the regime probability", () => {
-    render(<LabView data={lab()} />);
-    const verdict = screen.getByRole("region", { name: "Veredito do laboratório" });
-    expect(within(verdict).getByText("1 modelo passou")).toBeInTheDocument();
-    expect(within(verdict).getByText(/12 tentativas registradas · PBO do conjunto 41%/)).toBeInTheDocument();
-    const rows = within(screen.getByRole("table", { name: "Modelos do laboratório" })).getAllByRole("row").slice(1);
-    expect(within(rows[0]).getByText("Passou")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("Não passou")).toBeInTheDocument();
-    expect(within(rows[1]).getByText(/precisa de 95%/)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Probabilidade do regime de estresse mês a mês" })).toBeInTheDocument();
+  it("tells the verdict in decision terms and charts the model that passed", () => {
+    const data = lab({
+      models: lab().models!.map((m) => ({
+        ...m,
+        cumulative_gain: [
+          { month: "2026-08-31", value: m.passed ? 1.2 : -0.1 },
+          { month: "2026-09-30", value: m.passed ? 1.4 : -0.3 },
+        ],
+      })),
+    });
+    render(<LabView data={data} />);
+    expect(screen.getByRole("note", { name: "Veredito" })).toHaveTextContent(
+      /Regimes: HMM com 2 estados previu o mês seguinte melhor que a regra simples/,
+    );
+    const table = screen.getByRole("table", { name: "Modelos do laboratório" });
+    expect(within(table).getByRole("columnheader", { name: "Chance de ser melhor de verdade" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Acerto acumulado do Regimes: HMM com 2 estados/ })).toBeInTheDocument();
+    // HMM is the model on the chart, so its stress regime shows too.
+    expect(screen.getByRole("img", { name: /regime de estresse/ })).toBeInTheDocument();
+  });
+
+  it("charts the model picked in the table and says when it did not pass", () => {
+    const data = lab({
+      models: lab().models!.map((m) => ({ ...m, cumulative_gain: [{ month: "2026-08-31", value: 0 }, { month: "2026-09-30", value: -0.2 }] })),
+    });
+    render(<LabView data={data} />);
+    fireEvent.click(screen.getByRole("button", { name: "Risco: EWMA com λ = 0,94" }));
+    expect(screen.getByRole("button", { name: "Risco: EWMA com λ = 0,94" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("img", { name: /Acerto acumulado do Risco: EWMA/ })).toBeInTheDocument();
+    expect(screen.getByText(/Não passou: o gráfico aparece só para ilustrar/)).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /regime de estresse/ })).not.toBeInTheDocument();
   });
 
   it("states that no model passed", () => {
-    render(<LabView data={lab({ approved: [], verdict: "Nenhum modelo passou nos portões." })} />);
-    expect(screen.getAllByText(/Nenhum modelo passou/).length).toBeGreaterThan(0);
+    render(<LabView data={lab({ approved: [], models: lab().models!.map((m) => ({ ...m, passed: false })) })} />);
+    expect(screen.getByRole("note", { name: "Veredito" })).toHaveTextContent(/Nenhum modelo de regime ou de risco/);
+    expect(screen.getByText("Nenhum modelo passou")).toBeInTheDocument();
   });
 });
 
-describe("SimulationPage laboratory tab", () => {
-  it("runs the laboratory and waits for the worker", async () => {
-    let queued = false;
-    const { calls } = mockApi([
-      {
-        path: "/simulations/lab",
-        reply: () => (queued ? { run_id: null, pending_run_id: 12 } : { run_id: null, pending_run_id: null }),
-      },
-      {
-        method: "POST",
-        path: "/simulations/lab",
-        reply: () => {
-          queued = true;
-          return { status: 202, json: { id: 12, kind: "LAB", status: "PENDING", params_hash: "x", code_version: "33.9.0", seed: 1 } };
-        },
-      },
+describe("QualityPage", () => {
+  it("puts the confidence and the laboratory behind the seals", async () => {
+    mockApi([
+      { path: "/simulations/calibration", reply: { run_id: null } },
+      { path: "/simulations/lab", reply: lab() },
     ]);
-    renderAt("/tools/simulation?tab=lab");
-    expect(await screen.findByText("O laboratório ainda não rodou")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Rodar o laboratório" }));
-    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
-    expect(calls.some((c) => c.method === "POST" && c.path === "/simulations/lab")).toBe(true);
+    renderAt("/tools/simulation/quality");
+    expect(screen.getByRole("heading", { name: "Qualidade dos modelos" })).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Modelos do laboratório" })).toBeInTheDocument();
   });
 });

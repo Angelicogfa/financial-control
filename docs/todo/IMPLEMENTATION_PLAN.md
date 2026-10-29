@@ -54,7 +54,7 @@
 | **Fase 38** | Cotações Persistidas: o Worker Atualiza, as Telas Leem do Banco | `[x]` Concluída | 100% |
 | **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
 | **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
-| **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[ ]` Proposta (aguarda decisões da seção 8 do desenho) | 0% |
+| **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[x]` Concluída | 100% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -789,17 +789,17 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **40.4** Excluir simulação: exclusão lógica (`simulation_runs.deleted_at`, migração `script_00028`) que tira a rodada de toda lista, consulta, reaproveitamento e fila, sem rota de recuperação; botão na lista de cada aba e MCP `simulation.delete`.
 - `[x]` **40.5** O ativo sugerido no plano de aporte abre a página do ativo; o "Voltar" retorna ao plano com as quantidades, preços, data e conta digitados.
 
-## Fase 41 — Simular Carteira: Nova Experiência em Estudos e Capítulos (`[ ]` Proposta)
+## Fase 41 — Simular Carteira: Nova Experiência em Estudos e Capítulos (`[x]` Concluída)
 
 **Objetivo:** trocar as seis abas independentes por estudos que contam uma história: premissas definidas uma vez, capítulos De onde viemos (passado + robustez), Para onde vamos (futuro + confiança) e O que pode melhorar (candidatos sobre a mesma projeção), conclusão com próximos passos, e resultados guardados, comparáveis e refeitos com os dados de hoje. Desenho: [SIMULATION_EXPERIENCE_DESIGN.md](../features/SIMULATION_EXPERIENCE_DESIGN.md).
 
-- `[ ]` **41.0** Decisões da seção 8 do desenho.
-- `[ ]` **41.1** Correção do Laboratório: o gráfico segue o modelo escolhido na tabela (hoje é sempre o HMM, mesmo quando o aprovado é outro); veredito e colunas em linguagem de decisão.
-- `[ ]` **41.2** Estudo no backend (`simulation_studies`, rodadas com `study_id` e capítulo, encadeamento, versões, variações, exclusão, MCP).
-- `[ ]` **41.3** Conclusão do estudo e selos "Quanto confiar" como funções puras testadas.
-- `[ ]` **41.4** Lista de estudos e assistente em 3 passos.
-- `[ ]` **41.5** Página do estudo com capítulos, índice, estados, conclusão e próximos passos.
-- `[ ]` **41.6** Comparar estudos, linha do tempo, cartão no Início e versão para impressão.
-- `[ ]` **41.7** "Qualidade dos modelos" nos bastidores; remoção das abas antigas.
-- `[ ]` **41.8** Migração das rodadas atuais, testes de UI e integração, `docker compose build`.
+- `[x]` **41.0** Decisões da seção 8 aprovadas como recomendadas (estudo com capítulos, estudo completo como padrão, quatro níveis do selo, respostas de hoje no passado com aviso, Laboratório nos bastidores, todas as versões guardadas, último estudo no Início) e mock aprovado.
+- `[x]` **41.1** Laboratório: cada modelo guarda o acerto acumulado mês a mês sobre a regra simples e o gráfico mostra o modelo escolhido na tabela (o aprovado por padrão), dizendo se passou; o regime de estresse só aparece com o HMM; veredito e colunas em linguagem de decisão, com o termo técnico na dica.
+- `[x]` **41.2** Estudo no backend: `simulation_studies` e rodadas com `study_id`/`chapter` (migração `script_00029`, que converte cada rodada existente num estudo de um capítulo); `/api/v1/studies` (criar, listar, obter, versões, atualizar, variação, comparar, excluir) e MCP `study.*`; o backtest ganha `answers_mode` (respostas de hoje no período inteiro).
+- `[x]` **41.3** Conclusão, resumos de capítulo e selos "Quanto confiar" (robustez pelas variantes contra o CDI e pior crise; confiança pela cobertura da faixa de 90% do gerador combinado) como funções puras em `domain/simulation/studies.py`.
+- `[x]` **41.4** Lista de estudos com o principal em destaque e o assistente em 3 passos (pergunta, premissas, revisão).
+- `[x]` **41.5** Página do estudo: conclusão com próximos passos (variação, comparador, Aportar), índice, capítulos com os resultados e os selos, premissas e versões.
+- `[x]` **41.6** Comparar estudos capítulo por capítulo, versões com a chance da meta, cartão do último estudo no Início e versão para impressão/PDF.
+- `[x]` **41.7** "Qualidade dos modelos" (`/tools/simulation/quality`) com confiança e Laboratório; as seis abas, os três formulários e as listas de rodadas foram removidos.
+- `[x]` **41.8** Migração das rodadas atuais, testes de unidade, de UI e de integração e `docker compose build`. De quebra: `parseDecimal` passou a ler "1.200.000" como milhar, e os candidatos do screener voltaram a gravar os indicadores (chamada sem Unit of Work desde a 39.5).
 

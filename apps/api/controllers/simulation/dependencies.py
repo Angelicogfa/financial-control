@@ -9,6 +9,7 @@ from controllers.portfolio.dependencies import get_portfolio_service
 from controllers.shared.dependencies import UoWFactory
 from core.settings import AppSettings, get_settings
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
 
 
@@ -23,3 +24,10 @@ def get_simulation_handler(
         catalog_top=settings.simulation_catalog_top,
         portfolio_service=portfolio_service,
     )
+
+
+def get_study_handler(
+    simulations: SimulationHandler = Depends(get_simulation_handler),
+) -> StudyHandler:
+    """Provide the StudyHandler (Phase 41), built on the simulation handler."""
+    return StudyHandler(uow_factory=simulations.uow_factory, simulations=simulations)

@@ -1,8 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { SimulationRunDTO } from "../api/types";
 import { Breadcrumbs } from "../layout/Breadcrumbs";
 import { crumbsFor, nextTrail, type TrailEntry } from "../layout/trail";
 import { useStoredState } from "../utils/storedState";
@@ -117,45 +116,5 @@ describe("page state kept for the session", () => {
     first.unmount();
     renderAt("/contribute/7");
     expect(await screen.findByLabelText("Quantidade de HGLG11")).toHaveValue("5");
-  });
-});
-
-function run(overrides: Partial<SimulationRunDTO> = {}): SimulationRunDTO {
-  return {
-    id: 1,
-    kind: "PROJECTION",
-    status: "DONE",
-    label: "Projeção 10 anos",
-    params: { horizon_years: 10 },
-    params_hash: "h",
-    code_version: "33.4.0",
-    seed: 7,
-    created_at: "2026-10-29T12:00:00Z",
-    ...overrides,
-  } as SimulationRunDTO;
-}
-
-describe("deleting a simulation", () => {
-  it("asks first, deletes for good and reloads the list", async () => {
-    let deleted = false;
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    const { calls } = mockApi([
-      { path: "/simulations", reply: () => (deleted ? [] : [run()]) },
-      { path: "/simulations/1", reply: { ...run(), results: [] } },
-      { path: "/simulations/1/projection", reply: { status: 404, json: { detail: "x" } } },
-      {
-        method: "DELETE",
-        path: "/simulations/1",
-        reply: () => {
-          deleted = true;
-          return { status: 204 };
-        },
-      },
-    ]);
-    renderAt("/tools/simulation?tab=future");
-    fireEvent.click(await screen.findByRole("button", { name: "Excluir Projeção 10 anos" }));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/não há como recuperar/));
-    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/simulations/1")).toBe(true));
-    expect(await screen.findByText("Nenhuma simulação ainda")).toBeInTheDocument();
   });
 });

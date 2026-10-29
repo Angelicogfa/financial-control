@@ -46,6 +46,28 @@ class SimulationRun:
     finished_at: datetime | None = None
     reused_from: int | None = None
     id: int | None = None
+    # Phase 41: the study and chapter the run answers (None for a loose run).
+    study_id: int | None = None
+    chapter: str | None = None
+
+
+@dataclass(frozen=True)
+class SimulationStudy:
+    """A question with premises set once, answered by chapters (Phase 41).
+
+    Versions of a study share `origin_id` (the first one); a variation points to the study it
+    was copied from in `variation_of`.
+    """
+
+    label: str
+    question: str
+    premises: dict[str, Any]
+    version: int = 1
+    origin_id: int | None = None
+    variation_of: int | None = None
+    notes: list[str] = field(default_factory=list)
+    created_at: datetime | None = None
+    id: int | None = None
 
 
 @dataclass(frozen=True)

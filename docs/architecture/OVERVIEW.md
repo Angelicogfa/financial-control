@@ -141,7 +141,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00028`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00029`):
 
 ```mermaid
 erDiagram
@@ -351,4 +351,8 @@ Fase 39 estendeu a regra a todo dado exibido: histórico diário de preço (`ass
 ### Navegação (Fase 40.3)
 
 A barra do topo mostra a trilha (`layout/trail.ts`, `layout/Breadcrumbs.tsx`): as seções ficam sob o Início e uma página de detalhe fica sob a página de onde foi aberta, com cada link para o endereço que aquela página tinha (filtros da URL incluídos). O estado que não cabe na URL (filtros, a última busca do screener, um plano de aporte ainda não confirmado) fica na sessão do navegador (`utils/storedState.ts`), e a rolagem é restaurada ao voltar. Simulações excluídas ficam com `deleted_at` preenchido e somem de vez das listas, consultas, reaproveitamento e fila.
+
+### Simular carteira em estudos (Fase 41)
+
+A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, premissas definidas uma vez e capítulos que respondem, cada um sendo uma rodada dos motores da Fase 33 ligada por `study_id`/`chapter`. De onde viemos = backtest com variantes (robustez); Para onde vamos = projeção; O que pode melhorar = candidatos com as mesmas premissas. `domain/simulation/studies.py` monta, só a partir dos resultados, o resumo de cada capítulo, o selo "Quanto confiar" e a conclusão com próximos passos; `domain/simulation/services/studies.py` cria, versiona (`origin_id`), varia (`variation_of`), compara e exclui. Calibração e Laboratório ficam em "Qualidade dos modelos", que alimenta os selos.
 

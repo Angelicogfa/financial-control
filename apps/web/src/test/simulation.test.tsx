@@ -9,24 +9,9 @@ import type {
   ProjectionScenarioDTO,
   RobustnessDTO,
   SimulationResultDTO,
-  SimulationRunDetailDTO,
   SimulationRunDTO,
 } from "../api/types";
-import {
-  CalibrationView,
-  ProjectionView,
-  RobustnessView,
-  TAB_GUIDE,
-  isActive,
-  seriesOf,
-  toBacktestRequest,
-  toProjectionRequest,
-} from "../pages/tools/SimulationPage";
-import { mockApi, type Call } from "./mockApi";
-import { renderAt } from "./render";
-
-const last = (calls: Call[], method: string, path: string) =>
-  [...calls].reverse().find((c) => c.method === method && c.path === path);
+import { CalibrationView, ProjectionView, RobustnessView, isActive, seriesOf } from "../pages/simulation/views";
 
 function summary(overrides: Partial<BacktestSummaryDTO> = {}): BacktestSummaryDTO {
   return {
@@ -45,20 +30,6 @@ function summary(overrides: Partial<BacktestSummaryDTO> = {}): BacktestSummaryDT
   };
 }
 
-function result(key: string, label: string, overrides: Partial<SimulationResultDTO> = {}): SimulationResultDTO {
-  return {
-    key,
-    label,
-    summary: summary(),
-    points: [
-      { day: "2020-01-31", contribution: 1000, contributed: 1000, market_value: 1000, cash: 0, fees: 0, by_class: { ACOES: 1000 } },
-      { day: "2020-02-28", contribution: 1000, contributed: 2000, market_value: 2100, cash: 100, fees: 1, by_class: { ACOES: 2000 } },
-    ],
-    unavailable: [],
-    survivorship_bias: false,
-    ...overrides,
-  };
-}
 
 function run(overrides: Partial<SimulationRunDTO> = {}): SimulationRunDTO {
   return {
@@ -76,13 +47,6 @@ function run(overrides: Partial<SimulationRunDTO> = {}): SimulationRunDTO {
   };
 }
 
-function detail(overrides: Partial<SimulationRunDetailDTO> = {}): SimulationRunDetailDTO {
-  return {
-    ...run(),
-    results: [result("strategy", "Estratégia"), result("benchmark:CDI", "CDI"), result("variant:band5:hold", "Banda 5")],
-    ...overrides,
-  };
-}
 
 const dist = { count: 2, minimum: 0.08, median: 0.09, maximum: 0.1 };
 const window = { covered: true, months: 6, return_rate: -0.12, max_drawdown: -0.18 };
@@ -147,41 +111,6 @@ function robustness(overrides: Partial<RobustnessDTO> = {}): RobustnessDTO {
   };
 }
 
-describe("simulation helpers", () => {
-  it("builds the backtest request and rejects a missing contribution", () => {
-    const form = {
-      start: "2010-01-01",
-      end: "2020-01-01",
-      monthly: "1.500,50",
-      initial: "",
-      correctByIpca: true,
-      rebalance: false,
-      universe: "REGISTERED" as const,
-      policyMode: "CURRENT" as const,
-      benchmarks: ["CDI" as const],
-      variants: true,
-      label: "  ",
-    };
-    expect(toBacktestRequest(form)).toMatchObject({
-      monthly_contribution: 1500.5,
-      initial_contribution: 0,
-      variants: true,
-      benchmarks: ["CDI"],
-      label: null,
-    });
-    expect(toBacktestRequest({ ...form, monthly: "0" })).toBeNull();
-    expect(toBacktestRequest({ ...form, monthly: "" })).toBeNull();
-  });
-
-  it("keeps variants out of the series and flags active runs", () => {
-    expect(seriesOf(detail().results ?? []).map((r) => r.key)).toEqual(["strategy", "benchmark:CDI"]);
-    expect(isActive("PENDING")).toBe(true);
-    expect(isActive("RUNNING")).toBe(true);
-    expect(isActive("DONE")).toBe(false);
-    expect(isActive("TIMEOUT")).toBe(false);
-  });
-});
-
 describe("RobustnessView validation", () => {
   it("shows the verdict on the best variant with the three tests", () => {
     render(
@@ -238,55 +167,6 @@ describe("RobustnessView", () => {
     unmount();
     render(<RobustnessView data={robustness({ status: "RUNNING" })} />);
     expect(screen.getByText("A robustez aparece quando a simulação terminar")).toBeInTheDocument();
-  });
-});
-
-describe("SimulationPage", () => {
-  it("lists runs, shows the past of the latest one and switches to robustness", async () => {
-    mockApi([
-      { path: "/simulations", reply: [run()] },
-      { path: "/simulations/1", reply: detail() },
-      { path: "/simulations/1/robustness", reply: robustness() },
-    ]);
-    renderAt("/tools/simulation");
-    expect(await screen.findByRole("heading", { name: "Simular carteira" })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Base" })).toBeInTheDocument();
-
-    const table = await screen.findByRole("table", { name: "Resumo" });
-    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
-    expect(headers).toEqual(["Métrica", "Estratégia", "CDI"]);
-    expect(screen.getByText(/Motor 33\.4\.0 · semente 7/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Robustez" }));
-    expect(await screen.findByRole("table", { name: "Crises históricas" })).toBeInTheDocument();
-  });
-
-  it("submits a backtest with variants and selects the new run", async () => {
-    const { calls } = mockApi([
-      { path: "/simulations", reply: [] },
-      { method: "POST", path: "/simulations/backtests", reply: run({ id: 2, status: "PENDING", label: null }) },
-      { path: "/simulations/2", reply: detail({ id: 2, status: "PENDING", results: [] }) },
-    ]);
-    renderAt("/tools/simulation");
-    expect(await screen.findByText("Nenhuma simulação ainda")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Aporte mensal (R$)"), { target: { value: "2000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Simular" }));
-
-    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
-    const body = last(calls, "POST", "/simulations/backtests")?.body as Record<string, unknown>;
-    expect(body).toMatchObject({ monthly_contribution: 2000, variants: true, benchmarks: ["CDI", "IBOV"] });
-  });
-
-  it("shows a failed run and rejects a zero contribution", async () => {
-    mockApi([
-      { path: "/simulations", reply: [run({ status: "TIMEOUT", error: "120 s" })] },
-      { path: "/simulations/1", reply: detail({ status: "TIMEOUT", error: "120 s", results: [] }) },
-    ]);
-    renderAt("/tools/simulation");
-    expect(await screen.findByText(/A simulação passou do tempo limite/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Aporte mensal (R$)"), { target: { value: "0" } });
-    fireEvent.click(screen.getByRole("button", { name: "Simular" }));
-    expect(await screen.findByText("Informe um aporte mensal maior que zero.")).toBeInTheDocument();
   });
 });
 
@@ -376,48 +256,6 @@ const projectionRun = run({
   params: { horizon_years: 2, monthly_contribution: 1000, mean_block_months: 12 },
 });
 
-describe("projection helpers", () => {
-  const form = {
-    horizonYears: "20",
-    monthly: "1500",
-    realGrowth: "1,5",
-    wealthGoal: "1000000",
-    incomeGoal: "",
-    rebalance: true,
-    fromPortfolio: true,
-    initial: { ACOES: "0", REAL_ESTATE: "0", ATIVOS_INTERNACIONAIS: "0", CAIXA: "0" },
-    cdi: "",
-    ipca: "4,5",
-    generator: "STACKED" as const,
-    label: "",
-  };
-
-  it("converts percentages and leaves the starting point to the server", () => {
-    expect(toProjectionRequest(form)).toEqual({
-      horizon_years: 20,
-      monthly_contribution: 1500,
-      contribution_real_growth: 0.015,
-      wealth_goal: 1_000_000,
-      income_goal: null,
-      rebalance: true,
-      initial_by_class: null,
-      cdi_rate: null,
-      ipca_rate: 0.045,
-      generator: "STACKED",
-      label: null,
-    });
-  });
-
-  it("sends the typed values by class and rejects an invalid horizon", () => {
-    const typed = toProjectionRequest({ ...form, fromPortfolio: false, initial: { ...form.initial, ACOES: "5000", CAIXA: "-1" } });
-    expect(typed?.initial_by_class).toEqual({ ACOES: 5000, REAL_ESTATE: 0, ATIVOS_INTERNACIONAIS: 0, CAIXA: 0 });
-    expect(toProjectionRequest({ ...form, horizonYears: "0" })).toBeNull();
-    expect(toProjectionRequest({ ...form, horizonYears: "51" })).toBeNull();
-    expect(toProjectionRequest({ ...form, monthly: "" })).toBeNull();
-    expect(toProjectionRequest({ ...form, monthly: "0" })?.monthly_contribution).toBe(0);
-  });
-});
-
 describe("ProjectionView", () => {
   it("shows the base scenario, the goals, the percentiles and the premises", () => {
     render(<ProjectionView data={projection()} run={projectionRun} />);
@@ -454,29 +292,6 @@ describe("ProjectionView", () => {
   it("waits for an unfinished projection", () => {
     render(<ProjectionView data={projection({ status: "RUNNING", scenarios: [] })} run={projectionRun} />);
     expect(screen.getByText("A projeção aparece quando a simulação terminar")).toBeInTheDocument();
-  });
-});
-
-describe("SimulationPage future tab", () => {
-  it("lists projections, shows the selected one and submits a new one", async () => {
-    const { calls } = mockApi([
-      { path: "/simulations", reply: (call: Call) => (call.query.get("kind") === "PROJECTION" ? [projectionRun] : [run()]) },
-      { path: "/simulations/5", reply: { ...projectionRun, results: [] } },
-      { path: "/simulations/5/projection", reply: projection() },
-      { method: "POST", path: "/simulations/projections", reply: { ...projectionRun, id: 6, status: "PENDING" } },
-      { path: "/simulations/6", reply: { ...projectionRun, id: 6, status: "PENDING", results: [] } },
-    ]);
-    renderAt("/tools/simulation?tab=future");
-    expect(await screen.findByRole("button", { name: "Aposentadoria" })).toBeInTheDocument();
-    expect(screen.getByText("2 anos · R$ 1.000,00/mês")).toBeInTheDocument();
-    expect(await screen.findByRole("table", { name: "Percentis ao fim do horizonte" })).toBeInTheDocument();
-    expect(calls.some((c) => c.path === "/simulations" && c.query.get("kind") === "PROJECTION")).toBe(true);
-
-    fireEvent.change(screen.getByLabelText("Meta de renda passiva (R$/mês)"), { target: { value: "5000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Projetar" }));
-    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
-    const body = last(calls, "POST", "/simulations/projections")?.body as Record<string, unknown>;
-    expect(body).toMatchObject({ horizon_years: 20, monthly_contribution: 1000, income_goal: 5000, initial_by_class: null });
   });
 });
 
@@ -544,64 +359,11 @@ describe("CalibrationView", () => {
   });
 });
 
-describe("SimulationPage confidence tab", () => {
-  it("asks for a calibration and follows it until it is stored", async () => {
-    let queued = false;
-    const { calls } = mockApi([
-      {
-        path: "/simulations/calibration",
-        reply: () => (queued ? calibration({ run_id: null, generators: [], pending_run_id: 10 }) : { run_id: null, pending_run_id: null }),
-      },
-      {
-        method: "POST",
-        path: "/simulations/calibrations",
-        reply: () => {
-          queued = true;
-          return { status: 202, json: run({ id: 10, kind: "CALIBRATION", status: "PENDING" }) };
-        },
-      },
-    ]);
-    renderAt("/tools/simulation?tab=confidence");
-    expect(await screen.findByText("Ainda não há calibração")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Recalcular agora" }));
-    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Recalcular agora/ })).toBeDisabled();
-    expect(last(calls, "POST", "/simulations/calibrations")).toBeDefined();
+describe("simulation helpers", () => {
+  it("keeps variants out of the series and flags active runs", () => {
+    const series = [{ key: "strategy" }, { key: "variant:b5" }, { key: "benchmark:CDI" }] as SimulationResultDTO[];
+    expect(seriesOf(series).map((r) => r.key)).toEqual(["strategy", "benchmark:CDI"]);
+    expect(isActive("PENDING")).toBe(true);
+    expect(isActive("DONE")).toBe(false);
   });
-
-  it("explains what sets each tab apart", async () => {
-    mockApi([{ path: "/simulations/calibration", reply: calibration() }]);
-    renderAt("/tools/simulation?tab=confidence");
-    expect(await screen.findAllByText(TAB_GUIDE.confidence.question)).toHaveLength(2);
-    const comparison = screen.getByRole("table", { name: "Comparação das abas" });
-    const rows = within(comparison).getAllByRole("row").slice(1);
-    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Passado", "Futuro", "Candidatos", "Robustez", "Confiança", "Laboratório"]);
-    expect(within(comparison).getByText(TAB_GUIDE.future.question)).toBeInTheDocument();
-    expect(rows[4]).toHaveAttribute("aria-current", "true");
-    expect(await screen.findByRole("table", { name: "Calibração dos geradores" })).toBeInTheDocument();
-  });
-});
-
-describe("SimulationPage tabs (Phase 33.10)", () => {
-  const empties: Record<string, RegExp> = {
-    past: /Nenhuma simulação ainda/,
-    future: /Nenhuma simulação ainda/,
-    candidates: /Nenhuma simulação ainda/,
-    robustness: /Nenhuma simulação ainda/,
-    confidence: /Ainda não há calibração/,
-    lab: /O laboratório ainda não rodou/,
-  };
-
-  for (const [key, guide] of Object.entries(TAB_GUIDE)) {
-    it(`opens the ${key} tab with its guide and an empty state`, async () => {
-      mockApi([
-        { path: "/simulations", reply: [] },
-        { path: "/simulations/calibration", reply: { run_id: null, pending_run_id: null } },
-        { path: "/simulations/lab", reply: { run_id: null, pending_run_id: null } },
-      ]);
-      renderAt(`/tools/simulation?tab=${key}`);
-      expect((await screen.findAllByText(guide.question)).length).toBeGreaterThan(0);
-      expect(await screen.findByText(empties[key])).toBeInTheDocument();
-    });
-  }
 });

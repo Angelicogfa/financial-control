@@ -1,12 +1,10 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { CandidateResultDTO, CandidatesDTO, SimulationRunDTO } from "../api/types";
-import { CandidatesView, toCandidatesRequest } from "../pages/tools/SimulationPage";
-import { mockApi, type Call } from "./mockApi";
-import { renderAt } from "./render";
+import { CandidatesView } from "../pages/simulation/views";
 
 const run: SimulationRunDTO = {
   id: 8,
@@ -79,37 +77,6 @@ function data(overrides: Partial<CandidatesDTO> = {}): CandidatesDTO {
   };
 }
 
-describe("candidates helpers", () => {
-  it("builds the request with the weight mode", () => {
-    const form = {
-      horizonYears: "5",
-      monthly: "1000",
-      wealthGoal: "",
-      includeScreener: true,
-      minVolume: "1000000",
-      includeIneligible: false,
-      fixedWeight: true,
-      weightPct: "7,5",
-      ruptureStress: true,
-      label: "",
-    };
-    expect(toCandidatesRequest(form)).toEqual({
-      horizon_years: 5,
-      monthly_contribution: 1000,
-      wealth_goal: null,
-      include_screener: true,
-      screener_min_volume: 1000000,
-      include_ineligible: false,
-      weight_mode: "FIXED",
-      fixed_weight: 0.075,
-      rupture_stress: true,
-      label: null,
-    });
-    expect(toCandidatesRequest({ ...form, horizonYears: "31" })).toBeNull();
-    expect(toCandidatesRequest({ ...form, fixedWeight: false })?.weight_mode).toBe("NEXT_CONTRIBUTION");
-  });
-});
-
 describe("CandidatesView", () => {
   it("ranks the candidates with the chance of a real improvement and lists the excluded", () => {
     render(
@@ -144,22 +111,3 @@ describe("CandidatesView", () => {
   });
 });
 
-describe("SimulationPage candidates tab", () => {
-  it("submits an evaluation and shows the selected one", async () => {
-    const { calls } = mockApi([
-      { path: "/simulations", reply: (call: Call) => (call.query.get("kind") === "CANDIDATES" ? [run] : []) },
-      { path: "/simulations/8", reply: { ...run, results: [] } },
-      { path: "/simulations/8/candidates", reply: data() },
-      { method: "POST", path: "/simulations/candidates", reply: { ...run, id: 9, status: "PENDING" } },
-      { path: "/simulations/9", reply: { ...run, id: 9, status: "PENDING", results: [] } },
-    ]);
-    renderAt("/tools/simulation?tab=candidates");
-    // Three chained requests (runs, run detail, candidates): give it room when the suite is busy.
-    expect(await screen.findByRole("table", { name: "Candidatos" }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText("2 candidatos")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Avaliar candidatos" }));
-    expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();
-    const body = [...calls].reverse().find((c) => c.method === "POST")?.body as Record<string, unknown>;
-    expect(body).toMatchObject({ horizon_years: 5, include_screener: true, weight_mode: "NEXT_CONTRIBUTION" });
-  });
-});

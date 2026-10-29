@@ -312,6 +312,7 @@ export interface BacktestRequest {
   policy_mode?: "CURRENT" | "AS_OF";
   benchmarks?: ("CDI" | "IBOV" | "IFIX" | "SP500_BRL")[];
   variants?: boolean;
+  answers_mode?: "DATED" | "TODAY";
   label?: string | null;
 }
 
@@ -928,6 +929,11 @@ export interface FundamentalSnapshotDTO {
   source?: string | null;
 }
 
+export interface GainPointDTO {
+  month: string;
+  value: number;
+}
+
 export interface GeneratorCalibrationDTO {
   key: string;
   label: string;
@@ -1171,6 +1177,7 @@ export interface LabModelDTO {
   stable: boolean;
   passed: boolean;
   reasons?: string[];
+  cumulative_gain?: GainPointDTO[];
 }
 
 export interface LiquidityDetailDTO {
@@ -1768,6 +1775,124 @@ export interface StressResultDTO {
   window_end?: string | null;
   max_drawdown: number;
   observations: number;
+}
+
+export interface StudyActionDTO {
+  kind: "VARIATION" | "COMPARE_ASSET" | "CONTRIBUTE" | "SET_GOAL";
+  label: string;
+  ticker?: string | null;
+  changes?: Record<string, unknown>;
+}
+
+export interface StudyChapterDTO {
+  key: "PAST" | "FUTURE" | "IMPROVE";
+  number: number;
+  title: string;
+  question: string;
+  run_id?: number | null;
+  status?: SimulationStatus | null;
+  error?: string | null;
+  lead?: string | null;
+  tone?: string;
+  seal?: StudySealDTO | null;
+  notes?: string[];
+}
+
+export interface StudyComparisonDTO {
+  a: StudyDTO;
+  b: StudyDTO;
+  headline: string;
+  differences?: StudyDifferenceDTO[];
+  rows?: StudyComparisonRowDTO[];
+}
+
+export interface StudyComparisonRowDTO {
+  chapter: "PAST" | "FUTURE" | "IMPROVE";
+  label: string;
+  a: string;
+  b: string;
+  difference: string;
+  tone?: string;
+}
+
+export interface StudyDTO {
+  id: number;
+  label: string;
+  question: string;
+  question_label: string;
+  premises: Record<string, unknown>;
+  version: number;
+  origin_id?: number | null;
+  variation_of?: number | null;
+  created_at?: string | null;
+  status: "PENDING" | "RUNNING" | "DONE" | "PARTIAL" | "FAILED";
+  chapters: StudyChapterDTO[];
+  conclusion?: string | null;
+  actions?: StudyActionDTO[];
+  notes?: string[];
+  goal_probability?: number | null;
+  goal_target?: number | null;
+}
+
+export interface StudyDifferenceDTO {
+  key: string;
+  label: string;
+  a?: unknown;
+  b?: unknown;
+}
+
+export interface StudyRequest {
+  label: string;
+  question?: "COMPLETE" | "PAST" | "GOAL" | "IMPROVE";
+  monthly_contribution: number;
+  horizon_years?: number;
+  wealth_goal?: number | null;
+  correct_by_ipca?: boolean;
+  past_start?: string | null;
+  policy_mode?: "CURRENT" | "AS_OF";
+  answers_mode?: "DATED" | "TODAY";
+  benchmarks?: ("CDI" | "IBOV" | "IFIX" | "SP500_BRL")[];
+  rebalance?: boolean;
+  include_screener?: boolean;
+  weight_mode?: "NEXT_CONTRIBUTION" | "FIXED";
+  fixed_weight?: number;
+  rupture_stress?: boolean;
+}
+
+export interface StudySealDTO {
+  level: number;
+  label: string;
+  text: string;
+}
+
+export interface StudySummaryDTO {
+  id: number;
+  label: string;
+  question: string;
+  question_label: string;
+  version: number;
+  variation_of?: number | null;
+  created_at?: string | null;
+  status: "PENDING" | "RUNNING" | "DONE" | "PARTIAL" | "FAILED";
+  chapters_done: number;
+  chapters_total: number;
+  headline?: string | null;
+  goal_probability?: number | null;
+  goal_target?: number | null;
+  goal_change?: number | null;
+}
+
+export interface StudyVariationRequest {
+  changes: Record<string, unknown>;
+  label?: string | null;
+}
+
+export interface StudyVersionDTO {
+  id: number;
+  version: number;
+  created_at?: string | null;
+  status: string;
+  goal_probability?: number | null;
 }
 
 export interface TaxBracketDTO {

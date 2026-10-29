@@ -33,7 +33,10 @@ from domain.shared.repositories import (
     AbstractTreasuryCatalogRepository,
     AbstractWorkerErrorRepository,
 )
-from domain.simulation.repositories import AbstractSimulationRepository
+from domain.simulation.repositories import (
+    AbstractSimulationRepository,
+    AbstractSimulationStudyRepository,
+)
 from domain.tax.repositories import AbstractTaxRuleRepository
 
 
@@ -60,6 +63,7 @@ class AbstractUnitOfWork(ABC):
     agent_keys: AbstractAgentKeyRepository
     tax_rules: AbstractTaxRuleRepository
     simulations: AbstractSimulationRepository
+    simulation_studies: AbstractSimulationStudyRepository
     cvm_issuers: AbstractIssuerTickerRepository
     cvm_documents: AbstractCvmDocumentRepository
     market_data: AbstractMarketDataRepository
