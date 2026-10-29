@@ -1,7 +1,7 @@
 /** Wealth by custody account, each split into Bolsa and Internacional (Phase 40.2). */
 
 import { api } from "../../api/endpoints";
-import type { AccountWealthDTO, MarketGroupDTO } from "../../api/types";
+import type { AccountWealthDTO, MarketGroupDTO, WealthByAccountDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Section } from "../../components/Section";
 import { ErrorBanner, Loading } from "../../components/States";
@@ -17,24 +17,44 @@ function Change({ value }: Readonly<{ value: number | null | undefined }>) {
   );
 }
 
-function GroupCell({ group }: Readonly<{ group: MarketGroupDTO | undefined }>) {
-  if (!group || (group.value_brl <= 0 && group.invested_brl <= 0)) {
-    return <td className="app-numeric app-muted">—</td>;
-  }
+/** A money cell: the value and, under it, its rise or fall over the invested amount. */
+function MoneyCell({ value, change, strong = false }: Readonly<{ value: number; change?: number | null; strong?: boolean }>) {
   return (
     <td className="app-numeric">
-      <span className="app-cell-main">
-        <span>{brl(group.value_brl)}</span>
-        <small>
-          <Change value={group.change} />
-        </small>
+      <span className="wealth-cell">
+        {strong ? <strong>{brl(value)}</strong> : <span>{brl(value)}</span>}
+        <Change value={change} />
       </span>
     </td>
   );
 }
 
-function byKey(account: AccountWealthDTO, key: string): MarketGroupDTO | undefined {
-  return account.groups.find((g) => g.key === key);
+function GroupCell({ group }: Readonly<{ group: MarketGroupDTO | undefined }>) {
+  if (!group || (group.value_brl <= 0 && group.invested_brl <= 0)) {
+    return (
+      <td className="app-numeric app-muted" aria-label="Sem posição">
+        —
+      </td>
+    );
+  }
+  return <MoneyCell value={group.value_brl} change={group.change} />;
+}
+
+function byKey(groups: MarketGroupDTO[], key: string): MarketGroupDTO | undefined {
+  return groups.find((g) => g.key === key);
+}
+
+/** The conclusion of the table in one sentence. */
+export function wealthSummary(body: WealthByAccountDTO): string {
+  const largest = body.accounts[0];
+  const abroad = byKey(body.groups, "INTERNATIONAL");
+  const abroadShare = abroad && body.total_value_brl > 0 ? abroad.value_brl / body.total_value_brl : 0;
+  const accounts = plural(body.accounts.length, "conta", "contas");
+  return `${largest.name} concentra ${pct(largest.share, 0)} do patrimônio, em ${accounts}; ${pct(abroadShare, 0)} está no Internacional.`;
+}
+
+function sameName(account: AccountWealthDTO): boolean {
+  return !account.institution || account.institution.trim().toLowerCase() === account.name.trim().toLowerCase();
 }
 
 export function AccountsWealth() {
@@ -43,65 +63,82 @@ export function AccountsWealth() {
   if (data.loading && !data.data) return <Loading lines={3} />;
   const body = data.data;
   if (!body || body.accounts.length === 0) return null;
-  const largest = body.accounts[0];
+  const invested = body.accounts.reduce((sum, a) => sum + a.invested_brl, 0);
+  const pnl = body.accounts.reduce((sum, a) => sum + a.pnl_brl, 0);
+  const totalChange = invested > 0 ? pnl / invested : null;
+  const b3 = byKey(body.groups, "B3");
+  const abroad = byKey(body.groups, "INTERNATIONAL");
+
   return (
-    <Section
-      title="Patrimônio por conta"
-      subtitle={`${plural(body.accounts.length, "conta", "contas")} com posição · a maior é ${largest.name}, com ${pct(largest.share, 0)} do total. Bolsa reúne Caixa, Ações e Real Estate; a variação é o resultado sobre o investido.`}
-    >
+    <Section title="Patrimônio por conta" subtitle={wealthSummary(body)}>
       <div className="app-table-wrap">
-        <table className="app-table" aria-label="Patrimônio por conta">
+        <table className="app-table wealth-table" aria-label="Patrimônio por conta">
           <thead>
             <tr>
-              <th>Conta</th>
-              <th className="app-numeric">Bolsa</th>
-              <th className="app-numeric">Internacional</th>
-              <th className="app-numeric">Total</th>
-              <th className="app-numeric">Peso</th>
+              <th scope="col">Conta</th>
+              <th scope="col" className="app-numeric">
+                Bolsa
+              </th>
+              <th scope="col" className="app-numeric">
+                Internacional
+              </th>
+              <th scope="col" className="app-numeric">
+                Total
+              </th>
+              <th scope="col" className="wealth-share-head">
+                Peso no patrimônio
+              </th>
             </tr>
           </thead>
           <tbody>
             {body.accounts.map((account) => (
               <tr key={account.account_id}>
-                <td>
+                <th scope="row" className="wealth-account">
                   <span className="app-cell-main">
                     <strong>{account.name}</strong>
-                    {account.institution && <small>{account.institution}</small>}
+                    {!sameName(account) && <small>{account.institution}</small>}
+                  </span>
+                </th>
+                <GroupCell group={byKey(account.groups, "B3")} />
+                <GroupCell group={byKey(account.groups, "INTERNATIONAL")} />
+                <MoneyCell value={account.value_brl} change={account.change} strong />
+                <td className="wealth-share">
+                  <span className="wealth-share-inner">
+                    <span className="wealth-share-bar" aria-hidden="true">
+                      <span style={{ width: `${Math.round(account.share * 100)}%` }} />
+                    </span>
+                    <span className="wealth-share-value">{pct(account.share, 1)}</span>
                   </span>
                 </td>
-                <GroupCell group={byKey(account, "B3")} />
-                <GroupCell group={byKey(account, "INTERNATIONAL")} />
-                <td className="app-numeric">
-                  <span className="app-cell-main">
-                    <strong>{brl(account.value_brl)}</strong>
-                    <small>
-                      <Change value={account.change} />
-                    </small>
-                  </span>
-                </td>
-                <td className="app-numeric">{pct(account.share, 1)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr>
               <th scope="row">Todas as contas</th>
-              {["B3", "INTERNATIONAL"].map((key) => {
-                const group = body.groups.find((g) => g.key === key);
-                return (
-                  <td key={key} className="app-numeric">
-                    {group ? brl(group.value_brl) : "—"}
-                  </td>
-                );
-              })}
-              <td className="app-numeric">
-                <strong>{brl(body.total_value_brl)}</strong>
+              {b3 && b3.value_brl > 0 ? <MoneyCell value={b3.value_brl} change={b3.change} strong /> : <td className="app-numeric">—</td>}
+              {abroad && abroad.value_brl > 0 ? (
+                <MoneyCell value={abroad.value_brl} change={abroad.change} strong />
+              ) : (
+                <td className="app-numeric">—</td>
+              )}
+              <MoneyCell value={body.total_value_brl} change={totalChange} strong />
+              <td className="wealth-share">
+                <span className="wealth-share-inner">
+                  <span className="wealth-share-bar" aria-hidden="true">
+                    <span style={{ width: "100%" }} />
+                  </span>
+                  <span className="wealth-share-value">100%</span>
+                </span>
               </td>
-              <td className="app-numeric">100%</td>
             </tr>
           </tfoot>
         </table>
       </div>
+      <p className="app-meta">
+        Bolsa reúne Caixa, Ações e Real Estate; Internacional, os ativos no exterior. Alta e queda são o resultado consolidado
+        (preço, vendas e proventos) sobre o valor investido.
+      </p>
     </Section>
   );
 }

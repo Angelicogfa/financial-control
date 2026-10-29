@@ -38,6 +38,7 @@ const wealth: WealthByAccountDTO = {
     {
       account_id: 2,
       name: "Avenue",
+      institution: "Avenue",
       value_brl: 450,
       invested_brl: 500,
       pnl_brl: -50,
@@ -56,10 +57,15 @@ describe("wealth by account on the Home", () => {
     const table = await screen.findByRole("table", { name: "Patrimônio por conta" });
     const rows = within(table).getAllByRole("row");
     expect(rows[1]).toHaveTextContent(/XP.*R\$\s1\.200,00.*alta de 20,0%.*R\$\s90,00.*queda de 10,0%.*R\$\s1\.290,00.*74,1%/);
-    // An account without Bolsa shows a dash, not a zero.
-    expect(within(rows[2]).getAllByRole("cell")[1]).toHaveTextContent("—");
-    expect(rows[3]).toHaveTextContent(/Todas as contas.*R\$\s1\.200,00.*R\$\s540,00.*R\$\s1\.740,00.*100%/);
-    expect(screen.getByText(/2 contas com posição · a maior é XP, com 74% do total/)).toBeInTheDocument();
+    // An account without Bolsa shows a dash, not a zero; the institution only shows when it differs.
+    expect(within(rows[2]).getAllByRole("cell")[0]).toHaveTextContent("—");
+    expect(within(rows[2]).getByRole("rowheader")).toHaveTextContent(/^Avenue$/);
+    expect(within(rows[1]).getByRole("rowheader")).toHaveTextContent("XPXP Investimentos");
+    // The totals row carries the rise or fall of every column.
+    expect(rows[3]).toHaveTextContent(
+      /Todas as contas.*R\$\s1\.200,00.*alta de 20,0%.*R\$\s540,00.*queda de 10,0%.*R\$\s1\.740,00.*alta de 8,8%.*100%/,
+    );
+    expect(screen.getByText("XP concentra 74% do patrimônio, em 2 contas; 31% está no Internacional.")).toBeInTheDocument();
   });
 
   it("shows nothing without accounts with positions", async () => {
