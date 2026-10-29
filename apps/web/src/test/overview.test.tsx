@@ -69,6 +69,11 @@ describe("home (analytics)", () => {
     const split = within(screen.getByLabelText("Patrimônio por mercado"));
     expect(split.getByText("Bolsa")).toBeInTheDocument();
     expect(split.getAllByText(/(alta|queda) de .* sobre o investido/).length).toBeGreaterThan(0);
+    // The other cards back their number with what it is made of.
+    const result = within(screen.getByLabelText("Composição do resultado"));
+    expect(result.getByText("Valorização")).toBeInTheDocument();
+    expect(result.getByText("Proventos recebidos")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Proventos por mês")).getByText("Média por mês")).toBeInTheDocument();
     expect(await screen.findByText("+5,0%")).toBeInTheDocument(); // TWR from the base-100 curve
     expect(screen.getByText("CDI no período: 0,1%")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Peso atual de cada classe contra a meta" })).toBeInTheDocument();

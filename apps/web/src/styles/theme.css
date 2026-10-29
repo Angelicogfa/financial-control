@@ -1539,7 +1539,8 @@ ul.app-info-banner li + li {
 .home-split {
   display: grid;
   gap: var(--space-1);
-  margin: var(--space-2) 0 0;
+  /* Pushed to the bottom so the cards of a row line up whatever their height. */
+  margin: auto 0 0;
   padding-top: var(--space-2);
   border-top: 1px solid var(--app-border);
   font-size: var(--text-sm);

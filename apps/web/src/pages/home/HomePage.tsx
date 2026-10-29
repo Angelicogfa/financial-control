@@ -13,7 +13,7 @@ import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
 import { ErrorBanner, Loading } from "../../components/States";
-import { brl, brlCompact, daysAgo, pct, points } from "../../utils/format";
+import { brl, brlCompact, daysAgo, monthLabel, pct, points } from "../../utils/format";
 import { SEVERITY_TONES } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { Sparkline } from "../../viz/Sparkline";
@@ -82,6 +82,30 @@ function SplitList({ groups }: Readonly<{ groups: MarketSplit[] }>) {
   );
 }
 
+interface DetailRow {
+  label: string;
+  value: string;
+  tone?: "up" | "down";
+}
+
+/** Supporting figures under an indicator: what the headline number is made of. */
+function DetailList({ rows, label }: Readonly<{ rows: DetailRow[]; label: string }>) {
+  if (rows.length === 0) return null;
+  return (
+    <dl className="home-split" aria-label={label}>
+      {rows.map((row) => (
+        <div key={row.label} className="home-split-row">
+          <dt>{row.label}</dt>
+          <dd className={row.tone ? `home-delta is-${row.tone}` : undefined}>{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+const signedTone = (value: number | null | undefined): DetailRow["tone"] =>
+  value === null || value === undefined || value === 0 ? undefined : value > 0 ? "up" : "down";
+
 function Delta({ change }: Readonly<{ change: Change | null }>) {
   if (!change) return null;
   const up = change.value >= 0;
@@ -113,6 +137,25 @@ function KpiAct({
   const cdi = curveReturn(analytics?.curves.CDI);
   const reserve = report.value_by_purpose_brl?.EMERGENCY_RESERVE ?? 0;
   const months = lastMonths(report.earnings_by_month);
+  const ibov = curveReturn(analytics?.curves.IBOV);
+  const lastMonth = months.length > 0 ? months[months.length - 1] : null;
+  const total = report.total_current_value_brl;
+  const resultRows: DetailRow[] = [
+    { label: "Valorização", value: brl(report.total_unrealized_pnl_brl), tone: signedTone(report.total_unrealized_pnl_brl) },
+    { label: "Vendas realizadas", value: brl(report.total_realized_pnl_brl), tone: signedTone(report.total_realized_pnl_brl) },
+    { label: "Proventos recebidos", value: brl(report.total_received_earnings_brl), tone: signedTone(report.total_received_earnings_brl) },
+  ];
+  const returnRows: DetailRow[] =
+    twr === null
+      ? []
+      : [
+          ...(cdi === null ? [] : [{ label: "Contra o CDI", value: pct(twr - cdi, 1, true), tone: signedTone(twr - cdi) }]),
+          ...(ibov === null ? [] : [{ label: "Contra o Ibovespa", value: pct(twr - ibov, 1, true), tone: signedTone(twr - ibov) }]),
+        ];
+  const earningsRows: DetailRow[] = [
+    { label: "Média por mês", value: brl(report.total_earnings_12m_brl / 12) },
+    ...(lastMonth ? [{ label: `Último mês (${monthLabel(lastMonth[0])})`, value: brl(lastMonth[1]) }] : []),
+  ];
 
   return (
     <section className="home-act" aria-labelledby="act-figures">
@@ -135,6 +178,7 @@ function KpiAct({
           value={brlCompact(report.total_consolidated_pnl_brl)}
           note={`${points(report.total_consolidated_return_pct, 1, true)} sobre o investido`}
           trend={<Sparkline values={snapshots.map((s) => s.consolidated_pnl)} />}
+          detail={<DetailList label="Composição do resultado" rows={resultRows} />}
         />
         <Indicator
           label="Rentabilidade 12 meses"
@@ -146,14 +190,28 @@ function KpiAct({
                 ? "Taxa ponderada pelo tempo"
                 : `CDI no período: ${pct(cdi, 1)}`
           }
+          detail={<DetailList label="Rentabilidade contra as referências" rows={returnRows} />}
         />
         <Indicator
           label="Proventos 12 meses"
           value={brlCompact(report.total_earnings_12m_brl)}
           note={`Yield on cost ${points(report.portfolio_yield_on_cost_pct, 1)}`}
           trend={<Sparkline values={months.map(([, v]) => v)} />}
+          detail={<DetailList label="Proventos por mês" rows={earningsRows} />}
         />
-        {reserve > 0 && <Indicator label="Reserva de emergência" value={brlCompact(reserve)} note="Fora da ARCA" />}
+        {reserve > 0 && (
+          <Indicator
+            label="Reserva de emergência"
+            value={brlCompact(reserve)}
+            note="Fora da ARCA"
+            detail={
+              <DetailList
+                label="Peso da reserva"
+                rows={[{ label: "Do patrimônio", value: pct(total > 0 ? reserve / total : 0, 1) }]}
+              />
+            }
+          />
+        )}
       </div>
     </section>
   );
