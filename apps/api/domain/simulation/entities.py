@@ -20,6 +20,7 @@ class SimulationKind(StrEnum):
     BACKTEST = "BACKTEST"
     PROJECTION = "PROJECTION"
     CALIBRATION = "CALIBRATION"
+    CANDIDATES = "CANDIDATES"
 
 
 @dataclass(frozen=True)

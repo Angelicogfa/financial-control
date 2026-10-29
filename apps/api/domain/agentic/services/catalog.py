@@ -77,9 +77,10 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.requests import BacktestRequest, ProjectionRequest
+from controllers.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
 from controllers.simulation.responses import (
     CalibrationDTO,
+    CandidatesDTO,
     CoverageReportDTO,
     ProjectionDTO,
     RobustnessDTO,
@@ -1199,6 +1200,33 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationIdInput,
         output_type=ProjectionDTO,
         invoke=lambda h, p: h.simulation.projection(p.run_id),
+    ),
+    OperationSpec(
+        name="simulation.find_candidates",
+        kind="command",
+        description=(
+            "Agenda a avaliação de ativos candidatos fora da carteira (camada D): a watchlist e, "
+            "se pedido, os mais negociados do screener, com os mesmos filtros do aporte real "
+            "(elegibilidade, sem dado suspeito), até 20. Cada um é modelado contra a sua classe "
+            "(α encolhido por Bayes empírico, β para 1, resíduos em blocos, evento de ruptura) "
+            "sobre as trajetórias da projeção. Roda no worker; leia com simulation.candidates."
+        ),
+        input_model=CandidatesRequest,
+        output_type=SimulationRunDTO,
+        invoke=lambda h, p: h.simulation.submit_candidates(p),
+    ),
+    OperationSpec(
+        name="simulation.candidates",
+        kind="query",
+        description=(
+            "Candidatos para investigar (não recomendação): por ativo, a variação do patrimônio "
+            "final, a probabilidade de a melhora ser real com intervalo, a variação da chance "
+            "de meta, do CVaR de 12 meses, da queda, da diversificação e da renda, o α e o β "
+            "antes e depois do encolhimento e a estabilidade do ranking; e os excluídos."
+        ),
+        input_model=SimulationIdInput,
+        output_type=CandidatesDTO,
+        invoke=lambda h, p: h.simulation.candidates(p.run_id),
     ),
     OperationSpec(
         name="simulation.calibrate",

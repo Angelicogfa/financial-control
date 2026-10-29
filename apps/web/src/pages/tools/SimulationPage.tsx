@@ -7,6 +7,8 @@ import type {
   BacktestRequest,
   BacktestSummaryDTO,
   CalibrationDTO,
+  CandidatesDTO,
+  CandidatesRequest,
   EventOutcomeDTO,
   GeneratorCalibrationDTO,
   GoalOutcomeDTO,
@@ -29,14 +31,16 @@ import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, points
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { ColumnChart } from "../../viz/ColumnChart";
+import { compareLink } from "./AssetComparePage";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 
 type Benchmark = NonNullable<BacktestRequest["benchmarks"]>[number];
-type TabKey = "past" | "future" | "robustness" | "confidence";
+type TabKey = "past" | "future" | "candidates" | "robustness" | "confidence";
 
 const TABS: TabSpec<TabKey>[] = [
   { key: "past", label: "Passado" },
   { key: "future", label: "Futuro" },
+  { key: "candidates", label: "Candidatos" },
   { key: "robustness", label: "Robustez" },
   { key: "confidence", label: "Confiança" },
 ];
@@ -58,6 +62,15 @@ export const TAB_GUIDE: Record<TabKey, { question: string; method: string; use: 
       "incertos (o prêmio de cada classe sobre o CDI) e soma aos juros de três cenários (queda, premissa e alta).",
     use: "Para planejar aportes e metas. Mostra faixas e chances com intervalo, nunca um número único.",
     from: "A carteira e as premissas de hoje, projetadas para frente",
+  },
+  candidates: {
+    question: "Que ativos que eu ainda não tenho melhorariam a carteira, e com que chance a melhora é real?",
+    method:
+      "Cada ativo da watchlist (e, se pedido, do screener) que passa nos filtros do aporte real é modelado contra a " +
+      "sua classe, com o passado dele encolhido para não premiar sorte, e posto na carteira de hoje nas mesmas " +
+      "trajetórias do Futuro, com e sem ele.",
+    use: "Para escolher o que investigar a seguir. É uma lista para estudo, nunca uma ordem de compra.",
+    from: "A carteira de hoje, a watchlist e o screener",
   },
   robustness: {
     question: "O resultado do Passado depende de um período sortudo ou de uma escolha de regra?",
@@ -1397,6 +1410,299 @@ function FuturePanel() {
   );
 }
 
+// --- candidates -------------------------------------------------------------------------------
+
+interface CandidatesFormState {
+  horizonYears: string;
+  monthly: string;
+  wealthGoal: string;
+  includeScreener: boolean;
+  minVolume: string;
+  includeIneligible: boolean;
+  fixedWeight: boolean;
+  weightPct: string;
+  ruptureStress: boolean;
+  label: string;
+}
+
+const INITIAL_CANDIDATES: CandidatesFormState = {
+  horizonYears: "5",
+  monthly: "1000",
+  wealthGoal: "",
+  includeScreener: true,
+  minVolume: "1000000",
+  includeIneligible: false,
+  fixedWeight: false,
+  weightPct: "5",
+  ruptureStress: false,
+  label: "",
+};
+
+/** The API request from the form; null when the horizon is invalid. */
+export function toCandidatesRequest(form: CandidatesFormState): CandidatesRequest | null {
+  const years = Number.parseInt(form.horizonYears, 10);
+  if (!Number.isFinite(years) || years < 1 || years > 30) return null;
+  const goal = parseDecimal(form.wealthGoal);
+  const weight = percentInput(form.weightPct);
+  return {
+    horizon_years: years,
+    monthly_contribution: Math.max(parseDecimal(form.monthly) ?? 0, 0),
+    wealth_goal: goal !== null && goal > 0 ? goal : null,
+    include_screener: form.includeScreener,
+    screener_min_volume: Math.max(parseDecimal(form.minVolume) ?? 0, 0),
+    include_ineligible: form.includeIneligible,
+    weight_mode: form.fixedWeight ? "FIXED" : "NEXT_CONTRIBUTION",
+    fixed_weight: weight !== null && weight > 0 ? weight : 0.05,
+    rupture_stress: form.ruptureStress,
+    label: form.label.trim() || null,
+  };
+}
+
+function CandidatesForm({ onSubmitted }: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void }>) {
+  const [form, setForm] = useState<CandidatesFormState>(INITIAL_CANDIDATES);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (change: Partial<CandidatesFormState>) => setForm((f) => ({ ...f, ...change }));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const body = toCandidatesRequest(form);
+    if (!body) {
+      setError("Informe um horizonte de 1 a 30 anos.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      onSubmitted(await api.simulations.submitCandidates(body));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className="app-card app-card-padded" onSubmit={submit} aria-busy={saving} aria-label="Nova avaliação de candidatos">
+      <h2 className="app-card-heading">Avaliar candidatos</h2>
+      <p className="app-card-hint">
+        Entram a watchlist e, se marcado, os mais negociados do screener, com os filtros do aporte real (até 20). Cada um é
+        posto na carteira de hoje.
+      </p>
+      {error && (
+        <p className="app-error-banner" role="alert">
+          {error}
+        </p>
+      )}
+      <fieldset className="app-field-grid" disabled={saving}>
+        <div className="app-field">
+          <label htmlFor="cand-years">Horizonte (anos)</label>
+          <input id="cand-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="cand-monthly">Aporte mensal (R$)</label>
+          <input id="cand-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="cand-goal">Meta de patrimônio (R$, opcional)</label>
+          <input id="cand-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
+        </div>
+        <div className="app-field">
+          <label htmlFor="cand-volume">Volume mínimo no screener (R$/dia)</label>
+          <input id="cand-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set({ minVolume: e.target.value })} />
+        </div>
+        {form.fixedWeight && (
+          <div className="app-field">
+            <label htmlFor="cand-weight">Peso do candidato na carteira (%)</label>
+            <input id="cand-weight" inputMode="decimal" value={form.weightPct} onChange={(e) => set({ weightPct: e.target.value })} />
+          </div>
+        )}
+        <div className="app-field">
+          <label htmlFor="cand-label">Nome (opcional)</label>
+          <input id="cand-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
+        </div>
+      </fieldset>
+      <div className="app-check-row">
+        <label className="app-check">
+          <input type="checkbox" checked={form.includeScreener} onChange={(e) => set({ includeScreener: e.target.checked })} />
+          Incluir os mais negociados do screener
+        </label>
+        <label className="app-check">
+          <input type="checkbox" checked={form.includeIneligible} onChange={(e) => set({ includeIneligible: e.target.checked })} />
+          Incluir os fora da elegibilidade (marcados)
+        </label>
+        <label className="app-check">
+          <input type="checkbox" checked={form.fixedWeight} onChange={(e) => set({ fixedWeight: e.target.checked })} />
+          Usar um peso fixo (em vez da parte que o próximo aporte daria)
+        </label>
+        <label className="app-check">
+          <input type="checkbox" checked={form.ruptureStress} onChange={(e) => set({ ruptureStress: e.target.checked })} />
+          Ruptura em estresse (perda de 90% em vez de 55%)
+        </label>
+      </div>
+      <div className="app-form-actions">
+        <button type="submit" className="app-primary-button" disabled={saving}>
+          {saving && <Spinner size="sm" />}
+          <span>Avaliar candidatos</span>
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function signedBrl(value: number): string {
+  return `${value > 0 ? "+" : ""}${brl(value)}`;
+}
+
+export function CandidatesView({ data, run }: Readonly<{ data: CandidatesDTO; run: SimulationRunDTO }>) {
+  if (data.status !== "DONE") return <Empty title="Os candidatos aparecem quando a avaliação terminar" />;
+  const candidates = data.candidates ?? [];
+  const excluded = data.excluded ?? [];
+  const base = data.base;
+  return (
+    <div className="app-page-stack">
+      <ul className="app-warning-banner" aria-label="Avisos dos candidatos">
+        {(data.warnings ?? []).map((w) => (
+          <li key={w}>{w}</li>
+        ))}
+      </ul>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Candidatos para investigar</h2>
+        <p className="app-card-hint">
+          {data.evaluated} de {data.tested} avaliados em {yearsLabel(data.horizon_months ?? 0)}, {data.paths} trajetórias.
+          {base
+            ? ` Carteira de hoje: patrimônio mediano de ${brl(base.final_net_wealth_p50)}, CVaR de 12 meses de ${pct(base.cvar_12m, 1)}${
+                base.goal_probability != null ? `, chance de meta de ${pct(base.goal_probability, 0)}` : ""
+              }.`
+            : ""}
+        </p>
+        {candidates.length === 0 ? (
+          <Empty title="Nenhum candidato com histórico suficiente" hint="Veja os excluídos abaixo." />
+        ) : (
+          <div className="app-table-wrap">
+            <table className="app-table" aria-label="Candidatos">
+              <thead>
+                <tr>
+                  <th className="app-numeric">#</th>
+                  <th>Ativo</th>
+                  <th className="app-numeric">Chance de a melhora ser real</th>
+                  <th className="app-numeric">Patrimônio final</th>
+                  <th className="app-numeric">Chance de meta</th>
+                  <th className="app-numeric">CVaR 12 meses</th>
+                  <th className="app-numeric">Diversificação</th>
+                  <th className="app-numeric">Renda (DY)</th>
+                  <th className="app-numeric">Entre os 5 primeiros</th>
+                  <th className="app-numeric">α a.a. (histórico → encolhido)</th>
+                  <th className="app-numeric">β</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidates.map((c) => (
+                  <tr key={c.ticker}>
+                    <td className="app-numeric">{c.effect.rank}</td>
+                    <td>
+                      <Link className="app-link" to={compareLink(c.ticker)}>
+                        {c.ticker}
+                      </Link>
+                      <div className="app-muted">
+                        {ARCA_LABELS[c.arca_class as keyof typeof ARCA_LABELS] ?? c.arca_class} ·{" "}
+                        {c.source === "WATCHLIST" ? "watchlist" : "screener"} · {pct(c.effect.weight, 1)} da carteira
+                        {c.eligible === false ? " · fora da elegibilidade" : ""}
+                        {c.suspicious ? " · dado suspeito" : ""}
+                      </div>
+                    </td>
+                    <td className="app-numeric">
+                      <strong>{pct(c.effect.p_improve, 0)}</strong>
+                      <div className="app-muted">
+                        {pct(c.effect.p_improve_low, 0)} a {pct(c.effect.p_improve_high, 0)}
+                      </div>
+                    </td>
+                    <td className="app-numeric">
+                      <Signed value={c.effect.delta_final_wealth}>{signedBrl(c.effect.delta_final_wealth)}</Signed>
+                    </td>
+                    <td className="app-numeric">
+                      {c.effect.delta_goal_probability == null ? "—" : points(c.effect.delta_goal_probability * 100, 1, true) + " p.p."}
+                    </td>
+                    <td className="app-numeric">
+                      <Signed value={c.effect.delta_cvar_12m}>{points(c.effect.delta_cvar_12m * 100, 2, true)} p.p.</Signed>
+                    </td>
+                    <td className="app-numeric">{num(c.effect.delta_diversification, 3)}</td>
+                    <td className="app-numeric">{points(c.effect.delta_income_yield * 100, 2, true)} p.p.</td>
+                    <td className="app-numeric">{pct(c.effect.top_k_share, 0)}</td>
+                    <td className="app-numeric">
+                      {pct(c.fit.alpha_annual, 1, true)} → {pct(c.fit.alpha_post_annual, 1, true)}
+                      <div className="app-muted">{c.fit.months} meses</div>
+                    </td>
+                    <td className="app-numeric">
+                      {num(c.fit.beta, 2)} → {num(c.fit.beta_post, 2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="app-card-hint">
+          Melhora = patrimônio final maior nas mesmas trajetórias com o candidato. Variações positivas de CVaR significam
+          perdas menores na cauda. "Entre os 5 primeiros" mede se a posição no ranking resiste a outro sorteio das trajetórias.
+        </p>
+      </section>
+      {excluded.length > 0 && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Fora da avaliação</h2>
+          <ul aria-label="Candidatos excluídos">
+            {excluded.map((e) => (
+              <li key={e.ticker}>
+                <strong>{e.ticker}</strong>: {e.reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <Reproducibility run={run} />
+    </div>
+  );
+}
+
+function CandidatesTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
+  const state = useApi(`simulation-candidates-${run.id}-${run.status}`, () => api.simulations.candidates(run.id));
+  if (run.status !== "DONE") return <RunProblem run={run} />;
+  return <Async state={state}>{(data) => <CandidatesView data={data} run={run} />}</Async>;
+}
+
+function candidatesDescription(run: SimulationRunDTO): string {
+  const count = Array.isArray(run.params?.candidates) ? (run.params?.candidates as unknown[]).length : 0;
+  return `${count} candidato(s)`;
+}
+
+function CandidatesPanel() {
+  const runs = useApi("simulation-candidate-runs", () => api.simulations.list(20, "CANDIDATES"));
+  const [selected, select] = useSelected("candidates", runs.data);
+  return (
+    <>
+      <CandidatesForm
+        onSubmitted={(run) => {
+          select(run.id);
+          runs.reload();
+        }}
+      />
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Avaliações</h2>
+        <Async state={runs}>
+          {(items) => (
+            <RunList runs={items} selected={selected} onSelect={select} describe={candidatesDescription} describeLabel="Candidatos" />
+          )}
+        </Async>
+      </section>
+      {selected !== null && (
+        <SelectedRun key={selected} runId={selected} onStatus={runs.reload}>
+          {(detail) => <CandidatesTab run={detail} />}
+        </SelectedRun>
+      )}
+    </>
+  );
+}
+
 export function SimulationPage() {
   const [tab, setTab] = useTab(TABS, "past");
   return (
@@ -1410,6 +1716,7 @@ export function SimulationPage() {
         <TabGuide tab={tab} />
         {tab === "future" && <FuturePanel />}
         {tab === "confidence" && <ConfidencePanel />}
+        {tab === "candidates" && <CandidatesPanel />}
         {(tab === "past" || tab === "robustness") && <BacktestPanel tab={tab} />}
       </div>
     </div>

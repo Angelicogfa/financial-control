@@ -309,3 +309,81 @@ class CalibrationDTO(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     # A newer calibration still queued or running.
     pending_run_id: int | None = None
+
+
+class CandidateFitDTO(BaseModel):
+    months: int
+    alpha_annual: float
+    alpha_post_annual: float
+    alpha_post_sd_annual: float
+    beta: float
+    beta_post: float
+    beta_post_sd: float
+    shrinkage: float
+    residual_vol_annual: float
+
+
+class CandidateEffectDTO(BaseModel):
+    ticker: str
+    share_in_class: float
+    weight: float
+    delta_final_wealth: float
+    p_improve: float
+    p_improve_low: float
+    p_improve_high: float
+    delta_goal_probability: float | None = None
+    delta_cvar_12m: float
+    delta_drawdown: float
+    delta_diversification: float
+    delta_income_yield: float
+    top_k_share: float = 0.0
+    rank: int = 0
+
+
+class CandidateResultDTO(BaseModel):
+    ticker: str
+    name: str
+    arca_class: str
+    asset_type: str
+    source: str
+    eligible: bool | None = None
+    valuation_verdict: str | None = None
+    dividend_yield: float | None = None
+    suspicious: bool = False
+    zone: str = "NO_DATA"
+    fit: CandidateFitDTO
+    effect: CandidateEffectDTO
+
+
+class CandidateBaseDTO(BaseModel):
+    final_net_wealth_p50: float
+    cvar_12m: float
+    drawdown_median: float
+    diversification: float
+    goal_probability: float | None = None
+
+
+class ExcludedCandidateDTO(BaseModel):
+    ticker: str
+    reason: str
+
+
+class CandidatesDTO(BaseModel):
+    """Candidates to investigate, best first; never a purchase order."""
+
+    run_id: int
+    status: SimulationStatus
+    horizon_months: int = 0
+    paths: int = 0
+    base: CandidateBaseDTO | None = None
+    candidates: list[CandidateResultDTO] = Field(default_factory=list)
+    excluded: list[ExcludedCandidateDTO] = Field(default_factory=list)
+    tau_annual: dict[str, float] = Field(default_factory=dict)
+    tested: int = 0
+    evaluated: int = 0
+    weight_mode: str = "NEXT_CONTRIBUTION"
+    rupture_loss: float = 0.55
+    sample_start: date | None = None
+    sample_end: date | None = None
+    calibration_run: int | None = None
+    warnings: list[str] = Field(default_factory=list)

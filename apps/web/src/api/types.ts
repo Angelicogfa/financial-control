@@ -358,6 +358,103 @@ export interface CalibrationDTO {
   pending_run_id?: number | null;
 }
 
+export interface CandidateBaseDTO {
+  final_net_wealth_p50: number;
+  cvar_12m: number;
+  drawdown_median: number;
+  diversification: number;
+  goal_probability?: number | null;
+}
+
+export interface CandidateEffectDTO {
+  ticker: string;
+  share_in_class: number;
+  weight: number;
+  delta_final_wealth: number;
+  p_improve: number;
+  p_improve_low: number;
+  p_improve_high: number;
+  delta_goal_probability?: number | null;
+  delta_cvar_12m: number;
+  delta_drawdown: number;
+  delta_diversification: number;
+  delta_income_yield: number;
+  top_k_share?: number;
+  rank?: number;
+}
+
+export interface CandidateFitDTO {
+  months: number;
+  alpha_annual: number;
+  alpha_post_annual: number;
+  alpha_post_sd_annual: number;
+  beta: number;
+  beta_post: number;
+  beta_post_sd: number;
+  shrinkage: number;
+  residual_vol_annual: number;
+}
+
+export interface CandidateResultDTO {
+  ticker: string;
+  name: string;
+  arca_class: string;
+  asset_type: string;
+  source: string;
+  eligible?: boolean | null;
+  valuation_verdict?: string | null;
+  dividend_yield?: number | null;
+  suspicious?: boolean;
+  zone?: string;
+  fit: CandidateFitDTO;
+  effect: CandidateEffectDTO;
+}
+
+export interface CandidatesDTO {
+  run_id: number;
+  status: SimulationStatus;
+  horizon_months?: number;
+  paths?: number;
+  base?: CandidateBaseDTO | null;
+  candidates?: CandidateResultDTO[];
+  excluded?: ExcludedCandidateDTO[];
+  tau_annual?: Record<string, number>;
+  tested?: number;
+  evaluated?: number;
+  weight_mode?: string;
+  rupture_loss?: number;
+  sample_start?: string | null;
+  sample_end?: string | null;
+  calibration_run?: number | null;
+  warnings?: string[];
+}
+
+export interface CandidatesRequest {
+  horizon_years?: number;
+  monthly_contribution?: number;
+  contribution_real_growth?: number;
+  initial_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  income_yield_by_class?: Partial<Record<"ACOES" | "REAL_ESTATE" | "ATIVOS_INTERNACIONAIS" | "CAIXA", number>> | null;
+  cdi_rate?: number | null;
+  ipca_rate?: number | null;
+  wealth_goal?: number | null;
+  income_goal?: number | null;
+  rebalance?: boolean;
+  paths?: number;
+  mean_block_months?: number;
+  fee_rate?: number;
+  sample_start?: string | null;
+  generator?: "STACKED" | "BOOTSTRAP" | "BAYESIAN_BOOTSTRAP" | "BAYESIAN_NORMAL";
+  label?: string | null;
+  include_screener?: boolean;
+  screener_min_volume?: number;
+  include_ineligible?: boolean;
+  include_suspicious?: boolean;
+  weight_mode?: "NEXT_CONTRIBUTION" | "FIXED";
+  fixed_weight?: number;
+  rupture_stress?: boolean;
+}
+
 export interface CerradoEvaluationDTO {
   profile: ChecklistProfile;
   checklist_version: number;
@@ -709,6 +806,11 @@ export interface EventOutcomeDTO {
   low: number;
   high: number;
   by_generator?: Record<string, number>;
+}
+
+export interface ExcludedCandidateDTO {
+  ticker: string;
+  reason: string;
 }
 
 export interface ExecutionDTO {
@@ -1503,7 +1605,7 @@ export interface ShockDTO {
   note?: string;
 }
 
-export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION";
+export type SimulationKind = "BACKTEST" | "PROJECTION" | "CALIBRATION" | "CANDIDATES";
 
 export interface SimulationResultDTO {
   key: string;

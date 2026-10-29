@@ -21,6 +21,8 @@ import type {
   AssetUpdateRequest,
   BacktestRequest,
   CalibrationDTO,
+  CandidatesDTO,
+  CandidatesRequest,
   DisclosureFeedDTO,
   MarkReadRequest,
   MarkReadResultDTO,
@@ -178,6 +180,9 @@ export const api = {
     submitCalibration: () => request<SimulationRunDTO>("/simulations/calibrations", { method: "POST" }),
     submitBacktest: (body: BacktestRequest) =>
       request<SimulationRunDTO>("/simulations/backtests", { method: "POST", body }),
+    candidates: (id: number) => request<CandidatesDTO>(`/simulations/${id}/candidates`),
+    submitCandidates: (body: CandidatesRequest) =>
+      request<SimulationRunDTO>("/simulations/candidates", { method: "POST", body }),
     submitProjection: (body: ProjectionRequest) =>
       request<SimulationRunDTO>("/simulations/projections", { method: "POST", body }),
   },
