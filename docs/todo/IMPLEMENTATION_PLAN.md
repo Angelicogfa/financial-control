@@ -612,6 +612,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **27.3** Histórico anual (receita, lucro, ROE e DY) em gráfico com seletor; DY anual estimado pelos proventos pagos sobre o valor de mercado no último pregão do ano (número de ações de hoje). Veredito de valuation e nota do checklist por ativo no topo da tabela.
 - `[x]` **27.4** Rota `GET /api/v1/research/compare?tickers=A,B&indicators=...`, operação MCP `research.compare` e tela `/tools/compare` (menu Ferramentas · Comparar ativos); link "Comparar" na Pesquisa (resultados e watchlist), na Carteira e no detalhe do ativo.
 - `[x]` **27.5** Testes: `tests/test_asset_comparison.py` (normalização, seleção, melhor por linha, indicadores dos demonstrativos, DY anual, avisos, rota, catálogo com busca sob demanda, MCP) e `src/test/compare.test.tsx`.
+- `[x]` **27.6** Busca de ativos na tela de comparação: cartão "Buscar ativos" com nome ou código, setor e classe ARCA (mesmos filtros do Screener, via `GET /research/screener` e `/research/sectors`); cada resultado tem "Adicionar", desabilitado quando o ativo já está na comparação ou o limite de 5 foi atingido. Testes em `src/test/compare.test.tsx`.
 
 ## Fase 28 — Fatos Relevantes pelos Dados Abertos da CVM (`[ ]` Pendente)
 
