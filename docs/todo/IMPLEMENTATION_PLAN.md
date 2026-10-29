@@ -54,6 +54,7 @@
 | **Fase 38** | Cotações Persistidas: o Worker Atualiza, as Telas Leem do Banco | `[x]` Concluída | 100% |
 | **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
 | **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
+| **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[ ]` Proposta (aguarda decisões da seção 8 do desenho) | 0% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -787,4 +788,18 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **40.3** Breadcrumb em todas as páginas, na barra do topo, com "Voltar": as seções ficam sob o Início e uma página de detalhe (ativo, plano de aporte, lançamento) fica sob a página de onde foi aberta; cada link volta ao endereço que a página tinha. Filtros, a última busca do screener e a rolagem voltam com a página (`utils/storedState.ts`, sessão do navegador).
 - `[x]` **40.4** Excluir simulação: exclusão lógica (`simulation_runs.deleted_at`, migração `script_00028`) que tira a rodada de toda lista, consulta, reaproveitamento e fila, sem rota de recuperação; botão na lista de cada aba e MCP `simulation.delete`.
 - `[x]` **40.5** O ativo sugerido no plano de aporte abre a página do ativo; o "Voltar" retorna ao plano com as quantidades, preços, data e conta digitados.
+
+## Fase 41 — Simular Carteira: Nova Experiência em Estudos e Capítulos (`[ ]` Proposta)
+
+**Objetivo:** trocar as seis abas independentes por estudos que contam uma história: premissas definidas uma vez, capítulos De onde viemos (passado + robustez), Para onde vamos (futuro + confiança) e O que pode melhorar (candidatos sobre a mesma projeção), conclusão com próximos passos, e resultados guardados, comparáveis e refeitos com os dados de hoje. Desenho: [SIMULATION_EXPERIENCE_DESIGN.md](../features/SIMULATION_EXPERIENCE_DESIGN.md).
+
+- `[ ]` **41.0** Decisões da seção 8 do desenho.
+- `[ ]` **41.1** Correção do Laboratório: o gráfico segue o modelo escolhido na tabela (hoje é sempre o HMM, mesmo quando o aprovado é outro); veredito e colunas em linguagem de decisão.
+- `[ ]` **41.2** Estudo no backend (`simulation_studies`, rodadas com `study_id` e capítulo, encadeamento, versões, variações, exclusão, MCP).
+- `[ ]` **41.3** Conclusão do estudo e selos "Quanto confiar" como funções puras testadas.
+- `[ ]` **41.4** Lista de estudos e assistente em 3 passos.
+- `[ ]` **41.5** Página do estudo com capítulos, índice, estados, conclusão e próximos passos.
+- `[ ]` **41.6** Comparar estudos, linha do tempo, cartão no Início e versão para impressão.
+- `[ ]` **41.7** "Qualidade dos modelos" nos bastidores; remoção das abas antigas.
+- `[ ]` **41.8** Migração das rodadas atuais, testes de UI e integração, `docker compose build`.
 
