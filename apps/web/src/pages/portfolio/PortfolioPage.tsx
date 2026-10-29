@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
@@ -21,6 +20,7 @@ import {
 import { BarList } from "../../viz/BarList";
 import { compareLink } from "../tools/AssetComparePage";
 import { TreasuryMarketPanel } from "./TreasuryMarketPanel";
+import { useStoredState } from "../../utils/storedState";
 
 type ClassTab = "ALL" | ArcaClass;
 const TABS: TabSpec<ClassTab>[] = [
@@ -220,7 +220,8 @@ function Composition({ report, arcaClass }: Readonly<{ report: PortfolioReportRe
 
 export function PortfolioPage() {
   const [tab, setTab] = useTab(TABS, "ALL");
-  const [accountId, setAccountId] = useState<number | undefined>(undefined);
+  const [storedAccount, setAccountId] = useStoredState<number | null>("portfolio:account", null);
+  const accountId = storedAccount ?? undefined;
   const accounts = useApi("accounts", () => api.accounts.list());
   const report = useApi(`portfolio-${accountId ?? "all"}`, () => api.portfolio.report(accountId));
 
@@ -236,7 +237,7 @@ export function PortfolioPage() {
               <select
                 id="portfolio-account"
                 value={accountId ?? ""}
-                onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : undefined)}
+                onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)}
               >
                 <option value="">Todas</option>
                 {(accounts.data ?? []).map((a) => (

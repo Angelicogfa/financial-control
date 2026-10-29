@@ -28,7 +28,7 @@ import {
   type Change,
   type MarketSplit,
 } from "./story";
-import { DisclosureFeed } from "../disclosures/DisclosureFeed";
+import { AccountsWealth } from "./AccountsWealth";
 import { DeclaredEarnings } from "./DeclaredEarnings";
 import { QuoteClock } from "./QuoteClock";
 
@@ -402,6 +402,7 @@ export function HomePage() {
             analytics={analytics.data}
             onQuotesRefreshed={report.reload}
           />
+          <AccountsWealth />
           <AllocationAct
             report={report.data}
             analytics={analytics.data}
@@ -410,7 +411,6 @@ export function HomePage() {
             onAlertsChange={alerts.reload}
           />
           <DeclaredEarnings />
-          <DisclosureFeed limit={8} />
         </div>
       )}
       <ErrorBanner error={alerts.error} onRetry={alerts.reload} />

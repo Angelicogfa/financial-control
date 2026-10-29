@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from controllers.shared.dependencies import UoWFactory
 from controllers.simulation.requests import (
@@ -371,6 +371,13 @@ class SimulationHandler:
             **to_run_dto(run).model_dump(),
             results=[to_result_dto(r) for r in results] if backtest else [],
         )
+
+    def delete_run(self, run_id: int, *, now: datetime | None = None) -> None:
+        """Delete a run for good: it leaves every list and lookup and cannot be restored."""
+        with self.uow_factory() as uow:
+            self._get(uow, run_id)
+            uow.simulations.mark_deleted(run_id, deleted_at=now or datetime.now(UTC))
+            uow.commit()
 
     def list_runs(
         self, limit: int = 20, kind: SimulationKind | None = None

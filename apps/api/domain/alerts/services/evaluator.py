@@ -445,7 +445,7 @@ def relevant_fact_alerts(
                 (doc.subject or doc.company_name)
                 + ". Leia o documento na CVM e reveja a tese do ativo, se for o caso.",
                 subject,
-                f"/asset/{asset_id}?tab=disclosures" if asset_id else "/home",
+                f"/asset/{asset_id}?tab=disclosures" if asset_id else "/disclosures",
             )
         )
     return alerts

@@ -22,6 +22,7 @@ import { ResearchPage } from "./pages/research/ResearchPage";
 import { AccountsPage } from "./pages/settings/AccountsPage";
 import { AgenticPage } from "./pages/settings/agentic/AgenticPage";
 import { AgentKeyFormPage } from "./pages/settings/agentic/AgentKeyFormPage";
+import { DisclosuresPage } from "./pages/disclosures/DisclosuresPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
 import { AssetComparePage } from "./pages/tools/AssetComparePage";
 import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
@@ -35,6 +36,7 @@ export function AppRoutes() {
       <Route path="/home" element={<HomePage />} />
       <Route path="/performance" element={<PerformancePage />} />
       <Route path="/health" element={<HealthPage />} />
+      <Route path="/disclosures" element={<DisclosuresPage />} />
       <Route path="/portfolio" element={<PortfolioPage />} />
       <Route path="/asset/new" element={<AssetFormPage />} />
       <Route path="/asset/:id" element={<AssetDetailPage />} />

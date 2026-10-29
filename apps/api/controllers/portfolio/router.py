@@ -19,6 +19,7 @@ from controllers.portfolio.responses import (
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
     TreasuryMarketDTO,
+    WealthByAccountDTO,
 )
 from domain.portfolio.services.use_cases import PortfolioHandler
 
@@ -47,6 +48,15 @@ def get_consolidated_portfolio(
     return handler.get_portfolio_report(
         as_of_date=as_of_date, date_from=date_from, account_id=account_id
     )
+
+
+@portfolio_router.get("/by-account", response_model=WealthByAccountDTO)
+def get_wealth_by_account(
+    as_of_date: date | None = Query(default=None),
+    handler: PortfolioHandler = Depends(get_portfolio_handler),
+) -> WealthByAccountDTO:
+    """Wealth of each custody account, split into Bolsa and Internacional (Phase 40.2)."""
+    return handler.wealth_by_account(as_of_date=as_of_date)
 
 
 @portfolio_router.post("/contribution", response_model=ContributionPlanResponseDTO)

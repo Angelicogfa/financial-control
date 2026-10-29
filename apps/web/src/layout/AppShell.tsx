@@ -3,7 +3,8 @@ import { NavLink, useLocation } from "react-router-dom";
 
 import { api } from "../api/endpoints";
 import { CloseIcon, LogoutIcon, MenuIcon, MoonIcon, SunIcon } from "./icons";
-import { DESKTOP_QUERY, NAV_SECTIONS, pageTitleFor } from "./navigation";
+import { Breadcrumbs } from "./Breadcrumbs";
+import { DESKTOP_QUERY, NAV_SECTIONS } from "./navigation";
 import { applyTheme, currentTheme, type Theme } from "./theme";
 
 function matchesDesktop(): boolean {
@@ -171,7 +172,7 @@ export function AppShell({
           >
             <MenuIcon width={17} height={17} />
           </button>
-          <span className="app-topbar-title">{pageTitleFor(location.pathname)}</span>
+          <Breadcrumbs />
         </header>
         <main className="app-main">{children}</main>
       </div>

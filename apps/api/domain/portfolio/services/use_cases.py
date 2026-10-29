@@ -9,13 +9,16 @@ from datetime import date
 
 from controllers.portfolio.requests import ContributionSimulationRequest
 from controllers.portfolio.responses import (
+    AccountWealthDTO,
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
+    MarketGroupDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
     TreasuryMarketDTO,
+    WealthByAccountDTO,
 )
 from controllers.portfolio.serializers import (
     to_contribution_plan_dto,
@@ -28,7 +31,19 @@ from controllers.portfolio.serializers import (
 from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError
 from domain.accounts.services.use_cases import resolve_account_id
+from domain.portfolio.services.market_split import MarketGroup, market_groups
 from domain.portfolio.services.service import PortfolioApplicationService
+
+
+def _group_dto(group: MarketGroup) -> MarketGroupDTO:
+    return MarketGroupDTO(
+        key=group.key,
+        label=group.label,
+        value_brl=group.value,
+        invested_brl=group.invested,
+        pnl_brl=group.pnl,
+        change=group.change,
+    )
 
 
 class PortfolioHandler:
@@ -55,6 +70,51 @@ class PortfolioHandler:
                 account_id=resolve_account_id(uow, account_id),
             )
             return to_portfolio_report_dto(report)
+
+    def wealth_by_account(self, *, as_of_date: date | None = None) -> WealthByAccountDTO:
+        """Wealth of each account (its own trades and earnings), split into Bolsa and Internacional.
+
+        Accounts without a position are left out; prices come from the stored quotes.
+        """
+        service = self.portfolio_service
+        with self.uow_factory() as uow:
+            whole = service.build_portfolio_report(uow, as_of_date=as_of_date)
+            rows: list[AccountWealthDTO] = []
+            for account in uow.accounts.list_all():
+                if account.id is None:
+                    continue
+                report = service.build_portfolio_report(
+                    uow, as_of_date=as_of_date, account_id=account.id
+                )
+                groups = market_groups(report.allocations)
+                value = sum(g.value for g in groups)
+                invested = sum(g.invested for g in groups)
+                if value <= 0 and invested <= 0:
+                    continue
+                pnl = sum(g.pnl for g in groups)
+                rows.append(
+                    AccountWealthDTO(
+                        account_id=account.id,
+                        name=account.name,
+                        institution=account.institution,
+                        value_brl=round(value, 2),
+                        invested_brl=round(invested, 2),
+                        pnl_brl=round(pnl, 2),
+                        change=pnl / invested if invested > 0 else None,
+                        share=0.0,
+                        groups=[_group_dto(g) for g in groups],
+                    )
+                )
+        total = sum(r.value_brl for r in rows)
+        for row in rows:
+            row.share = row.value_brl / total if total > 0 else 0.0
+        rows.sort(key=lambda r: r.value_brl, reverse=True)
+        return WealthByAccountDTO(
+            as_of_date=whole.as_of_date,
+            total_value_brl=round(total, 2),
+            accounts=rows,
+            groups=[_group_dto(g) for g in market_groups(whole.allocations)],
+        )
 
     def simulate_contribution(
         self, req: ContributionSimulationRequest

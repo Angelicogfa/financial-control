@@ -14,6 +14,7 @@ import { brl, day, num, quantity } from "../../utils/format";
 import { EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
 import { clampPage, usePagedRows, usePagination, type PaginationState } from "../../utils/pagination";
 import { EditIcon, TrashIcon } from "../../layout/icons";
+import { useStoredState } from "../../utils/storedState";
 
 type TabKey = "trades" | "earnings" | "events";
 const TABS: TabSpec<TabKey>[] = [
@@ -334,7 +335,7 @@ const NEW_LINKS: Record<TabKey, { to: string; label: string }> = {
 
 export function LedgerPage() {
   const [tab, setTab] = useTab(TABS, "trades");
-  const [filters, setFilters] = useState<LedgerFilters>({});
+  const [filters, setFilters] = useStoredState<LedgerFilters>("ledger:filters", {});
   return (
     <div className="app-page">
       <PageHeader

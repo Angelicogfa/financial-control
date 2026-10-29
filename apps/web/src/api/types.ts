@@ -18,6 +18,18 @@ export interface AccountRequest {
   is_active?: boolean;
 }
 
+export interface AccountWealthDTO {
+  account_id: number;
+  name: string;
+  institution?: string | null;
+  value_brl: number;
+  invested_brl: number;
+  pnl_brl: number;
+  change?: number | null;
+  share: number;
+  groups: MarketGroupDTO[];
+}
+
 export interface AgendaItemDTO {
   ticker: string;
   name: string;
@@ -1227,6 +1239,15 @@ export interface MarkReadResultDTO {
   updated: number;
 }
 
+export interface MarketGroupDTO {
+  key: string;
+  label: string;
+  value_brl: number;
+  invested_brl: number;
+  pnl_brl: number;
+  change?: number | null;
+}
+
 export interface MarketHistoryPointDTO {
   day: string;
   curve_value: number;
@@ -1998,6 +2019,13 @@ export interface WatchlistItemDTO {
   valuation_verdict: string;
   fair_value?: number | null;
   margin?: number | null;
+}
+
+export interface WealthByAccountDTO {
+  as_of_date: string;
+  total_value_brl: number;
+  accounts: AccountWealthDTO[];
+  groups: MarketGroupDTO[];
 }
 
 export interface WindowOutcomeDTO {

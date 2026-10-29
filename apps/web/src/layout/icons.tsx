@@ -39,6 +39,13 @@ export const PulseIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const NewsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M7 8h10M7 12h10M7 16h6" />
+  </Icon>
+);
+
 export const ColumnsIcon = (p: IconProps) => (
   <Icon {...p}>
     <rect x="3" y="4" width="5" height="16" rx="1" />

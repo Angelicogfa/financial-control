@@ -71,6 +71,7 @@ from controllers.portfolio.responses import (
     PortfolioReportResponseDTO,
     SnapshotPointDTO,
     TreasuryMarketDTO,
+    WealthByAccountDTO,
 )
 from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import (
@@ -500,6 +501,17 @@ class OperationSpec:
 
 OPERATIONS: tuple[OperationSpec, ...] = (
     # 1. Portfolio & ARCA
+    OperationSpec(
+        name="portfolio.by_account",
+        kind="query",
+        description=(
+            "Patrimônio de cada conta de custódia, com o resultado sobre o investido, separado "
+            "em Bolsa (Caixa, Ações e Real Estate) e Internacional."
+        ),
+        input_model=AsOfDateInput,
+        output_type=WealthByAccountDTO,
+        invoke=lambda h, p: h.portfolio.wealth_by_account(as_of_date=p.as_of_date),
+    ),
     OperationSpec(
         name="portfolio.report",
         kind="query",
@@ -1351,6 +1363,17 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationListInput,
         output_type=list[SimulationRunDTO],
         invoke=lambda h, p: h.simulation.list_runs(p.limit, p.kind),
+    ),
+    OperationSpec(
+        name="simulation.delete",
+        kind="command",
+        description=(
+            "Exclui uma simulação de vez (exclusão lógica): ela some das listas e consultas e "
+            "não pode ser recuperada."
+        ),
+        input_model=SimulationIdInput,
+        output_type=OperationStatusDTO,
+        invoke=lambda h, p: (h.simulation.delete_run(p.run_id), OperationStatusDTO())[1],
     ),
 )
 
