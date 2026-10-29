@@ -21,6 +21,7 @@ from infra.data.models.ledger import CorporateEventModel, EarningModel, Transact
 from infra.data.models.market import (
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
+    MarketDataModel,
     MarketSeriesModel,
     TreasuryCatalogModel,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "InstrumentCatalogModel",
     "InvestmentPolicyModel",
     "JobRunModel",
+    "MarketDataModel",
     "MarketSeriesModel",
     "PortfolioSnapshotModel",
     "SimulationResultModel",

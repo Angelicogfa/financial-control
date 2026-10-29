@@ -57,6 +57,7 @@ import type {
   PortfolioReportResponseDTO,
   SavedContributionPlanDTO,
   ProjectionDTO,
+  QuoteStatusDTO,
   ProjectionRequest,
   RobustnessDTO,
   ScreenerResponseDTO,
@@ -295,6 +296,7 @@ export const api = {
   market: {
     series: () => request<SeriesStatusDTO[]>("/market/series-status"),
     jobs: () => request<JobRunDTO[]>("/market/job-runs"),
+    quoteStatus: () => request<QuoteStatusDTO>("/market/quotes/status"),
     requestJob: (name: string) =>
       request<JobRunDTO>(`/market/job-runs/${encodeURIComponent(name)}/request`, { method: "POST" }),
     workerErrors: (includeResolved = false) =>

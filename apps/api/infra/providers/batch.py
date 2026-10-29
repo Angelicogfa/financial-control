@@ -39,8 +39,12 @@ def fetch_market_data(
     include_fundamentals: bool = True,
     max_workers: int = 8,
     timeout_seconds: float = 20.0,
+    bypass_cache: bool = False,
 ) -> MarketSnapshot:
-    """Fetch quotes (and optionally fundamentals) for market-traded assets concurrently."""
+    """Fetch quotes (and optionally fundamentals) for market-traded assets concurrently.
+
+    `bypass_cache` asks the providers again (the worker refreshing the stored data).
+    """
     tradable = [a for a in assets if a.market not in OFFLINE_MARKETS]
     result = MarketSnapshot()
     if not tradable:
@@ -52,13 +56,17 @@ def fetch_market_data(
         if include_quotes:
             quote_future = executor.submit(
                 copy_context().run,
-                lambda a=asset: gateway.get_quote(a.ticker, asset_type=a.asset_type),
+                lambda a=asset: gateway.get_quote(
+                    a.ticker, asset_type=a.asset_type, bypass_cache=bypass_cache
+                ),
             )
             futures[quote_future] = ("quote", asset.ticker)
         if include_fundamentals:
             future = executor.submit(
                 copy_context().run,
-                lambda a=asset: gateway.get_fundamentals(a.ticker, asset_type=a.asset_type),
+                lambda a=asset: gateway.get_fundamentals(
+                    a.ticker, asset_type=a.asset_type, bypass_cache=bypass_cache
+                ),
             )
             futures[future] = ("fundamentals", asset.ticker)
 

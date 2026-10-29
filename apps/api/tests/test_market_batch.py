@@ -28,13 +28,17 @@ class _SlowGateway:
         with self._lock:
             self.active -= 1
 
-    def get_quote(self, ticker: str, asset_type: AssetType) -> Quote | None:
+    def get_quote(
+        self, ticker: str, asset_type: AssetType, bypass_cache: bool = False
+    ) -> Quote | None:
         self._enter(ticker)
         if ticker == "BROKEN3":
             raise RuntimeError("provider bug")
         return Quote(ticker, 10.0)
 
-    def get_fundamentals(self, ticker: str, asset_type: AssetType) -> Fundamentals | None:
+    def get_fundamentals(
+        self, ticker: str, asset_type: AssetType, bypass_cache: bool = False
+    ) -> Fundamentals | None:
         self._enter(ticker)
         return None
 

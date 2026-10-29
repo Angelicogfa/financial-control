@@ -83,6 +83,7 @@ from domain.tax.services.rules import rule_book
 from domain.tax.services.status import asset_tax_status
 from infra.providers.batch import fetch_distributions, fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
+from infra.providers.stored import stored_fundamentals, stored_market_data, stored_usd_brl
 
 
 def _restrict_to_account(assets: list[AssetEntity], account_id: int) -> list[AssetEntity]:
@@ -170,7 +171,7 @@ class PortfolioApplicationService:
 
     def evaluate_checklist(self, uow: AbstractUnitOfWork, asset: AssetEntity) -> CerradoEvaluation:
         """Checklist of one asset with its current fundamentals and statement history."""
-        fund = self.gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
+        fund = stored_fundamentals(uow, self.gateway, asset)
         return evaluate(
             asset.profile,
             asset.cerrado_answers,
@@ -195,7 +196,8 @@ class PortfolioApplicationService:
     ) -> dict[int, tuple[AssetLifecycle, bool]]:
         """Lifecycle status and eligibility of each asset under the current policy."""
         policy = self.load_policy(uow).eligibility
-        fundamentals = fetch_market_data(
+        fundamentals = stored_market_data(
+            uow,
             self.gateway,
             assets,
             include_quotes=False,
@@ -368,7 +370,8 @@ class PortfolioApplicationService:
             assets = _restrict_to_account(assets, account_id)
         policy = self.load_policy(uow)
 
-        market = fetch_market_data(
+        market = stored_market_data(
+            uow,
             self.gateway,
             assets,
             max_workers=self.fetch_workers,
@@ -376,7 +379,7 @@ class PortfolioApplicationService:
         )
         quotes, fundamentals = market.quotes, market.fundamentals
 
-        usd_brl = self.gateway.get_usd_brl_rate()
+        usd_brl = stored_usd_brl(uow, self.gateway)
         annual_cdi, annual_ipca = self.gateway.get_macro_rates()
 
         curves = load_rate_curves(
@@ -436,7 +439,7 @@ class PortfolioApplicationService:
             (p for p in report.positions if p.asset_id == asset.id), None
         )
 
-        fund = self.gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type)
+        fund = stored_fundamentals(uow, self.gateway, asset)
         snapshots = uow.fundamentals.list_for(asset.ticker)
         metrics = historical_metrics(snapshots) if snapshots else None
         checklist = evaluate(
@@ -636,7 +639,8 @@ class PortfolioApplicationService:
         assets = {a.id: a for a in uow.assets.list_all(active_only=True) if a.id is not None}
         held = [assets[p.asset_id] for p in report.positions if p.asset_id in assets]
 
-        fundamentals = fetch_market_data(
+        fundamentals = stored_market_data(
+            uow,
             self.gateway,
             held,
             include_quotes=False,

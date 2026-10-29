@@ -79,7 +79,10 @@ class Settings(BaseSettings):
     market_miss_cache_ttl: int = Field(default=300, ge=0)
 
     # Worker schedule and resilience
-    quote_refresh_minutes: int = Field(default=15, ge=1)
+    # Phase 38: the worker stores the quotes of the holdings on this cadence and those of the
+    # watchlist on the slower one; screens read the stored values.
+    quote_refresh_minutes: int = Field(default=5, ge=1)
+    watchlist_refresh_minutes: int = Field(default=60, ge=1)
     bcb_sync_cron_hour: int = Field(default=18, ge=0, le=23)
     bcb_sync_cron_minute: int = Field(default=0, ge=0, le=59)
     snapshot_cron_hour: int = Field(default=18, ge=0, le=23)

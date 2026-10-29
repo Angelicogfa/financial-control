@@ -1479,6 +1479,15 @@ export interface ProjectionScenarioDTO {
 
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
 
+export interface QuoteStatusDTO {
+  holdings: number;
+  stored: number;
+  oldest_at?: string | null;
+  newest_at?: string | null;
+  stale: number;
+  stale_minutes: number;
+}
+
 export interface RateScenarioDTO {
   name: string;
   annual_cdi_rate: number;

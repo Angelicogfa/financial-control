@@ -51,6 +51,7 @@ from controllers.ledger.responses import (
 )
 from controllers.market.responses import (
     JobRunDTO,
+    QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
@@ -168,7 +169,7 @@ class DisclosureListInput(BaseModel):
 
 
 class JobRequestInput(BaseModel):
-    job_name: Literal["sync_simulation_history", "sync_cvm_documents"]
+    job_name: Literal["sync_simulation_history", "sync_cvm_documents", "warm_portfolio_quotes"]
 
 
 class CalibrationInput(BaseModel):
@@ -1066,6 +1067,17 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, _p: h.market.series_status(),
     ),
     OperationSpec(
+        name="market.quote_status",
+        kind="query",
+        description=(
+            "Idade das cotações guardadas das posições: as telas leem do banco e o worker "
+            "atualiza a cada poucos minutos; peça `warm_portfolio_quotes` para atualizar já."
+        ),
+        input_model=EmptyInput,
+        output_type=QuoteStatusDTO,
+        invoke=lambda h, _p: h.market.quote_status(),
+    ),
+    OperationSpec(
         name="market.job_runs",
         kind="query",
         description="Lista as execuções recentes dos jobs em segundo plano de dados de mercado.",
@@ -1078,8 +1090,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         kind="command",
         description=(
             "Pede ao worker que rode agora uma rotina que aceita disparo manual: "
-            "`sync_simulation_history` (histórico longo da simulação) ou `sync_cvm_documents` "
-            "(fatos relevantes e comunicados da CVM). O worker atende em até 15 s; acompanhe "
+            "`sync_simulation_history` (histórico longo da simulação), `sync_cvm_documents` "
+            "(fatos relevantes e comunicados da CVM) ou `warm_portfolio_quotes` (cotações das "
+            "posições). O worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),
         input_model=JobRequestInput,

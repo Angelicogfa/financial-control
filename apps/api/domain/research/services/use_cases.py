@@ -45,6 +45,7 @@ from domain.shared.enums import (
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from infra.providers.batch import fetch_histories, fetch_market_data
+from infra.providers.stored import stored_market_data
 
 logger = logging.getLogger("fincontrol_api.research")
 
@@ -307,7 +308,8 @@ class ResearchHandler:
 
     def _items(self, uow: AbstractUnitOfWork, assets: list[AssetEntity]) -> list[WatchlistItemDTO]:
         service = self.portfolio_service
-        market = fetch_market_data(
+        market = stored_market_data(
+            uow,
             service.gateway,
             assets,
             max_workers=service.fetch_workers,

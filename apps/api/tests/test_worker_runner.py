@@ -217,6 +217,8 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
     jobs = {job.id: job for job in scheduler.get_jobs()}
     assert set(jobs) == {
         "warm_portfolio_quotes",
+        "refresh_watchlist_quotes",
+        "manual_warm_portfolio_quotes",
         "ensure_series_coverage",
         "sync_bcb_and_benchmarks",
         "record_daily_snapshot",

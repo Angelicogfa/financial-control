@@ -100,7 +100,8 @@ Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e nova
 
 | Rotina | Quando | O que faz |
 |---|---|---|
-| `warm_portfolio_quotes` | a cada `QUOTE_REFRESH_MINUTES` | renova cotações e fundamentos da carteira no cache |
+| `warm_portfolio_quotes` | a cada `QUOTE_REFRESH_MINUTES` (5 min; também na partida e sob pedido) | grava em `market_data` as cotações dos ativos com lançamento e os fundamentos com mais de 24 h (Fase 38) |
+| `refresh_watchlist_quotes` | a cada `WATCHLIST_REFRESH_MINUTES` (60 min) | idem para os ativos só em observação |
 | `ensure_series_coverage` | idem | completa séries BCB desde a aplicação de renda fixa mais antiga |
 | `sync_bcb_and_benchmarks` | diário (`BCB_SYNC_CRON_*`) | sincroniza CDI/SELIC/IPCA e índices de forma incremental |
 | `record_daily_snapshot` | dias úteis (`SNAPSHOT_CRON_*`) | grava o retrato diário da carteira (TWR) |
@@ -137,7 +138,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00025`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00026`):
 
 ```mermaid
 erDiagram
@@ -252,7 +253,7 @@ erDiagram
     }
 ```
 
-Também: `fixed_income_terms` (indexador, taxa contratada, emissão/vencimento, isenção), `job_runs` (execuções do worker e pedidos `REQUESTED`), `alert_dismissals` (alertas dispensados), `simulation_runs` e `simulation_results` (rodadas da simulação com parâmetros, `params_hash`, `data_hash`, versão do motor e semente; uma linha de resultado por série, cenário, candidato ou modelo), `cvm_documents` (documentos do IPE, protocolo único, lido ou não) e `cvm_issuer_tickers` (ticker → CNPJ do FCA).
+Também: `fixed_income_terms` (indexador, taxa contratada, emissão/vencimento, isenção), `job_runs` (execuções do worker e pedidos `REQUESTED`), `alert_dismissals` (alertas dispensados), `market_data` (última cotação e últimos fundamentos de cada ticker, gravados pelo worker e lidos pelas telas, cada parte com a hora da busca), `simulation_runs` e `simulation_results` (rodadas da simulação com parâmetros, `params_hash`, `data_hash`, versão do motor e semente; uma linha de resultado por série, cenário, candidato ou modelo), `cvm_documents` (documentos do IPE, protocolo único, lido ou não) e `cvm_issuer_tickers` (ticker → CNPJ do FCA).
 
 ---
 
@@ -337,3 +338,7 @@ Rotina diária `sync_cvm_documents`: FCA dos últimos 3 anos → mapa ticker →
 | **`^GSPC`** | S&P 500 | yfinance | Benchmark da classe `ATIVOS_INTERNACIONAIS` |
 | **`CDI`** | Taxa DI diária acumulada | BCB SGS (série 12) | Taxa livre de risco ($R_f$ para Sharpe/Sortino) e benchmark de `CAIXA` |
 | **`IPCA`** | Inflação oficial mensal | BCB SGS (série 433) | Cálculo de ganho real acima da inflação e indexação de títulos IPCA+ |
+
+### Cotações guardadas no banco (Fase 38)
+
+As telas (carteira, Início, alertas, saúde, observação e candidatos) não chamam os provedores de mercado: leem a última cotação e os últimos fundamentos de `market_data` (`infra/providers/stored.py`). Só o worker fala com Brapi e Yahoo, nas rotinas `warm_portfolio_quotes` (posições) e `refresh_watchlist_quotes` (observação); se um provedor falha, o valor anterior fica. Um ticker que nunca foi gravado (ativo recém-cadastrado) é buscado ao vivo uma vez, só ele. `GET /market/quotes/status` (MCP `market.quote_status`) diz a idade das cotações das posições; o botão "Atualizar" do Início pede `warm_portfolio_quotes` ao worker. O tempo de resposta passa a depender do banco, não do número de ativos cadastrados nem do provedor.

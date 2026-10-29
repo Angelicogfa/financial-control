@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
-from domain.market.entities import TreasuryBond
+from domain.market.entities import Fundamentals, Quote, StoredMarketData, TreasuryBond
 from domain.shared.entities import (
     CatalogInstrument,
     MarketSeriesPoint,
@@ -18,6 +18,7 @@ from domain.shared.enums import (
 from infra.data.models.market import (
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
+    MarketDataModel,
     MarketSeriesModel,
     TreasuryCatalogModel,
 )
@@ -84,4 +85,14 @@ def to_treasury_bond(model: TreasuryCatalogModel) -> TreasuryBond:
         liquidity=FixedIncomeLiquidity(model.liquidity),
         source=model.source,
         updated_at=model.updated_at,
+    )
+
+
+def to_stored_market_data(model: MarketDataModel) -> StoredMarketData:
+    return StoredMarketData(
+        ticker=model.ticker,
+        quote=Quote.from_dict(model.quote) if model.quote else None,
+        quote_fetched_at=model.quote_fetched_at,
+        fundamentals=Fundamentals.from_dict(model.fundamentals) if model.fundamentals else None,
+        fundamentals_fetched_at=model.fundamentals_fetched_at,
     )

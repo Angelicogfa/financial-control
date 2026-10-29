@@ -120,6 +120,9 @@ class SqlAlchemyTransactionRepository(_AccountDefaultMixin, AbstractTransactionR
         )
         return [to_transaction_entity(m) for m in self.session.scalars(stmt).all()]
 
+    def traded_asset_ids(self) -> set[int]:
+        return set(self.session.scalars(select(TransactionModel.asset_id).distinct()))
+
     def list_paginated(
         self,
         params: PaginationParams,

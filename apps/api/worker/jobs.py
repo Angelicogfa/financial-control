@@ -62,6 +62,7 @@ from domain.simulation.data import (
 from domain.simulation.runs import execute_next_run, queue_calibration
 from infra.providers.batch import fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
+from infra.providers.stored import refresh_stored_market_data, refresh_stored_usd_brl
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
 
@@ -192,23 +193,92 @@ def ensure_series_coverage_job(
     )
 
 
+# Fundamentals change slowly: the quote jobs ask for them again only after this age.
+FUNDAMENTALS_MAX_AGE = timedelta(hours=24)
+
+
+def _as_utc(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
+def _refresh_market_data(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    holdings: bool,
+    max_workers: int,
+    timeout_seconds: float,
+    now: datetime | None = None,
+) -> int:
+    """Store fresh quotes (and stale fundamentals) of the holdings or of the watchlist."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        traded = uow.transactions.traded_asset_ids()
+        assets = [
+            a
+            for a in uow.assets.list_all(active_only=True)
+            if a.market not in (Market.MANUAL, Market.FIXED_INCOME_CURVE)
+            and (a.id in traded) == holdings
+        ]
+        stored = uow.market_data.get_many(a.ticker for a in assets)
+        stale = [
+            a
+            for a in assets
+            if (data := stored.get(a.ticker)) is None
+            or data.fundamentals_fetched_at is None
+            or _as_utc(data.fundamentals_fetched_at) < at - FUNDAMENTALS_MAX_AGE
+        ]
+        fetched = refresh_stored_market_data(
+            uow,
+            gateway,
+            quotes_for=assets,
+            fundamentals_for=stale,
+            max_workers=max_workers,
+            timeout_seconds=timeout_seconds,
+            now=at,
+        )
+        if holdings:
+            refresh_stored_usd_brl(uow, gateway, now=at)
+        uow.commit()
+    return len(fetched.quotes)
+
+
 def warm_portfolio_quotes_job(
     uow_factory: UoWFactory,
     gateway: CachedMarketGateway,
+    *,
+    max_workers: int = 8,
+    timeout_seconds: float = 300.0,
+    now: datetime | None = None,
 ) -> int:
-    """Refresh cached quotes and fundamentals for all active market-traded assets."""
-    with uow_factory() as uow:
-        assets = uow.assets.list_all(active_only=True)
+    """Store the quotes of the assets with trades; the screens read them from the database."""
+    return _refresh_market_data(
+        uow_factory,
+        gateway,
+        holdings=True,
+        max_workers=max_workers,
+        timeout_seconds=timeout_seconds,
+        now=now,
+    )
 
-    warmed = 0
-    for asset in assets:
-        if asset.market in (Market.MANUAL, Market.FIXED_INCOME_CURVE):
-            continue
-        q = gateway.get_quote(asset.ticker, asset_type=asset.asset_type, bypass_cache=True)
-        gateway.get_fundamentals(asset.ticker, asset_type=asset.asset_type, bypass_cache=True)
-        if q is not None:
-            warmed += 1
-    return warmed
+
+def refresh_watchlist_quotes_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    max_workers: int = 8,
+    timeout_seconds: float = 900.0,
+    now: datetime | None = None,
+) -> int:
+    """Store the quotes of the followed assets without trades, on a slower cadence."""
+    return _refresh_market_data(
+        uow_factory,
+        gateway,
+        holdings=False,
+        max_workers=max_workers,
+        timeout_seconds=timeout_seconds,
+        now=now,
+    )
 
 
 def refresh_fundamentals_job(

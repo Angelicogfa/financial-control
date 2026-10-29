@@ -5,13 +5,15 @@ They take and return pure domain entities and never commit
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
-from domain.market.entities import TreasuryBond
+from domain.market.entities import Fundamentals, Quote, StoredMarketData, TreasuryBond
+from domain.market.repositories import AbstractMarketDataRepository
 from domain.shared.entities import (
     CatalogInstrument,
     MarketSeriesPoint,
@@ -27,11 +29,13 @@ from infra.data.mappers.market import (
     to_catalog_instrument,
     to_fundamental_snapshot,
     to_market_series_point,
+    to_stored_market_data,
     to_treasury_bond,
 )
 from infra.data.models.market import (
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
+    MarketDataModel,
     MarketSeriesModel,
     TreasuryCatalogModel,
 )
@@ -245,3 +249,58 @@ class SqlAlchemyTreasuryCatalogRepository(AbstractTreasuryCatalogRepository):
             TreasuryCatalogModel.symbol.asc(),
         )
         return [to_treasury_bond(m) for m in self.session.scalars(stmt).all()]
+
+
+class SqlAlchemyMarketDataRepository(AbstractMarketDataRepository):
+    """SQLAlchemy implementation of AbstractMarketDataRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get_many(self, tickers: Iterable[str]) -> dict[str, StoredMarketData]:
+        wanted = {t.strip().upper() for t in tickers}
+        if not wanted:
+            return {}
+        rows = self.session.scalars(
+            select(MarketDataModel).where(MarketDataModel.ticker.in_(wanted))
+        )
+        return {row.ticker: to_stored_market_data(row) for row in rows}
+
+    def _rows(self, tickers: Iterable[str]) -> dict[str, MarketDataModel]:
+        wanted = set(tickers)
+        existing = {
+            row.ticker: row
+            for row in self.session.scalars(
+                select(MarketDataModel).where(MarketDataModel.ticker.in_(wanted))
+            )
+        }
+        for ticker in wanted - existing.keys():
+            existing[ticker] = MarketDataModel(ticker=ticker)
+            self.session.add(existing[ticker])
+        return existing
+
+    def save_quotes(self, quotes: Mapping[str, Quote], *, fetched_at: datetime) -> int:
+        if not quotes:
+            return 0
+        normalized = {t.strip().upper(): q for t, q in quotes.items()}
+        rows = self._rows(normalized)
+        for ticker, quote in normalized.items():
+            rows[ticker].quote = quote.to_dict()
+            rows[ticker].quote_fetched_at = fetched_at
+            rows[ticker].updated_at = fetched_at
+        self.session.flush()
+        return len(normalized)
+
+    def save_fundamentals(
+        self, fundamentals: Mapping[str, Fundamentals], *, fetched_at: datetime
+    ) -> int:
+        if not fundamentals:
+            return 0
+        normalized = {t.strip().upper(): f for t, f in fundamentals.items()}
+        rows = self._rows(normalized)
+        for ticker, fund in normalized.items():
+            rows[ticker].fundamentals = fund.to_dict()
+            rows[ticker].fundamentals_fetched_at = fetched_at
+            rows[ticker].updated_at = fetched_at
+        self.session.flush()
+        return len(normalized)

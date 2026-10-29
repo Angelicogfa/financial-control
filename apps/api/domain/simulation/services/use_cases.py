@@ -98,7 +98,7 @@ from domain.simulation.runs import (
     pending_calibration,
     queue_calibration,
 )
-from infra.providers.batch import fetch_market_data
+from infra.providers.stored import stored_market_data
 
 
 def to_run_dto(run: SimulationRun) -> SimulationRunDTO:
@@ -242,13 +242,14 @@ class SimulationHandler:
             assets = [
                 a for a in (uow.assets.get_by_id(w.asset_id) for w in watchlist) if a is not None
             ]
-        fundamentals = fetch_market_data(
-            service.gateway,
-            assets,
-            include_quotes=False,
-            max_workers=service.fetch_workers,
-            timeout_seconds=service.fetch_timeout_seconds,
-        ).fundamentals
+            fundamentals = stored_market_data(
+                uow,
+                service.gateway,
+                assets,
+                include_quotes=False,
+                max_workers=service.fetch_workers,
+                timeout_seconds=service.fetch_timeout_seconds,
+            ).fundamentals
         for item in watchlist:
             fund = fundamentals.get(item.ticker)
             options.append(

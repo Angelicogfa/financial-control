@@ -32,6 +32,7 @@ from infra.data.repositories.ledger import (
 from infra.data.repositories.market import (
     SqlAlchemyCatalogRepository,
     SqlAlchemyFundamentalsRepository,
+    SqlAlchemyMarketDataRepository,
     SqlAlchemyMarketSeriesRepository,
     SqlAlchemyTreasuryCatalogRepository,
 )
@@ -75,6 +76,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.simulations = SqlAlchemySimulationRepository(self.session)
         self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)
         self.cvm_documents = SqlAlchemyCvmDocumentRepository(self.session)
+        self.market_data = SqlAlchemyMarketDataRepository(self.session)
         return self
 
     def __exit__(
