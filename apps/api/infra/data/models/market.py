@@ -77,9 +77,46 @@ class MarketDataModel(Base):
     fundamentals_fetched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    distributions: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    distributions_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    history_loaded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class MarketQuoteHistoryModel(Base):
+    """Audit trail of the stored quotes: the last one of each ticker per day (Phase 39.1)."""
+
+    __tablename__ = "market_quote_history"
+
+    ticker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    freshness: Mapped[str] = mapped_column(String(16), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AssetPriceHistoryModel(Base):
+    """Daily OHLCV of each ticker, loaded in full once and extended by the worker (Phase 39.2)."""
+
+    __tablename__ = "asset_price_history"
+
+    ticker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    open: Mapped[float | None] = mapped_column(Float, nullable=True)
+    high: Mapped[float | None] = mapped_column(Float, nullable=True)
+    low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    adj_close: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class InstrumentCatalogModel(Base):

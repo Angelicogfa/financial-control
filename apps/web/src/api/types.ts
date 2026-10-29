@@ -1477,6 +1477,15 @@ export interface ProjectionScenarioDTO {
   prior_months?: number | null;
 }
 
+export interface QuoteDayDTO {
+  day: string;
+  price: number;
+  currency: string;
+  provider?: string | null;
+  freshness: string;
+  fetched_at: string;
+}
+
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
 
 export interface QuoteStatusDTO {

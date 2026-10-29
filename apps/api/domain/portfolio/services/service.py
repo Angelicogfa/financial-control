@@ -81,9 +81,16 @@ from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.tax.entities import TaxRuleBook
 from domain.tax.services.rules import rule_book
 from domain.tax.services.status import asset_tax_status
-from infra.providers.batch import fetch_distributions, fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
-from infra.providers.stored import stored_fundamentals, stored_market_data, stored_usd_brl
+from infra.providers.stored import (
+    stored_distributions,
+    stored_fundamentals,
+    stored_histories,
+    stored_history,
+    stored_macro_rates,
+    stored_market_data,
+    stored_usd_brl,
+)
 
 
 def _restrict_to_account(assets: list[AssetEntity], account_id: int) -> list[AssetEntity]:
@@ -229,7 +236,7 @@ class PortfolioApplicationService:
         """Rate curves needed to validate a fixed income ledger (None for market assets)."""
         if asset.fixed_income_term is None:
             return None
-        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        annual_cdi, annual_ipca = stored_macro_rates(uow, self.gateway)
         return load_rate_curves(
             uow.market_series,
             date_from=earliest_fixed_income_start([asset]),
@@ -298,7 +305,7 @@ class PortfolioApplicationService:
         if not assets:
             return []
         policy = self.load_policy(uow).valuation
-        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        annual_cdi, annual_ipca = stored_macro_rates(uow, self.gateway)
         curves = load_rate_curves(
             uow.market_series,
             date_from=earliest_fixed_income_start(assets),
@@ -339,7 +346,8 @@ class PortfolioApplicationService:
         """Declared distributions of the held and followed B3 stocks, BDRs and FIIs."""
         as_of = as_of_date or date.today()
         assets = [a for a in uow.assets.list_all(active_only=True) if a.asset_type in AGENDA_TYPES]
-        declared = fetch_distributions(
+        declared = stored_distributions(
+            uow,
             self.gateway,
             assets,
             max_workers=self.fetch_workers,
@@ -380,7 +388,7 @@ class PortfolioApplicationService:
         quotes, fundamentals = market.quotes, market.fundamentals
 
         usd_brl = stored_usd_brl(uow, self.gateway)
-        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        annual_cdi, annual_ipca = stored_macro_rates(uow, self.gateway)
 
         curves = load_rate_curves(
             uow.market_series,
@@ -464,14 +472,12 @@ class PortfolioApplicationService:
             statements=snapshots,
         )
 
-        history = self.gateway.get_history(
-            asset.ticker, range_period="1y", asset_type=asset.asset_type
-        )
+        history = stored_history(uow, self.gateway, asset, "1y")
         asset_dates, asset_rets = dated_simple_returns(
             [p.date for p in history], [p.close for p in history]
         )
 
-        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        annual_cdi, annual_ipca = stored_macro_rates(uow, self.gateway)
         benchmark_symbol = (
             "IFIX"
             if asset.asset_type == AssetType.FII
@@ -515,26 +521,30 @@ class PortfolioApplicationService:
             "price_history": [p.to_dict() for p in history],
         }
 
-    def price_chart(self, asset: AssetEntity, range_period: str) -> PriceChart:
-        """Closes of one period for the asset chart, cleaned and thinned."""
-        history = self.gateway.get_history(
-            asset.ticker, range_period=range_period, asset_type=asset.asset_type
-        )
+    def price_chart(
+        self, uow: AbstractUnitOfWork, asset: AssetEntity, range_period: str
+    ) -> PriceChart:
+        """Closes of one period for the asset chart (stored history), cleaned and thinned."""
+        history = stored_history(uow, self.gateway, asset, range_period)
         return price_chart(range_period, history)
 
-    def catalog_fundamentals(self, instruments: list[CatalogInstrument]) -> dict[str, Fundamentals]:
-        """Current indicators of catalog instruments (cached by the gateway)."""
+    def catalog_fundamentals(
+        self, uow: AbstractUnitOfWork, instruments: list[CatalogInstrument]
+    ) -> dict[str, Fundamentals]:
+        """Indicators of catalog instruments from the database; the missing ones are saved."""
         probes = [
             AssetEntity(ticker=i.ticker, name=i.name, asset_type=i.asset_type)
             for i in instruments
             if i.asset_type is not None
         ]
-        return fetch_market_data(
+        return stored_market_data(
+            uow,
             self.gateway,
             probes,
             include_quotes=False,
             max_workers=self.fetch_workers,
             timeout_seconds=self.fetch_timeout_seconds,
+            persist=True,
         ).fundamentals
 
     def classes_below_band(self, uow: AbstractUnitOfWork) -> frozenset[ArcaClass]:
@@ -609,7 +619,7 @@ class PortfolioApplicationService:
                 [p.reference_date for p in cdi], [p.value for p in cdi]
             )
 
-        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        annual_cdi, annual_ipca = stored_macro_rates(uow, self.gateway)
         summary = analyze_return_series(
             port_returns,
             benchmark_returns_map=bench_returns if has_history else {},
@@ -658,7 +668,8 @@ class PortfolioApplicationService:
 
         history_start = as_of - timedelta(days=HEALTH_HISTORY_DAYS)
         histories, asset_notes = clean_histories(
-            fetch_histories(
+            stored_histories(
+                uow,
                 self.gateway,
                 [assets[p.asset_id] for p in report.positions if p.asset_id in assets],
                 range_period=HEALTH_HISTORY_RANGE,
@@ -692,7 +703,7 @@ class PortfolioApplicationService:
         index_returns["CDI"] = cdi
         targets = {c: p.target_pct for c, p in policy.arca.classes.items()}
 
-        annual_cdi, annual_ipca = self.gateway.get_macro_rates()
+        annual_cdi, annual_ipca = stored_macro_rates(uow, self.gateway)
         fixed_income = [a for a in held if a.fixed_income_term is not None]
         tax_statuses = []
         if fixed_income:

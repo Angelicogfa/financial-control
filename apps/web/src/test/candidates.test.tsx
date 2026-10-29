@@ -154,7 +154,8 @@ describe("SimulationPage candidates tab", () => {
       { path: "/simulations/9", reply: { ...run, id: 9, status: "PENDING", results: [] } },
     ]);
     renderAt("/tools/simulation?tab=candidates");
-    expect(await screen.findByRole("table", { name: "Candidatos" })).toBeInTheDocument();
+    // Three chained requests (runs, run detail, candidates): give it room when the suite is busy.
+    expect(await screen.findByRole("table", { name: "Candidatos" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("2 candidatos")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Avaliar candidatos" }));
     expect(await screen.findByText(/Na fila do worker/)).toBeInTheDocument();

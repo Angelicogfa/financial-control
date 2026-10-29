@@ -28,6 +28,7 @@ from domain.tax.services.comparator import (
     default_scenarios,
 )
 from domain.tax.services.status import asset_tax_status
+from infra.providers.stored import stored_macro_rates
 
 DEFAULT_OPEN_TERM_DAYS = 365
 
@@ -81,7 +82,7 @@ class TaxHandler:
                     for s in req.scenarios
                 )
             else:
-                market_cdi, market_ipca = self.portfolio_service.gateway.get_macro_rates()
+                market_cdi, market_ipca = stored_macro_rates(uow, self.portfolio_service.gateway)
                 premises = self.portfolio_service.load_policy(uow).valuation.projections
                 scenarios = default_scenarios(market_cdi, market_ipca, premises)
         comparison = compare_offers(

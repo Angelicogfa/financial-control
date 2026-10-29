@@ -29,6 +29,7 @@ from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.shared.entities import TransactionEntity
 from domain.shared.enums import ContributionPlanStatus, TransactionKind
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from infra.providers.stored import stored_usd_brl
 
 
 def to_saved_plan_dto(saved: SavedContributionPlan) -> SavedContributionPlanDTO:
@@ -115,7 +116,9 @@ class ContributionHandler:
                 if asset is not None and (asset.currency or "BRL").upper() != "BRL"
             }
             usd_brl = (
-                Decimal(str(self.portfolio_service.gateway.get_usd_brl_rate())) if foreign else None
+                Decimal(str(stored_usd_brl(uow, self.portfolio_service.gateway)))
+                if foreign
+                else None
             )
             if req.executions:
                 executions = [

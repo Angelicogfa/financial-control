@@ -19,7 +19,7 @@
 | **Fase 3** | Provedores de Mercado (`brapi`, `yfinance`, `BCB SGS` CDI/IPCA), Cache Redis e Motor Estatístico/Benchmarks | `[x]` Concluída | 100% |
 | **Fase 4** | Backend API (`apps/api` Controllers $\rightarrow$ Handlers $\rightarrow$ Services $\rightarrow$ UoW) e Worker (`apps/worker`) + Testes de Integração | `[x]` Concluída | 100% |
 | **Fase 5** | Frontend Web (`apps/web` React + TypeScript): Menu Hambúrguer, Cards Evolução/Projeção e Tabelas Paginadas | `[x]` Concluída | 100% |
-| **Fase 6** | Validação End-to-End no Docker Compose, CI/CD GitHub Actions e Publicação no GitHub Privado | `[~]` Em andamento | 95% |
+| **Fase 6** | Validação End-to-End no Docker Compose, CI/CD GitHub Actions e Publicação no GitHub Privado | `[x]` Concluída (CI sem execução: TD-10) | 100% |
 | **Fase 7** | Fundação de Correção: Git, rede de testes de regressão, convenções de unidades (ADR 0006) | `[x]` Concluída | 100% |
 | **Fase 8** | Correção dos Motores de Cálculo (CDI, câmbio, renda fixa, analytics, integridade do livro) | `[x]` Concluída | 100% |
 | **Fase 9** | Configuração, Segurança, Infraestrutura Docker, Worker e CI | `[x]` Concluída | 100% |
@@ -27,20 +27,33 @@
 | **Fase 11** | Módulo Fundamentalista: Histórico, Screener, Watchlist, Checklists e Valuation por Tipo | `[x]` Implementado | 100% |
 | **Fase 12** | Operação: Aporte Executável, Alertas, Importação B3 e Eventos Corporativos | `[x]` Implementado | 100% |
 | **Fase 13** | Frontend no Modelo de Referência (ADR 0005 e ADR 0007) | `[x]` Implementado | 100% |
+| **Fase 14** | Validação Operacional 100% | `[x]` Implementado | 100% |
 | **Fase 15** | Refatoração Estrutural por Módulos (`apps/packages/*`, `apps/worker`, `fincontrol_api`) | `[x]` Concluída | 100% |
 | **Fase 16** | Pesquisa e Importação Integradas (Cadastro Único de Ativos) | `[x]` Concluída | 100% |
 | **Fase 17** | Arquitetura Unificada de Backend em Camadas por Domínio em `apps/api` (ADR 0009) | `[x]` Concluída | 100% |
 | **Fase 18** | Configuração Agêntica e Servidor MCP Pessoal (`/settings/agentic`, `/api/v1/mcp`) | `[x]` Concluída | 100% |
 | **Fase 19** | Notificações de Erros de Requisição do Worker (Badge no menu e Log detalhado em Dados de Mercado) | `[x]` Concluída | 100% |
+| **Fase 20** | Correções do Worker: brapi e Snapshots Retroativos | `[x]` Implementado | 100% |
+| **Fase 21** | Correção do Câmbio nos Formulários de Lançamento | `[x]` Implementado | 100% |
 | **Fase 22** | Importação B3: Tesouro Direto, CDB e Fracionário com Dígito | `[x]` Implementado | 100% |
 | **Fase 23** | Importação B3: Ignorar Linhas e Vendas sem Saldo | `[x]` Implementado | 100% |
 | **Fase 24** | Tributação Regressiva por Ativo e Comparador Tributado × Isento | `[x]` Implementado | 100% |
 | **Fase 25** | Confiabilidade do Checklist e Sanidade dos Dados Fundamentalistas | `[x]` Implementado | 100% |
 | **Fase 26** | Tesouro a Mercado, Agenda de Proventos e Alertas Internos | `[x]` Implementado | 100% |
 | **Fase 27** | Comparador de Ativos | `[x]` Implementado | 100% |
-| **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[ ]` Pendente | 0% |
+| **Fase 28** | Fatos Relevantes pelos Dados Abertos da CVM | `[x]` Implementado | 100% |
 | **Fase 29** | Estatísticas e Saúde da Carteira | `[x]` Implementado | 100% |
-| **Fase 33** | Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana | `[~]` Em andamento (branch `feature/simulation`) | 40% |
+| **Fase 30** | Tesouro: Rendimento Pró-Rata por Compra | `[x]` Implementado | 100% |
+| **Fase 31** | Melhorias de Interface: Início, Ajudas, Ações e Pesquisa | `[x]` Implementado | 100% |
+| **Fase 32** | Legibilidade da Saúde da Carteira e da Estratégia | `[x]` Implementado | 100% |
+| **Fase 33** | Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana | `[x]` Implementado | 100% |
+| **Fase 34** | Otimização da Composição de Ativos dentro do ARCA | `[ ]` Proposta (aguarda decisões da seção 10 do desenho) | 0% |
+| **Fase 35** | Paginação das Tabelas de Pesquisa | `[x]` Implementado | 100% |
+| **Fase 36** | Carteiras de Comparação com o Seu Fluxo de Aportes | `[ ]` Proposta (aguarda decisões da seção 11 do desenho) | 0% |
+| **Fase 37** | Leitura Empresarial: Narrativa e Padrão Visual | `[x]` Concluída | 100% |
+| **Fase 38** | Cotações Persistidas: o Worker Atualiza, as Telas Leem do Banco | `[x]` Concluída | 100% |
+| **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
+| **Fase 40** | Fatos Relevantes em Página Própria e Patrimônio por Conta no Início | `[ ]` Pendente | 0% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -165,7 +178,7 @@
 
 ---
 
-## Fase 6 — Docker Compose End-to-End, CI/CD e GitHub (`[~]` Em andamento)
+## Fase 6 — Docker Compose End-to-End, CI/CD e GitHub (`[x]` Concluída)
 
 **Objetivo:** Validar toda a solução rodando em containers com volumes isolados, configurar pipeline de integração contínua e publicar no repositório GitHub privado.
 
@@ -174,8 +187,7 @@
 - `[x]` **6.2** Pipeline `.github/workflows/ci.yml` executando lint (`ruff`, `tsc`), testes de unidade, testes de integração (com validação das migrations `script_#####`) e `docker compose build`.
 - `[x]` **6.3** **Teste de Integração End-to-End (Fase 6):** `docker compose up --build -d` validado com execução automática do `migrate` (`script_00001`), sincronização real do `worker` com o BCB SGS (CDI, SELIC, IPCA) e benchmarks, healthcheck da API (`:8000` e proxy `:8080`), resposta `200 OK` do frontend e persistência de dados nos volumes isolados `fincontrol_pgdata` e `fincontrol_redisdata` após `docker compose restart`.
 
-### Item Pendente
-- `[ ]` **6.4** Criar repositório privado `Angelicogfa/financial-control` no GitHub, realizar commits semânticos em inglês e fazer push.
+- `[x]` **6.4** Repositório privado `Angelicogfa/financial-control` no GitHub com commits semânticos em inglês e PRs mesclados na `main`. Os jobs do Actions não iniciam por falta de crédito da conta (TD-10); cada PR é validado localmente.
 
 ---
 
@@ -753,15 +765,23 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **38.5** Início: "Cotações de HH:MM" com as posições defasadas e o botão "Atualizar", que pede a rotina ao worker e recarrega quando chegam cotações novas.
 - `[x]` **38.6** Câmbio USD/BRL gravado com as posições (`USDBRL=X` em `market_data`) e fundamentos de um ativo (checklist e análise) lidos do banco.
 
-## Fase 39 — Todo Dado Exibido Sai de Tabela Própria (`[ ]` Pendente)
+## Fase 39 — Todo Dado Exibido Sai de Tabela Própria (`[x]` Concluída)
 
 **Regra (pedido do usuário):** todo dado mostrado na aplicação tem tabela de persistência, para carregamento rápido, auditoria (de onde veio, quando e o que mudou) e acesso sem depender do provedor. O worker é o único que fala com os provedores; as telas leem do banco. O que ainda sai do provedor ou do Redis:
 
-- `[ ]` **39.1** Auditoria das cotações: `market_quote_history` com uma linha por ticker e dia (último preço do dia, fonte, hora), além da última em `market_data`.
-- `[ ]` **39.2** Histórico diário de preço dos ativos (gráfico do ativo, risco da análise, saúde, comparador, simulação): hoje no Redis por 6 h; tabela própria com carga incremental pelo worker.
-- `[ ]` **39.3** Agenda de proventos declarados (B3, empresa por empresa, a cada abertura do Início): tabela de proventos anunciados atualizada pelo worker.
-- `[ ]` **39.4** Taxas anuais de CDI e IPCA usadas no relatório, nos impostos e na simulação: hoje do BCB com Redis; calcular das séries já guardadas em `market_series`.
-- `[ ]` **39.5** Indicadores do screener sobre o catálogo e cotações do comparador para tickers fora do cadastro: tabela de fundamentos do catálogo atualizada pelo worker; o comparador usa o banco e só busca ao vivo o que nunca foi gravado.
-- `[ ]` **39.6** Títulos do Tesouro na busca da Pesquisa: ler de `treasury_catalog`, já mantido pelo worker.
-- `[ ]` **39.7** Câmbio na confirmação de aporte (hoje ao vivo): usar o gravado, com a hora da cotação registrada no lançamento.
+- `[x]` **39.1** Auditoria das cotações: `market_quote_history` (migração `script_00027`) guarda o último preço de cada ticker por dia, com provedor, situação e hora, a cada gravação em `market_data`; `GET /api/v1/market/quotes/{ticker}/history` e MCP `market.quote_history`.
+- `[x]` **39.2** Histórico diário de preço em `asset_price_history` (chave ticker + dia): a rotina `sync_price_history` (dias úteis após o catálogo, na partida e sob pedido) carrega o histórico inteiro uma vez e depois o último mês; gráfico do ativo, risco da análise, saúde e comparador leem da tabela.
+- `[x]` **39.3** Proventos declarados em `market_data`: a rotina `refresh_distributions` (a cada `DISTRIBUTIONS_REFRESH_HOURS`, na partida e sob pedido) grava o que a B3 publica, sem apagar o que já estava quando o provedor responde vazio; agenda do Início, importação B3 e MCP leem do banco.
+- `[x]` **39.4** CDI e IPCA anuais calculados das séries de `market_series` (mesma conta do provedor, `domain/market/services/macro.py`) no relatório, na análise, na saúde, nos impostos e na simulação; o BCB só é chamado sem séries.
+- `[x]` **39.5** Indicadores do catálogo em `market_data` pela rotina `refresh_catalog_fundamentals` (dias úteis, uma hora após o catálogo); screener e comparador leem do banco e gravam o que buscarem de um ticker nunca visto.
+- `[x]` **39.6** Títulos do Tesouro na busca da Pesquisa já liam de `treasury_catalog` (o provedor só preenche a tabela vazia, uma vez).
+- `[x]` **39.7** Câmbio na confirmação de aporte lido de `market_data` (`USDBRL=X`, atualizado com as posições a cada 5 min).
+- `[x]` **39.8** Proteção das buscas ao vivo que restam (ticker nunca gravado): no máximo 25 por requisição e nunca para ativo arquivado.
+
+## Fase 40 — Fatos Relevantes em Página Própria e Patrimônio por Conta no Início (`[ ]` Pendente)
+
+**Objetivo (pedido do usuário):** tirar do Início o que tem tela própria e mostrar onde está o dinheiro.
+
+- `[ ]` **40.1** Fatos relevantes e comunicados da CVM numa página dedicada, no menu logo abaixo de Saúde da carteira; o Início deixa de ter o cartão de comunicados (o alerta de fato relevante continua levando à página).
+- `[ ]` **40.2** Início: patrimônio por conta de custódia, cada conta separada em Bolsa (Caixa, Ações e Real Estate) e Internacional, com valor, peso e alta ou queda sobre o investido.
 

@@ -51,6 +51,7 @@ from controllers.ledger.responses import (
 )
 from controllers.market.responses import (
     JobRunDTO,
+    QuoteDayDTO,
     QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
@@ -114,6 +115,7 @@ from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
 from domain.simulation.entities import SimulationKind
 from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
+from infra.providers.stored import distribution_lookup
 
 OperationKind = Literal["query", "command"]
 
@@ -169,7 +171,20 @@ class DisclosureListInput(BaseModel):
 
 
 class JobRequestInput(BaseModel):
-    job_name: Literal["sync_simulation_history", "sync_cvm_documents", "warm_portfolio_quotes"]
+    job_name: Literal[
+        "sync_simulation_history",
+        "sync_cvm_documents",
+        "warm_portfolio_quotes",
+        "sync_price_history",
+        "refresh_distributions",
+        "refresh_catalog_fundamentals",
+    ]
+
+
+class QuoteHistoryInput(BaseModel):
+    ticker: str
+    date_from: date | None = None
+    date_to: date | None = None
 
 
 class CalibrationInput(BaseModel):
@@ -427,12 +442,9 @@ class AgenticRuntimeHandlers:
 
     @property
     def imports(self) -> ImportHandler:
-        gateway = self.portfolio_service.gateway
         return ImportHandler(
             uow_factory=self.uow_factory,
-            distributions=lambda ticker, asset_type: gateway.get_distributions(
-                ticker, asset_type=asset_type
-            ),
+            distributions=distribution_lookup(self.uow_factory, self.portfolio_service.gateway),
         )
 
     @property
@@ -1078,6 +1090,19 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, _p: h.market.quote_status(),
     ),
     OperationSpec(
+        name="market.quote_history",
+        kind="query",
+        description=(
+            "Histórico de auditoria das cotações guardadas de um ticker: o último preço de cada "
+            "dia, de qual provedor veio e quando foi buscado."
+        ),
+        input_model=QuoteHistoryInput,
+        output_type=list[QuoteDayDTO],
+        invoke=lambda h, p: h.market.quote_history(
+            p.ticker, date_from=p.date_from, date_to=p.date_to
+        ),
+    ),
+    OperationSpec(
         name="market.job_runs",
         kind="query",
         description="Lista as execuções recentes dos jobs em segundo plano de dados de mercado.",
@@ -1091,8 +1116,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         description=(
             "Pede ao worker que rode agora uma rotina que aceita disparo manual: "
             "`sync_simulation_history` (histórico longo da simulação), `sync_cvm_documents` "
-            "(fatos relevantes e comunicados da CVM) ou `warm_portfolio_quotes` (cotações das "
-            "posições). O worker atende em até 15 s; acompanhe "
+            "(fatos relevantes e comunicados da CVM), `warm_portfolio_quotes` (cotações das "
+            "posições), `sync_price_history` (histórico de preços), `refresh_distributions` "
+            "(proventos declarados) ou `refresh_catalog_fundamentals` (indicadores do "
+            "screener). O worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),
         input_model=JobRequestInput,

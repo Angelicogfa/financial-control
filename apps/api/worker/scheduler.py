@@ -23,12 +23,15 @@ from worker.jobs import (
     has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
+    refresh_catalog_fundamentals_job,
+    refresh_distributions_job,
     refresh_fundamentals_job,
     refresh_watchlist_quotes_job,
     run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_cvm_documents_job,
     sync_instrument_catalog_job,
+    sync_price_history_job,
     sync_simulation_history_job,
     sync_treasury_catalog_job,
     sync_treasury_prices_job,
@@ -73,6 +76,13 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         "sync_cvm_documents": sync_cvm_documents_job,
         "warm_portfolio_quotes": partial(
             warm_portfolio_quotes_job, max_workers=cfg.market_fetch_workers
+        ),
+        "sync_price_history": partial(sync_price_history_job, max_workers=cfg.market_fetch_workers),
+        "refresh_distributions": partial(
+            refresh_distributions_job, max_workers=cfg.market_fetch_workers
+        ),
+        "refresh_catalog_fundamentals": partial(
+            refresh_catalog_fundamentals_job, max_workers=cfg.market_fetch_workers
         ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
@@ -172,6 +182,43 @@ def create_scheduler(
         hour=cfg.catalog_sync_cron_hour,
         minute=0,
         id="sync_instrument_catalog",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "sync_price_history",
+            partial(sync_price_history_job, max_workers=cfg.market_fetch_workers),
+        ),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=cfg.catalog_sync_cron_hour,
+        minute=30,
+        id="sync_price_history",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "refresh_catalog_fundamentals",
+            partial(refresh_catalog_fundamentals_job, max_workers=cfg.market_fetch_workers),
+        ),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=(cfg.catalog_sync_cron_hour + 1) % 24,
+        minute=0,
+        id="refresh_catalog_fundamentals",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "refresh_distributions",
+            partial(refresh_distributions_job, max_workers=cfg.market_fetch_workers),
+        ),
+        trigger="interval",
+        hours=cfg.distributions_refresh_hours,
+        id="refresh_distributions",
         replace_existing=True,
         **defaults,
     )
@@ -293,6 +340,14 @@ def run_startup_jobs(
             partial(warm_portfolio_quotes_job, max_workers=settings.market_fetch_workers),
         ),
         ("sync_bcb_and_benchmarks", sync_bcb_and_benchmarks_job),
+        (
+            "refresh_distributions",
+            partial(refresh_distributions_job, max_workers=settings.market_fetch_workers),
+        ),
+        (
+            "sync_price_history",
+            partial(sync_price_history_job, max_workers=settings.market_fetch_workers),
+        ),
         ("sync_treasury_catalog", sync_treasury_catalog_job),
         ("sync_treasury_prices", sync_treasury_prices_job),
         ("backfill_snapshots", backfill_snapshots_job),

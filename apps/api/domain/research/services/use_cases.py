@@ -44,8 +44,7 @@ from domain.shared.enums import (
     Market,
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
-from infra.providers.batch import fetch_histories, fetch_market_data
-from infra.providers.stored import stored_market_data
+from infra.providers.stored import stored_histories, stored_market_data
 
 logger = logging.getLogger("fincontrol_api.research")
 
@@ -80,11 +79,14 @@ class ResearchHandler:
             outcome = screen(
                 catalog,
                 criteria,
-                load_fundamentals=self.portfolio_service.catalog_fundamentals,
+                load_fundamentals=lambda items: self.portfolio_service.catalog_fundamentals(
+                    uow, items
+                ),
                 registered=registered,
                 lifecycles=lifecycles,
                 valuation_policy=self.portfolio_service.load_policy(uow).valuation,
             )
+            uow.commit()  # indicators fetched for never-stored instruments
         return ScreenerResponseDTO(
             results=[to_screener_item_dto(r) for r in outcome.results],
             total=outcome.matched,
@@ -237,15 +239,19 @@ class ResearchHandler:
             if self._fetch_statements(uow, missing):
                 uow.commit()
                 stored = uow.fundamentals.list_for_many(wanted)
-            market = fetch_market_data(
+            market = stored_market_data(
+                uow,
                 service.gateway,
                 assets,
                 max_workers=service.fetch_workers,
                 timeout_seconds=service.fetch_timeout_seconds,
+                persist=True,
             )
-            prices = fetch_histories(
+            prices = stored_histories(
+                uow,
                 service.gateway,
                 assets,
+                persist=True,
                 range_period=COMPARISON_HISTORY_RANGE,
                 max_workers=service.fetch_workers,
                 timeout_seconds=service.fetch_timeout_seconds,

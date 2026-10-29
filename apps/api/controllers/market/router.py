@@ -5,11 +5,14 @@ Scope: market data jobs and series freshness.
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from controllers.market.dependencies import get_market_data_handler
 from controllers.market.responses import (
     JobRunDTO,
+    QuoteDayDTO,
     QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
@@ -45,6 +48,17 @@ def get_quote_status(
 ) -> QuoteStatusDTO:
     """How old the stored quotes of the holdings are (refresh: job `warm_portfolio_quotes`)."""
     return handler.quote_status()
+
+
+@market_router.get("/quotes/{ticker}/history", response_model=list[QuoteDayDTO])
+def get_quote_history(
+    ticker: str,
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    handler: MarketDataHandler = Depends(get_market_data_handler),
+) -> list[QuoteDayDTO]:
+    """The last stored quote of each day for a ticker (audit of the prices shown)."""
+    return handler.quote_history(ticker, date_from=date_from, date_to=date_to)
 
 
 @market_router.get("/series-status", response_model=list[SeriesStatusDTO])

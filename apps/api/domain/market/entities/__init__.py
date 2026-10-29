@@ -138,6 +138,34 @@ class StoredMarketData:
     quote_fetched_at: datetime | None = None
     fundamentals: Fundamentals | None = None
     fundamentals_fetched_at: datetime | None = None
+    # Phase 39: declared distributions and when the full price history was first loaded.
+    distributions: AnnouncedDistributions | None = None
+    distributions_fetched_at: datetime | None = None
+    history_loaded_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class QuoteDay:
+    """The last quote of a ticker on a day, kept for audit (Phase 39.1)."""
+
+    ticker: str
+    day: date
+    price: float
+    currency: str
+    provider: str | None
+    freshness: str
+    fetched_at: datetime
+
+
+def distributions_to_dict(value: AnnouncedDistributions) -> dict[str, Any]:
+    return {"cash": [i.to_dict() for i in value.cash], "stock": [i.to_dict() for i in value.stock]}
+
+
+def distributions_from_dict(data: dict[str, Any]) -> AnnouncedDistributions:
+    return AnnouncedDistributions(
+        cash=[AnnouncedEarning.from_dict(i) for i in data.get("cash", [])],
+        stock=[AnnouncedStockEvent.from_dict(i) for i in data.get("stock", [])],
+    )
 
 
 def financial_volume(volume_shares: float | None, price: float | None) -> float | None:

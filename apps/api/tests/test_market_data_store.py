@@ -97,9 +97,10 @@ def test_screens_read_the_database_and_go_live_only_for_never_stored(
     assert market.quotes["WEGE3"].price == 48.0
     assert market.quotes["WEGE3"].freshness == QuoteFreshness.CACHED
     assert market.quotes["ITUB4"].price == 30.0
-    # Only the ticker without a stored row reached the provider.
+    # Only what was never stored reached the provider: ITUB4's quote, and the fundamentals of
+    # both (WEGE3 has a stored quote but never had its indicators stored).
     assert provider.quotes == ["ITUB4"]
-    assert provider.fundamentals == ["ITUB4"]
+    assert sorted(provider.fundamentals) == ["ITUB4", "WEGE3"]
 
 
 def test_worker_stores_holdings_and_watchlist_on_their_own_jobs(

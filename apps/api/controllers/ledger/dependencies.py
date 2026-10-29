@@ -15,6 +15,7 @@ from domain.ledger.services.use_cases.corporate_events import CorporateEventHand
 from domain.ledger.services.use_cases.earnings import EarningHandler
 from domain.ledger.services.use_cases.transactions import TransactionHandler
 from domain.portfolio.services.service import PortfolioApplicationService
+from infra.providers.stored import distribution_lookup
 
 
 def get_import_handler(
@@ -22,12 +23,9 @@ def get_import_handler(
     portfolio_service: PortfolioApplicationService = Depends(get_portfolio_service),
 ) -> ImportHandler:
     """Provide the ImportHandler instance (declared distributions fix imported ex dates)."""
-    gateway = portfolio_service.gateway
     return ImportHandler(
         uow_factory=uow_factory,
-        distributions=lambda ticker, asset_type: gateway.get_distributions(
-            ticker, asset_type=asset_type
-        ),
+        distributions=distribution_lookup(uow_factory, portfolio_service.gateway),
     )
 
 

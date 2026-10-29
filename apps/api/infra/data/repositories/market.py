@@ -12,8 +12,20 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from domain.assets.services.history import FundamentalPeriod, FundamentalSnapshot
-from domain.market.entities import Fundamentals, Quote, StoredMarketData, TreasuryBond
-from domain.market.repositories import AbstractMarketDataRepository
+from domain.market.entities import (
+    AnnouncedDistributions,
+    Fundamentals,
+    PricePoint,
+    Quote,
+    QuoteDay,
+    StoredMarketData,
+    TreasuryBond,
+    distributions_to_dict,
+)
+from domain.market.repositories import (
+    AbstractMarketDataRepository,
+    AbstractPriceHistoryRepository,
+)
 from domain.shared.entities import (
     CatalogInstrument,
     MarketSeriesPoint,
@@ -29,13 +41,17 @@ from infra.data.mappers.market import (
     to_catalog_instrument,
     to_fundamental_snapshot,
     to_market_series_point,
+    to_price_point,
+    to_quote_day,
     to_stored_market_data,
     to_treasury_bond,
 )
 from infra.data.models.market import (
+    AssetPriceHistoryModel,
     FundamentalSnapshotModel,
     InstrumentCatalogModel,
     MarketDataModel,
+    MarketQuoteHistoryModel,
     MarketSeriesModel,
     TreasuryCatalogModel,
 )
@@ -288,8 +304,70 @@ class SqlAlchemyMarketDataRepository(AbstractMarketDataRepository):
             rows[ticker].quote = quote.to_dict()
             rows[ticker].quote_fetched_at = fetched_at
             rows[ticker].updated_at = fetched_at
+        self._record_days(normalized, fetched_at)
         self.session.flush()
         return len(normalized)
+
+    def _record_days(self, quotes: Mapping[str, Quote], fetched_at: datetime) -> None:
+        """Keep the last quote of each ticker per day (audit trail, Phase 39.1)."""
+        day = fetched_at.date()
+        existing = {
+            row.ticker: row
+            for row in self.session.scalars(
+                select(MarketQuoteHistoryModel).where(
+                    MarketQuoteHistoryModel.day == day,
+                    MarketQuoteHistoryModel.ticker.in_(set(quotes)),
+                )
+            )
+        }
+        for ticker, quote in quotes.items():
+            row = existing.get(ticker)
+            if row is None:
+                row = MarketQuoteHistoryModel(ticker=ticker, day=day)
+                self.session.add(row)
+            row.price = quote.price
+            row.currency = quote.currency
+            row.provider = quote.provider
+            row.freshness = quote.freshness.value
+            row.fetched_at = fetched_at
+
+    def save_distributions(
+        self, distributions: Mapping[str, AnnouncedDistributions], *, fetched_at: datetime
+    ) -> int:
+        if not distributions:
+            return 0
+        normalized = {t.strip().upper(): d for t, d in distributions.items()}
+        rows = self._rows(normalized)
+        for ticker, value in normalized.items():
+            rows[ticker].distributions = distributions_to_dict(value)
+            rows[ticker].distributions_fetched_at = fetched_at
+            rows[ticker].updated_at = fetched_at
+        self.session.flush()
+        return len(normalized)
+
+    def mark_history_loaded(self, tickers: Iterable[str], *, loaded_at: datetime) -> None:
+        normalized = {t.strip().upper() for t in tickers}
+        if not normalized:
+            return
+        for row in self._rows(normalized).values():
+            row.history_loaded_at = loaded_at
+            row.updated_at = loaded_at
+        self.session.flush()
+
+    def quote_history(
+        self, ticker: str, *, date_from: date | None = None, date_to: date | None = None
+    ) -> list[QuoteDay]:
+        stmt = select(MarketQuoteHistoryModel).where(
+            MarketQuoteHistoryModel.ticker == ticker.strip().upper()
+        )
+        if date_from is not None:
+            stmt = stmt.where(MarketQuoteHistoryModel.day >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(MarketQuoteHistoryModel.day <= date_to)
+        return [
+            to_quote_day(m)
+            for m in self.session.scalars(stmt.order_by(MarketQuoteHistoryModel.day))
+        ]
 
     def save_fundamentals(
         self, fundamentals: Mapping[str, Fundamentals], *, fetched_at: datetime
@@ -304,3 +382,67 @@ class SqlAlchemyMarketDataRepository(AbstractMarketDataRepository):
             rows[ticker].updated_at = fetched_at
         self.session.flush()
         return len(normalized)
+
+
+class SqlAlchemyPriceHistoryRepository(AbstractPriceHistoryRepository):
+    """SQLAlchemy implementation of AbstractPriceHistoryRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def upsert(self, ticker: str, points: Iterable[PricePoint], *, fetched_at: datetime) -> int:
+        normalized = ticker.strip().upper()
+        by_day = {p.date: p for p in points}
+        if not by_day:
+            return 0
+        existing = {
+            row.day: row
+            for row in self.session.scalars(
+                select(AssetPriceHistoryModel).where(
+                    AssetPriceHistoryModel.ticker == normalized,
+                    AssetPriceHistoryModel.day >= min(by_day),
+                    AssetPriceHistoryModel.day <= max(by_day),
+                )
+            )
+        }
+        for day, point in by_day.items():
+            row = existing.get(day)
+            if row is None:
+                row = AssetPriceHistoryModel(ticker=normalized, day=day)
+                self.session.add(row)
+            row.close = point.close
+            row.open = point.open
+            row.high = point.high
+            row.low = point.low
+            row.adj_close = point.adj_close
+            row.volume = point.volume
+            row.fetched_at = fetched_at
+        self.session.flush()
+        return len(by_day)
+
+    def list_for_many(
+        self, tickers: Iterable[str], *, date_from: date | None = None
+    ) -> dict[str, list[PricePoint]]:
+        wanted = {t.strip().upper() for t in tickers}
+        if not wanted:
+            return {}
+        stmt = select(AssetPriceHistoryModel).where(AssetPriceHistoryModel.ticker.in_(wanted))
+        if date_from is not None:
+            stmt = stmt.where(AssetPriceHistoryModel.day >= date_from)
+        found: dict[str, list[PricePoint]] = {}
+        for row in self.session.scalars(
+            stmt.order_by(AssetPriceHistoryModel.ticker, AssetPriceHistoryModel.day)
+        ):
+            found.setdefault(row.ticker, []).append(to_price_point(row))
+        return found
+
+    def last_dates(self, tickers: Iterable[str]) -> dict[str, date]:
+        wanted = {t.strip().upper() for t in tickers}
+        if not wanted:
+            return {}
+        rows = self.session.execute(
+            select(AssetPriceHistoryModel.ticker, func.max(AssetPriceHistoryModel.day))
+            .where(AssetPriceHistoryModel.ticker.in_(wanted))
+            .group_by(AssetPriceHistoryModel.ticker)
+        )
+        return {ticker: last for ticker, last in rows}
