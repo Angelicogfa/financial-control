@@ -28,6 +28,7 @@ from controllers.simulation.responses import (
     SimulationRunDetailDTO,
     SimulationRunDTO,
     VariantDTO,
+    VariantValidationDTO,
     WindowOutcomeDTO,
 )
 from core.errors import NotFoundError, ValidationError
@@ -52,10 +53,12 @@ from domain.simulation.candidates import (
     CandidateSource,
 )
 from domain.simulation.data import (
+    CDI_KEY,
     SIMULATION_HISTORY_START,
     coverage_report,
     simulation_universe,
 )
+from domain.simulation.engine import BacktestPoint
 from domain.simulation.entities import SimulationKind, SimulationResult, SimulationRun
 from domain.simulation.robustness import (
     HISTORICAL_CRISES,
@@ -68,9 +71,11 @@ from domain.simulation.robustness import (
     points_from_stored,
     rule_variants,
     sample_warnings,
+    variant_validation,
     window_outcome,
 )
 from domain.simulation.runs import (
+    BENCHMARK_PREFIX,
     CALIBRATION_KEY,
     PROJECTION_PREFIX,
     STRATEGY_KEY,
@@ -534,6 +539,43 @@ def build_robustness(
         trials_in_run=len(variants),
         trials_total=trials_total,
         warnings=sample_warnings(strategy, crisis_outcomes(strategy)) if strategy else [],
+        validation=_variant_validation(results, points, variants, trials_total, run.seed),
+    )
+
+
+def _variant_validation(
+    results: list[SimulationResult],
+    points: dict[str, list[BacktestPoint]],
+    variants: list[VariantDTO],
+    trials_total: int,
+    seed: int,
+) -> VariantValidationDTO | None:
+    report = variant_validation(
+        points,
+        [v.key for v in variants],
+        reference_key=STRATEGY_KEY,
+        cdi_key=f"{BENCHMARK_PREFIX}{CDI_KEY}",
+        trials_total=trials_total,
+        seed=seed,
+    )
+    if report is None:
+        return None
+    labels = {r.key: r.label for r in results}
+    months = 12**0.5
+    return VariantValidationDTO(
+        best=report.best,
+        best_label=labels.get(report.best, report.best),
+        best_sharpe_annual=report.best_sharpe_annual,
+        expected_max_sharpe_annual=round(report.deflated.expected_max * months, 4),
+        deflated_probability=report.deflated.probability,
+        trials=report.deflated.trials,
+        observations=report.deflated.observations,
+        pbo=report.overfitting.pbo if report.overfitting else None,
+        pbo_combinations=report.overfitting.combinations if report.overfitting else 0,
+        gate_probability=report.gate.probability if report.gate else None,
+        passed=report.passed,
+        verdict=report.verdict.replace(report.best, labels.get(report.best, report.best)),
+        notes=report.notes,
     )
 
 

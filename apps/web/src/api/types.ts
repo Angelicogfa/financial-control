@@ -1508,6 +1508,7 @@ export interface RobustnessDTO {
   trials_in_run?: number;
   trials_total?: number;
   warnings?: string[];
+  validation?: VariantValidationDTO | null;
 }
 
 export interface RollingPointDTO {
@@ -1872,6 +1873,22 @@ export interface VariantDTO {
   summary: BacktestSummaryDTO;
   selection: WindowOutcomeDTO;
   holdout: WindowOutcomeDTO;
+}
+
+export interface VariantValidationDTO {
+  best: string;
+  best_label: string;
+  best_sharpe_annual: number;
+  expected_max_sharpe_annual: number;
+  deflated_probability: number;
+  trials: number;
+  observations: number;
+  pbo?: number | null;
+  pbo_combinations?: number;
+  gate_probability?: number | null;
+  passed: boolean;
+  verdict: string;
+  notes?: string[];
 }
 
 export interface WatchlistAddRequest {

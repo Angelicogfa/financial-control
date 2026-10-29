@@ -148,6 +148,24 @@ class DistributionDTO(BaseModel):
     maximum: float | None = None
 
 
+class VariantValidationDTO(BaseModel):
+    """Phase 33.8: is the best rule variant better for real, or the luckiest of the trials?"""
+
+    best: str
+    best_label: str
+    best_sharpe_annual: float
+    expected_max_sharpe_annual: float
+    deflated_probability: float
+    trials: int
+    observations: int
+    pbo: float | None = None
+    pbo_combinations: int = 0
+    gate_probability: float | None = None
+    passed: bool
+    verdict: str
+    notes: list[str] = Field(default_factory=list)
+
+
 class RobustnessDTO(BaseModel):
     run_id: int
     status: SimulationStatus
@@ -164,6 +182,7 @@ class RobustnessDTO(BaseModel):
     trials_in_run: int = 0
     trials_total: int = 0
     warnings: list[str] = Field(default_factory=list)
+    validation: VariantValidationDTO | None = None
 
 
 class PercentilesDTO(BaseModel):

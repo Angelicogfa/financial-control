@@ -59,6 +59,7 @@ def test_the_worker_turns_the_request_into_the_run(api: SimpleNamespace) -> None
     assert _requested(api) == []
     latest = api.client.get("/api/v1/market/job-runs").json()
     assert [(j["job_name"], j["status"]) for j in latest] == [(NAME, "SUCCESS")]
+
     def instant(raw: str) -> datetime:  # the same time may come with or without "Z"
         return datetime.fromisoformat(raw.rstrip("Z")).replace(tzinfo=None)
 

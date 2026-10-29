@@ -20,6 +20,7 @@ import type {
   SimulationRunDetailDTO,
   SimulationRunDTO,
   SimulationStatus,
+  VariantValidationDTO,
   WindowOutcomeDTO,
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
@@ -659,7 +660,60 @@ export function RobustnessView({ data }: Readonly<{ data: RobustnessDTO }>) {
           </>
         )}
       </section>
+      {data.validation && <VariantValidation validation={data.validation} />}
     </div>
+  );
+}
+
+/** Phase 33.8: the best rule variant against the luck of the trials. */
+function VariantValidation({ validation }: Readonly<{ validation: VariantValidationDTO }>) {
+  return (
+    <section className="app-card app-card-padded" aria-label="Validação estatística">
+      <div className="health-pillar-head">
+        <h2 className="app-card-heading">Validação estatística da melhor variante</h2>
+        <Badge tone={validation.passed ? "success" : "warning"}>
+          {validation.passed ? "Passou nos três testes" : "Sem evidência"}
+        </Badge>
+      </div>
+      <p>{validation.verdict}</p>
+      <dl className="simulation-validation">
+        <div>
+          <dt>Melhor variante</dt>
+          <dd>{validation.best_label}</dd>
+        </div>
+        <div>
+          <dt>Sharpe a.a. (sobre o CDI)</dt>
+          <dd>
+            {num(validation.best_sharpe_annual, 2)}{" "}
+            <span className="app-muted">contra {num(validation.expected_max_sharpe_annual, 2)} esperado do acaso</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Sharpe deflacionado</dt>
+          <dd>
+            {pct(validation.deflated_probability, 0)} <span className="app-muted">({validation.trials} tentativas, ≥ 95% para passar)</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Probabilidade de ajuste ao ruído (PBO)</dt>
+          <dd>
+            {validation.pbo == null ? "—" : pct(validation.pbo, 0)}{" "}
+            <span className="app-muted">(abaixo de 50% para passar; {validation.pbo_combinations} divisões)</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Chance de superar a regra atual</dt>
+          <dd>
+            {validation.gate_probability == null ? "—" : pct(validation.gate_probability, 0)}{" "}
+            <span className="app-muted">(≥ 95% para passar)</span>
+          </dd>
+        </div>
+      </dl>
+      <p className="app-card-hint">
+        Todas as variantes testadas até hoje entram na conta: quanto mais tentativas, maior o Sharpe que o acaso sozinho
+        produziria. Retornos mensais sem os aportes, acima do CDI, em {validation.observations} meses.
+      </p>
+    </section>
   );
 }
 
