@@ -66,6 +66,12 @@ import type {
   SimulationRunDetailDTO,
   SimulationRunDTO,
   SnapshotPointDTO,
+  StudyComparisonDTO,
+  StudyDTO,
+  StudyRequest,
+  StudySummaryDTO,
+  StudyVariationRequest,
+  StudyVersionDTO,
   TaxRuleDTO,
   TransactionCreateRequest,
   TransactionResponseDTO,
@@ -198,6 +204,17 @@ export const api = {
       request<SimulationRunDTO>("/simulations/candidates", { method: "POST", body }),
     submitProjection: (body: ProjectionRequest) =>
       request<SimulationRunDTO>("/simulations/projections", { method: "POST", body }),
+  },
+  studies: {
+    list: (limit = 50) => request<StudySummaryDTO[]>("/studies", { query: { limit } }),
+    get: (id: number) => request<StudyDTO>(`/studies/${id}`),
+    create: (body: StudyRequest) => request<StudyDTO>("/studies", { method: "POST", body }),
+    refresh: (id: number) => request<StudyDTO>(`/studies/${id}/refresh`, { method: "POST" }),
+    variation: (id: number, body: StudyVariationRequest) =>
+      request<StudyDTO>(`/studies/${id}/variations`, { method: "POST", body }),
+    versions: (id: number) => request<StudyVersionDTO[]>(`/studies/${id}/versions`),
+    compare: (a: number, b: number) => request<StudyComparisonDTO>("/studies/compare", { query: { a, b } }),
+    remove: (id: number) => request<void>(`/studies/${id}`, { method: "DELETE" }),
   },
   tax: {
     rules: () => request<TaxRuleDTO[]>("/tax/rules"),

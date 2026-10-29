@@ -26,7 +26,11 @@ import { DisclosuresPage } from "./pages/disclosures/DisclosuresPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
 import { AssetComparePage } from "./pages/tools/AssetComparePage";
 import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
-import { SimulationPage } from "./pages/tools/SimulationPage";
+import { CompareStudiesPage } from "./pages/simulation/CompareStudiesPage";
+import { NewStudyPage } from "./pages/simulation/NewStudyPage";
+import { QualityPage } from "./pages/simulation/QualityPage";
+import { StudiesPage } from "./pages/simulation/StudiesPage";
+import { StudyPage } from "./pages/simulation/StudyPage";
 import { StrategyPage } from "./pages/settings/StrategyPage";
 
 export function AppRoutes() {
@@ -53,7 +57,11 @@ export function AppRoutes() {
       <Route path="/ledger/events/new" element={<EventFormPage />} />
       <Route path="/tools/fixed-income" element={<FixedIncomeComparePage />} />
       <Route path="/tools/compare" element={<AssetComparePage />} />
-      <Route path="/tools/simulation" element={<SimulationPage />} />
+      <Route path="/tools/simulation" element={<StudiesPage />} />
+      <Route path="/tools/simulation/new" element={<NewStudyPage />} />
+      <Route path="/tools/simulation/compare" element={<CompareStudiesPage />} />
+      <Route path="/tools/simulation/quality" element={<QualityPage />} />
+      <Route path="/tools/simulation/:studyId" element={<StudyPage />} />
       <Route path="/settings/strategy" element={<StrategyPage />} />
       <Route path="/settings/accounts" element={<AccountsPage />} />
       <Route path="/settings/market-data" element={<MarketDataPage />} />

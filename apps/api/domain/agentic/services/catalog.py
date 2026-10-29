@@ -81,7 +81,13 @@ from controllers.research.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
+from controllers.simulation.requests import (
+    BacktestRequest,
+    CandidatesRequest,
+    ProjectionRequest,
+    StudyRequest,
+    StudyVariationRequest,
+)
 from controllers.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
@@ -91,6 +97,9 @@ from controllers.simulation.responses import (
     RobustnessDTO,
     SimulationRunDetailDTO,
     SimulationRunDTO,
+    StudyComparisonDTO,
+    StudyDTO,
+    StudySummaryDTO,
 )
 from controllers.tax.requests import FixedIncomeCompareRequest
 from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
@@ -114,6 +123,7 @@ from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
 from domain.simulation.entities import SimulationKind
+from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
 from infra.providers.stored import distribution_lookup
@@ -186,6 +196,25 @@ class QuoteHistoryInput(BaseModel):
     ticker: str
     date_from: date | None = None
     date_to: date | None = None
+
+
+class StudyIdInput(BaseModel):
+    study_id: int
+
+
+class StudyListInput(BaseModel):
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class StudyVariationInput(BaseModel):
+    study_id: int
+    changes: dict[str, Any]
+    label: str | None = None
+
+
+class StudyCompareInput(BaseModel):
+    a: int
+    b: int
 
 
 class CalibrationInput(BaseModel):
@@ -471,6 +500,10 @@ class AgenticRuntimeHandlers:
         return SimulationHandler(
             uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
         )
+
+    @property
+    def studies(self) -> StudyHandler:
+        return StudyHandler(uow_factory=self.uow_factory, simulations=self.simulation)
 
     @property
     def disclosures(self) -> DisclosureHandler:
@@ -1363,6 +1396,76 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=SimulationListInput,
         output_type=list[SimulationRunDTO],
         invoke=lambda h, p: h.simulation.list_runs(p.limit, p.kind),
+    ),
+    OperationSpec(
+        name="study.list",
+        kind="query",
+        description=(
+            "Estudos de Simular carteira, mais recentes primeiro: pergunta, situação, a frase "
+            "principal e a chance da meta (com a variação desde a versão anterior)."
+        ),
+        input_model=StudyListInput,
+        output_type=list[StudySummaryDTO],
+        invoke=lambda h, p: h.studies.list(p.limit),
+    ),
+    OperationSpec(
+        name="study.get",
+        kind="query",
+        description=(
+            "Um estudo: premissas, capítulos (De onde viemos, Para onde vamos, O que pode "
+            "melhorar) com resumo e selo 'quanto confiar', a conclusão e os próximos passos."
+        ),
+        input_model=StudyIdInput,
+        output_type=StudyDTO,
+        invoke=lambda h, p: h.studies.get(p.study_id),
+    ),
+    OperationSpec(
+        name="study.create",
+        kind="command",
+        description=(
+            "Cria um estudo e põe os capítulos na fila do worker: question COMPLETE (1, 2 e 3), "
+            "PAST, GOAL ou IMPROVE; premissas únicas (aporte, horizonte, meta, passado, regras)."
+        ),
+        input_model=StudyRequest,
+        output_type=StudyDTO,
+        invoke=lambda h, p: h.studies.create(p),
+    ),
+    OperationSpec(
+        name="study.refresh",
+        kind="command",
+        description="Refaz um estudo com os dados de hoje: uma versão nova; a anterior fica.",
+        input_model=StudyIdInput,
+        output_type=StudyDTO,
+        invoke=lambda h, p: h.studies.refresh(p.study_id),
+    ),
+    OperationSpec(
+        name="study.variation",
+        kind="command",
+        description=(
+            'Copia um estudo mudando premissas (por exemplo {"monthly_contribution": 1800}) '
+            "para comparar com o original."
+        ),
+        input_model=StudyVariationInput,
+        output_type=StudyDTO,
+        invoke=lambda h, p: h.studies.variation(
+            p.study_id, StudyVariationRequest(changes=p.changes, label=p.label)
+        ),
+    ),
+    OperationSpec(
+        name="study.compare",
+        kind="query",
+        description="Compara dois estudos capítulo por capítulo, com as premissas que diferem.",
+        input_model=StudyCompareInput,
+        output_type=StudyComparisonDTO,
+        invoke=lambda h, p: h.studies.compare(p.a, p.b),
+    ),
+    OperationSpec(
+        name="study.delete",
+        kind="command",
+        description="Exclui um estudo e as rodadas dele de vez (exclusão lógica, sem recuperação).",
+        input_model=StudyIdInput,
+        output_type=OperationStatusDTO,
+        invoke=lambda h, p: (h.studies.delete(p.study_id), OperationStatusDTO())[1],
     ),
     OperationSpec(
         name="simulation.delete",

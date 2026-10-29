@@ -15,15 +15,25 @@ from domain.simulation.entities import (
     SimulationResult,
     SimulationRun,
     SimulationStatus,
+    SimulationStudy,
 )
-from domain.simulation.repositories import AbstractSimulationRepository
+from domain.simulation.repositories import (
+    AbstractSimulationRepository,
+    AbstractSimulationStudyRepository,
+)
 from infra.data.mappers.simulation import (
     apply_simulation_run,
+    apply_simulation_study,
     to_simulation_result,
     to_simulation_result_model,
     to_simulation_run,
+    to_simulation_study,
 )
-from infra.data.models.simulation import SimulationResultModel, SimulationRunModel
+from infra.data.models.simulation import (
+    SimulationResultModel,
+    SimulationRunModel,
+    SimulationStudyModel,
+)
 
 
 class SqlAlchemySimulationRepository(AbstractSimulationRepository):
@@ -53,6 +63,25 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
         if model is None or model.deleted_at is not None:
             return None
         return to_simulation_run(model)
+
+    def attach(self, run_id: int, *, study_id: int, chapter: str) -> None:
+        model = self.session.get(SimulationRunModel, run_id)
+        if model is None:
+            raise ValueError(f"Simulation run {run_id} not found.")
+        model.study_id = study_id
+        model.chapter = chapter
+        self.session.flush()
+
+    def list_for_study(self, study_id: int) -> list[SimulationRun]:
+        stmt = (
+            select(SimulationRunModel)
+            .where(
+                SimulationRunModel.study_id == study_id,
+                SimulationRunModel.deleted_at.is_(None),
+            )
+            .order_by(SimulationRunModel.id.asc())
+        )
+        return [to_simulation_run(m) for m in self.session.scalars(stmt).all()]
 
     def mark_deleted(self, run_id: int, *, deleted_at: datetime) -> bool:
         model = self.session.get(SimulationRunModel, run_id)
@@ -133,3 +162,67 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
             )
         )
         return int(self.session.scalar(stmt) or 0)
+
+
+class SqlAlchemySimulationStudyRepository(AbstractSimulationStudyRepository):
+    """SQLAlchemy implementation of AbstractSimulationStudyRepository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, study: SimulationStudy) -> SimulationStudy:
+        model = apply_simulation_study(SimulationStudyModel(), study)
+        self.session.add(model)
+        self.session.flush()
+        return to_simulation_study(model)
+
+    def update(self, study: SimulationStudy) -> SimulationStudy:
+        model = self.session.get(SimulationStudyModel, study.id)
+        if model is None or model.deleted_at is not None:
+            raise ValueError(f"Simulation study {study.id} not found.")
+        apply_simulation_study(model, study)
+        self.session.flush()
+        return to_simulation_study(model)
+
+    def get(self, study_id: int) -> SimulationStudy | None:
+        model = self.session.get(SimulationStudyModel, study_id)
+        if model is None or model.deleted_at is not None:
+            return None
+        return to_simulation_study(model)
+
+    def list_recent(self, limit: int = 50) -> list[SimulationStudy]:
+        alive = SimulationStudyModel.deleted_at.is_(None)
+        family = func.coalesce(SimulationStudyModel.origin_id, SimulationStudyModel.id)
+        newest = (
+            select(func.max(SimulationStudyModel.id))
+            .where(alive)
+            .group_by(family)
+            .scalar_subquery()
+        )
+        stmt = (
+            select(SimulationStudyModel)
+            .where(alive, SimulationStudyModel.id.in_(newest))
+            .order_by(SimulationStudyModel.id.desc())
+            .limit(limit)
+        )
+        return [to_simulation_study(m) for m in self.session.scalars(stmt).all()]
+
+    def versions(self, origin_id: int) -> list[SimulationStudy]:
+        stmt = (
+            select(SimulationStudyModel)
+            .where(
+                SimulationStudyModel.deleted_at.is_(None),
+                (SimulationStudyModel.id == origin_id)
+                | (SimulationStudyModel.origin_id == origin_id),
+            )
+            .order_by(SimulationStudyModel.version.asc(), SimulationStudyModel.id.asc())
+        )
+        return [to_simulation_study(m) for m in self.session.scalars(stmt).all()]
+
+    def mark_deleted(self, study_id: int, *, deleted_at: datetime) -> bool:
+        model = self.session.get(SimulationStudyModel, study_id)
+        if model is None or model.deleted_at is not None:
+            return False
+        model.deleted_at = deleted_at
+        self.session.flush()
+        return True

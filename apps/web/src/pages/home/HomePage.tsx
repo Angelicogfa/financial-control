@@ -30,6 +30,7 @@ import {
 } from "./story";
 import { AccountsWealth } from "./AccountsWealth";
 import { DeclaredEarnings } from "./DeclaredEarnings";
+import { LatestStudy } from "./LatestStudy";
 import { QuoteClock } from "./QuoteClock";
 
 function Indicator({
@@ -410,6 +411,7 @@ export function HomePage() {
             alerts={alerts.error ? [] : alerts.data?.alerts ?? null}
             onAlertsChange={alerts.reload}
           />
+          <LatestStudy />
           <DeclaredEarnings />
         </div>
       )}

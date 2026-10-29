@@ -37,6 +37,30 @@ class SimulationRunModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
+    # Phase 41: the study chapter this run answers.
+    study_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    chapter: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+
+class SimulationStudyModel(Base):
+    """A study: one question, its premises and the chapters (runs) that answer it."""
+
+    __tablename__ = "simulation_studies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    question: Mapped[str] = mapped_column(String(16), nullable=False)
+    premises: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    origin_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    variation_of: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class SimulationResultModel(Base):

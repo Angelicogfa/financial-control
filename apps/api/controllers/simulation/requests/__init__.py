@@ -27,6 +27,8 @@ class BacktestRequest(BaseModel):
     benchmarks: list[BenchmarkKey] = Field(default_factory=lambda: ["CDI", "IBOV"])
     # Also run the rule variants (bands x rebalancing) shown in the Robustness view.
     variants: bool = False
+    # DATED: an answer counts from the day it was given; TODAY: today's answers on every date.
+    answers_mode: Literal["DATED", "TODAY"] = "DATED"
     label: str | None = Field(default=None, max_length=120)
 
 
@@ -79,3 +81,36 @@ class CandidatesRequest(ProjectionRequest):
     fixed_weight: float = Field(default=0.05, gt=0, le=0.5)
     # Loss on the rupture event: 55% (central) or 90% (stress, design 10.4).
     rupture_stress: bool = False
+
+
+StudyQuestionKey = Literal["COMPLETE", "PAST", "GOAL", "IMPROVE"]
+
+
+class StudyRequest(BaseModel):
+    """A new study (Phase 41): one question and premises shared by every chapter."""
+
+    label: str = Field(min_length=1, max_length=120)
+    question: StudyQuestionKey = "COMPLETE"
+    monthly_contribution: float = Field(gt=0, le=10_000_000)
+    horizon_years: int = Field(default=15, ge=1, le=30)
+    wealth_goal: float | None = Field(default=None, gt=0)
+    correct_by_ipca: bool = True
+    past_start: date | None = None
+    policy_mode: Literal["CURRENT", "AS_OF"] = "CURRENT"
+    # TODAY: today's checklist answers on every past date (labelled in chapter 1).
+    answers_mode: Literal["DATED", "TODAY"] = "TODAY"
+    benchmarks: list[BenchmarkKey] = Field(
+        default_factory=lambda: ["CDI", "IBOV", "IFIX", "SP500_BRL"]
+    )
+    rebalance: bool = False
+    include_screener: bool = True
+    weight_mode: Literal["NEXT_CONTRIBUTION", "FIXED"] = "NEXT_CONTRIBUTION"
+    fixed_weight: float = Field(default=0.05, gt=0, le=0.5)
+    rupture_stress: bool = False
+
+
+class StudyVariationRequest(BaseModel):
+    """A copy of a study with some premises changed (e.g. a larger monthly contribution)."""
+
+    changes: dict[str, object] = Field(min_length=1)
+    label: str | None = Field(default=None, max_length=120)

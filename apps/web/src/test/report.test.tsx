@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AssetPriceHistoryDTO, SimulationResultDTO } from "../api/types";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../components/Section";
 import { PriceHistory } from "../pages/asset/PriceHistory";
-import { pastStory } from "../pages/tools/SimulationPage";
+import { pastStory } from "../pages/simulation/views";
 import { plural } from "../utils/format";
 import { mockApi, type Call } from "./mockApi";
 

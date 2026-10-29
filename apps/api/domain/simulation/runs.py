@@ -98,6 +98,11 @@ class Universe:
     REGISTERED_AND_CATALOG = "REGISTERED_AND_CATALOG"  # plus the most traded B3 instruments
 
 
+class AnswersMode:
+    DATED = "DATED"  # each checklist answer counts from the date it was given
+    TODAY = "TODAY"  # today's answers on every date (labelled: uses later information)
+
+
 class PolicyMode:
     CURRENT = "CURRENT"  # today's rules over the whole history (decision 5)
     AS_OF = "AS_OF"  # the version in force on each date
@@ -128,12 +133,15 @@ class BacktestParams:
     benchmarks: tuple[str, ...] = (CDI_KEY, IBOV_KEY)
     # Also run the rule variants (bands x rebalancing) for the Robustness view (33.4).
     variants: bool = False
+    answers_mode: str = AnswersMode.DATED
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["start"] = self.start.isoformat()
         data["end"] = self.end.isoformat()
         data["benchmarks"] = list(self.benchmarks)
+        if self.answers_mode == AnswersMode.DATED:
+            data.pop("answers_mode")  # older runs keep their hash
         return data
 
     @classmethod
@@ -151,6 +159,7 @@ class BacktestParams:
             policy_mode=data.get("policy_mode", PolicyMode.CURRENT),
             benchmarks=tuple(data.get("benchmarks", (CDI_KEY, IBOV_KEY))),
             variants=bool(data.get("variants", False)),
+            answers_mode=data.get("answers_mode", AnswersMode.DATED),
         )
 
     def config(self) -> BacktestConfig:
@@ -163,6 +172,7 @@ class BacktestParams:
             fee_rate=self.fee_rate,
             cash_symbol=CDI_KEY,
             rebalance=self.rebalance,
+            answers_today=self.answers_mode == AnswersMode.TODAY,
         )
 
 

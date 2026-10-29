@@ -95,6 +95,11 @@ def test_noise_passes_no_model() -> None:
     assert result.verdict.startswith("Nenhum modelo passou")
     assert result.trials == 6 and all(m.reasons for m in result.models)
     assert len(result.regime) == 200
+    # Phase 41.1: every model carries its own gain curve, so the chart follows the table.
+    assert set(result.cumulative_gains) == {m.key for m in result.models}
+    curve = result.cumulative_gains[result.models[0].key]
+    assert len(curve) == result.models[0].months
+    assert abs(curve[-1][1] - result.models[0].mean_gain * result.models[0].months) < 1e-2
 
 
 def test_real_regimes_are_recognized() -> None:
@@ -161,6 +166,7 @@ def test_lab_runs_in_the_worker_and_counts_the_trials(api: SimpleNamespace) -> N
     assert [m["key"] for m in data["models"]] == [m.key for m in MODELS]
     assert data["regime"] and 0.0 <= data["regime"][-1]["stress_probability"] <= 1.0
     assert data["verdict"]
+    assert all(m["cumulative_gain"] for m in data["models"])
 
     api.client.post("/api/v1/simulations/lab")
     run_pending_simulations_job(api.uow_factory, timeout_seconds=300)

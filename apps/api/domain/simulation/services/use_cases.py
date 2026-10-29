@@ -171,6 +171,7 @@ class SimulationHandler:
             policy_mode=req.policy_mode,
             benchmarks=tuple(dict.fromkeys(req.benchmarks)),
             variants=req.variants,
+            answers_mode=req.answers_mode,
         )
         with self.uow_factory() as uow:
             run = uow.simulations.add(new_backtest_run(params, label=req.label))
@@ -275,8 +276,9 @@ class SimulationHandler:
             )
             with self.uow_factory() as uow:
                 catalog = {c.ticker: c for c in uow.catalog.list_all()}
-            instruments = [catalog[r.ticker] for r in found.results if r.ticker in catalog]
-            screened = service.catalog_fundamentals(instruments)
+                instruments = [catalog[r.ticker] for r in found.results if r.ticker in catalog]
+                screened = service.catalog_fundamentals(uow, instruments)
+                uow.commit()  # indicators fetched for never-stored instruments (Phase 39.5)
             for row in found.results:
                 fund = screened.get(row.ticker)
                 options.append(
@@ -466,7 +468,11 @@ class SimulationHandler:
         summary = next((r for r in results if r.key == LAB_SUMMARY_KEY), None)
         if summary is None:
             return LabDTO(**base)
-        models = [r.summary for r in results if r.key.startswith(LAB_MODEL_PREFIX)]
+        models = [
+            {**r.summary, "cumulative_gain": r.points}
+            for r in results
+            if r.key.startswith(LAB_MODEL_PREFIX)
+        ]
         return LabDTO(**base, **summary.summary, models=models, regime=summary.points)
 
     def projection(self, run_id: int) -> ProjectionDTO:

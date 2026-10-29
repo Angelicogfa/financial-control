@@ -61,6 +61,7 @@ def to_stored_lab(run_id: int, result: LabResult) -> list[SimulationResult]:
     summary: dict[str, Any] = asdict(result)
     regime = summary.pop("regime")
     models = summary.pop("models")
+    cumulative = summary.pop("cumulative_gains", {})
     summary["first_forecast"] = result.first_forecast.isoformat()
     summary["last_forecast"] = result.last_forecast.isoformat()
     rows = [
@@ -74,7 +75,14 @@ def to_stored_lab(run_id: int, result: LabResult) -> list[SimulationResult]:
     ]
     rows.extend(
         SimulationResult(
-            run_id=run_id, key=f"{LAB_MODEL_PREFIX}{m['key']}", label=m["label"], summary=m
+            run_id=run_id,
+            key=f"{LAB_MODEL_PREFIX}{m['key']}",
+            label=m["label"],
+            summary=m,
+            points=[
+                {"month": month.isoformat(), "value": value}
+                for month, value in cumulative.get(m["key"], [])
+            ],
         )
         for m in models
     )

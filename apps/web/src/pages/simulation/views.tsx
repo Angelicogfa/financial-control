@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
@@ -8,14 +8,12 @@ import type {
   BacktestSummaryDTO,
   CalibrationDTO,
   CandidatesDTO,
-  CandidatesRequest,
   LabDTO,
   EventOutcomeDTO,
   GeneratorCalibrationDTO,
   GoalOutcomeDTO,
   PercentilesDTO,
   ProjectionDTO,
-  ProjectionRequest,
   RobustnessDTO,
   SimulationResultDTO,
   SimulationRunDetailDTO,
@@ -26,149 +24,16 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
-import { PageHeader } from "../../components/PageHeader";
-import { IconButton } from "../../components/RowActions";
 import { KpiGrid, Lead, Notes, Section, Segmented, type KpiSpec, type Tone } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
-import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, plural, points, today } from "../../utils/format";
+import { brl, brlCompact, day, dateTime, num, pct, plural, points } from "../../utils/format";
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { ColumnChart } from "../../viz/ColumnChart";
-import { TrashIcon } from "../../layout/icons";
-import { compareLink } from "./AssetComparePage";
+import { compareLink } from "../tools/AssetComparePage";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 
 type Benchmark = NonNullable<BacktestRequest["benchmarks"]>[number];
-type TabKey = "past" | "future" | "candidates" | "robustness" | "confidence" | "lab";
-
-const TABS: TabSpec<TabKey>[] = [
-  { key: "past", label: "Passado" },
-  { key: "future", label: "Futuro" },
-  { key: "candidates", label: "Candidatos" },
-  { key: "robustness", label: "Robustez" },
-  { key: "confidence", label: "Confiança" },
-  { key: "lab", label: "Laboratório" },
-];
-
-/** What sets each view apart: the question, how it is computed and when to use it. */
-export const TAB_GUIDE: Record<TabKey, { question: string; method: string; use: string; from: string }> = {
-  past: {
-    question: "Onde eu estaria se tivesse seguido a minha estratégia desde uma data?",
-    method:
-      "Reaplica mês a mês as suas regras reais de aporte (metas e bandas ARCA, checklist, política) sobre os preços " +
-      "históricos, com custos e IR, e compara com CDI e índices recebendo os mesmos aportes nas mesmas datas.",
-    use: "Para conferir se as regras teriam funcionado. Descreve o que aconteceu; não diz nada sobre o futuro.",
-    from: "Período escolhido no passado e as regras de hoje (ou as vigentes em cada data)",
-  },
-  future: {
-    question: "Qual a faixa provável do patrimônio e da renda daqui a N anos, e com que chance chego à meta?",
-    method:
-      "Parte da carteira de hoje e gera milhares de futuros possíveis: sorteia trechos do histórico e parâmetros " +
-      "incertos (o prêmio de cada classe sobre o CDI) e soma aos juros de três cenários (queda, premissa e alta).",
-    use: "Para planejar aportes e metas. Mostra faixas e chances com intervalo, nunca um número único.",
-    from: "A carteira e as premissas de hoje, projetadas para frente",
-  },
-  candidates: {
-    question: "Que ativos que eu ainda não tenho melhorariam a carteira, e com que chance a melhora é real?",
-    method:
-      "Cada ativo da watchlist (e, se pedido, do screener) que passa nos filtros do aporte real é modelado contra a " +
-      "sua classe, com o passado dele encolhido para não premiar sorte, e posto na carteira de hoje nas mesmas " +
-      "trajetórias do Futuro, com e sem ele.",
-    use: "Para escolher o que investigar a seguir. É uma lista para estudo, nunca uma ordem de compra.",
-    from: "A carteira de hoje, a watchlist e o screener",
-  },
-  robustness: {
-    question: "O resultado do Passado depende de um período sortudo ou de uma escolha de regra?",
-    method:
-      "Mede a simulação do Passado selecionada dentro de crises conhecidas, aplica choques à alocação final e repete " +
-      "o cálculo com outras bandas e com e sem rebalanceamento, mostrando todas as variantes.",
-    use: "Para não escolher uma regra por sorte. Usa a mesma simulação da aba Passado.",
-    from: "A simulação do Passado selecionada",
-  },
-  confidence: {
-    question: "As chances que a aba Futuro mostra costumam se confirmar?",
-    method:
-      "Em cada mês do passado, cada gerador de cenários prevê os 12 meses seguintes usando só os dados até ali; a " +
-      "previsão é comparada com o que aconteceu (cobertura, PIT, Brier, log score) e define os pesos da combinação.",
-    use: "Para saber quanto confiar nas probabilidades do Futuro. Roda sozinha toda semana.",
-    from: "Todo o histórico guardado, mês a mês",
-  },
-  lab: {
-    question: "Algum modelo de regime ou de risco prevê o mês seguinte melhor que uma regra simples?",
-    method:
-      "Modelos de regime (HMM, mistura gaussiana) e de risco (EWMA, GARCH) preveem o retorno do mês seguinte, " +
-      "sempre só com o passado, contra a média e a volatilidade históricas; só passa quem vence com folga, " +
-      "descontado o número de tentativas e estável quando a data de corte muda.",
-    use: "Para saber se vale condicionar a simulação a regimes. 'Nenhum modelo passou' é um resultado válido.",
-    from: "O histórico da carteira-modelo, mês a mês",
-  },
-};
-
-function TabGuide({ tab }: Readonly<{ tab: TabKey }>) {
-  const guide = TAB_GUIDE[tab];
-  return (
-    <section className="app-card app-card-padded app-guide" aria-label="Sobre esta aba">
-      <span className="app-eyebrow">A pergunta desta aba</span>
-      <h2 className="app-guide-question">{guide.question}</h2>
-      <p className="app-guide-method">{guide.method}</p>
-      <dl className="app-guide-facts">
-        <div>
-          <dt>Parte de:</dt>
-          <dd>{guide.from}</dd>
-        </div>
-        <div>
-          <dt>Quando usar:</dt>
-          <dd>{guide.use}</dd>
-        </div>
-      </dl>
-      <details>
-        <summary>Comparar as seis abas</summary>
-        <div className="app-table-wrap">
-          <table className="app-table" aria-label="Comparação das abas">
-            <thead>
-              <tr>
-                <th>Aba</th>
-                <th>Pergunta</th>
-                <th>Parte de</th>
-                <th>Quando usar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {TABS.map((t) => (
-                <tr key={t.key} aria-current={t.key === tab ? "true" : undefined}>
-                  <td>{t.label}</td>
-                  <td className="app-cell-wrap">{TAB_GUIDE[t.key].question}</td>
-                  <td className="app-cell-wrap">{TAB_GUIDE[t.key].from}</td>
-                  <td className="app-cell-wrap">{TAB_GUIDE[t.key].use}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </section>
-  );
-}
-
-/** A form that folds once there are results, so the result leads the page. */
-function FormCard({
-  title,
-  hint,
-  open,
-  children,
-}: Readonly<{ title: string; hint?: string; open: boolean; children: ReactNode }>) {
-  return (
-    <details className="app-card app-disclosure" open={open}>
-      <summary>
-        {title}
-        {hint && <small>{hint}</small>}
-      </summary>
-      <div className="app-disclosure-body">{children}</div>
-    </details>
-  );
-}
-
 export const BENCHMARK_LABELS: Record<Benchmark, string> = {
   CDI: "CDI",
   IBOV: "Ibovespa",
@@ -191,256 +56,9 @@ export function isActive(status: SimulationStatus): boolean {
   return status === "PENDING" || status === "RUNNING";
 }
 
-function StatusBadge({ status }: Readonly<{ status: SimulationStatus }>) {
+export function StatusBadge({ status }: Readonly<{ status: SimulationStatus }>) {
   const spec = STATUS_LABELS[status];
   return <Badge tone={spec.tone}>{spec.label}</Badge>;
-}
-
-// --- form -----------------------------------------------------------------------------------
-
-interface FormState {
-  start: string;
-  end: string;
-  monthly: string;
-  initial: string;
-  correctByIpca: boolean;
-  rebalance: boolean;
-  universe: NonNullable<BacktestRequest["universe"]>;
-  policyMode: NonNullable<BacktestRequest["policy_mode"]>;
-  benchmarks: Benchmark[];
-  variants: boolean;
-  label: string;
-}
-
-const INITIAL_FORM: FormState = {
-  start: "2010-01-01",
-  end: daysAgo(1),
-  monthly: "1000",
-  initial: "0",
-  correctByIpca: true,
-  rebalance: false,
-  universe: "REGISTERED",
-  policyMode: "CURRENT",
-  benchmarks: ["CDI", "IBOV"],
-  variants: true,
-  label: "",
-};
-
-/** The API request from the form; null when a number is missing. */
-export function toBacktestRequest(form: FormState): BacktestRequest | null {
-  const monthly = parseDecimal(form.monthly);
-  const initial = parseDecimal(form.initial) ?? 0;
-  if (monthly === null || monthly <= 0) return null;
-  return {
-    start: form.start,
-    end: form.end,
-    monthly_contribution: monthly,
-    initial_contribution: initial,
-    correct_by_ipca: form.correctByIpca,
-    rebalance: form.rebalance,
-    universe: form.universe,
-    policy_mode: form.policyMode,
-    benchmarks: form.benchmarks,
-    variants: form.variants,
-    label: form.label.trim() || null,
-  };
-}
-
-function BacktestForm({
-  onSubmitted,
-  open = true,
-}: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void; open?: boolean }>) {
-  const [form, setForm] = useState<FormState>(INITIAL_FORM);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const set = (change: Partial<FormState>) => setForm((f) => ({ ...f, ...change }));
-  const toggleBenchmark = (key: Benchmark) =>
-    set({ benchmarks: form.benchmarks.includes(key) ? form.benchmarks.filter((b) => b !== key) : [...form.benchmarks, key] });
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const body = toBacktestRequest(form);
-    if (!body) {
-      setError("Informe um aporte mensal maior que zero.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      onSubmitted(await api.simulations.submitBacktest(body));
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <FormCard title="Nova simulação" hint="Período, aporte, regras e referências" open={open}>
-      <form onSubmit={submit} aria-busy={saving} aria-label="Nova simulação">
-        {error && (
-          <p className="app-error-banner" role="alert">
-            {error}
-          </p>
-        )}
-        <fieldset className="app-field-grid" disabled={saving}>
-          <div className="app-field">
-            <label htmlFor="sim-start">Início</label>
-            <input id="sim-start" type="date" value={form.start} max={today()} onChange={(e) => set({ start: e.target.value })} required />
-          </div>
-          <div className="app-field">
-            <label htmlFor="sim-end">Fim</label>
-            <input id="sim-end" type="date" value={form.end} max={today()} onChange={(e) => set({ end: e.target.value })} required />
-          </div>
-          <div className="app-field">
-            <label htmlFor="sim-monthly">Aporte mensal (R$)</label>
-            <input id="sim-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
-          </div>
-          <div className="app-field">
-            <label htmlFor="sim-initial">Aporte inicial (R$)</label>
-            <input id="sim-initial" inputMode="decimal" value={form.initial} onChange={(e) => set({ initial: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="sim-universe">Ativos</label>
-            <select id="sim-universe" value={form.universe} onChange={(e) => set({ universe: e.target.value as FormState["universe"] })}>
-              <option value="REGISTERED">Carteira e watchlist</option>
-              <option value="REGISTERED_AND_CATALOG">Carteira, watchlist e mais negociados da B3 (viés de sobrevivência)</option>
-            </select>
-          </div>
-          <div className="app-field">
-            <label htmlFor="sim-policy">Política</label>
-            <select id="sim-policy" value={form.policyMode} onChange={(e) => set({ policyMode: e.target.value as FormState["policyMode"] })}>
-              <option value="CURRENT">Regras atuais em todo o período</option>
-              <option value="AS_OF">Versão vigente em cada data</option>
-            </select>
-          </div>
-          <div className="app-field">
-            <label htmlFor="sim-label">Nome (opcional)</label>
-            <input id="sim-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
-          </div>
-        </fieldset>
-        <fieldset className="app-field-grid" disabled={saving}>
-          <legend>Regras</legend>
-          <label className="app-check">
-            <input type="checkbox" checked={form.correctByIpca} onChange={(e) => set({ correctByIpca: e.target.checked })} />
-            Corrigir o aporte pelo IPCA
-          </label>
-          <label className="app-check">
-            <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
-            Rebalancear vendendo o excesso (com IR)
-          </label>
-          <label className="app-check">
-            <input type="checkbox" checked={form.variants} onChange={(e) => set({ variants: e.target.checked })} />
-            Testar variantes de banda e rebalanceamento
-          </label>
-        </fieldset>
-        <fieldset className="app-field-grid" disabled={saving}>
-          <legend>Comparar com o mesmo fluxo de aportes em</legend>
-          {(Object.keys(BENCHMARK_LABELS) as Benchmark[]).map((key) => (
-            <label key={key} className="app-check">
-              <input type="checkbox" checked={form.benchmarks.includes(key)} onChange={() => toggleBenchmark(key)} />
-              {BENCHMARK_LABELS[key]}
-            </label>
-          ))}
-        </fieldset>
-        <div className="app-form-actions">
-          <button type="submit" className="app-primary-button" disabled={saving}>
-            {saving && <Spinner size="sm" />}
-            <span>{saving ? "Enviando…" : "Simular"}</span>
-          </button>
-        </div>
-      </form>
-    </FormCard>
-  );
-}
-
-// --- runs list --------------------------------------------------------------------------------
-
-function backtestPeriod(run: SimulationRunDTO): string {
-  return `${day(String(run.params?.start ?? ""))} a ${day(String(run.params?.end ?? ""))}`;
-}
-
-function RunList({
-  runs,
-  selected,
-  onSelect,
-  onDeleted,
-  describe = backtestPeriod,
-  describeLabel = "Período",
-}: Readonly<{
-  runs: SimulationRunDTO[];
-  selected: number | null;
-  onSelect: (id: number) => void;
-  /** After a run is deleted for good (Phase 40.4). */
-  onDeleted: (id: number) => void;
-  describe?: (run: SimulationRunDTO) => string;
-  describeLabel?: string;
-}>) {
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const remove = async (run: SimulationRunDTO) => {
-    const name = run.label || `Simulação #${run.id}`;
-    if (!window.confirm(`Excluir "${name}"? A simulação e o resultado somem e não há como recuperar.`)) return;
-    setDeleting(run.id);
-    setError(null);
-    try {
-      await api.simulations.remove(run.id);
-      onDeleted(run.id);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setDeleting(null);
-    }
-  };
-  if (runs.length === 0) return <Empty title="Nenhuma simulação ainda" hint="Preencha o formulário e clique em Simular." />;
-  return (
-    <div className="app-table-wrap">
-      {error && <p className="app-error-banner">{error}</p>}
-      <table className="app-table" aria-label="Simulações">
-        <thead>
-          <tr>
-            <th>Simulação</th>
-            <th>{describeLabel}</th>
-            <th>Status</th>
-            <th>Pedida em</th>
-            <th aria-label="Ações" />
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((run) => (
-            <tr key={run.id} aria-selected={run.id === selected}>
-              <td>
-                <button
-                  type="button"
-                  className="app-link-button"
-                  aria-current={run.id === selected ? "true" : undefined}
-                  onClick={() => onSelect(run.id)}
-                >
-                  {run.label || `Simulação #${run.id}`}
-                </button>
-                {run.id === selected && <span className="app-muted"> · em exibição</span>}
-              </td>
-              <td>{describe(run)}</td>
-              <td>
-                <StatusBadge status={run.status} />
-              </td>
-              <td>{dateTime(run.created_at)}</td>
-              <td className="app-row-actions">
-                <IconButton
-                  label={`Excluir ${run.label || `simulação #${run.id}`}`}
-                  busyLabel="Excluindo…"
-                  icon={<TrashIcon />}
-                  danger
-                  busy={deleting === run.id}
-                  onClick={() => void remove(run)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 // --- past -------------------------------------------------------------------------------------
@@ -492,7 +110,7 @@ function SummaryTable({ results }: Readonly<{ results: SimulationResultDTO[] }>)
   );
 }
 
-function Reproducibility({ run }: Readonly<{ run: SimulationRunDTO }>) {
+export function Reproducibility({ run }: Readonly<{ run: SimulationRunDTO }>) {
   return (
     <p className="app-muted">
       Motor {run.code_version} · semente {run.seed} · dados {run.data_hash?.slice(0, 12) ?? "—"} · parâmetros{" "}
@@ -502,7 +120,7 @@ function Reproducibility({ run }: Readonly<{ run: SimulationRunDTO }>) {
   );
 }
 
-function RunProblem({ run }: Readonly<{ run: SimulationRunDTO }>) {
+export function RunProblem({ run }: Readonly<{ run: SimulationRunDTO }>) {
   if (isActive(run.status)) {
     return (
       <p className="app-muted" role="status">
@@ -561,7 +179,7 @@ export function pastStory(series: SimulationResultDTO[]): { tone: Tone; lines: s
   return { tone, lines, cashShare };
 }
 
-function PastTab({ detail }: Readonly<{ detail: SimulationRunDetailDTO }>) {
+export function PastTab({ detail }: Readonly<{ detail: SimulationRunDetailDTO }>) {
   if (detail.status !== "DONE") return <RunProblem run={detail} />;
   const series = seriesOf(detail.results ?? []);
   const strategy = series.find((r) => r.key === "strategy");
@@ -876,212 +494,13 @@ function VariantValidation({ validation }: Readonly<{ validation: VariantValidat
   );
 }
 
-function RobustnessTab({ run }: Readonly<{ run: SimulationRunDTO }>) {
+export function RobustnessTab({ run }: Readonly<{ run: SimulationRunDTO }>) {
   const state = useApi(`simulation-robustness-${run.id}-${run.status}`, () => api.simulations.robustness(run.id));
   if (run.status !== "DONE") return <RunProblem run={run} />;
   return <Async state={state}>{(data) => <RobustnessView data={data} />}</Async>;
 }
 
 // --- future -----------------------------------------------------------------------------------
-
-type ClassKey = keyof NonNullable<ProjectionRequest["initial_by_class"]>;
-const CLASS_KEYS: ClassKey[] = ["ACOES", "REAL_ESTATE", "ATIVOS_INTERNACIONAIS", "CAIXA"];
-
-interface ProjectionFormState {
-  horizonYears: string;
-  monthly: string;
-  realGrowth: string;
-  wealthGoal: string;
-  incomeGoal: string;
-  rebalance: boolean;
-  fromPortfolio: boolean;
-  initial: Record<ClassKey, string>;
-  cdi: string;
-  ipca: string;
-  generator: NonNullable<ProjectionRequest["generator"]>;
-  label: string;
-}
-
-const GENERATOR_OPTIONS: Array<[NonNullable<ProjectionRequest["generator"]>, string]> = [
-  ["STACKED", "Combinação calibrada (recomendado)"],
-  ["BOOTSTRAP", "Só o bootstrap em blocos"],
-  ["BAYESIAN_BOOTSTRAP", "Só o bootstrap bayesiano"],
-  ["BAYESIAN_NORMAL", "Só a normal bayesiana"],
-];
-
-const INITIAL_PROJECTION: ProjectionFormState = {
-  horizonYears: "20",
-  monthly: "1000",
-  realGrowth: "0",
-  wealthGoal: "",
-  incomeGoal: "",
-  rebalance: false,
-  fromPortfolio: true,
-  initial: { ACOES: "0", REAL_ESTATE: "0", ATIVOS_INTERNACIONAIS: "0", CAIXA: "0" },
-  cdi: "",
-  ipca: "",
-  generator: "STACKED",
-  label: "",
-};
-
-/** A percentage typed by the user ("10,5") as a fraction; null when empty. */
-function percentInput(text: string): number | null {
-  const value = parseDecimal(text);
-  return value === null ? null : value / 100;
-}
-
-/** The API request from the form; null when the horizon or the contribution is invalid. */
-export function toProjectionRequest(form: ProjectionFormState): ProjectionRequest | null {
-  const years = Number.parseInt(form.horizonYears, 10);
-  const monthly = parseDecimal(form.monthly);
-  if (!Number.isFinite(years) || years < 1 || years > 50 || monthly === null || monthly < 0) return null;
-  const positive = (text: string) => {
-    const value = parseDecimal(text);
-    return value !== null && value > 0 ? value : null;
-  };
-  return {
-    horizon_years: years,
-    monthly_contribution: monthly,
-    contribution_real_growth: percentInput(form.realGrowth) ?? 0,
-    wealth_goal: positive(form.wealthGoal),
-    income_goal: positive(form.incomeGoal),
-    rebalance: form.rebalance,
-    initial_by_class: form.fromPortfolio
-      ? null
-      : Object.fromEntries(CLASS_KEYS.map((k) => [k, Math.max(parseDecimal(form.initial[k]) ?? 0, 0)])),
-    cdi_rate: percentInput(form.cdi),
-    ipca_rate: percentInput(form.ipca),
-    generator: form.generator,
-    label: form.label.trim() || null,
-  };
-}
-
-function projectionHorizon(run: SimulationRunDTO): string {
-  const years = Number(run.params?.horizon_years ?? 0);
-  return `${years} ${years === 1 ? "ano" : "anos"} · ${brl(Number(run.params?.monthly_contribution ?? 0))}/mês`;
-}
-
-function ProjectionForm({
-  onSubmitted,
-  open = true,
-}: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void; open?: boolean }>) {
-  const [form, setForm] = useState<ProjectionFormState>(INITIAL_PROJECTION);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const set = (change: Partial<ProjectionFormState>) => setForm((f) => ({ ...f, ...change }));
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const body = toProjectionRequest(form);
-    if (!body) {
-      setError("Informe um horizonte de 1 a 50 anos e um aporte mensal (zero é permitido).");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      onSubmitted(await api.simulations.submitProjection(body));
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <FormCard title="Nova projeção" hint="Horizonte, aporte, metas e juros" open={open}>
-      <form onSubmit={submit} aria-busy={saving} aria-label="Nova projeção">
-        <p className="app-card-hint">Valores em R$ de hoje: o aporte acompanha a inflação de cada cenário.</p>
-        {error && (
-          <p className="app-error-banner" role="alert">
-            {error}
-          </p>
-        )}
-        <fieldset className="app-field-grid" disabled={saving}>
-          <div className="app-field">
-            <label htmlFor="proj-years">Horizonte (anos)</label>
-            <input id="proj-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} required />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-monthly">Aporte mensal (R$)</label>
-            <input id="proj-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} required />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-growth">Crescimento real do aporte (% a.a.)</label>
-            <input id="proj-growth" inputMode="decimal" value={form.realGrowth} onChange={(e) => set({ realGrowth: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-wealth-goal">Meta de patrimônio (R$)</label>
-            <input id="proj-wealth-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-income-goal">Meta de renda passiva (R$/mês)</label>
-            <input id="proj-income-goal" inputMode="decimal" value={form.incomeGoal} onChange={(e) => set({ incomeGoal: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-cdi">CDI (% a.a., vazio = premissa)</label>
-            <input id="proj-cdi" inputMode="decimal" value={form.cdi} onChange={(e) => set({ cdi: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-ipca">IPCA (% a.a., vazio = premissa)</label>
-            <input id="proj-ipca" inputMode="decimal" value={form.ipca} onChange={(e) => set({ ipca: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-generator">Gerador de cenários</label>
-            <select
-              id="proj-generator"
-              value={form.generator}
-              onChange={(e) => set({ generator: e.target.value as ProjectionFormState["generator"] })}
-            >
-              {GENERATOR_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="app-field">
-            <label htmlFor="proj-label">Nome (opcional)</label>
-            <input id="proj-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
-          </div>
-        </fieldset>
-        <fieldset className="app-field-grid" disabled={saving}>
-          <legend>Ponto de partida</legend>
-          <label className="app-check">
-            <input type="checkbox" checked={form.fromPortfolio} onChange={(e) => set({ fromPortfolio: e.target.checked })} />
-            Partir da carteira de hoje
-          </label>
-          <label className="app-check">
-            <input type="checkbox" checked={form.rebalance} onChange={(e) => set({ rebalance: e.target.checked })} />
-            Rebalancear vendendo o excesso (com IR)
-          </label>
-        </fieldset>
-        {!form.fromPortfolio && (
-          <fieldset className="app-field-grid" disabled={saving}>
-            <legend>Valor inicial por classe (R$)</legend>
-            {CLASS_KEYS.map((k) => (
-              <div className="app-field" key={k}>
-                <label htmlFor={`proj-initial-${k}`}>{ARCA_LABELS[k]}</label>
-                <input
-                  id={`proj-initial-${k}`}
-                  inputMode="decimal"
-                  value={form.initial[k]}
-                  onChange={(e) => set({ initial: { ...form.initial, [k]: e.target.value } })}
-                />
-              </div>
-            ))}
-          </fieldset>
-        )}
-        <div className="app-form-actions">
-          <button type="submit" className="app-primary-button" disabled={saving}>
-            {saving && <Spinner size="sm" />}
-            <span>{saving ? "Enviando…" : "Projetar"}</span>
-          </button>
-        </div>
-      </form>
-    </FormCard>
-  );
-}
 
 const PERCENTILE_COLUMNS: Array<[keyof PercentilesDTO, string]> = [
   ["p5", "5% (pessimista)"],
@@ -1371,7 +790,7 @@ export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; ru
   );
 }
 
-function ProjectionTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
+export function ProjectionTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
   const state = useApi(`simulation-projection-${run.id}-${run.status}`, () => api.simulations.projection(run.id));
   if (run.status !== "DONE") return <RunProblem run={run} />;
   return <Async state={state}>{(data) => <ProjectionView data={data} run={run} />}</Async>;
@@ -1505,7 +924,7 @@ export function CalibrationView({ data }: Readonly<{ data: CalibrationDTO }>) {
   );
 }
 
-function ConfidencePanel() {
+export function ConfidencePanel() {
   const [tick, setTick] = useState(0);
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1576,9 +995,7 @@ function ConfidencePanel() {
   );
 }
 
-// --- page -------------------------------------------------------------------------------------
-
-function SelectedRun({
+export function SelectedRun({
   runId,
   onStatus,
   children,
@@ -1604,133 +1021,88 @@ function SelectedRun({
 }
 
 /** The run chosen in the URL (`param`), or the newest one. */
-function useSelected(param: string, runs: SimulationRunDTO[] | null | undefined): [number | null, (id: number | null) => void] {
-  const [params, setParams] = useSearchParams();
-  const selected = Number(params.get(param)) || runs?.[0]?.id || null;
-  /** `null` drops the choice (after a delete), so the newest run shows. */
-  const select = (id: number | null) =>
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        if (id === null) next.delete(param);
-        else next.set(param, String(id));
-        return next;
-      },
-      { replace: true },
-    );
-  return [selected, select];
-}
-
-function BacktestPanel({ tab }: Readonly<{ tab: "past" | "robustness" }>) {
-  const runs = useApi("simulation-runs", () => api.simulations.list(20, "BACKTEST"));
-  const [selected, select] = useSelected("run", runs.data);
-  return (
-    <>
-      <BacktestForm
-        open={(runs.data ?? []).length === 0}
-        onSubmitted={(run) => {
-          select(run.id);
-          runs.reload();
-        }}
-      />
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Simulações do passado</h2>
-        <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
-        <Async state={runs}>{(items) => <RunList runs={items} selected={selected} onSelect={select} onDeleted={(id) => {
-              if (id === selected) select(null);
-              runs.reload();
-            }} />}</Async>
-      </section>
-      {selected !== null && (
-        <SelectedRun key={`${selected}-${tab}`} runId={selected} onStatus={runs.reload}>
-          {(detail) => (tab === "past" ? <PastTab detail={detail} /> : <RobustnessTab run={detail} />)}
-        </SelectedRun>
-      )}
-    </>
-  );
-}
-
-function FuturePanel() {
-  const runs = useApi("simulation-projection-runs", () => api.simulations.list(20, "PROJECTION"));
-  const [selected, select] = useSelected("projection", runs.data);
-  return (
-    <>
-      <ProjectionForm
-        open={(runs.data ?? []).length === 0}
-        onSubmitted={(run) => {
-          select(run.id);
-          runs.reload();
-        }}
-      />
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Projeções</h2>
-        <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
-        <Async state={runs}>
-          {(items) => (
-            <RunList runs={items} selected={selected} onSelect={select} onDeleted={(id) => {
-              if (id === selected) select(null);
-              runs.reload();
-            }} describe={projectionHorizon} describeLabel="Horizonte" />
-          )}
-        </Async>
-      </section>
-      {selected !== null && (
-        <SelectedRun key={selected} runId={selected} onStatus={runs.reload}>
-          {(detail) => <ProjectionTab run={detail} />}
-        </SelectedRun>
-      )}
-    </>
-  );
-}
-
 // --- laboratory -------------------------------------------------------------------------------
+
+/** The verdict in decision terms (Phase 41.1); the technical one stays in the notes. */
+export function labVerdict(data: LabDTO): string {
+  const models = data.models ?? [];
+  const passed = models.filter((m) => m.passed);
+  if (passed.length === 0) {
+    return "Nenhum modelo de regime ou de risco previu o mês seguinte melhor que a regra simples (média e volatilidade históricas). A simulação continua sem eles, e isso é um resultado válido.";
+  }
+  const names = passed.map((m) => m.label).join(", ");
+  return `${names} ${passed.length > 1 ? "previram" : "previu"} o mês seguinte melhor que a regra simples e ${passed.length > 1 ? "passaram" : "passou"} em todos os testes, mesmo descontando as tentativas.`;
+}
+
+/** The model the chart shows: the one picked in the table, else the first that passed, else the first. */
+export function labChartModel(data: LabDTO, picked: string | null): string | null {
+  const models = data.models ?? [];
+  if (picked && models.some((m) => m.key === picked)) return picked;
+  return models.find((m) => m.passed)?.key ?? models[0]?.key ?? null;
+}
 
 export function LabView({ data }: Readonly<{ data: LabDTO }>) {
   const models = data.models ?? [];
   const regime = data.regime ?? [];
   const approved = data.approved ?? [];
+  const [picked, setPicked] = useState<string | null>(null);
+  const shownKey = labChartModel(data, picked);
+  const shown = models.find((m) => m.key === shownKey) ?? null;
+  const curve = shown?.cumulative_gain ?? [];
   return (
     <div className="app-page-stack">
-      <section className="app-card app-card-padded" aria-label="Veredito do laboratório">
-        <div className="health-pillar-head">
-          <h2 className="app-card-heading">Veredito</h2>
+      <Lead eyebrow="Veredito" tone={approved.length ? "positive" : "neutral"}>
+        <p>{labVerdict(data)}</p>
+      </Lead>
+      <Section
+        title="Algum modelo prevê o mês seguinte melhor que a regra simples?"
+        subtitle={`Previsões de ${day(data.first_forecast)} a ${day(data.last_forecast)} · ${plural(data.trials ?? 0, "tentativa registrada", "tentativas registradas")}. Escolha um modelo para vê-lo no gráfico.`}
+        actions={
           <Badge tone={approved.length ? "success" : "neutral"}>
-            {approved.length
-              ? plural(approved.length, "modelo passou", "modelos passaram")
-              : "Nenhum modelo passou"}
+            {approved.length ? plural(approved.length, "modelo passou", "modelos passaram") : "Nenhum modelo passou"}
           </Badge>
-        </div>
-        <p className="app-lead-text">{data.verdict}</p>
-        <p className="app-muted">
-          Previsões de {day(data.first_forecast)} a {day(data.last_forecast)} · {data.trials} tentativas registradas · PBO do
-          conjunto {data.pbo == null ? "—" : pct(data.pbo, 0)} · escolhido perde para a referência em{" "}
-          {data.loss_probability == null ? "—" : pct(data.loss_probability, 0)} das divisões
-        </p>
-      </section>
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Modelos</h2>
+        }
+      >
         <div className="app-table-wrap">
           <table className="app-table" aria-label="Modelos do laboratório">
             <thead>
               <tr>
                 <th>Modelo</th>
-                <th className="app-numeric">Ganho de log score por mês</th>
-                <th className="app-numeric">Chance de superar a referência</th>
-                <th className="app-numeric">Sharpe deflacionado</th>
-                <th>Estável</th>
+                <th className="app-numeric" title="Ganho de log score por mês sobre a normal com a média e a volatilidade históricas">
+                  Acerto a mais que a regra simples
+                </th>
+                <th className="app-numeric" title="Probabilidade de superar a referência (portão bayesiano de 95%)">
+                  Chance de ser melhor de verdade
+                </th>
+                <th title={`Sharpe deflacionado de 95% ou mais e PBO do conjunto abaixo de 20% (PBO ${data.pbo == null ? "—" : pct(data.pbo, 0)})`}>
+                  Continua melhor descontando as tentativas?
+                </th>
+                <th>Estável com outro corte?</th>
                 <th>Situação</th>
               </tr>
             </thead>
             <tbody>
               {models.map((m) => (
-                <tr key={m.key}>
-                  <td>{m.label}</td>
+                <tr key={m.key} aria-selected={m.key === shownKey}>
+                  <td>
+                    <button
+                      type="button"
+                      className="app-link-button"
+                      aria-pressed={m.key === shownKey}
+                      onClick={() => setPicked(m.key)}
+                    >
+                      {m.label}
+                    </button>
+                    {m.key === shownKey && <span className="app-muted"> · no gráfico</span>}
+                  </td>
                   <td className="app-numeric">{num(m.mean_gain, 4)}</td>
                   <td className="app-numeric">{pct(m.gate_probability, 0)}</td>
-                  <td className="app-numeric">{pct(m.deflated_probability, 0)}</td>
+                  <td title={`Sharpe deflacionado ${pct(m.deflated_probability, 0)}`}>
+                    {m.deflated_probability >= 0.95 ? "Sim" : "Não"}
+                  </td>
                   <td>{m.stable ? "Sim" : "Não"}</td>
                   <td>
-                    <Badge tone={m.passed ? "success" : "warning"}>{m.passed ? "Passou" : "Não passou"}</Badge>
+                    <Badge tone={m.passed ? "success" : "neutral"}>{m.passed ? "Passou" : "Não passou"}</Badge>
                     {(m.reasons ?? []).length > 0 && <div className="app-muted">{(m.reasons ?? []).join("; ")}</div>}
                   </td>
                 </tr>
@@ -1738,37 +1110,56 @@ export function LabView({ data }: Readonly<{ data: LabDTO }>) {
             </tbody>
           </table>
         </div>
-        <p className="app-card-hint">
-          Ganho positivo = a densidade prevista pelo modelo explica melhor o mês seguinte que a normal com a média e a
-          volatilidade históricas. Para passar: chance de superar de 95% ou mais, Sharpe deflacionado de 95% ou mais,
-          escolhido perdendo fora da amostra em menos de 20% das divisões e resultado estável com o corte deslocado.
-        </p>
-      </section>
-      {regime.length > 1 && (
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Probabilidade do regime de estresse (HMM de 2 estados)</h2>
-          <TrendChart
-            title="Probabilidade do regime de estresse mês a mês"
-            labels={regime.map((p) => day(p.month))}
-            series={[
-              {
-                key: "stress",
-                label: "Estresse",
-                color: "var(--viz-serie-2)",
-                values: regime.map((p) => p.stress_probability),
-              },
-            ]}
-            hint="Probabilidade filtrada: usa só os meses até cada data. Descreve o passado; não é previsão de queda."
-            format={(v) => pct(v, 0)}
-          />
-        </section>
+      </Section>
+      {shown && (
+        <Section
+          title={`${shown.label} · acerto acumulado sobre a regra simples`}
+          subtitle={
+            shown.passed
+              ? "Passou: a linha subindo mostra que o modelo acerta mais que a regra simples ao longo do tempo."
+              : "Não passou: o gráfico aparece só para ilustrar. Uma linha que não sobe de forma constante não supera a regra simples."
+          }
+          actions={<Badge tone={shown.passed ? "success" : "neutral"}>{shown.passed ? "Passou" : "Não passou"}</Badge>}
+        >
+          {curve.length > 1 ? (
+            <TrendChart
+              title={`Acerto acumulado do ${shown.label} sobre a regra simples`}
+              labels={curve.map((p) => day(p.month))}
+              baseline={0}
+              series={[{ key: shown.key, label: shown.label, color: "var(--viz-serie-1)", values: curve.map((p) => p.value) }]}
+              hint="Soma, mês a mês, do acerto a mais que a regra simples (log score); acima de zero, o modelo acertou mais."
+              format={(v) => num(v, 2)}
+            />
+          ) : (
+            <p className="app-muted">Esta rodada é anterior ao registro mês a mês; rode o laboratório de novo para ver o gráfico.</p>
+          )}
+          {shown.key === "HMM2" && regime.length > 1 && (
+            <TrendChart
+              title="Probabilidade do regime de estresse mês a mês (HMM de 2 estados)"
+              labels={regime.map((p) => day(p.month))}
+              series={[
+                { key: "stress", label: "Estresse", color: "var(--viz-serie-2)", values: regime.map((p) => p.stress_probability) },
+              ]}
+              hint="Probabilidade filtrada: usa só os meses até cada data. Descreve o passado; não é previsão de queda."
+              format={(v) => pct(v, 0)}
+            />
+          )}
+        </Section>
       )}
-      <Notes items={(data.warnings ?? [])} label="Avisos do laboratório" tone="neutral" />
+      <Notes
+        items={[
+          ...(data.warnings ?? []),
+          ...(data.verdict ? [`Veredito técnico: ${data.verdict}`] : []),
+          `Escolhido perde para a referência fora da amostra em ${data.loss_probability == null ? "—" : pct(data.loss_probability, 0)} das divisões.`,
+        ]}
+        label="Avisos do laboratório"
+        tone="neutral"
+      />
     </div>
   );
 }
 
-function LabPanel() {
+export function LabPanel() {
   const [tick, setTick] = useState(0);
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1832,148 +1223,6 @@ function LabPanel() {
 }
 
 // --- candidates -------------------------------------------------------------------------------
-
-interface CandidatesFormState {
-  horizonYears: string;
-  monthly: string;
-  wealthGoal: string;
-  includeScreener: boolean;
-  minVolume: string;
-  includeIneligible: boolean;
-  fixedWeight: boolean;
-  weightPct: string;
-  ruptureStress: boolean;
-  label: string;
-}
-
-const INITIAL_CANDIDATES: CandidatesFormState = {
-  horizonYears: "5",
-  monthly: "1000",
-  wealthGoal: "",
-  includeScreener: true,
-  minVolume: "1000000",
-  includeIneligible: false,
-  fixedWeight: false,
-  weightPct: "5",
-  ruptureStress: false,
-  label: "",
-};
-
-/** The API request from the form; null when the horizon is invalid. */
-export function toCandidatesRequest(form: CandidatesFormState): CandidatesRequest | null {
-  const years = Number.parseInt(form.horizonYears, 10);
-  if (!Number.isFinite(years) || years < 1 || years > 30) return null;
-  const goal = parseDecimal(form.wealthGoal);
-  const weight = percentInput(form.weightPct);
-  return {
-    horizon_years: years,
-    monthly_contribution: Math.max(parseDecimal(form.monthly) ?? 0, 0),
-    wealth_goal: goal !== null && goal > 0 ? goal : null,
-    include_screener: form.includeScreener,
-    screener_min_volume: Math.max(parseDecimal(form.minVolume) ?? 0, 0),
-    include_ineligible: form.includeIneligible,
-    weight_mode: form.fixedWeight ? "FIXED" : "NEXT_CONTRIBUTION",
-    fixed_weight: weight !== null && weight > 0 ? weight : 0.05,
-    rupture_stress: form.ruptureStress,
-    label: form.label.trim() || null,
-  };
-}
-
-function CandidatesForm({
-  onSubmitted,
-  open = true,
-}: Readonly<{ onSubmitted: (run: SimulationRunDTO) => void; open?: boolean }>) {
-  const [form, setForm] = useState<CandidatesFormState>(INITIAL_CANDIDATES);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const set = (change: Partial<CandidatesFormState>) => setForm((f) => ({ ...f, ...change }));
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const body = toCandidatesRequest(form);
-    if (!body) {
-      setError("Informe um horizonte de 1 a 30 anos.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      onSubmitted(await api.simulations.submitCandidates(body));
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <FormCard title="Avaliar candidatos" hint="Horizonte, aporte e de onde vêm os candidatos" open={open}>
-      <form onSubmit={submit} aria-busy={saving} aria-label="Nova avaliação de candidatos">
-        <p className="app-card-hint">
-          Entram a watchlist e, se marcado, os mais negociados do screener, com os filtros do aporte real (até 20). Cada um é
-          posto na carteira de hoje.
-        </p>
-        {error && (
-          <p className="app-error-banner" role="alert">
-            {error}
-          </p>
-        )}
-        <fieldset className="app-field-grid" disabled={saving}>
-          <div className="app-field">
-            <label htmlFor="cand-years">Horizonte (anos)</label>
-            <input id="cand-years" inputMode="numeric" value={form.horizonYears} onChange={(e) => set({ horizonYears: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="cand-monthly">Aporte mensal (R$)</label>
-            <input id="cand-monthly" inputMode="decimal" value={form.monthly} onChange={(e) => set({ monthly: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="cand-goal">Meta de patrimônio (R$, opcional)</label>
-            <input id="cand-goal" inputMode="decimal" value={form.wealthGoal} onChange={(e) => set({ wealthGoal: e.target.value })} />
-          </div>
-          <div className="app-field">
-            <label htmlFor="cand-volume">Volume mínimo no screener (R$/dia)</label>
-            <input id="cand-volume" inputMode="decimal" value={form.minVolume} onChange={(e) => set({ minVolume: e.target.value })} />
-          </div>
-          {form.fixedWeight && (
-            <div className="app-field">
-              <label htmlFor="cand-weight">Peso do candidato na carteira (%)</label>
-              <input id="cand-weight" inputMode="decimal" value={form.weightPct} onChange={(e) => set({ weightPct: e.target.value })} />
-            </div>
-          )}
-          <div className="app-field">
-            <label htmlFor="cand-label">Nome (opcional)</label>
-            <input id="cand-label" value={form.label} maxLength={120} onChange={(e) => set({ label: e.target.value })} />
-          </div>
-        </fieldset>
-        <div className="app-check-row">
-          <label className="app-check">
-            <input type="checkbox" checked={form.includeScreener} onChange={(e) => set({ includeScreener: e.target.checked })} />
-            Incluir os mais negociados do screener
-          </label>
-          <label className="app-check">
-            <input type="checkbox" checked={form.includeIneligible} onChange={(e) => set({ includeIneligible: e.target.checked })} />
-            Incluir os fora da elegibilidade (marcados)
-          </label>
-          <label className="app-check">
-            <input type="checkbox" checked={form.fixedWeight} onChange={(e) => set({ fixedWeight: e.target.checked })} />
-            Usar um peso fixo (em vez da parte que o próximo aporte daria)
-          </label>
-          <label className="app-check">
-            <input type="checkbox" checked={form.ruptureStress} onChange={(e) => set({ ruptureStress: e.target.checked })} />
-            Ruptura em estresse (perda de 90% em vez de 55%)
-          </label>
-        </div>
-        <div className="app-form-actions">
-          <button type="submit" className="app-primary-button" disabled={saving}>
-            {saving && <Spinner size="sm" />}
-            <span>Avaliar candidatos</span>
-          </button>
-        </div>
-      </form>
-    </FormCard>
-  );
-}
 
 function signedBrl(value: number): string {
   return `${value > 0 ? "+" : ""}${brl(value)}`;
@@ -2113,67 +1362,8 @@ export function CandidatesView({ data, run }: Readonly<{ data: CandidatesDTO; ru
   );
 }
 
-function CandidatesTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
+export function CandidatesTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
   const state = useApi(`simulation-candidates-${run.id}-${run.status}`, () => api.simulations.candidates(run.id));
   if (run.status !== "DONE") return <RunProblem run={run} />;
   return <Async state={state}>{(data) => <CandidatesView data={data} run={run} />}</Async>;
-}
-
-function candidatesDescription(run: SimulationRunDTO): string {
-  const count = Array.isArray(run.params?.candidates) ? (run.params?.candidates as unknown[]).length : 0;
-  return plural(count, "candidato", "candidatos");
-}
-
-function CandidatesPanel() {
-  const runs = useApi("simulation-candidate-runs", () => api.simulations.list(20, "CANDIDATES"));
-  const [selected, select] = useSelected("candidates", runs.data);
-  return (
-    <>
-      <CandidatesForm
-        open={(runs.data ?? []).length === 0}
-        onSubmitted={(run) => {
-          select(run.id);
-          runs.reload();
-        }}
-      />
-      <section className="app-card app-card-padded">
-        <h2 className="app-card-heading">Avaliações</h2>
-        <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
-        <Async state={runs}>
-          {(items) => (
-            <RunList runs={items} selected={selected} onSelect={select} onDeleted={(id) => {
-              if (id === selected) select(null);
-              runs.reload();
-            }} describe={candidatesDescription} describeLabel="Candidatos" />
-          )}
-        </Async>
-      </section>
-      {selected !== null && (
-        <SelectedRun key={selected} runId={selected} onStatus={runs.reload}>
-          {(detail) => <CandidatesTab run={detail} />}
-        </SelectedRun>
-      )}
-    </>
-  );
-}
-
-export function SimulationPage() {
-  const [tab, setTab] = useTab(TABS, "past");
-  return (
-    <div className="app-page">
-      <PageHeader
-        title="Simular carteira"
-        subtitle="As suas regras de aporte no passado e as faixas prováveis do futuro. Simulação, não recomendação."
-      />
-      <div className="app-page-stack">
-        <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Visões da simulação" />
-        <TabGuide tab={tab} />
-        {tab === "future" && <FuturePanel />}
-        {tab === "confidence" && <ConfidencePanel />}
-        {tab === "candidates" && <CandidatesPanel />}
-        {tab === "lab" && <LabPanel />}
-        {(tab === "past" || tab === "robustness") && <BacktestPanel tab={tab} />}
-      </div>
-    </div>
-  );
 }
