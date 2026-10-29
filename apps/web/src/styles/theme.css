@@ -804,6 +804,38 @@ a.app-icon-button {
   background: var(--app-surface-muted);
 }
 
+.app-table tbody th[scope="row"] {
+  text-align: left;
+  font-weight: 400;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--app-border-subtle);
+  color: var(--app-text);
+  vertical-align: middle;
+}
+
+.app-table tbody tr:last-child th[scope="row"] {
+  border-bottom: none;
+}
+
+/* Totals row: same grid as the body, set apart by a stronger rule. */
+.app-table tfoot th,
+.app-table tfoot td {
+  padding: var(--space-3) var(--space-4);
+  border-top: 2px solid var(--app-border);
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.app-table tfoot th {
+  text-align: left;
+}
+
+.app-table tfoot td.app-numeric {
+  text-align: right;
+}
+
 .app-table tbody tr.app-table-group td {
   padding-top: var(--space-3);
   font-size: var(--text-micro);
@@ -3091,5 +3123,58 @@ details[open] > summary {
   details {
     display: block;
   }
+}
+
+/* Wealth by account (Home) ---------------------------------------------------------------- */
+.wealth-table .wealth-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wealth-table .home-delta {
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.wealth-table .wealth-account {
+  width: 28%;
+}
+
+.wealth-share-head {
+  width: 180px;
+}
+
+.wealth-share {
+  min-width: 160px;
+}
+
+.wealth-share-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wealth-share-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--app-border-subtle);
+  overflow: hidden;
+}
+
+.wealth-share-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--viz-serie-1);
+}
+
+.wealth-share-value {
+  min-width: 48px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
