@@ -141,7 +141,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00027`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00028`):
 
 ```mermaid
 erDiagram
@@ -347,4 +347,8 @@ Rotina diária `sync_cvm_documents`: FCA dos últimos 3 anos → mapa ticker →
 As telas (carteira, Início, alertas, saúde, observação e candidatos) não chamam os provedores de mercado: leem a última cotação e os últimos fundamentos de `market_data` (`infra/providers/stored.py`). Só o worker fala com Brapi e Yahoo, nas rotinas `warm_portfolio_quotes` (posições) e `refresh_watchlist_quotes` (observação); se um provedor falha, o valor anterior fica. Um ticker que nunca foi gravado (ativo recém-cadastrado) é buscado ao vivo uma vez, só ele. `GET /market/quotes/status` (MCP `market.quote_status`) diz a idade das cotações das posições; o botão "Atualizar" do Início pede `warm_portfolio_quotes` ao worker. O tempo de resposta passa a depender do banco, não do número de ativos cadastrados nem do provedor.
 
 Fase 39 estendeu a regra a todo dado exibido: histórico diário de preço (`asset_price_history`), proventos declarados e indicadores do catálogo (`market_data`), CDI e IPCA anuais (calculados de `market_series`) e câmbio do aporte. Cada gravação de cotação também deixa o último preço do dia em `market_quote_history` (`GET /market/quotes/{ticker}/history`, MCP `market.quote_history`). O que ainda vai ao provedor numa requisição é só o ticker nunca gravado: no máximo 25 por requisição, nunca para ativo arquivado.
+
+### Navegação (Fase 40.3)
+
+A barra do topo mostra a trilha (`layout/trail.ts`, `layout/Breadcrumbs.tsx`): as seções ficam sob o Início e uma página de detalhe fica sob a página de onde foi aberta, com cada link para o endereço que aquela página tinha (filtros da URL incluídos). O estado que não cabe na URL (filtros, a última busca do screener, um plano de aporte ainda não confirmado) fica na sessão do navegador (`utils/storedState.ts`), e a rolagem é restaurada ao voltar. Simulações excluídas ficam com `deleted_at` preenchido e somem de vez das listas, consultas, reaproveitamento e fila.
 

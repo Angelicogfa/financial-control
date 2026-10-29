@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from domain.simulation.entities import SimulationKind, SimulationResult, SimulationRun
 
@@ -25,6 +26,11 @@ class AbstractSimulationRepository(ABC):
         self, limit: int = 20, kind: SimulationKind | None = None
     ) -> list[SimulationRun]:
         """Newest first, optionally of one kind."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def mark_deleted(self, run_id: int, *, deleted_at: datetime) -> bool:
+        """Hide a run for good (Phase 40.4); False when it does not exist or is already gone."""
         raise NotImplementedError
 
     @abstractmethod

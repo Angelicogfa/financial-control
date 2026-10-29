@@ -7,6 +7,7 @@ import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
 import { day, plural } from "../../utils/format";
+import { useStoredState } from "../../utils/storedState";
 
 /** The categories of most interest first; the others come from what the companies filed. */
 export const MAIN_CATEGORIES = ["Fato Relevante", "Comunicado ao Mercado", "Aviso aos Acionistas"];
@@ -53,8 +54,8 @@ export function DisclosureFeed({
   limit = 30,
   title = "Fatos relevantes e comunicados (CVM)",
 }: Readonly<{ assetId?: number; limit?: number; title?: string }>) {
-  const [category, setCategory] = useState("");
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [category, setCategory] = useStoredState(`disclosures:${assetId ?? "all"}:category`, "");
+  const [unreadOnly, setUnreadOnly] = useStoredState(`disclosures:${assetId ?? "all"}:unread`, false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const feed = useApi(`disclosures-${assetId ?? "all"}-${category}-${unreadOnly}-${limit}`, () =>

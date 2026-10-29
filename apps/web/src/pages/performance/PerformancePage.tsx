@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { api } from "../../api/endpoints";
 import type { PortfolioAnalyticsResponseDTO, PortfolioReportResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
@@ -11,6 +9,7 @@ import { brl, brlCompact, daysAgo, monthLabel, num, pct, plural, points } from "
 import { ColumnChart } from "../../viz/ColumnChart";
 import { TrendChart } from "../../viz/TrendChart";
 import { alignCurves, curveReturn, lastMonths } from "../home/story";
+import { useStoredState } from "../../utils/storedState";
 
 const PERIODS = [
   { key: "6m", label: "6 meses", days: 182 },
@@ -304,7 +303,7 @@ function Content({
 }
 
 export function PerformancePage() {
-  const [period, setPeriod] = useState<PeriodKey>("12m");
+  const [period, setPeriod] = useStoredState<PeriodKey>("performance:period", "12m");
   const days = PERIODS.find((p) => p.key === period)?.days ?? 365;
   const since = daysAgo(days);
   const periodText = period === "all" ? "todo o histórico" : (PERIODS.find((p) => p.key === period)?.label ?? "");

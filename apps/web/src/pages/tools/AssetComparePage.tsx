@@ -28,6 +28,7 @@ import {
 } from "../../utils/labels";
 import { TrendChart } from "../../viz/TrendChart";
 import { useScreenerSearch, type ScreenerSearch } from "../research/useScreenerSearch";
+import { useStoredState } from "../../utils/storedState";
 
 export const MAX_COMPARED = 5;
 
@@ -192,7 +193,7 @@ function SearchResults({
 
 /** Finds candidates in the B3 catalog by name, sector and ARCA class, like the screener. */
 function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (ticker: string) => void }>) {
-  const [form, setForm] = useState<SearchForm>(EMPTY_SEARCH);
+  const [form, setForm] = useStoredState<SearchForm>("compare:search-form", EMPTY_SEARCH);
   const search = useScreenerSearch();
   const { result, error, loading } = search;
   const sectors = useApi("research-sectors", () => api.research.sectors());

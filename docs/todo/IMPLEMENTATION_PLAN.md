@@ -53,7 +53,7 @@
 | **Fase 37** | Leitura Empresarial: Narrativa e Padrão Visual | `[x]` Concluída | 100% |
 | **Fase 38** | Cotações Persistidas: o Worker Atualiza, as Telas Leem do Banco | `[x]` Concluída | 100% |
 | **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
-| **Fase 40** | Fatos Relevantes em Página Própria e Patrimônio por Conta no Início | `[ ]` Pendente | 0% |
+| **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -778,10 +778,13 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **39.7** Câmbio na confirmação de aporte lido de `market_data` (`USDBRL=X`, atualizado com as posições a cada 5 min).
 - `[x]` **39.8** Proteção das buscas ao vivo que restam (ticker nunca gravado): no máximo 25 por requisição e nunca para ativo arquivado.
 
-## Fase 40 — Fatos Relevantes em Página Própria e Patrimônio por Conta no Início (`[ ]` Pendente)
+## Fase 40 — Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações (`[x]` Concluída)
 
-**Objetivo (pedido do usuário):** tirar do Início o que tem tela própria e mostrar onde está o dinheiro.
+**Objetivo (pedido do usuário):** tirar do Início o que tem tela própria, mostrar onde está o dinheiro, navegar com trilha e voltar sem perder nada, e poder excluir simulações.
 
-- `[ ]` **40.1** Fatos relevantes e comunicados da CVM numa página dedicada, no menu logo abaixo de Saúde da carteira; o Início deixa de ter o cartão de comunicados (o alerta de fato relevante continua levando à página).
-- `[ ]` **40.2** Início: patrimônio por conta de custódia, cada conta separada em Bolsa (Caixa, Ações e Real Estate) e Internacional, com valor, peso e alta ou queda sobre o investido.
+- `[x]` **40.1** Página Fatos relevantes (`/disclosures`), no menu logo abaixo de Saúde da carteira, com as notas de leitura; o Início deixa de ter o cartão e o alerta de fato relevante sem ativo leva à página.
+- `[x]` **40.2** Início: "Patrimônio por conta" com cada conta em Bolsa (Caixa, Ações e Real Estate) e Internacional, valor, peso e alta ou queda sobre o investido (`GET /api/v1/portfolio/by-account`, MCP `portfolio.by_account`, regra única em `domain/portfolio/services/market_split.py`).
+- `[x]` **40.3** Breadcrumb em todas as páginas, na barra do topo, com "Voltar": as seções ficam sob o Início e uma página de detalhe (ativo, plano de aporte, lançamento) fica sob a página de onde foi aberta; cada link volta ao endereço que a página tinha. Filtros, a última busca do screener e a rolagem voltam com a página (`utils/storedState.ts`, sessão do navegador).
+- `[x]` **40.4** Excluir simulação: exclusão lógica (`simulation_runs.deleted_at`, migração `script_00028`) que tira a rodada de toda lista, consulta, reaproveitamento e fila, sem rota de recuperação; botão na lista de cada aba e MCP `simulation.delete`.
+- `[x]` **40.5** O ativo sugerido no plano de aporte abre a página do ativo; o "Voltar" retorna ao plano com as quantidades, preços, data e conta digitados.
 

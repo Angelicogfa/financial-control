@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from controllers.simulation.dependencies import get_simulation_handler
 from controllers.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
@@ -128,6 +128,16 @@ def get_robustness(
     handler: SimulationHandler = Depends(get_simulation_handler),
 ) -> RobustnessDTO:
     return handler.robustness(run_id)
+
+
+@simulation_router.delete("/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_run(
+    run_id: int,
+    handler: SimulationHandler = Depends(get_simulation_handler),
+) -> Response:
+    """Delete a simulation for good (logical deletion, no restore)."""
+    handler.delete_run(run_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @simulation_router.get("/{run_id}", response_model=SimulationRunDetailDTO)

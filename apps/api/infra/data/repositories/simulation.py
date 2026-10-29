@@ -5,6 +5,8 @@ It takes and returns pure domain entities and never commits
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -48,12 +50,27 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
 
     def get(self, run_id: int) -> SimulationRun | None:
         model = self.session.get(SimulationRunModel, run_id)
-        return to_simulation_run(model) if model is not None else None
+        if model is None or model.deleted_at is not None:
+            return None
+        return to_simulation_run(model)
+
+    def mark_deleted(self, run_id: int, *, deleted_at: datetime) -> bool:
+        model = self.session.get(SimulationRunModel, run_id)
+        if model is None or model.deleted_at is not None:
+            return False
+        model.deleted_at = deleted_at
+        self.session.flush()
+        return True
 
     def list_recent(
         self, limit: int = 20, kind: SimulationKind | None = None
     ) -> list[SimulationRun]:
-        stmt = select(SimulationRunModel).order_by(SimulationRunModel.id.desc()).limit(limit)
+        stmt = (
+            select(SimulationRunModel)
+            .where(SimulationRunModel.deleted_at.is_(None))
+            .order_by(SimulationRunModel.id.desc())
+            .limit(limit)
+        )
         if kind is not None:
             stmt = stmt.where(SimulationRunModel.kind == kind.value)
         return [to_simulation_run(m) for m in self.session.scalars(stmt).all()]
@@ -61,7 +78,10 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
     def next_pending(self) -> SimulationRun | None:
         stmt = (
             select(SimulationRunModel)
-            .where(SimulationRunModel.status == SimulationStatus.PENDING.value)
+            .where(
+                SimulationRunModel.status == SimulationStatus.PENDING.value,
+                SimulationRunModel.deleted_at.is_(None),
+            )
             .order_by(SimulationRunModel.id.asc())
             .limit(1)
         )
@@ -79,6 +99,7 @@ class SqlAlchemySimulationRepository(AbstractSimulationRepository):
                 SimulationRunModel.data_hash == data_hash,
                 SimulationRunModel.code_version == code_version,
                 SimulationRunModel.reused_from.is_(None),
+                SimulationRunModel.deleted_at.is_(None),
             )
             .order_by(SimulationRunModel.id.desc())
             .limit(1)

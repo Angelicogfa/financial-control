@@ -17,6 +17,7 @@ import { Async, Empty, Spinner } from "../../components/States";
 import { brl, dateTime, num, parseDecimal, plural, points, quantity, today } from "../../utils/format";
 import { ARCA_LABELS, PLAN_STATUS_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
+import { clearStored, useStoredState } from "../../utils/storedState";
 
 const STEPS = ["Valor", "Classes", "Ativos", "Confirmar"];
 
@@ -236,9 +237,13 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
   const navigate = useNavigate();
   const report = useApi("contribution-current", () => api.portfolio.report());
   const accounts = useApi("accounts", () => api.accounts.list());
-  const [executions, setExecutions] = useState(() => initialExecutions(saved.plan.orders));
-  const [tradeDate, setTradeDate] = useState(today());
-  const [accountId, setAccountId] = useState<number | null>(null);
+  const draftKey = `contribute:${saved.id}`;
+  const [executions, setExecutions] = useStoredState(`${draftKey}:executions`, initialExecutions(saved.plan.orders));
+  const [tradeDate, setTradeDate] = useStoredState(`${draftKey}:date`, today());
+  const [accountId, setAccountId] = useStoredState<number | null>(`${draftKey}:account`, null);
+  const forgetDraft = () => {
+    for (const part of ["executions", "date", "account"]) clearStored(`${draftKey}:${part}`);
+  };
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [discarding, setDiscarding] = useState(false);
@@ -270,6 +275,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
     setBusy(true);
     try {
       await api.contributions.confirm(saved.id, { trade_date: tradeDate, account_id: accountId, executions: payload });
+      forgetDraft();
       onChange();
     } catch (err) {
       setError(errorMessage(err));
@@ -283,6 +289,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
     setDiscarding(true);
     try {
       await api.contributions.discard(saved.id);
+      forgetDraft();
       navigate("/contribute");
     } catch (err) {
       setError(errorMessage(err));
@@ -347,7 +354,9 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                       </td>
                       <td>
                         <span className="app-cell-main">
-                          <strong>{o.ticker}</strong>
+                          <Link className="app-link" to={`/asset/${o.asset_id}`}>
+                            <strong>{o.ticker}</strong>
+                          </Link>
                           <small>Peso alvo {points(o.intra_class_target_weight_pct)} na classe</small>
                         </span>
                       </td>

@@ -40,6 +40,7 @@ import {
 import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
 import { compareLink } from "../tools/AssetComparePage";
 import { useScreenerSearch, type ScreenerSearch } from "./useScreenerSearch";
+import { useStoredState } from "../../utils/storedState";
 
 type TabKey = "screener" | "treasury" | "watchlist";
 const TABS: TabSpec<TabKey>[] = [
@@ -210,7 +211,7 @@ function ResultsTable({
 }
 
 function Screener() {
-  const [form, setForm] = useState<ScreenForm>(EMPTY_FORM);
+  const [form, setForm] = useStoredState<ScreenForm>("research:screener-form", EMPTY_FORM);
   const search = useScreenerSearch();
   const { result, error, loading } = search;
   const [following, setFollowing] = useState<string | null>(null);
@@ -577,9 +578,12 @@ export function ResearchPage() {
 }
 
 function TreasuryScreener() {
-  const [q, setQ] = useState("");
-  const [indexer, setIndexer] = useState<FixedIncomeIndexer | "">("");
-  const [couponType, setCouponType] = useState<"" | "zero" | "semestral">("");
+  const [q, setQ] = useStoredState("research:treasury-q", "");
+  const [indexer, setIndexer] = useStoredState<FixedIncomeIndexer | "">("research:treasury-indexer", "");
+  const [couponType, setCouponType] = useStoredState<"" | "zero" | "semestral">(
+    "research:treasury-coupon",
+    "",
+  );
   const [result, setResult] = useState<TreasurySearchResponseDTO | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);

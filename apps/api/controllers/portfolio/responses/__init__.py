@@ -121,6 +121,40 @@ class PortfolioReportResponseDTO(BaseModel):
     value_by_purpose_brl: dict[str, float] = Field(default_factory=dict)
 
 
+class MarketGroupDTO(BaseModel):
+    """Bolsa (Caixa, Ações, Real Estate) or Internacional inside an account (Phase 40.2)."""
+
+    key: str
+    label: str
+    value_brl: float
+    invested_brl: float
+    pnl_brl: float
+    change: float | None = Field(
+        default=None, description="Consolidated result over the invested amount (fraction)."
+    )
+
+
+class AccountWealthDTO(BaseModel):
+    account_id: int
+    name: str
+    institution: str | None = None
+    value_brl: float
+    invested_brl: float
+    pnl_brl: float
+    change: float | None = None
+    share: float = Field(description="Weight of the account in the total wealth (fraction).")
+    groups: list[MarketGroupDTO]
+
+
+class WealthByAccountDTO(BaseModel):
+    """Current wealth of each custody account, split into Bolsa and Internacional."""
+
+    as_of_date: date
+    total_value_brl: float
+    accounts: list[AccountWealthDTO]
+    groups: list[MarketGroupDTO] = Field(description="Bolsa and Internacional over all accounts.")
+
+
 class ContributionSimulationRequest(BaseModel):
     """Payload to simulate a 2-level contribution across ARCA classes and assets."""
 

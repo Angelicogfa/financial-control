@@ -438,6 +438,63 @@ a.app-icon-button {
   font-weight: 600;
 }
 
+/* Breadcrumb (Phase 40.3): ancestors as links, the current page last. */
+.app-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.app-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.app-breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.app-breadcrumb li a {
+  color: var(--app-text-muted);
+  text-decoration: none;
+}
+
+.app-breadcrumb li a:hover,
+.app-breadcrumb li a:focus-visible {
+  color: var(--app-text);
+  text-decoration: underline;
+}
+
+.app-breadcrumb li .app-topbar-title {
+  color: var(--app-text);
+}
+
+.app-breadcrumb-back {
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.app-breadcrumb-back:hover {
+  background: var(--app-surface-muted, var(--app-surface));
+}
+
 .app-topbar-meta {
   margin-left: auto;
   font-size: var(--text-sm);

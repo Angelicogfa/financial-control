@@ -74,6 +74,7 @@ import type {
   TreasurySearchResponseDTO,
   WatchlistAddRequest,
   WatchlistItemDTO,
+  WealthByAccountDTO,
   WorkerErrorsResponseDTO,
 } from "./types";
 
@@ -141,6 +142,7 @@ export const api = {
     treasuryMarketDetail: (assetId: number) =>
       request<TreasuryMarketDTO>(`/portfolio/treasury-market/${assetId}`),
     earningsAgenda: () => request<EarningsAgendaDTO>("/portfolio/earnings-agenda"),
+    byAccount: () => request<WealthByAccountDTO>("/portfolio/by-account"),
   },
   alerts: {
     list: () => request<AlertsResponseDTO>("/alerts"),
@@ -181,6 +183,7 @@ export const api = {
     list: (limit = 20, kind?: SimulationKind) =>
       request<SimulationRunDTO[]>("/simulations", { query: { limit, kind } }),
     get: (id: number) => request<SimulationRunDetailDTO>(`/simulations/${id}`),
+    remove: (id: number) => request<void>(`/simulations/${id}`, { method: "DELETE" }),
     robustness: (id: number) => request<RobustnessDTO>(`/simulations/${id}/robustness`),
     projection: (id: number) => request<ProjectionDTO>(`/simulations/${id}/projection`),
     calibration: (runId?: number) =>

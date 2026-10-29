@@ -1,8 +1,17 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type ScreenerFilters } from "../../api/endpoints";
 import type { ScreenerResponseDTO } from "../../api/types";
 import { clampPage, DEFAULT_PAGE_SIZE } from "../../utils/pagination";
+import { readStored, writeStored } from "../../utils/storedState";
+
+const STORE_KEY = "research:screener-search";
+
+interface StoredSearch {
+  filters: ScreenerFilters;
+  page: number;
+  pageSize: number;
+}
 
 export interface ScreenerSearch {
   result: ScreenerResponseDTO | null;
@@ -53,12 +62,19 @@ export function useScreenerSearch(): ScreenerSearch {
       setFilters(next);
       setPage(target);
       setPageSize(size);
+      writeStored(STORE_KEY, { filters: next, page: target, pageSize: size } satisfies StoredSearch);
     } catch (err) {
       if (request === latest.current) setError(err);
     } finally {
       if (request === latest.current) setLoading(false);
     }
   };
+
+  // Coming back to the page (breadcrumb, "Voltar") shows the same search on the same page.
+  useEffect(() => {
+    const stored = readStored<StoredSearch | null>(STORE_KEY, null);
+    if (stored) void load(stored.filters, stored.page, stored.pageSize);
+  }, []);
 
   return {
     result,

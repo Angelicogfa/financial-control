@@ -27,6 +27,7 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { PageHeader } from "../../components/PageHeader";
+import { IconButton } from "../../components/RowActions";
 import { KpiGrid, Lead, Notes, Section, Segmented, type KpiSpec, type Tone } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
@@ -34,6 +35,7 @@ import { brl, brlCompact, day, dateTime, daysAgo, num, parseDecimal, pct, plural
 import { ARCA_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { ColumnChart } from "../../viz/ColumnChart";
+import { TrashIcon } from "../../layout/icons";
 import { compareLink } from "./AssetComparePage";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 
@@ -362,18 +364,38 @@ function RunList({
   runs,
   selected,
   onSelect,
+  onDeleted,
   describe = backtestPeriod,
   describeLabel = "Período",
 }: Readonly<{
   runs: SimulationRunDTO[];
   selected: number | null;
   onSelect: (id: number) => void;
+  /** After a run is deleted for good (Phase 40.4). */
+  onDeleted: (id: number) => void;
   describe?: (run: SimulationRunDTO) => string;
   describeLabel?: string;
 }>) {
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const remove = async (run: SimulationRunDTO) => {
+    const name = run.label || `Simulação #${run.id}`;
+    if (!window.confirm(`Excluir "${name}"? A simulação e o resultado somem e não há como recuperar.`)) return;
+    setDeleting(run.id);
+    setError(null);
+    try {
+      await api.simulations.remove(run.id);
+      onDeleted(run.id);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setDeleting(null);
+    }
+  };
   if (runs.length === 0) return <Empty title="Nenhuma simulação ainda" hint="Preencha o formulário e clique em Simular." />;
   return (
     <div className="app-table-wrap">
+      {error && <p className="app-error-banner">{error}</p>}
       <table className="app-table" aria-label="Simulações">
         <thead>
           <tr>
@@ -381,6 +403,7 @@ function RunList({
             <th>{describeLabel}</th>
             <th>Status</th>
             <th>Pedida em</th>
+            <th aria-label="Ações" />
           </tr>
         </thead>
         <tbody>
@@ -402,6 +425,16 @@ function RunList({
                 <StatusBadge status={run.status} />
               </td>
               <td>{dateTime(run.created_at)}</td>
+              <td className="app-row-actions">
+                <IconButton
+                  label={`Excluir ${run.label || `simulação #${run.id}`}`}
+                  busyLabel="Excluindo…"
+                  icon={<TrashIcon />}
+                  danger
+                  busy={deleting === run.id}
+                  onClick={() => void remove(run)}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -1571,14 +1604,16 @@ function SelectedRun({
 }
 
 /** The run chosen in the URL (`param`), or the newest one. */
-function useSelected(param: string, runs: SimulationRunDTO[] | null | undefined): [number | null, (id: number) => void] {
+function useSelected(param: string, runs: SimulationRunDTO[] | null | undefined): [number | null, (id: number | null) => void] {
   const [params, setParams] = useSearchParams();
   const selected = Number(params.get(param)) || runs?.[0]?.id || null;
-  const select = (id: number) =>
+  /** `null` drops the choice (after a delete), so the newest run shows. */
+  const select = (id: number | null) =>
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
-        next.set(param, String(id));
+        if (id === null) next.delete(param);
+        else next.set(param, String(id));
         return next;
       },
       { replace: true },
@@ -1601,7 +1636,10 @@ function BacktestPanel({ tab }: Readonly<{ tab: "past" | "robustness" }>) {
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Simulações do passado</h2>
         <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
-        <Async state={runs}>{(items) => <RunList runs={items} selected={selected} onSelect={select} />}</Async>
+        <Async state={runs}>{(items) => <RunList runs={items} selected={selected} onSelect={select} onDeleted={(id) => {
+              if (id === selected) select(null);
+              runs.reload();
+            }} />}</Async>
       </section>
       {selected !== null && (
         <SelectedRun key={`${selected}-${tab}`} runId={selected} onStatus={runs.reload}>
@@ -1629,7 +1667,10 @@ function FuturePanel() {
         <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
         <Async state={runs}>
           {(items) => (
-            <RunList runs={items} selected={selected} onSelect={select} describe={projectionHorizon} describeLabel="Horizonte" />
+            <RunList runs={items} selected={selected} onSelect={select} onDeleted={(id) => {
+              if (id === selected) select(null);
+              runs.reload();
+            }} describe={projectionHorizon} describeLabel="Horizonte" />
           )}
         </Async>
       </section>
@@ -2100,7 +2141,10 @@ function CandidatesPanel() {
         <p className="app-card-hint">Escolha uma linha para ver o resultado abaixo.</p>
         <Async state={runs}>
           {(items) => (
-            <RunList runs={items} selected={selected} onSelect={select} describe={candidatesDescription} describeLabel="Candidatos" />
+            <RunList runs={items} selected={selected} onSelect={select} onDeleted={(id) => {
+              if (id === selected) select(null);
+              runs.reload();
+            }} describe={candidatesDescription} describeLabel="Candidatos" />
           )}
         </Async>
       </section>
