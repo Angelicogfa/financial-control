@@ -80,6 +80,7 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
+from controllers.recommendation.responses import LensBoardDTO
 from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import (
     AssetComparisonDTO,
@@ -132,6 +133,7 @@ from domain.mining.services import MiningHandler
 from domain.policy.services.use_cases import PolicyHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.use_cases import PortfolioHandler
+from domain.recommendation.services import RecommendationHandler
 from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
@@ -161,11 +163,21 @@ CONTEXT_LABELS: dict[str, str] = {
     "simulation": "Simulação de carteira",
     "study": "Estudos de simulação",
     "disclosures": "Comunicados da CVM",
+    "recommendation": "Recomendação",
 }
 
 
 class EmptyInput(BaseModel):
     """Input model for operations that take no parameters."""
+
+
+class LensBoardInput(BaseModel):
+    """Filters of the lenses: an ARCA class, where the asset comes from, or one ticker."""
+
+    arca_class: Literal["ACOES", "REAL_ESTATE", "ATIVOS_INTERNACIONAIS"] | None = None
+    source: Literal["PORTFOLIO", "WATCHLIST", "CATALOG"] | None = None
+    ticker: str | None = Field(default=None, min_length=1, max_length=16)
+    eligible: bool | None = None  # True: only who passed every gate; False: only who failed
 
 
 class TickerInput(BaseModel):
@@ -217,6 +229,7 @@ class JobRequestInput(BaseModel):
         "estimate_forecast_models",
         "sync_mining_universe",
         "run_mining",
+        "refresh_asset_lenses",
     ]
 
 
@@ -534,6 +547,10 @@ class AgenticRuntimeHandlers:
         return MiningHandler(uow_factory=self.uow_factory)
 
     @property
+    def recommendation(self) -> RecommendationHandler:
+        return RecommendationHandler(uow_factory=self.uow_factory)
+
+    @property
     def statements(self) -> StatementsHandler:
         return StatementsHandler(uow_factory=self.uow_factory)
 
@@ -734,6 +751,25 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=TickerInput,
         output_type=MiningWhyDTO,
         invoke=lambda h, p: h.mining.why(p.ticker),
+    ),
+    OperationSpec(
+        name="recommendation.lenses",
+        kind="query",
+        description=(
+            "Lentes da recomendação (Fase 45.1) de cada ativo da carteira, da watchlist e das "
+            "ações líquidas do catálogo: Cerrado (0 a 10; sem análise = 0, com destaque para "
+            "analisar), qualidade, valuation, melhora, momentum, renda e risco (z frente ao "
+            "setor, ±3) e projeção (previsão de preço sem a camada de valuation). Cada lente "
+            "traz o valor em [0, 1] (maior é melhor), a confiança e uma frase. Traz também os "
+            "portões (Fase 45.2: lançamentos, liquidez, histórico de preço, risco de ruína e "
+            "dados do provedor, este só como aviso) e se o ativo está apto (eligible). Ainda "
+            "não é a recomendação: a combinação pelo AHP vem na 45.3."
+        ),
+        input_model=LensBoardInput,
+        output_type=LensBoardDTO,
+        invoke=lambda h, p: h.recommendation.lenses(
+            arca_class=p.arca_class, source=p.source, ticker=p.ticker, eligible=p.eligible
+        ),
     ),
     OperationSpec(
         name="research.mining_universe",
@@ -1334,7 +1370,8 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "(proventos declarados), `refresh_catalog_fundamentals` (indicadores do "
             "screener), `refresh_asset_forecasts`, `calibrate_forecasts`, "
             "`estimate_forecast_models` (previsão de preço) e `sync_mining_universe` "
-            "(histórico do garimpo), `run_mining` (sinais do garimpo). O "
+            "(histórico do garimpo), `run_mining` (sinais do garimpo), `refresh_asset_lenses` "
+            "(lentes da recomendação). O "
             "worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),

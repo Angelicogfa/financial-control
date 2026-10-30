@@ -18,7 +18,7 @@ from domain.forecast.valuation_model import month_of
 from domain.mining.findings import RecordLine, ranking_weights
 from domain.mining.model import FINDINGS, MiningModel, ranking
 from domain.mining.runs import MINING
-from domain.mining.signals import IMPROVEMENT, MOMENTUM, QUALITY, VALUE
+from domain.mining.signals import IMPROVEMENT, MOMENTUM, QUALITY, SIGNALS, VALUE
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.shared.enums import AssetType
 from domain.simulation.data import px_symbol
@@ -169,6 +169,8 @@ class MiningHandler:
             return MiningWhyDTO(ticker=code, status="NOT_IN_UNIVERSE", reasons=reasons)
         panel: dict[str, dict] = {}
         for s in signals:
+            if s.signal not in SIGNALS:  # the panel also keeps the recommendation's signals
+                continue
             panel.setdefault(s.ticker, {}).setdefault(month_of(s.month), {})[s.signal] = s.z
         weights = ranking_weights(model)
         key = month_of(findings[0].month) if findings else None

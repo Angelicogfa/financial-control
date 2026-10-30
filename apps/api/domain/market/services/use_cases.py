@@ -39,7 +39,8 @@ MANUAL_JOBS: dict[str, str] = {
     "calibrate_forecasts": "Calibração da previsão de preço (quanto as faixas se confirmaram)",
     "estimate_forecast_models": "Valuation na previsão de preço, com teste fora da amostra",
     "sync_mining_universe": "Histórico de preço das ações líquidas do garimpo",
-    "run_mining": "Garimpo: sinais de valor, qualidade, melhora e momentum",
+    "run_mining": "Garimpo e painel de sinais: valor, qualidade, melhora, momentum, renda e risco",
+    "refresh_asset_lenses": "Lentes e portões da recomendação de cada ativo",
 }
 
 

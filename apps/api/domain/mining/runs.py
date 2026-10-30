@@ -4,6 +4,10 @@ The panel is the valuation layer's (42.3) on the mining universe: each company's
 delivery date, its split-adjusted monthly prices and splits, and its monthly return over the
 Ações class (the excess over the CDI minus the class's), which feeds momentum and, from 43.3, the
 outcome the weights are estimated on.
+
+The stored panel is the one register of point-in-time signals (Phase 45.1): besides the four of
+the Garimpo it keeps the recommendation's INCOME and RISK, computed in the same run. The
+Garimpo's model, findings and record use only its four.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from domain.mining.model import estimate_mining_model
 from domain.mining.repositories import MiningSignal
 from domain.mining.signals import mining_signals, month_list
 from domain.mining.universe import MIN_DAILY_VOLUME, MiningMember, mining_universe
+from domain.recommendation.signals import registry_signals
 from domain.shared.enums import ArcaClass
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.simulation.candidates import monthly_excess
@@ -46,10 +51,12 @@ def _monthly_prices(uow: AbstractUnitOfWork, ticker: str, end: date) -> dict[Mon
     return out
 
 
-def mining_panel(
-    uow: AbstractUnitOfWork, members: list[MiningMember], today: date
-) -> tuple[dict[str, CompanyInput], dict[str, dict[Month, float]]]:
-    """Companies with statements and prices, and their monthly return over the Ações class."""
+Panel = tuple[dict[str, CompanyInput], dict[str, dict[Month, float]], dict[str, dict[Month, float]]]
+
+
+def mining_panel(uow: AbstractUnitOfWork, members: list[MiningMember], today: date) -> Panel:
+    """Companies with statements and prices, their monthly return over the Ações class and over
+    the CDI."""
     companies: dict[str, CompanyInput] = {}
     for m in members:
         facts = uow.cvm_statements.facts_for(m.cnpj)
@@ -67,24 +74,28 @@ def mining_panel(
             ],
         )
     if not companies:
-        return {}, {}
+        return {}, {}, {}
     history = build_market_history(
         uow.market_series, sorted(companies), start=SIMULATION_HISTORY_START, end=today
     )
     try:
         sample = class_sample(history, [ArcaClass.ACOES])
     except InsufficientHistory:
-        return companies, {}
+        return companies, {}, {}
     k = CLASS_ORDER.index(ArcaClass.ACOES)
     alphas: dict[str, dict[Month, float]] = {}
+    over_cdi: dict[str, dict[Month, float]] = {}
     for ticker in companies:
         excess, mask = monthly_excess(history, ticker, sample)
+        over_cdi[ticker] = {
+            month_of(sample.months[i]): float(excess[i]) for i in range(sample.size) if mask[i]
+        }
         alphas[ticker] = {
             month_of(sample.months[i]): float(excess[i] - sample.excess[i, k])
             for i in range(sample.size)
             if mask[i]
         }
-    return companies, alphas
+    return companies, alphas, over_cdi
 
 
 MINING = "MINING"
@@ -99,15 +110,17 @@ def run_mining(
     """Signals of the universe, the gated model, this week's findings and the record."""
     as_of = today or date.today()
     members = mining_universe(uow, min_daily_volume)
-    companies, alphas = mining_panel(uow, members, as_of)
+    companies, alphas, over_cdi = mining_panel(uow, members, as_of)
     if not companies:
         return {"universe": len(members), "companies": 0, "signals": 0}
     first = min(min(c.prices) for c in companies.values())
     months = month_list(first, as_of)
     panel = mining_signals(companies, alphas, months)
+    extra = registry_signals(companies, over_cdi, months)
     rows = [
         MiningSignal(ticker=t, month=month_end(m), signal=name, z=z)
-        for t, by_month in panel.items()
+        for source in (panel, extra)
+        for t, by_month in source.items()
         for m, values in by_month.items()
         for name, z in values.items()
     ]

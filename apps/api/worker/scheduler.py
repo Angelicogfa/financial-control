@@ -26,6 +26,7 @@ from worker.jobs import (
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
     refresh_asset_forecasts_job,
+    refresh_asset_lenses_job,
     refresh_catalog_fundamentals_job,
     refresh_distributions_job,
     refresh_fundamentals_job,
@@ -110,6 +111,9 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
             batch=cfg.mining_history_batch,
         ),
         "run_mining": partial(run_mining_job, min_daily_volume=cfg.mining_min_daily_volume),
+        "refresh_asset_lenses": partial(
+            refresh_asset_lenses_job, min_daily_volume=cfg.mining_min_daily_volume
+        ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
 
@@ -307,6 +311,19 @@ def create_scheduler(
         hour=(cfg.fundamentals_cron_hour + 3) % 24,
         minute=0,
         id="run_mining",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "refresh_asset_lenses",
+            partial(refresh_asset_lenses_job, min_daily_volume=cfg.mining_min_daily_volume),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=(cfg.fundamentals_cron_hour + 4) % 24,
+        minute=0,
+        id="refresh_asset_lenses",
         replace_existing=True,
         **defaults,
     )

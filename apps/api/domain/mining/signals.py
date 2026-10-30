@@ -130,7 +130,7 @@ def momentum_raw(alphas: Mapping[Month, float], month: Month) -> float | None:
     return float(sum(values))  # type: ignore[arg-type]
 
 
-def _family_scores(
+def family_scores(
     raw: Mapping[str, Mapping[Month, Mapping[str, float]]],
     parts: Sequence[str],
     sectors: Mapping[str, str],
@@ -162,8 +162,8 @@ def mining_signals(
     sectors = {t: c.sector for t, c in companies.items()}
     value = value_scores({t: company_yields(c) for t, c in companies.items()}, sectors)
     raw = {t: {m: fundamentals_raw(c, m) for m in months} for t, c in companies.items()}
-    quality = _family_scores(raw, QUALITY_PARTS, sectors)
-    improvement = _family_scores(raw, IMPROVEMENT_PARTS, sectors)
+    quality = family_scores(raw, QUALITY_PARTS, sectors)
+    improvement = family_scores(raw, IMPROVEMENT_PARTS, sectors)
     momentum_rows = {
         t: {
             m: {"momentum": v}
@@ -172,7 +172,7 @@ def mining_signals(
         }
         for t in companies
     }
-    momentum = _family_scores(momentum_rows, ("momentum",), sectors)
+    momentum = family_scores(momentum_rows, ("momentum",), sectors)
 
     out: dict[str, dict[Month, dict[str, float]]] = defaultdict(dict)
     for name, family in (

@@ -32,6 +32,7 @@ from domain.mining.signals import (
     mining_signals,
     momentum_raw,
 )
+from domain.recommendation.signals import INCOME, REGISTRY_SIGNALS, RISK
 from domain.shared.entities import CatalogInstrument
 from domain.shared.enums import AssetType, SeriesUnit
 from domain.simulation.data import index_symbol, px_symbol, tr_symbol
@@ -124,8 +125,9 @@ def test_signals_order_the_companies() -> None:
     assert all(-3 <= z <= 3 for r in rows.values() for z in r.values())
 
 
-def test_run_mining_stores_the_panel(api: SimpleNamespace) -> None:
-    companies, _alphas, months = _companies()
+def seed_panel(api: SimpleNamespace) -> dict[str, CompanyInput]:
+    """Twelve liquid companies with statements and weekly prices, mapped to the CVM."""
+    companies, _alphas, _months = _companies()
     days = [date(2019, 1, 2) + timedelta(days=7 * i) for i in range(270)]
     rng = np.random.default_rng(3)
     ibov = 100_000 * np.cumprod(1 + rng.normal(0.001, 0.02, len(days)))
@@ -180,7 +182,11 @@ def test_run_mining_stores_the_panel(api: SimpleNamespace) -> None:
             "CDI", [(d, 0.04) for d in days], unit=SeriesUnit.PERCENT_PER_DAY
         )
         uow.commit()
+    return companies
 
+
+def test_run_mining_stores_the_panel(api: SimpleNamespace) -> None:
+    seed_panel(api)
     details = run_mining_job(api.uow_factory, offline_gateway(), now=NOW)
     assert details["universe"] == 12 and details["companies"] == 12 and details["signals"] > 0
     with api.uow_factory() as uow:
@@ -188,7 +194,10 @@ def test_run_mining_stores_the_panel(api: SimpleNamespace) -> None:
         own = uow.mining.signals_for("C113")
         priced = max(s.month for s in own if s.signal == MOMENTUM)  # synthetic prices end in 2024
         month = uow.mining.signals_of_month(priced)
-        assert {s.signal for s in month} == {VALUE, QUALITY, IMPROVEMENT, MOMENTUM}
+        # The one register of point-in-time signals: the Garimpo's four and, from Phase 45.1,
+        # the recommendation's income and risk.
+        assert {s.signal for s in month} == set(REGISTRY_SIGNALS)
+        assert {INCOME, RISK} <= {s.signal for s in own}
     assert details["last_month"] == last.isoformat()
     # Recomputing replaces the panel instead of piling it up.
     again = run_mining_job(api.uow_factory, offline_gateway(), now=NOW)

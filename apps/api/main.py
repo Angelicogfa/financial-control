@@ -25,6 +25,7 @@ from controllers.ledger.router import (
 from controllers.market.router import market_router
 from controllers.policy.router import policy_router, settings_router
 from controllers.portfolio.router import portfolio_router
+from controllers.recommendation.router import recommendation_router
 from controllers.research.router import research_router
 from controllers.simulation.router import simulation_router
 from controllers.simulation.study_router import study_router
@@ -59,6 +60,7 @@ PROTECTED_ROUTERS = (
     study_router,
     simulation_router,
     disclosures_router,
+    recommendation_router,
 )
 
 

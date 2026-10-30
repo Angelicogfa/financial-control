@@ -16,6 +16,7 @@ from domain.market.repositories import (
     AbstractPriceHistoryRepository,
 )
 from domain.mining.repositories import AbstractMiningRepository
+from domain.recommendation.repositories import AbstractRecommendationRepository
 from domain.shared.repositories import (
     AbstractAccountRepository,
     AbstractAgentKeyRepository,
@@ -74,6 +75,7 @@ class AbstractUnitOfWork(ABC):
     price_history: AbstractPriceHistoryRepository
     forecasts: AbstractForecastRepository
     mining: AbstractMiningRepository
+    recommendation: AbstractRecommendationRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

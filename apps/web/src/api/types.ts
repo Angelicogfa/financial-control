@@ -229,6 +229,17 @@ export interface AssetHistoryDTO {
   points?: HistoryPointDTO[];
 }
 
+export interface AssetLensesDTO {
+  ticker: string;
+  source: "PORTFOLIO" | "WATCHLIST" | "CATALOG";
+  arca_class?: string | null;
+  sector?: string;
+  signal_ticker?: string | null;
+  lenses?: LensDTO[];
+  eligible?: boolean | null;
+  gates?: GateDTO[];
+}
+
 export type AssetLifecycle = "WATCHLIST" | "ELIGIBLE" | "HELD" | "REVIEW" | "ARCHIVED";
 
 export interface AssetPriceHistoryDTO {
@@ -1120,6 +1131,13 @@ export interface GainPointDTO {
   value: number;
 }
 
+export interface GateDTO {
+  gate: "LEDGER" | "LIQUIDITY" | "HISTORY" | "RUIN" | "DATA";
+  label: string;
+  status: "PASS" | "FAIL" | "WARN" | "NOT_APPLICABLE";
+  reason: string;
+}
+
 export interface GeneratorCalibrationDTO {
   key: string;
   label: string;
@@ -1369,6 +1387,24 @@ export interface LabModelDTO {
   passed: boolean;
   reasons?: string[];
   cumulative_gain?: GainPointDTO[];
+}
+
+export interface LensBoardDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  assets?: AssetLensesDTO[];
+  counts?: Record<string, number>;
+  eligible?: number;
+}
+
+export interface LensDTO {
+  lens: "CERRADO" | "QUALITY" | "VALUATION" | "IMPROVEMENT" | "MOMENTUM" | "INCOME" | "RISK" | "PROJECTION";
+  label: string;
+  value?: number | null;
+  normalized?: number | null;
+  confidence: number;
+  note: string;
+  flags?: string[];
 }
 
 export interface LiquidityDetailDTO {
