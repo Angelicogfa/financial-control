@@ -993,8 +993,7 @@ a.app-icon-button {
    the <label>: its bubble text would become part of the control's accessible name,
    and the trigger button would be interactive content inside the label. */
 .app-field-label {
-  display: flex;
-  align-items: center;
+  display: block;
 }
 
 .app-field-label label {
@@ -1014,9 +1013,10 @@ a.app-icon-button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-3);
-  /* Labels line up at the top of each row: a field with help text under its control
-     grows downwards instead of pushing its neighbours' labels out of line. */
-  align-items: start;
+  /* Controls line up at the bottom of each row, so a label wrapping to two lines does not
+     push its input below the neighbours'. Help text never goes under a control inside the
+     grid (it would lift that field's label): use a Hint, or a line below the grid. */
+  align-items: end;
 }
 
 /* A checkbox keeps its size whatever the label length: the control never shrinks when the

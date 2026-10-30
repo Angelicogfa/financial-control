@@ -480,6 +480,28 @@ describe("contribute", () => {
     });
   });
 
+  it("lists only the assets the plan buys until the filter is cleared", async () => {
+    const base = savedPlan();
+    const idle = { ...base.plan.orders[0], asset_id: 4, ticker: "KNRI11", recommended_quantity: 0, allocated_amount_brl: 0, executed_amount_brl: 0 };
+    mockApi([
+      { path: "/contributions/7", reply: savedPlan({ plan: { ...base.plan, orders: [...base.plan.orders, idle] } }) },
+      { path: "/portfolio/consolidated", reply: report() },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/contribute/7");
+    const filter = await screen.findByLabelText(/Só os recomendados para comprar \(1 de 2\)/);
+    expect(filter).toBeChecked();
+    expect(screen.getByLabelText("Comprar HGLG11")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Comprar KNRI11")).not.toBeInTheDocument();
+
+    fireEvent.click(filter);
+    fireEvent.click(screen.getByLabelText("Comprar KNRI11"));
+    // Ticked by hand, it stays listed when the filter comes back.
+    fireEvent.click(screen.getByLabelText(/Só os recomendados para comprar/));
+    expect(screen.getByLabelText("Comprar KNRI11")).toBeChecked();
+    expect(screen.getByLabelText(/Só os recomendados para comprar \(2 de 2\)/)).toBeChecked();
+  });
+
   it("refuses to confirm without any asset", async () => {
     mockApi([
       { path: "/contributions/7", reply: savedPlan() },
