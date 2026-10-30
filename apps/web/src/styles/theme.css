@@ -1994,6 +1994,20 @@ ul.app-info-banner li + li {
   word-break: break-all;
 }
 
+.app-rated {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-rating-reference {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}
+
 .app-run-list {
   display: flex;
   flex-direction: column;

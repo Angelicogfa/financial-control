@@ -154,6 +154,7 @@ export interface AssetAnalysisResponseDTO {
   risk_return: RiskReturnSummaryDTO;
   benchmark: string;
   price_history: Record<string, unknown>[];
+  indicator_ratings?: Record<string, IndicatorRatingDTO>;
 }
 
 export interface AssetComparisonDTO {
@@ -1267,6 +1268,11 @@ export interface ImportPreviewDTO {
 }
 
 export type IndicatorGroup = "VALUATION" | "DEBT" | "EFFICIENCY" | "PROFITABILITY" | "GROWTH";
+
+export interface IndicatorRatingDTO {
+  status: "GOOD" | "CAUTION" | "BAD" | "SUSPICIOUS";
+  reference: string;
+}
 
 export type IndicatorUnit = "FRACTION" | "MULTIPLE";
 

@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
-import type { AssetAnalysisResponseDTO } from "../../api/types";
+import type { AssetAnalysisResponseDTO, IndicatorRatingDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { Hint } from "../../components/Hint";
@@ -274,6 +274,32 @@ function Term({ label, hint }: Readonly<{ label: string; hint: string }>) {
   );
 }
 
+const RATING_LABELS: Record<IndicatorRatingDTO["status"], string> = {
+  GOOD: "Bom",
+  CAUTION: "Atenção",
+  BAD: "Ruim",
+  SUSPICIOUS: "Confira o dado",
+};
+const RATING_TONES: Record<IndicatorRatingDTO["status"], string> = {
+  GOOD: "success",
+  CAUTION: "warning",
+  BAD: "danger",
+  SUSPICIOUS: "neutral",
+};
+
+/** The value, whether it is good by the strategy's references, and against what. */
+function Rated({ value, rating }: Readonly<{ value: ReactNode; rating?: IndicatorRatingDTO }>) {
+  return (
+    <dd>
+      <span className="app-rated">
+        {value}
+        {rating && <Badge tone={RATING_TONES[rating.status]}>{RATING_LABELS[rating.status]}</Badge>}
+      </span>
+      {rating && <span className="app-rating-reference">{rating.reference}</span>}
+    </dd>
+  );
+}
+
 const STATEMENT_COLUMNS: Array<[string, string]> = [
   ["revenue", "Receita"],
   ["net_income", "Lucro líquido"],
@@ -288,6 +314,7 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
   const f = (analysis.fundamentals ?? {}) as Record<string, unknown>;
   const m = analysis.historical_metrics;
   const history = analysis.fundamental_history ?? [];
+  const ratings = analysis.indicator_ratings ?? {};
   return (
     <div className="app-page-stack">
       <div className="app-split">
@@ -298,7 +325,10 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
               {INDICATORS.map(([key, label, format, hint]) => (
                 <div key={key} style={{ display: "contents" }}>
                   <Term label={label} hint={hint} />
-                  <dd>{typeof f[key] === "number" ? format(f[key] as number) : "—"}</dd>
+                  <Rated
+                    value={typeof f[key] === "number" ? format(f[key] as number) : "—"}
+                    rating={typeof f[key] === "number" ? ratings[key] : undefined}
+                  />
                 </div>
               ))}
             </dl>
@@ -315,21 +345,17 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
                 {m.years} anos ({m.first_year}–{m.last_year})
               </dd>
               <Term label="ROE médio" hint={HISTORY_HINTS.roe} />
-              <dd>{pct(m.roe_average)}</dd>
+              <Rated value={pct(m.roe_average)} rating={ratings.roe_average} />
               <Term label="CAGR da receita" hint={HISTORY_HINTS.revenueCagr} />
-              <dd>{pct(m.revenue_cagr, 1, true)}</dd>
+              <Rated value={pct(m.revenue_cagr, 1, true)} rating={ratings.revenue_cagr} />
               <Term label="CAGR do lucro" hint={HISTORY_HINTS.earningsCagr} />
-              <dd>{pct(m.earnings_cagr, 1, true)}</dd>
+              <Rated value={pct(m.earnings_cagr, 1, true)} rating={ratings.earnings_cagr} />
               <Term label="Anos com lucro" hint={HISTORY_HINTS.profitableYears} />
-              <dd>
-                {m.profitable_years} de {m.years}
-              </dd>
+              <Rated value={`${m.profitable_years} de ${m.years}`} rating={ratings.profitable_years} />
               <Term label="Anos com proventos" hint={HISTORY_HINTS.dividendYears} />
-              <dd>
-                {m.dividend_years} de {m.years}
-              </dd>
+              <Rated value={`${m.dividend_years} de ${m.years}`} rating={ratings.dividend_years} />
               <Term label="Payout médio" hint={HISTORY_HINTS.payout} />
-              <dd>{pct(m.payout_average)}</dd>
+              <Rated value={pct(m.payout_average)} rating={ratings.payout_average} />
             </dl>
           ) : (
             <p className="app-muted">

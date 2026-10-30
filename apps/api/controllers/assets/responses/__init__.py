@@ -187,6 +187,13 @@ class ChecklistAnswerHistoryDTO(ChecklistAnswerDTO):
     question_id: str
 
 
+class IndicatorRatingDTO(BaseModel):
+    """Whether an indicator is good, and against what (the strategy's own references)."""
+
+    status: Literal["GOOD", "CAUTION", "BAD", "SUSPICIOUS"]
+    reference: str
+
+
 class AssetAnalysisResponseDTO(BaseModel):
     """Everything about one asset: position, fundamentals over time, valuation, checklist."""
 
@@ -202,6 +209,8 @@ class AssetAnalysisResponseDTO(BaseModel):
     risk_return: RiskReturnSummaryDTO
     benchmark: str
     price_history: list[dict[str, Any]]
+    # By indicator key (fundamentals and history), e.g. "price_to_earnings", "roe_average".
+    indicator_ratings: dict[str, IndicatorRatingDTO] = Field(default_factory=dict)
 
 
 PriceRange = Literal["6mo", "1y", "2y", "5y", "max"]

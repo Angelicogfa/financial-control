@@ -133,6 +133,10 @@ def to_asset_analysis_dto(asset: AssetEntity, raw: dict[str, Any]) -> dict[str, 
             for s in raw["fundamental_history"]
         ],
         "historical_metrics": to_historical_metrics_dto(metrics) if metrics else None,
+        "indicator_ratings": {
+            key: {"status": r.status, "reference": r.reference}
+            for key, r in raw.get("indicator_ratings", {}).items()
+        },
         "valuation": to_valuation_dto(raw["valuation"]),
         "checklist": to_cerrado_dto(raw["checklist"]),
         "checklist_history": [to_checklist_record_dto(r) for r in raw["checklist_history"]],
