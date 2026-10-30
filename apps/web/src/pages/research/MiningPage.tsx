@@ -26,7 +26,8 @@ const SIGNALS = ["VALUE", "QUALITY", "IMPROVEMENT", "MOMENTUM"];
 function Follow({ finding, onDone }: Readonly<{ finding: MiningFindingDTO; onDone: () => void }>) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (finding.asset_id) return <Link to={`/asset/${finding.asset_id}`}>Ver ativo</Link>;
+  // A registered asset is reached through its ticker; only the others can be followed.
+  if (finding.asset_id) return null;
   const follow = async () => {
     setBusy(true);
     setError(null);
@@ -57,6 +58,8 @@ function Follow({ finding, onDone }: Readonly<{ finding: MiningFindingDTO; onDon
 function Findings({ data, onFollowed }: Readonly<{ data: MiningOverviewDTO; onFollowed: () => void }>) {
   const findings = data.findings ?? [];
   if (findings.length === 0) return <Empty title="Nenhum achado nesta semana" hint="Faltam empresas com sinais no último mês." />;
+  // The last column only holds "Seguir", for the findings not registered yet.
+  const followable = findings.some((f) => !f.asset_id);
   return (
     <div className="app-table-wrap">
       <table className="app-table" aria-label={data.trusted ? "Achados da semana" : "Ranking em observação"}>
@@ -71,15 +74,21 @@ function Findings({ data, onFollowed }: Readonly<{ data: MiningOverviewDTO; onFo
               </th>
             ))}
             <th className="app-numeric">Esperado ao ano</th>
-            <th />
+            {followable && <th />}
           </tr>
         </thead>
         <tbody>
           {findings.map((f) => (
             <tr key={f.ticker}>
               <td className="app-numeric">{f.rank}</td>
-              <td>
-                <strong>{f.ticker}</strong>
+              <td className="app-cell-wrap">
+                {f.asset_id ? (
+                  <Link className="app-link" to={`/asset/${f.asset_id}`}>
+                    {f.ticker}
+                  </Link>
+                ) : (
+                  <strong>{f.ticker}</strong>
+                )}
                 <div className="app-muted">{[f.company, f.sector].filter(Boolean).join(" · ")}</div>
               </td>
               <td className="app-cell-wrap">{f.reason}</td>
@@ -89,9 +98,11 @@ function Findings({ data, onFollowed }: Readonly<{ data: MiningOverviewDTO; onFo
                 </td>
               ))}
               <td className="app-numeric">{pct(f.score_annual, 1, true)}</td>
-              <td className="app-row-actions">
-                <Follow finding={f} onDone={onFollowed} />
-              </td>
+              {followable && (
+                <td className="app-row-actions">
+                  <Follow finding={f} onDone={onFollowed} />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

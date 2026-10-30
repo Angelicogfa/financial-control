@@ -250,6 +250,11 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
     setExecutions((all) => ({ ...all, [id]: { ...all[id], ...change } }));
 
   const chosen = orders.filter((o) => executions[o.asset_id]?.include);
+  // By default only the assets the plan buys are listed; one ticked by hand stays visible.
+  const [onlyRecommended, setOnlyRecommended] = useState(true);
+  const visible = onlyRecommended
+    ? orders.filter((o) => o.recommended_quantity > 0 || executions[o.asset_id]?.include)
+    : orders;
   const total = chosen.reduce((sum, o) => {
     const e = executions[o.asset_id];
     return sum + (parseDecimal(e.quantity) ?? 0) * (parseDecimal(e.price) ?? 0) + (parseDecimal(e.fees) ?? 0);
@@ -323,81 +328,96 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
         {orders.length === 0 ? (
           <Empty title="Nenhum ativo elegível nas classes que recebem o aporte" />
         ) : (
-          <div className="app-table-wrap">
-            <table className="app-table">
-              <thead>
-                <tr>
-                  <th>Comprar</th>
-                  <th>Ativo</th>
-                  <th>Classe</th>
-                  <th className="app-numeric">Sugerido</th>
-                  <th>Quantidade</th>
-                  <th>Preço (R$)</th>
-                  <th>Taxas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => {
-                  const e = executions[o.asset_id];
-                  return (
-                    <tr key={o.asset_id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          aria-label={`Comprar ${o.ticker}`}
-                          checked={e.include}
-                          disabled={busy || discarding}
-                          onChange={(ev) => update(o.asset_id, { include: ev.target.checked })}
-                        />
-                      </td>
-                      <td>
-                        <span className="app-cell-main">
-                          <Link className="app-link" to={`/asset/${o.asset_id}`}>
-                            <strong>{o.ticker}</strong>
-                          </Link>
-                          <small>Peso alvo {points(o.intra_class_target_weight_pct)} na classe</small>
-                        </span>
-                      </td>
-                      <td>{ARCA_LABELS[o.arca_class]}</td>
-                      <td className="app-numeric">
-                        {quantity(o.recommended_quantity)} × {num(o.unit_price_brl)} = {brl(o.executed_amount_brl)}
-                      </td>
-                      <td>
-                        <input
-                          aria-label={`Quantidade de ${o.ticker}`}
-                          inputMode="decimal"
-                          value={e.quantity}
-                          size={8}
-                          disabled={busy || discarding || !e.include}
-                          onChange={(ev) => update(o.asset_id, { quantity: ev.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          aria-label={`Preço de ${o.ticker}`}
-                          inputMode="decimal"
-                          value={e.price}
-                          size={8}
-                          disabled={busy || discarding || !e.include}
-                          onChange={(ev) => update(o.asset_id, { price: ev.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          aria-label={`Taxas de ${o.ticker}`}
-                          inputMode="decimal"
-                          value={e.fees}
-                          size={6}
-                          disabled={busy || discarding || !e.include}
-                          onChange={(ev) => update(o.asset_id, { fees: ev.target.value })}
-                        />
-                      </td>
+          <>
+            <label className="app-check" style={{ marginBottom: "var(--space-3)" }}>
+              <input type="checkbox" checked={onlyRecommended} onChange={(ev) => setOnlyRecommended(ev.target.checked)} />
+              <span>
+                Só os recomendados para comprar ({visible.length} de {orders.length})
+              </span>
+            </label>
+            {visible.length === 0 ? (
+              <Empty
+                title="O plano não sugere compra em nenhum ativo"
+                hint="Desmarque o filtro para escolher entre todos os ativos elegíveis."
+              />
+            ) : (
+              <div className="app-table-wrap">
+                <table className="app-table">
+                  <thead>
+                    <tr>
+                      <th>Comprar</th>
+                      <th>Ativo</th>
+                      <th>Classe</th>
+                      <th className="app-numeric">Sugerido</th>
+                      <th>Quantidade</th>
+                      <th>Preço (R$)</th>
+                      <th>Taxas</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {visible.map((o) => {
+                      const e = executions[o.asset_id];
+                      return (
+                        <tr key={o.asset_id}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Comprar ${o.ticker}`}
+                              checked={e.include}
+                              disabled={busy || discarding}
+                              onChange={(ev) => update(o.asset_id, { include: ev.target.checked })}
+                            />
+                          </td>
+                          <td>
+                            <span className="app-cell-main">
+                              <Link className="app-link" to={`/asset/${o.asset_id}`}>
+                                <strong>{o.ticker}</strong>
+                              </Link>
+                              <small>Peso alvo {points(o.intra_class_target_weight_pct)} na classe</small>
+                            </span>
+                          </td>
+                          <td>{ARCA_LABELS[o.arca_class]}</td>
+                          <td className="app-numeric">
+                            {quantity(o.recommended_quantity)} × {num(o.unit_price_brl)} = {brl(o.executed_amount_brl)}
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Quantidade de ${o.ticker}`}
+                              inputMode="decimal"
+                              value={e.quantity}
+                              size={8}
+                              disabled={busy || discarding || !e.include}
+                              onChange={(ev) => update(o.asset_id, { quantity: ev.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Preço de ${o.ticker}`}
+                              inputMode="decimal"
+                              value={e.price}
+                              size={8}
+                              disabled={busy || discarding || !e.include}
+                              onChange={(ev) => update(o.asset_id, { price: ev.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Taxas de ${o.ticker}`}
+                              inputMode="decimal"
+                              value={e.fees}
+                              size={6}
+                              disabled={busy || discarding || !e.include}
+                              onChange={(ev) => update(o.asset_id, { fees: ev.target.value })}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </Section>
 

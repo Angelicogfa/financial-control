@@ -116,9 +116,6 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
           <div className="app-field">
             <label htmlFor="trade-fx">Câmbio {currency}/BRL do dia</label>
             <input id="trade-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required disabled={saving} />
-            <output htmlFor="trade-qty trade-price trade-fees trade-fx" className="app-muted">
-              Total em reais: {brl(totalBrl)}
-            </output>
           </div>
         )}
         <div className="app-field">
@@ -126,6 +123,12 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
           <AccountSelect id="trade-account" value={accountId} onChange={setAccountId} disabled={saving} />
         </div>
       </div>
+      {/* Below the grid, not under the FX field: help text inside a cell would push its row's labels out of line. */}
+      {currency !== "BRL" && (
+        <output htmlFor="trade-qty trade-price trade-fees trade-fx" className="app-muted" style={{ display: "block", marginTop: "var(--space-2)" }}>
+          Total em reais: {brl(totalBrl)}
+        </output>
+      )}
       <div className="app-field" style={{ marginTop: "var(--space-3)" }}>
         <label htmlFor="trade-notes">Observação</label>
         <input id="trade-notes" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={saving} />

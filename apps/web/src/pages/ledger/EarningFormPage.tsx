@@ -105,9 +105,6 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
           <div className="app-field">
             <label htmlFor="earning-fx">Câmbio do pagamento</label>
             <input id="earning-fx" inputMode="decimal" value={fx} onChange={(e) => setFx(e.target.value)} required disabled={saving} />
-            <output htmlFor="earning-gross earning-tax earning-fx" className="app-muted">
-              Líquido em reais: {brl(netBrl)}
-            </output>
           </div>
         )}
         <div className="app-field">
@@ -115,6 +112,12 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
           <AccountSelect id="earning-account" value={accountId} onChange={setAccountId} disabled={saving} />
         </div>
       </div>
+      {/* Below the grid, not under the FX field: help text inside a cell would push its row's labels out of line. */}
+      {currency !== "BRL" && (
+        <output htmlFor="earning-gross earning-tax earning-fx" className="app-muted" style={{ display: "block", marginTop: "var(--space-2)" }}>
+          Líquido em reais: {brl(netBrl)}
+        </output>
+      )}
       <div className="app-field" style={{ marginTop: "var(--space-3)" }}>
         <label htmlFor="earning-notes">Observação</label>
         <input id="earning-notes" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={saving} />

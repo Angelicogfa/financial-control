@@ -70,7 +70,9 @@ describe("Garimpo (Phase 43)", () => {
     const table = await screen.findByRole("table", { name: "Achados da semana" }, { timeout: 5000 });
     expect(within(table).getByText("ABCD3")).toBeInTheDocument();
     expect(within(table).getByText("Barata frente ao próprio histórico e ao setor (z +1,8)")).toBeInTheDocument();
-    expect(within(table).getByRole("link", { name: "Ver ativo" })).toHaveAttribute("href", "/asset/7");
+    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/asset/7");
+    expect(within(table).queryByRole("link", { name: "ABCD3" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Ver ativo" })).not.toBeInTheDocument();
     expect(screen.getByText("Chance de perder do universo")).toBeInTheDocument();
     expect(screen.getByText(/não usado \(60% de confiança no sentido\)/)).toBeInTheDocument();
     const record = screen.getByRole("table", { name: "Placar dos achados" });
@@ -124,7 +126,8 @@ describe("Garimpo (Phase 43)", () => {
     ]);
     renderAt("/research/mining");
     fireEvent.click(await screen.findByRole("button", { name: "Seguir" }, { timeout: 5000 }));
-    await waitFor(() => expect(screen.getAllByRole("link", { name: "Ver ativo" })).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole("link", { name: "ABCD3" })).toHaveAttribute("href", "/asset/9"));
+    expect(screen.queryByRole("button", { name: "Seguir" })).not.toBeInTheDocument();
     const post = calls.find((c) => c.method === "POST");
     expect(post?.body).toMatchObject({ ticker: "ABCD3", asset_type: "STOCK_BR" });
 
