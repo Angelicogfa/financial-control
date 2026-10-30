@@ -45,6 +45,7 @@ from infra.data.repositories.portfolio import (
     SqlAlchemyContributionPlanRepository,
     SqlAlchemyPortfolioSnapshotRepository,
 )
+from infra.data.repositories.recommendation import SqlAlchemyRecommendationRepository
 from infra.data.repositories.simulation import (
     SqlAlchemySimulationRepository,
     SqlAlchemySimulationStudyRepository,
@@ -89,6 +90,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.price_history = SqlAlchemyPriceHistoryRepository(self.session)
         self.forecasts = SqlAlchemyForecastRepository(self.session)
         self.mining = SqlAlchemyMiningRepository(self.session)
+        self.recommendation = SqlAlchemyRecommendationRepository(self.session)
         return self
 
     def __exit__(

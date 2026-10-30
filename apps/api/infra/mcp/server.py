@@ -113,6 +113,8 @@ Pesquisa B3, Estratégia, Contas e Alertas:
 compara dois estudos de simulação).
 - Garimpo semanal de ações: `research.mining` (achados), `research.mining_why` (por que um ticker \
 entrou ou não), `research.mining_record` (placar) e `research.mining_universe` (universo).
+- Lentes da recomendação (Fase 45): `recommendation.lenses` (Cerrado de 0 a 10, qualidade, \
+valuation, melhora, momentum, renda, risco e projeção de cada ativo; ainda não é a recomendação).
 - Documentos da CVM: `disclosures.list`, `disclosures.mark_read` e `disclosures.event_study` \
 (retorno anormal médio por tipo de fato relevante).
 - Política de investimentos e metas ARCA: `policy.get`, `policy.update`, `policy.versions`, \

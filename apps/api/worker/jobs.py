@@ -43,6 +43,7 @@ from domain.policy.services.policy import EligibilityPolicy, current_policy
 from domain.portfolio.services.consolidation import consolidate_portfolio
 from domain.portfolio.services.curves import earliest_fixed_income_start, load_rate_curves
 from domain.portfolio.services.fixed_income import RateCurves
+from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.snapshots import (
     PriceLookup,
     first_trade_date,
@@ -53,6 +54,7 @@ from domain.portfolio.services.snapshots import (
     snapshot_from_report,
 )
 from domain.portfolio.services.treasury_rates import IPCA_HISTORY_START
+from domain.recommendation.runs import refresh_lenses
 from domain.shared.entities import AssetEntity, PortfolioSnapshotEntity
 from domain.shared.enums import (
     ArcaClass,
@@ -991,6 +993,24 @@ def run_mining_job(
         uow.commit()
     last = result.get("last_month")
     return {**result, "last_month": last.isoformat() if last else None}
+
+
+def refresh_asset_lenses_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    min_daily_volume: float = 1_000_000.0,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Lenses (45.1) and gates (45.2) of every asset of the universe, after the Garimpo."""
+    at = now or datetime.now(UTC)
+    service = PortfolioApplicationService(gateway)
+    with uow_factory() as uow:
+        result = refresh_lenses(
+            uow, service.evaluate_checklist, min_daily_volume=min_daily_volume, today=at.date()
+        )
+        uow.commit()
+    return result
 
 
 def sync_cvm_event_history_job(

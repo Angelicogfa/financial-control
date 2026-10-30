@@ -14,7 +14,7 @@ class MiningSignal:
 
     ticker: str
     month: date  # month end
-    signal: str  # VALUE, QUALITY, IMPROVEMENT, MOMENTUM
+    signal: str  # VALUE, QUALITY, IMPROVEMENT, MOMENTUM; INCOME, RISK (Phase 45.1)
     z: float
 
 
