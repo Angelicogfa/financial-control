@@ -162,3 +162,27 @@ def test_foreign_execution_without_fx_is_read_in_brl() -> None:
     assert (explicit.unit_price, explicit.fx_rate) == (Decimal("190"), Decimal("5.2"))
     domestic = _execution(ExecutionDTO(asset_id=1, quantity="2", unit_price="30"), None)
     assert domestic.fx_rate == Decimal("1")
+
+
+def test_saved_plan_keeps_the_rationale(client) -> None:  # type: ignore[no-untyped-def]
+    draft = client.post(
+        "/api/v1/contributions", json={"amount_brl": 2000.0, "strategy_override": "EQUAL_WEIGHT"}
+    )
+    assert draft.status_code == 201, draft.text
+    plan = client.get(f"/api/v1/contributions/{draft.json()['id']}").json()["plan"]
+
+    rationale = {r["arca_class"]: r for r in plan["class_rationale"]}
+    assert set(rationale) == {"ACOES", "REAL_ESTATE", "CAIXA", "ATIVOS_INTERNACIONAIS"}
+    assert rationale["ACOES"]["strategy"] == "EQUAL_WEIGHT"
+    assert rationale["ACOES"]["strategy_overridden"] is True
+    assert rationale["CAIXA"]["reason"] == "NO_ELIGIBLE_ASSETS"
+    assert sum(r["received_brl"] for r in rationale.values()) == pytest.approx(
+        plan["executed_total_brl"]
+    )
+    assert {o["reason"] for o in plan["orders"]} <= {"BOUGHT", "LEFTOVER_FILL"}
+
+    simulated = client.post("/api/v1/portfolio/contribution", json={"amount_brl": 2000.0})
+    assert simulated.status_code == 200, simulated.text
+    # Without an override each class reports the policy's own strategy.
+    policy_rationale = simulated.json()["class_rationale"]
+    assert all(r["strategy"] is not None and not r["strategy_overridden"] for r in policy_rationale)

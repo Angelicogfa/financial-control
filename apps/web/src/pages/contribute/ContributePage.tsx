@@ -19,6 +19,7 @@ import { brl, dateTime, num, parseDecimal, plural, points, quantity, today } fro
 import { ARCA_LABELS, PLAN_STATUS_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 import { BarList } from "../../viz/BarList";
 import { clearStored, useStoredState } from "../../utils/storedState";
+import { orderReasonText, orderWeightText, PlanRationale, strategyByClass } from "./Rationale";
 
 const STEPS = ["Valor", "Classes", "Ativos", "Confirmar"];
 
@@ -37,7 +38,6 @@ export function planStory(saved: SavedContributionPlanDTO): string {
 }
 
 const PLAN_NOTES = [
-  "As classes abaixo da banda recebem primeiro; dentro delas, só ativos elegíveis pela Estratégia.",
   "Quantidades são arredondadas para unidades inteiras; o que não compra uma unidade fica sem destino.",
   "Ajuste quantidade e preço ao que foi executado na corretora antes de confirmar.",
 ];
@@ -246,7 +246,8 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
   const [busy, setBusy] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const orders = saved.plan.orders;
-  const update = (id: number, change: Partial<ExecutionDraft>) =>
+  const strategies = strategyByClass(saved);
+  const update =(id: number, change: Partial<ExecutionDraft>) =>
     setExecutions((all) => ({ ...all, [id]: { ...all[id], ...change } }));
 
   const chosen = orders.filter((o) => executions[o.asset_id]?.include);
@@ -320,6 +321,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
         ]}
       />
       <ClassesStep saved={saved} current={report.data?.allocations ?? null} />
+      <PlanRationale saved={saved} />
 
       <Section
         title="Ativos"
@@ -349,6 +351,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                       <th>Ativo</th>
                       <th>Classe</th>
                       <th className="app-numeric">Sugerido</th>
+                      <th>Por quê</th>
                       <th>Quantidade</th>
                       <th>Preço (R$)</th>
                       <th>Taxas</th>
@@ -357,6 +360,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                   <tbody>
                     {visible.map((o) => {
                       const e = executions[o.asset_id];
+                      const strategy = strategies.get(o.arca_class);
                       return (
                         <tr key={o.asset_id}>
                           <td>
@@ -373,13 +377,14 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                               <Link className="app-link" to={`/asset/${o.asset_id}`}>
                                 <strong>{o.ticker}</strong>
                               </Link>
-                              <small>Peso alvo {points(o.intra_class_target_weight_pct)} na classe</small>
+                              <small>{orderWeightText(o, strategy)}</small>
                             </span>
                           </td>
                           <td>{ARCA_LABELS[o.arca_class]}</td>
                           <td className="app-numeric">
                             {quantity(o.recommended_quantity)} × {num(o.unit_price_brl)} = {brl(o.executed_amount_brl)}
                           </td>
+                          <td className="contribute-reason">{orderReasonText(o, strategy) || "—"}</td>
                           <td>
                             <input
                               aria-label={`Quantidade de ${o.ticker}`}
@@ -489,6 +494,7 @@ function ClosedPlan({ saved }: Readonly<{ saved: SavedContributionPlanDTO }>) {
         </span>
       </div>
       <ClassesStep saved={saved} current={null} />
+      <PlanRationale saved={saved} />
     </div>
   );
 }

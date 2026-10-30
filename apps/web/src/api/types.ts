@@ -180,6 +180,9 @@ export interface AssetContributionOrderDTO {
   recommended_quantity: number;
   executed_amount_brl: number;
   projected_value_brl: number;
+  class_current_weight_pct?: number;
+  leftover_amount_brl?: number;
+  reason?: ContributionOrderReason | null;
 }
 
 export interface AssetCreateRequest {
@@ -582,6 +585,21 @@ export interface ClassAllocationDTO {
   band_status?: string;
 }
 
+export interface ClassContributionRationaleDTO {
+  arca_class: ArcaClass;
+  reason: ContributionClassReason;
+  band_status: string;
+  current_pct: number;
+  target_pct: number;
+  band_pct: number;
+  deficit_brl: number;
+  first_level_brl: number;
+  received_brl: number;
+  eligible_assets: number;
+  strategy?: IntraClassStrategy | null;
+  strategy_overridden?: boolean;
+}
+
 export interface ClassPolicyDTO {
   arca_class: ArcaClass;
   target_pct: number;
@@ -655,11 +673,15 @@ export interface ConfidenceIntervalDTO {
   confidence?: number;
 }
 
+export type ContributionClassReason = "REFILL_BELOW_BAND" | "BELOW_BAND_PRIORITY" | "BELOW_TARGET" | "ABOVE_TARGET" | "NO_ELIGIBLE_ASSETS";
+
 export interface ContributionConfirmRequest {
   trade_date: string;
   account_id?: number | null;
   executions?: ExecutionDTO[] | null;
 }
+
+export type ContributionOrderReason = "BOUGHT" | "LEFTOVER_FILL" | "PRICE_ABOVE_BUDGET" | "ABOVE_TARGET" | "ZERO_WEIGHT" | "NO_PRICE";
 
 export interface ContributionPlanResponseDTO {
   contribution_amount_brl: number;
@@ -668,6 +690,7 @@ export interface ContributionPlanResponseDTO {
   by_class_allocated_brl: Record<string, number>;
   orders: AssetContributionOrderDTO[];
   projected_allocations: ClassAllocationDTO[];
+  class_rationale?: ClassContributionRationaleDTO[];
 }
 
 export type ContributionPlanStatus = "DRAFT" | "CONFIRMED" | "DISCARDED";

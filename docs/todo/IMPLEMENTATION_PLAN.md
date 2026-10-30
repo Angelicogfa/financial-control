@@ -840,3 +840,12 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **43.2** Componente `Combobox` (filtro sem acento nem caixa, todas as palavras em qualquer ordem; setas, Enter, Escape; texto sem correspondência volta à escolha atual; opção vazia como placeholder; lista limitada a 100 itens com aviso para refinar; lista em posição fixa para não ser cortada em tabelas). Substitui todos os `<select>` de escolha única.
 - `[x]` **43.3** Página do estudo: espaço entre o resumo e o corpo, sem margem dobrada entre os cartões, índice lateral fixo ao rolar em telas largas.
 - `[x]` **43.4** Testes de unidade do `Combobox` e da leitura paginada, testes de UI e e2e ajustados, `docker compose build web`.
+
+## Fase 44 — Justificativa do Aporte (`[x]` Concluída)
+
+**Objetivo:** a tela Aportar mostra por que cada classe e cada ativo receberam o que receberam, deixando claro que o aporte segue regras fixas (banda, déficit e divisão interna), não uma otimização.
+
+- `[x]` **44.1** `plan_contribution` registra a regra de cada classe (`ClassContributionRationale`: abaixo da banda, prioridade da banda, abaixo da meta, na meta, sem ativo elegível; déficit, valor pela regra, valor recebido, estratégia e se foi escolhida no aporte) e o motivo de cada ativo (`ContributionOrderReason`: comprado, só com sobras, preço acima do reservado, no peso alvo, sem peso, sem cotação), além do peso atual na classe e da parte paga com sobras.
+- `[x]` **44.2** A justificativa é gravada no JSON do plano (sem migração); planos antigos carregam sem ela. Exposta em `/portfolio/contribution`, `/contributions` e no `contributions.simulate` do MCP.
+- `[x]` **44.3** Tela: seção "Como chegamos nesta sugestão" (passos do método, regra por classe, limites do cálculo) e coluna "Por quê" na tabela de ativos; o plano confirmado também mostra a justificativa.
+- `[x]` **44.4** Testes de domínio, de persistência, de API e de UI; `docker compose build`.
