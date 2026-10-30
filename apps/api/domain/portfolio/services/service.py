@@ -20,6 +20,7 @@ from domain.assets.services.cerrado import (
 )
 from domain.assets.services.history import HistoricalMetrics, historical_metrics
 from domain.assets.services.questions import STATEMENT_PROFILES
+from domain.assets.services.ratings import rate_indicators
 from domain.assets.services.valuation import AssetValuation, value_asset
 from domain.market.entities import Fundamentals
 from domain.market.services.price_chart import PriceChart, price_chart
@@ -519,6 +520,9 @@ class PortfolioApplicationService:
             "risk_return": risk_summary,
             "benchmark": benchmark_symbol,
             "price_history": [p.to_dict() for p in history],
+            "indicator_ratings": rate_indicators(
+                asset.profile, fund, metrics, self.load_policy(uow).valuation
+            ),
         }
 
     def price_chart(
