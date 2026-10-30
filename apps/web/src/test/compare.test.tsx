@@ -6,6 +6,7 @@ import { compareLink, formatIndicator, parseTickers, searchFilters } from "../pa
 import { pickWhenLoaded } from "./combobox";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
+import { writeStored } from "../utils/storedState";
 
 const comparison: AssetComparisonDTO = {
   assets: [
@@ -187,5 +188,15 @@ describe("asset comparator", () => {
       expect(calls.find((c) => c.path === "/research/compare")?.query.get("tickers")).toBe("WEGE3,ITUB4"),
     );
     expect(screen.getByRole("button", { name: "Remover ITUB4" })).toBeInTheDocument();
+  });
+
+  it("does not run the Research page's last search when it opens", async () => {
+    writeStored("research:screener-search", { filters: { q: "banco" }, page: 0, pageSize: 25 });
+    const { calls } = mockApi([{ path: "/research/sectors", reply: ["Finance"] }]);
+    renderAt("/tools/compare");
+    expect(await screen.findByText("Escolha ao menos dois ativos")).toBeInTheDocument();
+    await waitFor(() => expect(calls.some((c) => c.path === "/research/sectors")).toBe(true));
+    expect(calls.some((c) => c.path === "/research/screener")).toBe(false);
+    expect(screen.getByRole("button", { name: "Buscar" })).toBeEnabled();
   });
 });

@@ -5,7 +5,9 @@ import type { ScreenerResponseDTO } from "../../api/types";
 import { clampPage, DEFAULT_PAGE_SIZE } from "../../utils/pagination";
 import { readStored, writeStored } from "../../utils/storedState";
 
-const STORE_KEY = "research:screener-search";
+/** Each page keeps its own last search: the Research screener and the asset comparison must not
+ *  restore (and run again) each other's. */
+export const RESEARCH_SEARCH_KEY = "research:screener-search";
 
 interface StoredSearch {
   filters: ScreenerFilters;
@@ -34,7 +36,7 @@ export interface ScreenerSearch {
  * A screener search paged by the API: each page asks for its own rows, so every match of the
  * catalog can be reached, not only the first API page.
  */
-export function useScreenerSearch(): ScreenerSearch {
+export function useScreenerSearch(storeKey: string = RESEARCH_SEARCH_KEY): ScreenerSearch {
   const [result, setResult] = useState<ScreenerResponseDTO | null>(null);
   const [filters, setFilters] = useState<ScreenerFilters | null>(null);
   const [page, setPage] = useState(0);
@@ -62,7 +64,7 @@ export function useScreenerSearch(): ScreenerSearch {
       setFilters(next);
       setPage(target);
       setPageSize(size);
-      writeStored(STORE_KEY, { filters: next, page: target, pageSize: size } satisfies StoredSearch);
+      writeStored(storeKey, { filters: next, page: target, pageSize: size } satisfies StoredSearch);
     } catch (err) {
       if (request === latest.current) setError(err);
     } finally {
@@ -72,8 +74,10 @@ export function useScreenerSearch(): ScreenerSearch {
 
   // Coming back to the page (breadcrumb, "Voltar") shows the same search on the same page.
   useEffect(() => {
-    const stored = readStored<StoredSearch | null>(STORE_KEY, null);
+    const stored = readStored<StoredSearch | null>(storeKey, null);
     if (stored) void load(stored.filters, stored.page, stored.pageSize);
+    // Once, when the page opens: the key is fixed per page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
