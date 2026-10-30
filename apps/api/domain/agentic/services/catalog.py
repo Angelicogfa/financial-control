@@ -82,6 +82,7 @@ from controllers.portfolio.responses import (
 from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import (
     AssetComparisonDTO,
+    MiningUniverseDTO,
     ScreenerResponseDTO,
     WatchlistItemDTO,
 )
@@ -123,6 +124,7 @@ from domain.ledger.services.use_cases.corporate_events import CorporateEventHand
 from domain.ledger.services.use_cases.earnings import EarningHandler
 from domain.ledger.services.use_cases.transactions import TransactionHandler
 from domain.market.services.use_cases import MarketDataHandler
+from domain.mining.services import MiningHandler
 from domain.policy.services.use_cases import PolicyHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.use_cases import PortfolioHandler
@@ -201,6 +203,7 @@ class JobRequestInput(BaseModel):
         "refresh_asset_forecasts",
         "calibrate_forecasts",
         "estimate_forecast_models",
+        "sync_mining_universe",
     ]
 
 
@@ -514,6 +517,10 @@ class AgenticRuntimeHandlers:
         )
 
     @property
+    def mining(self) -> MiningHandler:
+        return MiningHandler(uow_factory=self.uow_factory)
+
+    @property
     def statements(self) -> StatementsHandler:
         return StatementsHandler(uow_factory=self.uow_factory)
 
@@ -679,6 +686,17 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AssetIdInput,
         output_type=AssetAnalysisResponseDTO,
         invoke=lambda h, p: h.assets.get_analysis(p.asset_id),
+    ),
+    OperationSpec(
+        name="research.mining_universe",
+        kind="query",
+        description=(
+            "Universo do garimpo: as ações brasileiras líquidas (volume médio diário acima do "
+            "piso) com balanço na CVM, e até onde vai o histórico de preço guardado de cada uma."
+        ),
+        input_model=EmptyInput,
+        output_type=MiningUniverseDTO,
+        invoke=lambda h, _p: h.mining.universe(),
     ),
     OperationSpec(
         name="assets.statements",
@@ -1235,9 +1253,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "CVM), `warm_portfolio_quotes` (cotações das "
             "posições), `sync_price_history` (histórico de preços), `refresh_distributions` "
             "(proventos declarados), `refresh_catalog_fundamentals` (indicadores do "
-            "screener), `refresh_asset_forecasts`, `calibrate_forecasts` e "
-            "`estimate_forecast_models` (previsão "
-            "de preço). O "
+            "screener), `refresh_asset_forecasts`, `calibrate_forecasts`, "
+            "`estimate_forecast_models` (previsão de preço) e `sync_mining_universe` "
+            "(histórico do garimpo). O "
             "worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),

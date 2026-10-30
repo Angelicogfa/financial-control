@@ -56,7 +56,7 @@
 | **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
 | **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[x]` Concluída | 100% |
 | **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.3 feitas; antes das Fases 34 e 36) | 50% |
-| **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[ ]` Proposta (aguarda decisões da seção 9 do desenho) | 0% |
+| **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 e 43.1 feitas) | 25% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -819,12 +819,12 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **42.6** Negociações de administradores (VLMO), se houver o conjunto estruturado.
 - `[ ]` **42.7** Integração com os estudos, alerta opcional, testes de UI e integração, `docker compose build`.
 
-## Fase 43 — Garimpo: Achados no Catálogo Inteiro (`[ ]` Proposta)
+## Fase 43 — Garimpo: Achados no Catálogo Inteiro (`[~]` Em andamento)
 
 **Objetivo:** procurar, em todas as ações líquidas com balanço na CVM, empresas que ninguém está olhando e que os dados dizem merecer um olhar (valor, qualidade, melhora dos fundamentos, momentum e, depois, eventos e administradores), com pesos bayesianos, portões fora da amostra, PBO, custos e um placar dos achados contra a classe e o acaso. Um achado vira candidato só quando você o segue. Desenho: [ASSET_MINING_DESIGN.md](../features/ASSET_MINING_DESIGN.md).
 
-- `[ ]` **43.0** Decisões da seção 9 do desenho.
-- `[ ]` **43.1** Universo e histórico de preço com desdobramentos de todas as ações líquidas.
+- `[x]` **43.0** Decisões da seção 9 do desenho, aprovadas com as recomendações: liquidez acima de R$ 1 milhão por dia, até 10 achados por semana, sinais de valor, qualidade, melhora e momentum, antes de 42.4–42.7, alerta criado e desligado.
+- `[x]` **43.1** Universo (`domain/mining/universe.py`): ações brasileiras do catálogo com CNPJ no mapa da CVM e volume médio diário acima do piso (`MINING_MIN_DAILY_VOLUME`; o volume da última sessão enquanto o indicador não existe), uma classe por empresa (a mais líquida). Job `sync_mining_universe` (dias úteis, também manual): recarrega o histórico longo (retorno total, preço e desdobramentos) dos papéis com histórico de mais de uma semana, os mais antigos primeiro, `MINING_HISTORY_BATCH` por vez; a gravação é a mesma do histórico da simulação (`store_long_history`). `GET /research/mining/universe` e MCP `research.mining_universe` mostram o universo e a cobertura.
 - `[ ]` **43.2** Sinais point-in-time e `mining_signals`.
 - `[ ]` **43.3** Pesos bayesianos, portões, PBO e custos.
 - `[ ]` **43.4** Achados semanais, `mining_findings`, página "Garimpo", "Seguir" e MCP.

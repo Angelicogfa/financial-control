@@ -34,6 +34,7 @@ from domain.market.services.treasury_prices import (
     bond_family,
     price_symbol,
 )
+from domain.mining.universe import mining_universe
 from domain.policy.services.allocation import ArcaTargets
 from domain.policy.services.policy import EligibilityPolicy, current_policy
 from domain.portfolio.services.consolidation import consolidate_portfolio
@@ -885,6 +886,88 @@ def sync_cvm_statements_job(
     return result.as_details()
 
 
+def store_long_history(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    ticker: str,
+    asset_type: AssetType | None,
+    *,
+    start: date,
+    end: date,
+) -> int:
+    """Reload a ticker's long history in full: total return, split-adjusted price and splits.
+
+    Always in full from `start`: Yahoo rescales the whole dividend-adjusted series after every
+    new dividend, so appending would mix scales.
+    """
+    points = gateway.get_full_history(ticker, asset_type=asset_type, start=start)
+    if not points:
+        return 0
+    with uow_factory() as uow:
+        count = uow.market_series.upsert_points(
+            tr_symbol(ticker),
+            [(p.date, p.adj_close or p.close) for p in points if p.date <= end],
+            unit=SeriesUnit.PRICE,
+        )
+        uow.market_series.upsert_points(
+            px_symbol(ticker),
+            [(p.date, p.close) for p in points if p.date <= end],
+            unit=SeriesUnit.PRICE,
+        )
+        splits = [(p.date, p.split) for p in points if p.split and p.date <= end]
+        if splits:  # Yahoo's prices are split-adjusted; the valuation undoes it (42.3)
+            uow.market_series.upsert_points(split_symbol(ticker), splits, unit=SeriesUnit.RATIO)
+        uow.commit()
+    return count
+
+
+MINING_HISTORY_MAX_AGE_DAYS = 7
+
+
+def sync_mining_universe_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    as_of_date: date | None = None,
+    min_daily_volume: float = 1_000_000.0,
+    batch: int = 60,
+    start: date = SIMULATION_HISTORY_START,
+    timeout_seconds: float = 1500.0,
+) -> dict[str, object]:
+    """Long histories of the mining universe (Phase 43.1), the stalest first, `batch` a run.
+
+    A history counts as fresh when its last stored day is less than a week old; the weekly
+    reload keeps the dividend-adjusted series on one scale.
+    """
+    end = as_of_date or date.today()
+    started = time.monotonic()
+    with uow_factory() as uow:
+        members = mining_universe(uow, min_daily_volume)
+        last = {m.ticker: uow.market_series.date_range(px_symbol(m.ticker)) for m in members}
+    stale = [
+        m
+        for m in members
+        if last[m.ticker] is None or (end - last[m.ticker][1]).days >= MINING_HISTORY_MAX_AGE_DAYS  # type: ignore[index]
+    ]
+    stale.sort(key=lambda m: last[m.ticker][1] if last[m.ticker] else date.min)  # type: ignore[index]
+    loaded: list[str] = []
+    empty: list[str] = []
+    for member in stale[:batch]:
+        if time.monotonic() - started > timeout_seconds:
+            break
+        count = store_long_history(
+            uow_factory, gateway, member.ticker, AssetType.STOCK_BR, start=start, end=end
+        )
+        (loaded if count else empty).append(member.ticker)
+    return {
+        "universe": len(members),
+        "fresh": len(members) - len(stale),
+        "loaded": len(loaded),
+        "without_history": empty[:20],
+        "remaining": max(len(stale) - len(loaded) - len(empty), 0),
+    }
+
+
 def sync_simulation_history_job(
     uow_factory: UoWFactory,
     gateway: CachedMarketGateway,
@@ -906,27 +989,9 @@ def sync_simulation_history_job(
 
     counts: dict[str, int] = {}
     for asset in universe:
-        points = gateway.get_full_history(asset.ticker, asset_type=asset.asset_type, start=start)
-        if not points:
-            counts[asset.ticker] = 0
-            continue
-        with uow_factory() as uow:
-            counts[asset.ticker] = uow.market_series.upsert_points(
-                tr_symbol(asset.ticker),
-                [(p.date, p.adj_close or p.close) for p in points if p.date <= end],
-                unit=SeriesUnit.PRICE,
-            )
-            uow.market_series.upsert_points(
-                px_symbol(asset.ticker),
-                [(p.date, p.close) for p in points if p.date <= end],
-                unit=SeriesUnit.PRICE,
-            )
-            splits = [(p.date, p.split) for p in points if p.split and p.date <= end]
-            if splits:  # Yahoo's prices are split-adjusted; the valuation undoes it (42.3)
-                uow.market_series.upsert_points(
-                    split_symbol(asset.ticker), splits, unit=SeriesUnit.RATIO
-                )
-            uow.commit()
+        counts[asset.ticker] = store_long_history(
+            uow_factory, gateway, asset.ticker, asset.asset_type, start=start, end=end
+        )
 
     for label, yahoo_symbol in INDEX_SOURCES.items():
         points = gateway.get_full_history(yahoo_symbol, market=Market.INDEX, start=start)

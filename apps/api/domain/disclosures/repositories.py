@@ -95,6 +95,11 @@ class AbstractCvmStatementRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def cnpjs_with_statements(self) -> set[str]:
+        """Companies with at least one stored statement."""
+        raise NotImplementedError
+
+    @abstractmethod
     def docs_for(self, cnpj: str) -> list[StatementDoc]:
         """The delivered statements of a company, every version."""
         raise NotImplementedError

@@ -1389,6 +1389,24 @@ export interface MethodResultDTO {
   note?: string;
 }
 
+export interface MiningMemberDTO {
+  ticker: string;
+  company: string;
+  sector: string;
+  daily_volume: number;
+  volume_source: "AVERAGE" | "LAST_SESSION";
+  history_from?: string | null;
+  history_to?: string | null;
+  has_statements?: boolean;
+}
+
+export interface MiningUniverseDTO {
+  min_daily_volume: number;
+  members?: MiningMemberDTO[];
+  with_history?: number;
+  with_statements?: number;
+}
+
 export type OfferIndexer = "CDI_PERCENT" | "CDI_SPREAD" | "IPCA_SPREAD" | "PRE";
 
 export interface OfferOutcomeDTO {

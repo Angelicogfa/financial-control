@@ -37,6 +37,7 @@ MANUAL_JOBS: dict[str, str] = {
     "refresh_asset_forecasts": "Previsão probabilística do preço dos ativos",
     "calibrate_forecasts": "Calibração da previsão de preço (quanto as faixas se confirmaram)",
     "estimate_forecast_models": "Valuation na previsão de preço, com teste fora da amostra",
+    "sync_mining_universe": "Histórico de preço das ações líquidas do garimpo",
 }
 
 

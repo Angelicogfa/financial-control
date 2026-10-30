@@ -236,6 +236,9 @@ class SqlAlchemyCvmStatementRepository(AbstractCvmStatementRepository):
         )
         return [_fact(m) for m in self.session.scalars(stmt).all()]
 
+    def cnpjs_with_statements(self) -> set[str]:
+        return set(self.session.scalars(select(CvmStatementFactModel.cnpj).distinct()).all())
+
     def docs_for(self, cnpj: str) -> list[StatementDoc]:
         stmt = (
             select(

@@ -32,6 +32,7 @@ const JOB_LABELS: Record<string, string> = {
   refresh_asset_forecasts: "Previsão de preço dos ativos",
   calibrate_forecasts: "Calibração da previsão de preço",
   estimate_forecast_models: "Valuation na previsão de preço",
+  sync_mining_universe: "Histórico do garimpo",
 };
 
 const JOB_STATUS_LABELS: Record<string, string> = {
@@ -64,6 +65,13 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Baixa da CVM os balanços anuais e trimestrais (DFP e ITR) das empresas listadas, com a data em que cada um foi entregue. " +
       "Roda sozinha todo dia: confere os dois últimos anos e traz o histórico desde 2010 aos poucos (alguns arquivos por vez).",
+  },
+  {
+    name: "sync_mining_universe",
+    action: "Carregar o histórico do garimpo",
+    hint:
+      "Baixa o histórico longo de preço (com desdobramentos) das ações líquidas de todo o catálogo, que o garimpo usa para medir os sinais. " +
+      "Roda sozinha todo dia útil, alguns papéis por vez, até cobrir o universo; depois mantém cada um com até uma semana.",
   },
   {
     name: "refresh_asset_forecasts",
