@@ -1,0 +1,138 @@
+# Builds one Docker image per module from a release tag (vX.Y.Z) and pushes it to the
+# GitHub Container Registry as ghcr.io/<owner>/finance-controle-<module>:vX.Y.Z.
+# The worker and migrate services run from the api image, so only api and web are built.
+#
+# Triggers:
+#   - a vX.Y.Z tag pushed by a person (git push origin vX.Y.Z or a release made in the UI);
+#   - the create-release-tag workflow, which calls this one directly because tags pushed
+#     with GITHUB_TOKEN do not start other workflows;
+#   - manually, to rebuild the images of an existing tag.
+name: Release images
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to build (vX.Y.Z)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild (vX.Y.Z)
+        required: true
+        type: string
+
+concurrency:
+  group: release-images-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_PREFIX: finance-controle
+
+jobs:
+  resolve:
+    name: Resolve release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      latest: ${{ steps.tag.outputs.latest }}
+      owner: ${{ steps.tag.outputs.owner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate tag and check whether it is the newest release
+        id: tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' does not follow the vX.Y.Z pattern."
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/tags/$TAG" > /dev/null; then
+            echo "::error::Tag '$TAG' does not exist in the repository."
+            exit 1
+          fi
+          newest=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+          {
+            echo "tag=$TAG"
+            echo "latest=$([[ "$TAG" == "$newest" ]] && echo true || echo false)"
+            # GHCR image names must be lowercase.
+            echo "owner=${OWNER,,}"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and push ${{ matrix.module }}
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: api
+            dockerfile: apps/api/Dockerfile
+          - module: web
+            dockerfile: apps/web/Dockerfile
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ needs.resolve.outputs.owner }}/${{ env.IMAGE_PREFIX }}-${{ matrix.module }}
+          tags: |
+            type=raw,value=${{ needs.resolve.outputs.tag }}
+            type=raw,value=latest,enable=${{ needs.resolve.outputs.latest == 'true' }}
+          labels: |
+            org.opencontainers.image.title=${{ env.IMAGE_PREFIX }}-${{ matrix.module }}
+            org.opencontainers.image.version=${{ needs.resolve.outputs.tag }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.module }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.module }}
+
+      - name: Summarize published image
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "### ${{ matrix.module }}"
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

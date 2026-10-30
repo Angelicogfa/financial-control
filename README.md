@@ -1,5 +1,10 @@
 # Financial Control
 
+[![Versão](https://img.shields.io/github/v/tag/Angelicogfa/financial-control?sort=semver&filter=v*&label=vers%C3%A3o)](https://github.com/Angelicogfa/financial-control/releases/latest)
+[![Licença](https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE.md)
+
+**Versão atual:** a do selo acima, lida da maior tag `vX.Y.Z` do repositório; o histórico fica em [Releases](https://github.com/Angelicogfa/financial-control/releases). Veja [Releases e imagens Docker](#releases-e-imagens-docker).
+
 Ferramenta pessoal de gestão de carteira de investimentos que une duas metodologias:
 
 - **ARCA** (Ações, Real Estate, Caixa, Ativos internacionais) para segmentar a carteira, com metas, bandas de tolerância e aportes que corrigem o desvio sem vender nada;
@@ -81,7 +86,7 @@ Gerar o hash da senha de login (pede a senha duas vezes, sem ecoar, e imprime a 
 uv run python -m fincontrol_api hash-password
 ```
 
-Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python -m fincontrol_api hash-password`.
+Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python cli.py hash-password`.
 
 Gerar o segredo do JWT:
 
@@ -132,7 +137,7 @@ O worker sincroniza séries, cotações, catálogo da B3, demonstrativos e os co
 Para explorar o app sem os seus dados, use um banco **vazio** (por exemplo uma stack isolada com outros volumes). O comando recusa rodar em um banco que já tenha ativos:
 
 ```bash
-docker compose exec worker python -m fincontrol_worker.seed_demo
+docker compose exec worker python -m worker.seed_demo
 ```
 
 Ele cria uma carteira com dois anos de histórico (aportes mensais, proventos, renda fixa, reserva e retratos diários).
@@ -218,6 +223,23 @@ Smoke e E2E sobem stacks **isoladas** (outro nome de projeto, outros volumes e p
 
 `scripts/install-hooks.sh` instala um hook de `pre-push` que roda o modo `--fast`.
 
+### Releases e imagens Docker
+
+Cada release é uma tag `vX.Y.Z` e publica uma imagem por módulo no GitHub Container Registry:
+
+| Imagem | Usada por |
+|---|---|
+| `ghcr.io/angelicogfa/finance-controle-api:vX.Y.Z` | `api`, `worker` e `migrate` |
+| `ghcr.io/angelicogfa/finance-controle-web:vX.Y.Z` | `web` |
+
+A release mais nova também recebe a tag `latest`. Para rodar o app a partir dessas imagens, sem clonar o repositório nem compilar nada, siga o passo a passo de [`stand-alone/`](stand-alone/README.md).
+
+- **Criar uma release:** em *Actions → Create release tag → Run workflow*, escolha `patch`, `minor` ou `major`. O workflow lê a maior tag `vX.Y.Z` (começa de `v0.0.0`), cria a próxima no topo da `main`, abre o GitHub Release com as notas geradas e publica as imagens. Ele recusa a execução se o topo da `main` já tiver uma release.
+- **Tag manual:** `git push origin vX.Y.Z` (ou um release criado na interface do GitHub) dispara o mesmo build (`.github/workflows/release.yml`).
+- **Rebuild:** *Actions → Release images → Run workflow*, informando uma tag que já existe.
+
+Como o CI, esses workflows só rodam quando a conta tiver crédito de GitHub Actions.
+
 ### Convenções
 
 As regras do projeto estão em [`AGENTS.md`](AGENTS.md): código, commits e banco em inglês; testes de unidade obrigatórios; migrations Alembic sequenciais (`script_#####`); camadas estritas no backend; unidades numéricas pela [ADR 0006](docs/architecture/adr/0006-units-and-numeric-conventions.md).
@@ -231,3 +253,18 @@ As regras do projeto estão em [`AGENTS.md`](AGENTS.md): código, commits e banc
 - [Débitos técnicos](docs/tech-debt/TECH_DEBT.md)
 - [Plano de implementação](docs/todo/IMPLEMENTATION_PLAN.md)
 - Desenhos: [simulação de carteira](docs/features/PORTFOLIO_SIMULATION_DESIGN.md), [otimização da composição (proposta)](docs/features/ASSET_COMPOSITION_OPTIMIZATION_DESIGN.md) e [carteiras de comparação (proposta)](docs/features/COMPARISON_PORTFOLIOS_DESIGN.md)
+
+## Licença
+
+Copyright (c) 2026 Guilherme Fernando Angelico. Distribuído sob a **[PolyForm Noncommercial License 1.0.0](LICENSE.md)**. O texto do [`LICENSE.md`](LICENSE.md), em inglês, é o que vale; o resumo abaixo só ajuda a entendê-lo.
+
+| | |
+|---|---|
+| ✅ **Uso pessoal: gratuito** | Uso em casa, estudo, pesquisa, testes e projetos sem fins comerciais, com liberdade para modificar o código. A licença também cobre entidades sem fins lucrativos, como instituições de ensino, de pesquisa pública e órgãos de governo. |
+| ⛔ **Uso empresarial ou comercial: proibido** | Usar o software, ou obras derivadas dele, em empresas, para fins lucrativos, para prestar serviços a terceiros ou para revendê-lo exige uma licença comercial separada, negociada com o autor pelo [perfil no GitHub](https://github.com/Angelicogfa). |
+| 📌 **Citar a fonte: obrigatório** | Quem redistribuir o software, com ou sem modificações, deve entregar junto o texto da licença (ou o link dela) e manter a linha `Required Notice` do topo do [`LICENSE.md`](LICENSE.md), que identifica o autor e o repositório original. |
+| ⚠️ **Sem garantia** | O software é fornecido "como está". Ele não é recomendação de investimento, e o autor não responde por perdas ou danos decorrentes do uso. |
+
+No Brasil, o programa é protegido como obra intelectual pela **Lei nº 9.609/1998 (Lei do Software)** e pela **Lei nº 9.610/1998 (Lei de Direitos Autorais)**. Todo uso fora dos termos da licença depende de autorização prévia e expressa do autor.
+
+Ao citar o projeto, use: *Financial Control, por Guilherme Fernando Angelico — https://github.com/Angelicogfa/financial-control*.
