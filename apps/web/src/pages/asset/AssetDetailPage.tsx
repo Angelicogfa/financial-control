@@ -5,6 +5,7 @@ import { api } from "../../api/endpoints";
 import type { AssetAnalysisResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
+import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
 import { Lead } from "../../components/Section";
 import { IconLink } from "../../components/RowActions";
@@ -66,11 +67,24 @@ const TABS: TabSpec<TabKey>[] = [
 /** Treasury bonds also show the curve versus the redemption price (Phase 26). */
 const TREASURY_TABS: TabSpec<TabKey>[] = [TABS[0], { key: "market", label: "Mercado" }, ...TABS.slice(1)];
 
+/**
+ * The price of an asset without a position: the report's or the valuation's price when there is
+ * one, else the last stored close (dated, since it may be a few days old).
+ */
+function currentQuote(analysis: AssetAnalysisResponseDTO): { price: number; date?: string } | null {
+  const known = analysis.position?.current_unit_price || analysis.valuation.price;
+  if (known) return { price: known };
+  const prices = analysis.price_history as Array<{ date?: string; close?: number }>;
+  const last = [...prices].reverse().find((point) => typeof point.close === "number" && point.close > 0);
+  return last?.close ? { price: last.close, date: last.date } : null;
+}
+
 function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
   const p = analysis.position;
   const prices = analysis.price_history as Array<{ date?: string; close?: number }>;
   const risk = analysis.risk_return;
   const held = Boolean(p && (p.quantity > 0 || p.invested_value_brl > 0));
+  const quote = held ? null : currentQuote(analysis);
   return (
     <div className="app-page-stack">
       {held && p && (
@@ -117,7 +131,20 @@ function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>)
               </dd>
             </dl>
           ) : (
-            <p className="app-muted">Sem posição: o ativo está em observação.</p>
+            <>
+              {quote && (
+                <dl className="app-definition-list">
+                  <dt>Preço atual</dt>
+                  <dd>
+                    {money(quote.price, p?.currency || analysis.asset.currency || "BRL")}
+                    {quote.date && <span className="app-muted"> · fechamento de {day(quote.date)}</span>}
+                  </dd>
+                </dl>
+              )}
+              <p className="app-muted" style={quote ? { marginTop: "var(--space-3)" } : undefined}>
+                Sem posição: o ativo está em observação.
+              </p>
+            </>
           )}
         </section>
         <section className="app-card app-card-padded">
@@ -163,18 +190,89 @@ function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>)
   );
 }
 
-const INDICATORS: Array<[string, string, (v: number) => string]> = [
-  ["price_to_earnings", "P/L", (v) => num(v, 2)],
-  ["price_to_book", "P/VP", (v) => num(v, 2)],
-  ["dividend_yield", "Dividend yield", (v) => pct(v)],
-  ["return_on_equity", "ROE", (v) => pct(v)],
-  ["profit_margin", "Margem líquida", (v) => pct(v)],
-  ["net_debt_to_ebitda", "Dív. líq./EBITDA", (v) => num(v, 2)],
-  ["earnings_per_share", "LPA", (v) => num(v, 2)],
-  ["book_value_per_share", "VPA", (v) => num(v, 2)],
-  ["market_cap", "Valor de mercado", (v) => brlCompact(v)],
-  ["avg_daily_volume", "Volume financeiro médio", (v) => brlCompact(v)],
+const INDICATORS: Array<[string, string, (v: number) => string, string]> = [
+  [
+    "price_to_earnings",
+    "P/L",
+    (v) => num(v, 2),
+    "Preço dividido pelo lucro por ação: quantos anos do lucro atual pagariam o preço da ação. Quanto menor, mais barata a ação em relação ao que lucra.",
+  ],
+  [
+    "price_to_book",
+    "P/VP",
+    (v) => num(v, 2),
+    "Preço dividido pelo valor patrimonial por ação. Abaixo de 1, a bolsa paga menos que o patrimônio contábil da empresa.",
+  ],
+  [
+    "dividend_yield",
+    "Dividend yield",
+    (v) => pct(v),
+    "Proventos pagos por ação nos últimos 12 meses divididos pelo preço atual: o retorno em dinheiro de quem comprasse hoje.",
+  ],
+  [
+    "return_on_equity",
+    "ROE",
+    (v) => pct(v),
+    "Retorno sobre o patrimônio: lucro líquido dividido pelo patrimônio líquido. Mostra quanto a empresa lucra com o capital dos sócios.",
+  ],
+  [
+    "profit_margin",
+    "Margem líquida",
+    (v) => pct(v),
+    "Lucro líquido dividido pela receita: quanto de cada real vendido sobra como lucro.",
+  ],
+  [
+    "net_debt_to_ebitda",
+    "Dív. líq./EBITDA",
+    (v) => num(v, 2),
+    "Dívida líquida (dívida menos caixa) dividida pelo EBITDA: quantos anos da geração de caixa operacional quitariam a dívida. Negativo indica mais caixa que dívida.",
+  ],
+  [
+    "earnings_per_share",
+    "LPA",
+    (v) => num(v, 2),
+    "Lucro por ação: lucro líquido dos últimos 12 meses dividido pelo número de ações.",
+  ],
+  [
+    "book_value_per_share",
+    "VPA",
+    (v) => num(v, 2),
+    "Valor patrimonial por ação: patrimônio líquido dividido pelo número de ações.",
+  ],
+  [
+    "market_cap",
+    "Valor de mercado",
+    (v) => brlCompact(v),
+    "Preço da ação multiplicado pelo total de ações: quanto a bolsa avalia a empresa inteira hoje.",
+  ],
+  [
+    "avg_daily_volume",
+    "Volume financeiro médio",
+    (v) => brlCompact(v),
+    "Valor médio negociado por pregão nos dias recentes. Quanto maior, mais fácil comprar e vender sem mexer no preço (liquidez).",
+  ],
 ];
+
+const HISTORY_HINTS = {
+  period: "Exercícios anuais armazenados usados nos cálculos abaixo (até os últimos 5 anos).",
+  roe: "Média do ROE (lucro líquido ÷ patrimônio líquido) de cada ano do período.",
+  revenueCagr: "Crescimento anual composto da receita entre o primeiro e o último ano do período.",
+  earningsCagr:
+    "Crescimento anual composto do lucro líquido entre o primeiro e o último ano. Fica em branco quando um dos dois anos teve prejuízo.",
+  profitableYears: "Em quantos anos do período a empresa teve lucro líquido positivo.",
+  dividendYears: "Em quantos anos do período a empresa pagou dividendos ou JCP.",
+  payout: "Média, ano a ano, da parcela do lucro líquido distribuída como proventos.",
+};
+
+/** A definition-list term with its help marker beside it. */
+function Term({ label, hint }: Readonly<{ label: string; hint: string }>) {
+  return (
+    <dt>
+      {label}
+      <Hint about={label}>{hint}</Hint>
+    </dt>
+  );
+}
 
 const STATEMENT_COLUMNS: Array<[string, string]> = [
   ["revenue", "Receita"],
@@ -197,9 +295,9 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
           <h2 className="app-card-heading">Indicadores atuais</h2>
           {analysis.fundamentals ? (
             <dl className="app-definition-list">
-              {INDICATORS.map(([key, label, format]) => (
+              {INDICATORS.map(([key, label, format, hint]) => (
                 <div key={key} style={{ display: "contents" }}>
-                  <dt>{label}</dt>
+                  <Term label={label} hint={hint} />
                   <dd>{typeof f[key] === "number" ? format(f[key] as number) : "—"}</dd>
                 </div>
               ))}
@@ -212,25 +310,25 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
           <h2 className="app-card-heading">Histórico</h2>
           {m && m.years > 0 ? (
             <dl className="app-definition-list">
-              <dt>Período</dt>
+              <Term label="Período" hint={HISTORY_HINTS.period} />
               <dd>
                 {m.years} anos ({m.first_year}–{m.last_year})
               </dd>
-              <dt>ROE médio</dt>
+              <Term label="ROE médio" hint={HISTORY_HINTS.roe} />
               <dd>{pct(m.roe_average)}</dd>
-              <dt>CAGR da receita</dt>
+              <Term label="CAGR da receita" hint={HISTORY_HINTS.revenueCagr} />
               <dd>{pct(m.revenue_cagr, 1, true)}</dd>
-              <dt>CAGR do lucro</dt>
+              <Term label="CAGR do lucro" hint={HISTORY_HINTS.earningsCagr} />
               <dd>{pct(m.earnings_cagr, 1, true)}</dd>
-              <dt>Anos com lucro</dt>
+              <Term label="Anos com lucro" hint={HISTORY_HINTS.profitableYears} />
               <dd>
                 {m.profitable_years} de {m.years}
               </dd>
-              <dt>Anos com proventos</dt>
+              <Term label="Anos com proventos" hint={HISTORY_HINTS.dividendYears} />
               <dd>
                 {m.dividend_years} de {m.years}
               </dd>
-              <dt>Payout médio</dt>
+              <Term label="Payout médio" hint={HISTORY_HINTS.payout} />
               <dd>{pct(m.payout_average)}</dd>
             </dl>
           ) : (

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Hint } from "../components/Hint";
 
@@ -63,5 +63,21 @@ describe("Hint", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(button).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("slides the bubble left when it would leave the viewport", () => {
+    render(<Hint about="Payout">Texto de ajuda</Hint>);
+    const tooltip = screen.getByRole("tooltip");
+    Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1000 });
+    const rect = vi
+      .spyOn(tooltip, "getBoundingClientRect")
+      .mockReturnValue({ left: 800, right: 1080, top: 0, bottom: 40, width: 280, height: 40, x: 800, y: 0, toJSON: () => ({}) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajuda sobre Payout" }));
+    // 1080 - (1000 - 8) = 88 px past the edge.
+    expect(tooltip).toHaveStyle({ left: "-88px" });
+
+    rect.mockRestore();
+    Reflect.deleteProperty(document.documentElement, "clientWidth");
   });
 });
