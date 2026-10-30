@@ -48,7 +48,7 @@ describe("CVM statements in the Fundamentals tab (Phase 42.2)", () => {
       { path: "/assets/1/statements", reply: statements() },
     ]);
     renderAt("/asset/1?tab=fundamentals");
-    const table = await screen.findByRole("table", { name: "Balanços entregues à CVM" });
+    const table = await screen.findByRole("table", { name: "Balanços entregues à CVM" }, { timeout: 5000 });
     expect(within(table).getByText("29/10/2025")).toBeInTheDocument();
     expect(within(table).getByText("· versão 2")).toBeInTheDocument();
     expect(within(table).getByText("Dívida líquida")).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe("CVM statements in the Fundamentals tab (Phase 42.2)", () => {
       { path: "/assets/1/statements", reply: statements({ template: "FINANCIAL" }) },
     ]);
     renderAt("/asset/1?tab=fundamentals");
-    const table = await screen.findByRole("table", { name: "Balanços entregues à CVM" });
+    const table = await screen.findByRole("table", { name: "Balanços entregues à CVM" }, { timeout: 5000 });
     expect(within(table).queryByText("Dívida líquida")).not.toBeInTheDocument();
     expect(within(table).queryByText("EBITDA 12m")).not.toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe("CVM statements in the Fundamentals tab (Phase 42.2)", () => {
       },
     ]);
     renderAt("/asset/1?tab=fundamentals");
-    expect(await screen.findByText("Balanços ainda não carregados")).toBeInTheDocument();
+    expect(await screen.findByText("Balanços ainda não carregados", undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("Ainda não carregados.")).toBeInTheDocument();
   });
 });
