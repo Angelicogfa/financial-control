@@ -15,6 +15,21 @@ const last = (calls: Call[], method: string, path: string) =>
   [...calls].reverse().find((c) => c.method === method && c.path === path);
 
 describe("asset detail", () => {
+  it("shows the current price of an asset without a position", async () => {
+    mockApi([{ path: "/assets/1/analysis", reply: analysis({ position: null }) }]);
+    renderAt("/asset/1");
+    expect(await screen.findByText("Sem posição: o ativo está em observação.")).toBeInTheDocument();
+    expect(screen.getByText("Preço atual").nextElementSibling).toHaveTextContent("R$ 50,00");
+  });
+
+  it("falls back to the last stored close, dated, when no price is known", async () => {
+    const base = analysis();
+    mockApi([{ path: "/assets/1/analysis", reply: analysis({ position: null, valuation: { ...base.valuation, price: null } }) }]);
+    renderAt("/asset/1");
+    await screen.findByText("Sem posição: o ativo está em observação.");
+    expect(screen.getByText("Preço atual").nextElementSibling).toHaveTextContent("R$ 50,00 · fechamento de 02/03/2026");
+  });
+
   it("shows summary, fundamentals and valuation by tab", async () => {
     mockApi([{ path: "/assets/1/analysis", reply: analysis() }]);
     renderAt("/asset/1");
@@ -24,6 +39,10 @@ describe("asset detail", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fundamentos" }));
     expect(screen.getByText("ROE médio")).toBeInTheDocument();
+    const peHelp = screen.getByRole("button", { name: "Ajuda sobre P/L" });
+    fireEvent.mouseEnter(peHelp);
+    expect(peHelp).toHaveAccessibleDescription(/Preço dividido pelo lucro por ação/);
+    expect(screen.getByRole("button", { name: "Ajuda sobre Payout médio" })).toHaveAccessibleDescription(/parcela do lucro líquido distribuída/);
     expect(screen.getByRole("img", { name: /Lucro líquido anual/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Valuation" }));

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /**
  * Informative tooltip that does not occupy space in the layout.
@@ -65,9 +65,28 @@ export interface HintProps {
   about?: string;
 }
 
+/** Gap kept between the bubble and the viewport edges. */
+const EDGE = 8;
+
 export function Hint({ children, about }: Readonly<HintProps>) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const [shift, setShift] = useState(0);
+  const bubble = useRef<HTMLSpanElement>(null);
+
+  // The bubble opens to the right of the marker; near the right edge (a field in the last
+  // column, a term in the right-hand card) it slides left so it never leaves the viewport.
+  useLayoutEffect(() => {
+    if (!open || !bubble.current) {
+      setShift(0);
+      return;
+    }
+    const rect = bubble.current.getBoundingClientRect();
+    // clientWidth leaves out the vertical scrollbar, which innerWidth counts.
+    const viewport = document.documentElement.clientWidth || window.innerWidth;
+    const overflow = rect.right - (viewport - EDGE);
+    if (overflow > 0) setShift(-Math.min(overflow, Math.max(rect.left - EDGE, 0)));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -103,7 +122,7 @@ export function Hint({ children, about }: Readonly<HintProps>) {
         ?
       </button>
 
-      <span id={id} role="tooltip" style={open ? BUBBLE : VISUALLY_HIDDEN}>
+      <span id={id} ref={bubble} role="tooltip" style={open ? { ...BUBBLE, left: shift } : VISUALLY_HIDDEN}>
         {children}
       </span>
     </span>
