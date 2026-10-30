@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -18,6 +19,7 @@ from domain.assets.services.cerrado import (
     record_if_changed,
 )
 from domain.assets.services.history import STATEMENT_TYPES
+from domain.disclosures.services.statements_sync import sync_statements
 from domain.disclosures.services.sync import sync_documents
 from domain.forecast.runs import refresh_forecasts, run_calibration
 from domain.market.entities import Quote, QuoteFreshness
@@ -826,6 +828,33 @@ def sync_cvm_documents_job(
         today=as_of_date,
     )
     logger.info("CVM disclosures synced", extra={"job": "sync_cvm_documents", "new": result.new})
+    return result.as_details()
+
+
+def sync_cvm_statements_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    as_of_date: date | None = None,
+    max_files: int = 4,
+    timeout_seconds: float = 1500.0,
+) -> dict[str, object]:
+    """Load the DFP/ITR statements of the listed companies, point in time (Phase 42.2).
+
+    The last two years are checked every run; the history since 2010 comes a few files a run.
+    """
+    started = time.monotonic()
+    result = sync_statements(
+        uow_factory,
+        fetch_stamp=gateway.get_cvm_statement_stamp,
+        fetch_statements=gateway.get_cvm_statements,
+        today=as_of_date,
+        max_files=max_files,
+        deadline=lambda: time.monotonic() - started > timeout_seconds,
+    )
+    logger.info(
+        "CVM statements synced", extra={"job": "sync_cvm_statements", "facts": result.facts}
+    )
     return result.as_details()
 
 

@@ -26,6 +26,7 @@ import {
 } from "../../utils/labels";
 import { ColumnChart } from "../../viz/ColumnChart";
 import { ChecklistTab } from "./ChecklistTab";
+import { CvmStatements } from "./CvmStatements";
 import { ForecastTab } from "./ForecastTab";
 import { MarketTab } from "./MarketTab";
 import { PriceHistory } from "./PriceHistory";
@@ -281,6 +282,7 @@ function Fundamentals({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDT
           </div>
         </>
       )}
+      {analysis.asset.asset_type === "STOCK_BR" && <CvmStatements assetId={analysis.asset.id} />}
     </div>
   );
 }

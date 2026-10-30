@@ -15,6 +15,7 @@ import type {
   AssetAnalysisResponseDTO,
   AssetForecastDTO,
   AssetPriceHistoryDTO,
+  AssetStatementsDTO,
   AssetComparisonDTO,
   AssetCreateRequest,
   AssetResponseDTO,
@@ -186,6 +187,7 @@ export const api = {
     prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>
       request<AssetPriceHistoryDTO>(`/assets/${id}/prices`, { query: { range } }),
     forecast: (id: number) => request<AssetForecastDTO>(`/assets/${id}/forecast`),
+    statements: (id: number) => request<AssetStatementsDTO>(`/assets/${id}/statements`),
     refreshForecast: (id: number) => request<AssetForecastDTO>(`/assets/${id}/forecast`, { method: "POST" }),
     create: (body: AssetCreateRequest) => request<AssetResponseDTO>("/assets", { method: "POST", body }),
     update: (id: number, body: AssetUpdateRequest) =>

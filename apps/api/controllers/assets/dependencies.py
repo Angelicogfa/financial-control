@@ -12,6 +12,7 @@ from controllers.portfolio.dependencies import get_portfolio_service
 from controllers.shared.dependencies import UoWFactory
 from core.settings import AppSettings, get_settings
 from domain.assets.services.use_cases import AssetHandler
+from domain.disclosures.services.statements_view import StatementsHandler
 from domain.forecast.services import ForecastHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 
@@ -35,3 +36,10 @@ def get_forecast_handler(
         portfolio_service=portfolio_service,
         catalog_top=settings.simulation_catalog_top,
     )
+
+
+def get_statements_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+) -> StatementsHandler:
+    """Provide the StatementsHandler (Phase 42.2): the stored CVM statements of an asset."""
+    return StatementsHandler(uow_factory=uow_factory)

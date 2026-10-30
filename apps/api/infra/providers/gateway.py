@@ -11,6 +11,7 @@ from domain.assets.services.history import (
     snapshot_to_dict,
 )
 from domain.disclosures.entities import CvmDocument, IssuerTicker
+from domain.disclosures.statements import StatementFact
 from domain.market.entities import (
     AnnouncedDistributions,
     AnnouncedEarning,
@@ -227,6 +228,16 @@ class CachedMarketGateway:
     def get_cvm_issuer_tickers(self, year: int) -> list[IssuerTicker]:
         """Trading codes of each CNPJ declared in the FCA of `year` (Phase 28)."""
         return self.cvm.issuer_tickers(year)
+
+    def get_cvm_statement_stamp(self, kind: str, year: int) -> str | None:
+        """Last-Modified of the yearly DFP/ITR file (Phase 42.2; not cached)."""
+        return self.cvm.statement_stamp(kind, year)
+
+    def get_cvm_statements(
+        self, kind: str, year: int, cnpjs: set[str], known: set[tuple[str, date, int]]
+    ) -> list[StatementFact] | None:
+        """Metrics of the DFP/ITR statements of `year` (Phase 42.2; bulk file, not cached)."""
+        return self.cvm.statements(kind, year, cnpjs, known)
 
     def get_distributions(
         self,

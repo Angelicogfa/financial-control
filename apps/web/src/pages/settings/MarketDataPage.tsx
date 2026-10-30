@@ -26,6 +26,7 @@ const JOB_LABELS: Record<string, string> = {
   sync_instrument_catalog: "Catálogo de ativos B3",
   sync_simulation_history: "Histórico longo da simulação",
   sync_cvm_documents: "Comunicados da CVM",
+  sync_cvm_statements: "Balanços da CVM (DFP e ITR)",
   run_pending_simulations: "Simulações na fila",
   refresh_asset_forecasts: "Previsão de preço dos ativos",
   calibrate_forecasts: "Calibração da previsão de preço",
@@ -54,6 +55,13 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Baixa da CVM os fatos relevantes, comunicados e avisos das ações da carteira e da watchlist. " +
       "Roda sozinha todo dia; use aqui para ver já os documentos de hoje.",
+  },
+  {
+    name: "sync_cvm_statements",
+    action: "Carregar os balanços da CVM",
+    hint:
+      "Baixa da CVM os balanços anuais e trimestrais (DFP e ITR) das empresas listadas, com a data em que cada um foi entregue. " +
+      "Roda sozinha todo dia: confere os dois últimos anos e traz o histórico desde 2010 aos poucos (alguns arquivos por vez).",
   },
   {
     name: "refresh_asset_forecasts",

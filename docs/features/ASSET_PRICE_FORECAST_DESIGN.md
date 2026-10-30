@@ -59,6 +59,15 @@ A camada B muda o prior de α: μ_α = γ · z_valuation, onde z_valuation mede 
   Se γ não passa nos portões, ele vale 0 e a tela diz: "valuation não melhorou a previsão; não foi usado".
 - **Efeito colateral útil:** a mesma base point-in-time tira o look-ahead do Passado da simulação e é exatamente o que as Fases 34.9 e 36.8 esperam.
 
+**O que os arquivos reais mostraram (42.2, DFP e ITR de 2024):**
+- o layout é o mesmo para todas as empresas, com as mesmas colunas e os mesmos arquivos por ano;
+- as contas de topo são fixas, mas há três modelos de plano de contas: 450 empresas, cerca de 10 bancos e 7 seguradoras. O mesmo código muda de sentido entre eles (2.03 é o patrimônio de uma empresa e as provisões de um banco), por isso patrimônio e lucro são achados pelo nome;
+- dívida e caixa estão em contas fixas em cerca de 99% dos casos; depreciação e dividendos pagos ficam em contas livres da DFC e são achados pelo nome (432 de 451 e 383 de 451 empresas);
+- os valores vêm em mil ou em unidade, conforme a coluna de escala;
+- a quantidade de ações vem em milhares para algumas empresas (Vale, Itaú), sem coluna de escala;
+- cerca de 10% dos documentos são reapresentações, com até 6 versões;
+- o ITR traz o trimestre e o acumulado do ano; o 4º trimestre sai da DFP, e há empresas com ano fiscal fora do calendário.
+
 ### 3.3 Camada C: eventos da CVM (qualitativo transformado em dado)
 
 1. **Taxonomia:** cada documento do IPE recebe uma classe, pela categoria e por palavras-chave do assunto. Classes iniciais:

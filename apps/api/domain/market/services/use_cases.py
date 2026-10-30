@@ -29,6 +29,7 @@ QUOTE_STALE_MINUTES = 30
 MANUAL_JOBS: dict[str, str] = {
     "sync_simulation_history": "Carga do histórico longo usado pela simulação de carteira",
     "sync_cvm_documents": "Carga dos fatos relevantes e comunicados da CVM",
+    "sync_cvm_statements": "Carga dos balanços entregues à CVM (DFP e ITR)",
     "warm_portfolio_quotes": "Atualização das cotações das posições",
     "sync_price_history": "Carga do histórico diário de preços dos ativos",
     "refresh_distributions": "Atualização dos proventos declarados na B3",

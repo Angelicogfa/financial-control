@@ -7,7 +7,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from controllers.assets.dependencies import get_asset_handler, get_forecast_handler
+from controllers.assets.dependencies import (
+    get_asset_handler,
+    get_forecast_handler,
+    get_statements_handler,
+)
 from controllers.assets.requests import AssetCreateRequest, AssetUpdateRequest, CerradoUpdateRequest
 from controllers.assets.responses import (
     ArcaSuggestionDTO,
@@ -17,10 +21,12 @@ from controllers.assets.responses import (
     AssetResponseDTO,
     PriceRange,
 )
+from controllers.disclosures.responses import AssetStatementsDTO
 from controllers.shared.dependencies import pagination_query
 from controllers.shared.responses import PaginatedResponse
 from core.helpers.pagination import PaginationParams
 from domain.assets.services.use_cases import AssetHandler
+from domain.disclosures.services.statements_view import StatementsHandler
 from domain.forecast.services import ForecastHandler
 from domain.shared.enums import AssetType
 
@@ -124,6 +130,15 @@ def refresh_asset_forecast(
 ) -> AssetForecastDTO:
     """Compute this asset's forecast now from the stored history (12 months on, with a warning)."""
     return handler.refresh(asset_id)
+
+
+@assets_router.get("/{asset_id}/statements", response_model=AssetStatementsDTO)
+def get_asset_statements(
+    asset_id: int,
+    handler: StatementsHandler = Depends(get_statements_handler),
+) -> AssetStatementsDTO:
+    """Statements delivered to the CVM, point in time, and today's indicators (Phase 42.2)."""
+    return handler.get(asset_id)
 
 
 @assets_router.get("/{asset_id}/prices", response_model=AssetPriceHistoryDTO)

@@ -7,6 +7,7 @@ from types import TracebackType
 
 from domain.disclosures.repositories import (
     AbstractCvmDocumentRepository,
+    AbstractCvmStatementRepository,
     AbstractIssuerTickerRepository,
 )
 from domain.forecast.repositories import AbstractForecastRepository
@@ -67,6 +68,7 @@ class AbstractUnitOfWork(ABC):
     simulation_studies: AbstractSimulationStudyRepository
     cvm_issuers: AbstractIssuerTickerRepository
     cvm_documents: AbstractCvmDocumentRepository
+    cvm_statements: AbstractCvmStatementRepository
     market_data: AbstractMarketDataRepository
     price_history: AbstractPriceHistoryRepository
     forecasts: AbstractForecastRepository

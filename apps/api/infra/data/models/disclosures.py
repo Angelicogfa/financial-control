@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Integer, String, Text
+from sqlalchemy import Date, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from infra.data.db import Base
@@ -47,3 +47,39 @@ class CvmDocumentModel(Base):
         DateTime(timezone=True), nullable=False, default=utc_now
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CvmStatementFactModel(Base):
+    """One value of a statement delivered to the CVM (DFP/ITR), per version (Phase 42.2)."""
+
+    __tablename__ = "cvm_statements"
+    __table_args__ = (
+        Index("ix_cvm_statements_cnpj_delivered", "cnpj", "delivered_on"),
+        Index("ix_cvm_statements_doc", "doc_type", "reference_date"),
+    )
+
+    cnpj: Mapped[str] = mapped_column(String(14), primary_key=True)
+    doc_type: Mapped[str] = mapped_column(String(3), primary_key=True)
+    reference_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    metric: Mapped[str] = mapped_column(String(32), primary_key=True)
+    delivered_on: Mapped[date] = mapped_column(Date, nullable=False)
+    basis: Mapped[str] = mapped_column(String(3), nullable=False)
+    template: Mapped[str] = mapped_column(String(10), nullable=False)
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class CvmStatementLoadModel(Base):
+    """Which yearly CVM statement file was loaded, and from which version of the file."""
+
+    __tablename__ = "cvm_statement_loads"
+
+    doc_type: Mapped[str] = mapped_column(String(3), primary_key=True)
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_stamp: Mapped[str] = mapped_column(String(64), nullable=False)
+    facts: Mapped[int] = mapped_column(Integer, nullable=False)
+    loaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )

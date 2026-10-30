@@ -35,7 +35,11 @@ from controllers.assets.responses import (
 from controllers.contributions.requests import ContributionConfirmRequest
 from controllers.contributions.responses import SavedContributionPlanDTO
 from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import DisclosureFeedDTO, MarkReadResultDTO
+from controllers.disclosures.responses import (
+    AssetStatementsDTO,
+    DisclosureFeedDTO,
+    MarkReadResultDTO,
+)
 from controllers.ledger.requests import (
     CorporateEventRequest,
     EarningCreateRequest,
@@ -111,6 +115,7 @@ from domain.accounts.services.use_cases import AccountHandler
 from domain.alerts.services.use_cases import AlertHandler
 from domain.assets.services.use_cases import AssetHandler
 from domain.contributions.services.use_cases import ContributionHandler
+from domain.disclosures.services.statements_view import StatementsHandler
 from domain.disclosures.services.use_cases import DisclosureHandler
 from domain.forecast.services import ForecastHandler
 from domain.ledger.services.use_cases.b3_import import ImportHandler
@@ -188,6 +193,7 @@ class JobRequestInput(BaseModel):
     job_name: Literal[
         "sync_simulation_history",
         "sync_cvm_documents",
+        "sync_cvm_statements",
         "warm_portfolio_quotes",
         "sync_price_history",
         "refresh_distributions",
@@ -507,6 +513,10 @@ class AgenticRuntimeHandlers:
         )
 
     @property
+    def statements(self) -> StatementsHandler:
+        return StatementsHandler(uow_factory=self.uow_factory)
+
+    @property
     def forecasts(self) -> ForecastHandler:
         return ForecastHandler(
             uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
@@ -668,6 +678,19 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AssetIdInput,
         output_type=AssetAnalysisResponseDTO,
         invoke=lambda h, p: h.assets.get_analysis(p.asset_id),
+    ),
+    OperationSpec(
+        name="assets.statements",
+        kind="query",
+        description=(
+            "Balanços entregues à CVM (DFP e ITR) pela empresa do ativo, como eram conhecidos em "
+            "cada data de entrega: receita, EBIT, EBITDA, lucro e dividendos dos últimos 12 "
+            "meses, patrimônio e dívida líquida; e P/L, P/VP, EV/EBITDA e dividend yield ao "
+            "preço guardado de hoje."
+        ),
+        input_model=AssetIdInput,
+        output_type=AssetStatementsDTO,
+        invoke=lambda h, p: h.statements.get(p.asset_id),
     ),
     OperationSpec(
         name="assets.forecast",
@@ -1207,10 +1230,12 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         description=(
             "Pede ao worker que rode agora uma rotina que aceita disparo manual: "
             "`sync_simulation_history` (histórico longo da simulação), `sync_cvm_documents` "
-            "(fatos relevantes e comunicados da CVM), `warm_portfolio_quotes` (cotações das "
+            "(fatos relevantes e comunicados da CVM), `sync_cvm_statements` (balanços DFP e ITR da "
+            "CVM), `warm_portfolio_quotes` (cotações das "
             "posições), `sync_price_history` (histórico de preços), `refresh_distributions` "
-            "(proventos declarados) ou `refresh_catalog_fundamentals` (indicadores do "
-            "screener). O worker atende em até 15 s; acompanhe "
+            "(proventos declarados), `refresh_catalog_fundamentals` (indicadores do "
+            "screener), `refresh_asset_forecasts` e `calibrate_forecasts` (previsão de preço). O "
+            "worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),
         input_model=JobRequestInput,

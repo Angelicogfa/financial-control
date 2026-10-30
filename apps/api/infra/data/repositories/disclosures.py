@@ -8,16 +8,24 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date, datetime
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from domain.disclosures.entities import CvmDocument, IssuerTicker
 from domain.disclosures.repositories import (
     AbstractCvmDocumentRepository,
+    AbstractCvmStatementRepository,
     AbstractIssuerTickerRepository,
+    StatementLoad,
 )
+from domain.disclosures.statements import StatementDoc, StatementFact
 from infra.data.mappers.disclosures import apply_cvm_document, to_cvm_document
-from infra.data.models.disclosures import CvmDocumentModel, CvmIssuerTickerModel
+from infra.data.models.disclosures import (
+    CvmDocumentModel,
+    CvmIssuerTickerModel,
+    CvmStatementFactModel,
+    CvmStatementLoadModel,
+)
 
 # SQLite caps the parameters of one statement; IN lists go in chunks.
 CHUNK = 500
@@ -55,6 +63,9 @@ class SqlAlchemyIssuerTickerRepository(AbstractIssuerTickerRepository):
             )
             out.update({t: c for t, c in self.session.execute(stmt).all()})
         return out
+
+    def all_cnpjs(self) -> set[str]:
+        return set(self.session.scalars(select(CvmIssuerTickerModel.cnpj).distinct()).all())
 
 
 class SqlAlchemyCvmDocumentRepository(AbstractCvmDocumentRepository):
@@ -154,3 +165,115 @@ class SqlAlchemyCvmDocumentRepository(AbstractCvmDocumentRepository):
 
     def latest_delivery(self) -> date | None:
         return self.session.scalar(select(func.max(CvmDocumentModel.delivery_date)))
+
+
+def _fact(m: CvmStatementFactModel) -> StatementFact:
+    return StatementFact(
+        cnpj=m.cnpj,
+        doc_type=m.doc_type,
+        reference_date=m.reference_date,
+        version=m.version,
+        delivered_on=m.delivered_on,
+        basis=m.basis,
+        template=m.template,
+        metric=m.metric,
+        period_start=m.period_start,
+        period_end=m.period_end,
+        value=m.value,
+    )
+
+
+class SqlAlchemyCvmStatementRepository(AbstractCvmStatementRepository):
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def known_docs(self, doc_type: str, year: int) -> set[tuple[str, date, int]]:
+        stmt = (
+            select(
+                CvmStatementFactModel.cnpj,
+                CvmStatementFactModel.reference_date,
+                CvmStatementFactModel.version,
+            )
+            .where(
+                CvmStatementFactModel.doc_type == doc_type,
+                CvmStatementFactModel.reference_date >= date(year, 1, 1),
+                CvmStatementFactModel.reference_date <= date(year, 12, 31),
+            )
+            .distinct()
+        )
+        return {(c, r, v) for c, r, v in self.session.execute(stmt).all()}
+
+    def add_many(self, facts: Sequence[StatementFact]) -> int:
+        unique = {(f.cnpj, f.doc_type, f.reference_date, f.version, f.metric): f for f in facts}
+        if not unique:
+            return 0
+        rows = [
+            {
+                "cnpj": f.cnpj,
+                "doc_type": f.doc_type,
+                "reference_date": f.reference_date,
+                "version": f.version,
+                "metric": f.metric,
+                "delivered_on": f.delivered_on,
+                "basis": f.basis,
+                "template": f.template,
+                "period_start": f.period_start,
+                "period_end": f.period_end,
+                "value": f.value,
+            }
+            for f in unique.values()
+        ]
+        for i in range(0, len(rows), CHUNK):
+            self.session.execute(insert(CvmStatementFactModel), rows[i : i + CHUNK])
+        self.session.flush()
+        return len(rows)
+
+    def facts_for(self, cnpj: str) -> list[StatementFact]:
+        stmt = (
+            select(CvmStatementFactModel)
+            .where(CvmStatementFactModel.cnpj == cnpj)
+            .order_by(CvmStatementFactModel.delivered_on, CvmStatementFactModel.reference_date)
+        )
+        return [_fact(m) for m in self.session.scalars(stmt).all()]
+
+    def docs_for(self, cnpj: str) -> list[StatementDoc]:
+        stmt = (
+            select(
+                CvmStatementFactModel.doc_type,
+                CvmStatementFactModel.reference_date,
+                CvmStatementFactModel.version,
+                CvmStatementFactModel.delivered_on,
+            )
+            .where(CvmStatementFactModel.cnpj == cnpj)
+            .distinct()
+            .order_by(CvmStatementFactModel.delivered_on.desc())
+        )
+        return [
+            StatementDoc(cnpj=cnpj, doc_type=t, reference_date=r, version=v, delivered_on=d)
+            for t, r, v, d in self.session.execute(stmt).all()
+        ]
+
+    def record_load(self, load: StatementLoad) -> None:
+        row = self.session.get(CvmStatementLoadModel, (load.doc_type, load.year))
+        if row is None:
+            row = CvmStatementLoadModel(doc_type=load.doc_type, year=load.year)
+            self.session.add(row)
+        row.source_stamp = load.source_stamp[:64]
+        row.facts = load.facts
+        row.loaded_at = load.loaded_at
+        self.session.flush()
+
+    def loads(self) -> list[StatementLoad]:
+        stmt = select(CvmStatementLoadModel).order_by(
+            CvmStatementLoadModel.doc_type, CvmStatementLoadModel.year
+        )
+        return [
+            StatementLoad(
+                doc_type=m.doc_type,
+                year=m.year,
+                source_stamp=m.source_stamp,
+                facts=m.facts,
+                loaded_at=m.loaded_at,
+            )
+            for m in self.session.scalars(stmt).all()
+        ]
