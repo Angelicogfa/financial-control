@@ -32,6 +32,7 @@ from worker.jobs import (
     run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_cvm_documents_job,
+    sync_cvm_statements_job,
     sync_instrument_catalog_job,
     sync_price_history_job,
     sync_simulation_history_job,
@@ -76,6 +77,7 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
             sync_simulation_history_job, catalog_top=cfg.simulation_catalog_top
         ),
         "sync_cvm_documents": sync_cvm_documents_job,
+        "sync_cvm_statements": sync_cvm_statements_job,
         "warm_portfolio_quotes": partial(
             warm_portfolio_quotes_job, max_workers=cfg.market_fetch_workers
         ),
@@ -262,6 +264,15 @@ def create_scheduler(
         hour=cfg.cvm_sync_cron_hour,
         minute=10,
         id="sync_cvm_documents",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("sync_cvm_statements", sync_cvm_statements_job),
+        trigger="cron",
+        hour=(cfg.cvm_sync_cron_hour + 1) % 24,
+        minute=10,
+        id="sync_cvm_statements",
         replace_existing=True,
         **defaults,
     )

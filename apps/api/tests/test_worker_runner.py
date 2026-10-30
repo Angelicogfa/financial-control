@@ -239,6 +239,8 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "manual_sync_simulation_history",
         "sync_cvm_documents",
         "manual_sync_cvm_documents",
+        "sync_cvm_statements",
+        "manual_sync_cvm_statements",
         "refresh_asset_forecasts",
         "manual_refresh_asset_forecasts",
         "calibrate_forecasts",

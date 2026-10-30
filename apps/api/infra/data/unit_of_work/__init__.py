@@ -17,6 +17,7 @@ from infra.data.repositories.assets import (
 )
 from infra.data.repositories.disclosures import (
     SqlAlchemyCvmDocumentRepository,
+    SqlAlchemyCvmStatementRepository,
     SqlAlchemyIssuerTickerRepository,
 )
 from infra.data.repositories.forecast import SqlAlchemyForecastRepository
@@ -82,6 +83,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.simulation_studies = SqlAlchemySimulationStudyRepository(self.session)
         self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)
         self.cvm_documents = SqlAlchemyCvmDocumentRepository(self.session)
+        self.cvm_statements = SqlAlchemyCvmStatementRepository(self.session)
         self.market_data = SqlAlchemyMarketDataRepository(self.session)
         self.price_history = SqlAlchemyPriceHistoryRepository(self.session)
         self.forecasts = SqlAlchemyForecastRepository(self.session)

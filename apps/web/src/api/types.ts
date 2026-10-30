@@ -260,6 +260,18 @@ export interface AssetResponseDTO {
   updated_at?: string | null;
 }
 
+export interface AssetStatementsDTO {
+  asset_id: number;
+  ticker: string;
+  status: "OK" | "NOT_A_COMPANY" | "NOT_MAPPED" | "NOT_LOADED";
+  cnpj?: string | null;
+  template?: "COMPANY" | "FINANCIAL" | null;
+  deliveries?: StatementDeliveryDTO[];
+  valuation?: StatementValuationDTO | null;
+  years_loaded?: number[];
+  notes?: string[];
+}
+
 export interface AssetTaxStatusDTO {
   asset_id: number | null;
   ticker: string;
@@ -1848,6 +1860,32 @@ export interface SnapshotPointDTO {
   consolidated_pnl: number;
   earnings_cum: number;
   net_flow: number;
+}
+
+export interface StatementDeliveryDTO {
+  reference_date: string;
+  delivered_on: string;
+  doc_type: "DFP" | "ITR";
+  version: number;
+  revenue?: number | null;
+  ebit?: number | null;
+  ebitda?: number | null;
+  net_income?: number | null;
+  dividends_paid?: number | null;
+  equity?: number | null;
+  net_debt?: number | null;
+  total_assets?: number | null;
+  shares_outstanding?: number | null;
+}
+
+export interface StatementValuationDTO {
+  price: number;
+  price_date?: string | null;
+  market_cap: number;
+  earnings_yield?: number | null;
+  dividend_yield?: number | null;
+  price_to_book?: number | null;
+  ev_to_ebitda?: number | null;
 }
 
 export interface StressResultDTO {

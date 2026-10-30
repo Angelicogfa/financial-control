@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -39,3 +40,47 @@ class DisclosureFeedDTO(BaseModel):
 
 class MarkReadResultDTO(BaseModel):
     updated: int
+
+
+class StatementDeliveryDTO(BaseModel):
+    """What was known right after a statement was delivered: 12-month flows, last balance."""
+
+    reference_date: date
+    delivered_on: date
+    doc_type: Literal["DFP", "ITR"]
+    version: int
+    revenue: float | None = None
+    ebit: float | None = None
+    ebitda: float | None = None
+    net_income: float | None = None
+    dividends_paid: float | None = None
+    equity: float | None = None
+    net_debt: float | None = None
+    total_assets: float | None = None
+    shares_outstanding: float | None = None
+
+
+class StatementValuationDTO(BaseModel):
+    """Indicators from the last delivered statement and the stored quote."""
+
+    price: float
+    price_date: date | None = None
+    market_cap: float
+    earnings_yield: float | None = None
+    dividend_yield: float | None = None
+    price_to_book: float | None = None
+    ev_to_ebitda: float | None = None
+
+
+class AssetStatementsDTO(BaseModel):
+    """Statements delivered to the CVM by the asset's company, point in time (Phase 42.2)."""
+
+    asset_id: int
+    ticker: str
+    status: Literal["OK", "NOT_A_COMPANY", "NOT_MAPPED", "NOT_LOADED"]
+    cnpj: str | None = None
+    template: Literal["COMPANY", "FINANCIAL"] | None = None
+    deliveries: list[StatementDeliveryDTO] = Field(default_factory=list)
+    valuation: StatementValuationDTO | None = None
+    years_loaded: list[int] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)

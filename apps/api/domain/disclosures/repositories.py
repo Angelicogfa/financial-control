@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from domain.disclosures.entities import CvmDocument, IssuerTicker
+from domain.disclosures.statements import StatementDoc, StatementFact
 
 
 class AbstractIssuerTickerRepository(ABC):
@@ -18,6 +20,11 @@ class AbstractIssuerTickerRepository(ABC):
     @abstractmethod
     def cnpjs_for(self, tickers: Sequence[str]) -> dict[str, str]:
         """Ticker -> CNPJ (digits) for the tickers found."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def all_cnpjs(self) -> set[str]:
+        """Every company with a trading code in the map."""
         raise NotImplementedError
 
 
@@ -58,4 +65,44 @@ class AbstractCvmDocumentRepository(ABC):
 
     @abstractmethod
     def latest_delivery(self) -> date | None:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class StatementLoad:
+    """A yearly CVM statement file already loaded, and the version of the file it came from."""
+
+    doc_type: str
+    year: int
+    source_stamp: str  # Last-Modified of the file: a new one means new deliveries
+    facts: int
+    loaded_at: datetime
+
+
+class AbstractCvmStatementRepository(ABC):
+    @abstractmethod
+    def known_docs(self, doc_type: str, year: int) -> set[tuple[str, date, int]]:
+        """(cnpj, reference date, version) already stored for the statements of that year."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_many(self, facts: Sequence[StatementFact]) -> int:
+        """Store the facts of statements not stored yet (a version never changes)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def facts_for(self, cnpj: str) -> list[StatementFact]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def docs_for(self, cnpj: str) -> list[StatementDoc]:
+        """The delivered statements of a company, every version."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def record_load(self, load: StatementLoad) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def loads(self) -> list[StatementLoad]:
         raise NotImplementedError
