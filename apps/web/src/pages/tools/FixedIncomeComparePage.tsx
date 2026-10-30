@@ -12,6 +12,7 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/States";
 import { brl, day, parseDecimal, pct } from "../../utils/format";
@@ -87,18 +88,15 @@ function OfferFields({
       <div className="app-field-grid">
         <div className="app-field">
           <label htmlFor={id("asset")}>Origem</label>
-          <select
+          <Combobox<number | "">
             id={id("asset")}
             value={row.assetId}
-            onChange={(e) => onChange({ assetId: e.target.value === "" ? "" : Number(e.target.value) })}
-          >
-            <option value="">Informar à mão</option>
-            {assets.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.ticker} — {a.name}
-              </option>
-            ))}
-          </select>
+            onChange={(assetId) => onChange({ assetId })}
+            options={[
+              { value: "", label: "Informar à mão" },
+              ...assets.map((a) => ({ value: a.id, label: `${a.ticker} — ${a.name}` })),
+            ]}
+          />
         </div>
         <div className="app-field">
           <label htmlFor={id("label")}>Nome</label>
@@ -108,13 +106,7 @@ function OfferFields({
           <>
             <div className="app-field">
               <label htmlFor={id("indexer")}>Indexador</label>
-              <select id={id("indexer")} value={row.indexer} onChange={(e) => onChange({ indexer: e.target.value as OfferIndexer })}>
-                {OFFER_INDEXERS.map((k) => (
-                  <option key={k} value={k}>
-                    {OFFER_INDEXER_LABELS[k]}
-                  </option>
-                ))}
-              </select>
+              <Combobox id={id("indexer")} value={row.indexer} onChange={(indexer) => onChange({ indexer })} options={codeOptions(OFFER_INDEXERS, OFFER_INDEXER_LABELS)} />
             </div>
             <div className="app-field">
               <label htmlFor={id("rate")}>Taxa</label>

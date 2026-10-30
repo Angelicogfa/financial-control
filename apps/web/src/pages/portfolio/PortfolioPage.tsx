@@ -4,6 +4,7 @@ import { api } from "../../api/endpoints";
 import type { ArcaClass, PortfolioReportResponseDTO, ValuedPositionDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
+import { Combobox } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { KpiGrid, Lead, Notes, Section, type Tone } from "../../components/Section";
 import { Async, Empty } from "../../components/States";
@@ -234,18 +235,12 @@ export function PortfolioPage() {
           <>
             <label className="app-check" htmlFor="portfolio-account">
               <span className="app-muted">Conta</span>
-              <select
+              <Combobox<number | "">
                 id="portfolio-account"
                 value={accountId ?? ""}
-                onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">Todas</option>
-                {(accounts.data ?? []).map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setAccountId(v === "" ? null : v)}
+                options={[{ value: "", label: "Todas" }, ...(accounts.data ?? []).map((a) => ({ value: a.id, label: a.name }))]}
+              />
             </label>
             <Link className="app-primary-button" to="/asset/new">
               Novo ativo

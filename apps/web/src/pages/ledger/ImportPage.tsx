@@ -14,6 +14,7 @@ import type {
 } from "../../api/types";
 import { ArcaClassSelect } from "../../components/ArcaClassSelect";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/States";
 import { day, num, parseDecimal, quantity } from "../../utils/format";
@@ -322,19 +323,13 @@ export function ImportPage() {
                                 </label>
                               </td>
                               <td>
-                                <select
-                                  aria-label={`Tipo de ${u.ticker}`}
+                                <Combobox<AssetType | "">
+                                  label={`Tipo de ${u.ticker}`}
                                   value={choice.asset_type}
                                   disabled={busy || previewing || Boolean(term)}
-                                  onChange={(e) => void chooseType(u.ticker, e.target.value as AssetType | "")}
-                                >
-                                  <option value="">Escolha o tipo</option>
-                                  {ASSET_TYPES.map((type) => (
-                                    <option key={type} value={type}>
-                                      {ASSET_TYPE_LABELS[type]}
-                                    </option>
-                                  ))}
-                                </select>
+                                  onChange={(v) => void chooseType(u.ticker, v)}
+                                  options={[{ value: "", label: "Escolha o tipo" }, ...codeOptions(ASSET_TYPES, ASSET_TYPE_LABELS)]}
+                                />
                               </td>
                               <td>
                                 <ArcaClassSelect
@@ -362,18 +357,13 @@ export function ImportPage() {
                                     </div>
                                     <div className="app-field">
                                       <label htmlFor={`indexer-${u.ticker}`}>Indexador</label>
-                                      <select
+                                      <Combobox
                                         id={`indexer-${u.ticker}`}
                                         value={term.indexer}
                                         disabled={busy || previewing}
-                                        onChange={(e) => chooseTerm(u.ticker, { indexer: e.target.value as FixedIncomeIndexer })}
-                                      >
-                                        {INDEXERS.map((indexer) => (
-                                          <option key={indexer} value={indexer}>
-                                            {indexer}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        onChange={(indexer) => chooseTerm(u.ticker, { indexer })}
+                                        options={codeOptions(INDEXERS)}
+                                      />
                                     </div>
                                     <div className="app-field">
                                       <label htmlFor={`rate-${u.ticker}`}>Taxa contratada</label>
@@ -408,18 +398,13 @@ export function ImportPage() {
                                     </div>
                                     <div className="app-field">
                                       <label htmlFor={`liquidity-${u.ticker}`}>Liquidez</label>
-                                      <select
+                                      <Combobox
                                         id={`liquidity-${u.ticker}`}
                                         value={term.liquidity}
                                         disabled={busy || previewing}
-                                        onChange={(e) => chooseTerm(u.ticker, { liquidity: e.target.value as FixedIncomeLiquidity })}
-                                      >
-                                        {(Object.keys(LIQUIDITY_LABELS) as FixedIncomeLiquidity[]).map((liquidity) => (
-                                          <option key={liquidity} value={liquidity}>
-                                            {LIQUIDITY_LABELS[liquidity]}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        onChange={(liquidity) => chooseTerm(u.ticker, { liquidity })}
+                                        options={codeOptions(Object.keys(LIQUIDITY_LABELS) as FixedIncomeLiquidity[], LIQUIDITY_LABELS)}
+                                      />
                                     </div>
                                   </div>
                                 </td>

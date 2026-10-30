@@ -710,8 +710,8 @@ a.app-icon-button {
   white-space: nowrap;
 }
 
-.app-pagination-size select {
-  padding: 4px 6px;
+.app-pagination-size .app-combobox > input {
+  padding: 4px 28px 4px 6px;
   font-size: var(--text-sm);
   min-height: 32px;
 }
@@ -2985,6 +2985,11 @@ details[open] > summary {
   align-items: flex-start;
 }
 
+/* The study body sits a block away from the header summary above it, like any other card. */
+:where(.app-lead, .app-error-banner) + .study-layout {
+  margin-top: var(--block-gap);
+}
+
 .study-index {
   flex: 1 1 200px;
   max-width: 240px;
@@ -2996,6 +3001,14 @@ details[open] > summary {
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
   font-size: var(--text-sm);
+}
+
+/* Side by side, the index follows the reader down the chapters. */
+@media (min-width: 900px) {
+  .study-index {
+    position: sticky;
+    top: var(--space-4);
+  }
 }
 
 .study-index-actions {
@@ -3014,6 +3027,11 @@ details[open] > summary {
   display: flex;
   flex-direction: column;
   gap: var(--block-gap);
+}
+
+/* The column's gap already spaces the cards; the generic card-after-card margin would double it. */
+.study-main > * {
+  margin-top: 0;
 }
 
 .study-conclusion,
@@ -3178,3 +3196,75 @@ details[open] > summary {
   font-variant-numeric: tabular-nums;
 }
 
+
+/* Select-like field that filters its options as the user types (Combobox). */
+.app-combobox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-combobox > input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  padding-right: 32px;
+  text-overflow: ellipsis;
+}
+
+.app-combobox > input::placeholder {
+  color: var(--app-text-muted);
+  opacity: 1;
+}
+
+.app-combobox > input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.app-combobox-chevron {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  color: var(--app-text-muted);
+  cursor: pointer;
+}
+
+.app-combobox > input:disabled + .app-combobox-chevron {
+  cursor: not-allowed;
+}
+
+.app-combobox-panel {
+  z-index: 60;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  overflow-y: auto;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.app-combobox-option {
+  padding: 6px var(--space-2);
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+  font-size: var(--text-body);
+  color: var(--app-text);
+}
+
+.app-combobox-option.is-active {
+  background: var(--app-surface-hover);
+}
+
+.app-combobox-option[aria-selected="true"] {
+  font-weight: 600;
+}
+
+.app-combobox-empty {
+  padding: 6px var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}

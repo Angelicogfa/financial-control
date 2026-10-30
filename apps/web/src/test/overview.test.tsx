@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { alerts, analytics, position, report } from "./fixtures";
+import { pickWhenLoaded } from "./combobox";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -149,8 +150,7 @@ describe("portfolio", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Ações" }));
     expect(await screen.findByRole("list", { name: "Peso dos ativos em Ações" })).toBeInTheDocument();
 
-    await screen.findByRole("option", { name: "XP" });
-    fireEvent.change(screen.getByLabelText("Conta"), { target: { value: "1" } });
+    await pickWhenLoaded(screen.getByLabelText("Conta"), "XP");
     await waitFor(() =>
       expect(calls.some((c) => c.path === "/portfolio/consolidated" && c.query.get("account_id") === "1")).toBe(true),
     );

@@ -17,6 +17,7 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { Pagination } from "../../components/Pagination";
 import { Async, Spinner } from "../../components/States";
@@ -332,18 +333,13 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
       <div className="app-field-grid">
         <div className="app-field">
           <label htmlFor="asset-type">Tipo</label>
-          <select
+          <Combobox
             id="asset-type"
             value={form.assetType}
             disabled={saving || archiving}
-            onChange={(e) => set("assetType", e.target.value as AssetType)}
-          >
-            {ASSET_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {ASSET_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set("assetType", v)}
+            options={codeOptions(ASSET_TYPES, ASSET_TYPE_LABELS)}
+          />
         </div>
         <div className="app-field">
           <label htmlFor="asset-ticker">Código</label>
@@ -378,48 +374,31 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
               <Hint about="Classe ARCA">{`Sugestão: ${suggestion}`}</Hint>
             )}
           </span>
-          <select
+          <Combobox<ArcaClass | "">
             id="asset-class"
             value={form.arcaClass}
             disabled={saving || archiving}
-            onChange={(e) => set("arcaClass", e.target.value as ArcaClass | "")}
-          >
-            <option value="">Automática</option>
-            {ARCA_CLASSES.map((c) => (
-              <option key={c} value={c}>
-                {ARCA_LABELS[c]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set("arcaClass", v)}
+            options={[{ value: "", label: "Automática" }, ...codeOptions(ARCA_CLASSES, ARCA_LABELS)]}
+          />
         </div>
         <div className="app-field">
           <label htmlFor="asset-purpose">Objetivo</label>
-          <select
+          <Combobox
             id="asset-purpose"
             value={form.purpose}
-            onChange={(e) => set("purpose", e.target.value as AssetPurpose)}
-          >
-            {(Object.keys(PURPOSE_LABELS) as AssetPurpose[]).map((p) => (
-              <option key={p} value={p}>
-                {PURPOSE_LABELS[p]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set("purpose", v)}
+            options={codeOptions(Object.keys(PURPOSE_LABELS) as AssetPurpose[], PURPOSE_LABELS)}
+          />
         </div>
         <div className="app-field">
           <label htmlFor="asset-profile">Perfil do checklist</label>
-          <select
+          <Combobox<ChecklistProfile | "">
             id="asset-profile"
             value={form.profile}
-            onChange={(e) => set("profile", e.target.value as ChecklistProfile | "")}
-          >
-            <option value="">Padrão do tipo</option>
-            {PROFILES.map((p) => (
-              <option key={p} value={p}>
-                {PROFILE_LABELS[p]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set("profile", v)}
+            options={[{ value: "", label: "Padrão do tipo" }, ...codeOptions(PROFILES, PROFILE_LABELS)]}
+          />
         </div>
         <div className="app-field">
           <span className="app-field-label">
@@ -444,34 +423,21 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
           <div className="app-field-grid">
             <div className="app-field">
               <label htmlFor="fi-kind">Instrumento</label>
-              <select
+              <Combobox
                 id="fi-kind"
                 value={form.instrumentKind}
-                onChange={(e) => set("instrumentKind", e.target.value as FixedIncomeInstrumentKind)}
-              >
-                {INSTRUMENT_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {INSTRUMENT_LABELS[k]}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => set("instrumentKind", v)}
+                options={codeOptions(INSTRUMENT_KINDS, INSTRUMENT_LABELS)}
+              />
             </div>
             <div className="app-field">
               <label htmlFor="fi-indexer">Indexador</label>
-              <select
+              <Combobox
                 id="fi-indexer"
                 value={form.indexer}
-                onChange={(e) => {
-                  const indexer = e.target.value as FixedIncomeIndexer;
-                  setForm((f) => ({ ...f, indexer, ratePercent: DEFAULT_RATE_PERCENT[indexer] }));
-                }}
-              >
-                {INDEXERS.map((i) => (
-                  <option key={i} value={i}>
-                    {i}
-                  </option>
-                ))}
-              </select>
+                onChange={(indexer) => setForm((f) => ({ ...f, indexer, ratePercent: DEFAULT_RATE_PERCENT[indexer] }))}
+                options={codeOptions(INDEXERS)}
+              />
             </div>
             <div className="app-field">
               <span className="app-field-label">
@@ -516,17 +482,12 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
             </div>
             <div className="app-field">
               <label htmlFor="fi-liquidity">Liquidez</label>
-              <select
+              <Combobox
                 id="fi-liquidity"
                 value={form.liquidity}
-                onChange={(e) => set("liquidity", e.target.value as FixedIncomeLiquidity)}
-              >
-                {(Object.keys(LIQUIDITY_LABELS) as FixedIncomeLiquidity[]).map((l) => (
-                  <option key={l} value={l}>
-                    {LIQUIDITY_LABELS[l]}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => set("liquidity", v)}
+                options={codeOptions(Object.keys(LIQUIDITY_LABELS) as FixedIncomeLiquidity[], LIQUIDITY_LABELS)}
+              />
             </div>
             <div className="app-field">
               <label htmlFor="fi-issuer">Emissor</label>

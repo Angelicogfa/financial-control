@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import { api } from "../../api/endpoints";
+import { Combobox } from "../../components/Combobox";
 import type { AccountDTO, AssetResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 
@@ -34,20 +35,16 @@ export function AssetSelect({
     resolve.current?.(loaded.items.find((a) => a.id === value) ?? null);
   }, [loaded, value]);
   return (
-    <select
+    <Combobox<number | "">
       id={id}
       value={value}
       disabled={disabled}
       required
-      onChange={(e) => onChange(items.find((a) => a.id === Number(e.target.value)) ?? null)}
-    >
-      <option value="">{assets.loading ? "Carregando…" : "Escolha o ativo"}</option>
-      {items.map((a) => (
-        <option key={a.id} value={a.id}>
-          {a.ticker} — {a.name}
-        </option>
-      ))}
-    </select>
+      loading={assets.loading}
+      placeholder="Escolha o ativo"
+      options={items.map((a) => ({ value: a.id, label: `${a.ticker} — ${a.name}` }))}
+      onChange={(next) => onChange(items.find((a) => a.id === next) ?? null)}
+    />
   );
 }
 
@@ -59,13 +56,17 @@ export function AccountSelect({
 }: Readonly<{ id: string; value: number | null; disabled?: boolean; onChange: (id: number | null) => void }>) {
   const accounts = useApi("accounts", () => api.accounts.list());
   return (
-    <select id={id} value={value ?? ""} disabled={disabled} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
-      <option value="">Conta padrão</option>
-      {(accounts.data ?? []).filter((a: AccountDTO) => a.is_active !== false || a.id === value).map((a) => (
-        <option key={a.id} value={a.id}>
-          {a.name}
-        </option>
-      ))}
-    </select>
+    <Combobox<number | "">
+      id={id}
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(next) => onChange(next === "" ? null : next)}
+      options={[
+        { value: "", label: "Conta padrão" },
+        ...(accounts.data ?? [])
+          .filter((a: AccountDTO) => a.is_active !== false || a.id === value)
+          .map((a) => ({ value: a.id, label: a.name })),
+      ]}
+    />
   );
 }

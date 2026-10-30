@@ -12,6 +12,7 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { Hint } from "../../components/Hint";
 import { MultiSelect } from "../../components/MultiSelect";
 import { PageHeader } from "../../components/PageHeader";
@@ -221,14 +222,14 @@ function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (t
           </div>
           <div className="app-field">
             <label htmlFor="compare-sector">Setor</label>
-            <select id="compare-sector" value={form.sector} onChange={(e) => set("sector", e.target.value)} disabled={loading}>
-              <option value="">Todos</option>
-              {(sectors.data ?? []).map((sector) => (
-                <option key={sector} value={sector}>
-                  {sector}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              id="compare-sector"
+              value={form.sector}
+              onChange={(v) => set("sector", v)}
+              disabled={loading}
+              loading={sectors.loading}
+              options={[{ value: "", label: "Todos" }, ...codeOptions(sectors.data ?? [])]}
+            />
           </div>
           <div className="app-field">
             <label htmlFor="compare-arca">Classe ARCA</label>

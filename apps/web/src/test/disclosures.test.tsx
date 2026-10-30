@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CvmDocumentDTO, DisclosureFeedDTO } from "../api/types";
 import { DisclosureFeed } from "../pages/disclosures/DisclosureFeed";
+import { optionLabels, pick } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 
 const doc = (id: number, category: string, overrides: Partial<CvmDocumentDTO> = {}): CvmDocumentDTO => ({
@@ -58,9 +59,9 @@ describe("DisclosureFeed", () => {
     expect(screen.getByText("1 não lido")).toBeInTheDocument();
     expect(screen.getByText(/Sem CNPJ no cadastro da CVM ainda: ITSA4/)).toBeInTheDocument();
     expect(screen.getByText("FIIs e ETFs não são companhias abertas.")).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Assembleia (3)" })).toBeInTheDocument();
+    expect(optionLabels(screen.getByLabelText("Categoria"))).toContain("Assembleia (3)");
 
-    fireEvent.change(screen.getByLabelText("Categoria"), { target: { value: "Fato Relevante" } });
+    pick(screen.getByLabelText("Categoria"), /^Fato Relevante/);
     await waitFor(() => expect(calls.some((c) => c.query.get("category") === "Fato Relevante")).toBe(true));
 
     fireEvent.click(await screen.findByRole("button", { name: "Marcar como lido" }));

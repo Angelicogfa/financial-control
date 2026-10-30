@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { analysis, asset, report, savedPlan } from "./fixtures";
+import { optionLabels, pick, pickWhenLoaded } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -53,7 +54,7 @@ describe("asset detail", () => {
     const governance = screen.getByRole("group", { name: "Tem boa governança?" });
     fireEvent.click(within(governance).getByRole("button", { name: "Sim" }));
     fireEvent.change(screen.getByLabelText("Evidência: Tem boa governança?"), { target: { value: "Novo Mercado" } });
-    fireEvent.change(screen.getByLabelText("Perfil do checklist"), { target: { value: "BANK" } });
+    pick(screen.getByLabelText("Perfil do checklist"), "Banco");
     expect(screen.getByText(/Salve para ver as perguntas do perfil Banco/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Salvar checklist" }));
     await screen.findByText("Checklist salvo.");
@@ -90,7 +91,7 @@ describe("asset form", () => {
   it("creates a fixed income asset converting the typed rate", async () => {
     const { calls } = mockApi([{ method: "POST", path: "/assets", reply: asset({ id: 4 }) }]);
     renderAt("/asset/new");
-    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "FIXED_INCOME" } });
+    pick(screen.getByLabelText("Tipo"), "Renda fixa");
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "CDB Banco X" } });
     fireEvent.change(screen.getByLabelText("Taxa (%)"), { target: { value: "112,5" } });
     expect(screen.getByLabelText("Data de emissão (opcional)")).toHaveValue("");
@@ -134,16 +135,16 @@ describe("asset form", () => {
       { method: "POST", path: "/assets", reply: asset({ id: 13, asset_type: "TREASURY" }) },
     ]);
     renderAt("/asset/new");
-    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "TREASURY" } });
+    pick(screen.getByLabelText("Tipo"), "Tesouro Direto");
     fireEvent.change(screen.getByLabelText("Título ou vencimento"), { target: { value: "2035" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
     fireEvent.click(await screen.findByRole("button", { name: "Usar título" }));
 
     expect(screen.getByLabelText("Paga juros semestrais")).toBeChecked();
     expect(screen.getByText(/taxa implícita no preço/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Instrumento"), { target: { value: "TESOURO_SELIC" } });
+    pick(screen.getByLabelText("Instrumento"), "Tesouro Selic");
     expect(screen.queryByText(/taxa implícita no preço/)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Instrumento"), { target: { value: "TESOURO_PRE" } });
+    pick(screen.getByLabelText("Instrumento"), "Tesouro Prefixado");
 
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar ativo" }));
     await waitFor(() => expect(last(calls, "POST", "/assets")).toBeDefined());
@@ -187,7 +188,7 @@ describe("asset form", () => {
       { method: "POST", path: "/assets", reply: asset({ id: 12, asset_type: "TREASURY" }) },
     ]);
     renderAt("/asset/new");
-    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "TREASURY" } });
+    pick(screen.getByLabelText("Tipo"), "Tesouro Direto");
     fireEvent.change(screen.getByLabelText("Título ou vencimento"), { target: { value: "2035" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
     expect(await screen.findByText("Tesouro IPCA+ 2035")).toBeInTheDocument();
@@ -243,8 +244,7 @@ describe("research", () => {
     expect(screen.getByLabelText("Tipo")).toHaveTextContent("Fundo imobiliário");
     fireEvent.click(screen.getByLabelText("Classe ARCA"));
     fireEvent.click(screen.getByRole("checkbox", { name: "Ações" }));
-    expect(await screen.findByRole("option", { name: "Finance" })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Setor"), { target: { value: "Finance" } });
+    await pickWhenLoaded(screen.getByLabelText("Setor"), "Finance");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("ITUB4")).toBeInTheDocument();
     const query = last(calls, "GET", "/research/screener")?.query;
@@ -257,9 +257,9 @@ describe("research", () => {
     // "Observar" asks for the ARCA quadrant first, with the suggestion preselected.
     fireEvent.click(screen.getByRole("button", { name: "Observar" }));
     const quadrant = screen.getByRole("combobox", { name: "Classe ARCA de ITUB4" });
-    expect(quadrant).toHaveValue("ACOES");
-    expect(within(quadrant).getByRole("option", { name: "Ações (sugerida)" })).toBeInTheDocument();
-    fireEvent.change(quadrant, { target: { value: "ATIVOS_INTERNACIONAIS" } });
+    expect(quadrant).toHaveValue("Ações (sugerida)");
+    expect(optionLabels(quadrant)).toContain("Ações (sugerida)");
+    pick(quadrant, "Ativos internacionais");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
     expect(await screen.findByText("ITUB4 está em observação em Ativos internacionais.")).toBeInTheDocument();
     expect(last(calls, "POST", "/research/watchlist")?.body).toMatchObject({
@@ -317,8 +317,8 @@ describe("research", () => {
 
     // Reclassify in place.
     const quadrant = screen.getByRole("combobox", { name: "Classe ARCA de BBAS3" });
-    expect(quadrant).toHaveValue("ACOES");
-    fireEvent.change(quadrant, { target: { value: "CAIXA" } });
+    expect((quadrant as HTMLInputElement).value).toMatch(/^Ações/);
+    pick(quadrant, "Caixa");
     await waitFor(() =>
       expect(last(calls, "PUT", "/research/watchlist/9/classification")?.body).toEqual({ arca_class: "CAIXA" }),
     );
@@ -326,7 +326,7 @@ describe("research", () => {
     // Follow by code with a chosen quadrant (empty = the suggestion).
     fireEvent.change(screen.getByLabelText("Observar código"), { target: { value: "taee11" } });
     expect(screen.getByLabelText("Classe ARCA")).toHaveValue("");
-    fireEvent.change(screen.getByLabelText("Classe ARCA"), { target: { value: "REAL_ESTATE" } });
+    pick(screen.getByLabelText("Classe ARCA"), "Real Estate");
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
     await waitFor(() =>
       expect(last(calls, "POST", "/research/watchlist")?.body).toMatchObject({ ticker: "TAEE11", arca_class: "REAL_ESTATE" }),
@@ -372,7 +372,7 @@ describe("research", () => {
       },
     ]);
     renderAt("/research?tab=treasury");
-    fireEvent.change(screen.getByLabelText("Indexador"), { target: { value: "SELIC" } });
+    pick(screen.getByLabelText("Indexador"), "SELIC");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("Tesouro Selic 2031")).toBeInTheDocument();
     expect(screen.getByText("SELIC + 0,10% a.a.")).toBeInTheDocument();
@@ -452,8 +452,7 @@ describe("contribute", () => {
     expect(screen.getByRole("note", { name: "Em resumo" })).toHaveTextContent(/em 1 compra sugerida\. R\$\s40,00 ficam sem destino\./);
     fireEvent.change(screen.getByLabelText("Quantidade de HGLG11"), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText("Preço de HGLG11"), { target: { value: "158,5" } });
-    await screen.findByRole("option", { name: "XP" });
-    fireEvent.change(screen.getByLabelText("Conta"), { target: { value: "1" } });
+    await pickWhenLoaded(screen.getByLabelText("Conta"), "XP");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar 1 compra" }));
     expect(await screen.findByText(/Plano confirmado/)).toBeInTheDocument();
     expect(last(calls, "POST", "/contributions/7/confirm")?.body).toMatchObject({
@@ -492,8 +491,7 @@ describe("ledger", () => {
     ]);
     renderAt("/ledger");
     expect(await screen.findByRole("link", { name: "WEGE3" })).toBeInTheDocument();
-    await screen.findByRole("option", { name: "WEGE3" });
-    fireEvent.change(screen.getByLabelText("Ativo"), { target: { value: "1" } });
+    await pickWhenLoaded(screen.getByLabelText("Ativo"), "WEGE3");
     await waitFor(() => expect(last(calls, "GET", "/transactions")?.query.get("asset_id")).toBe("1"));
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
     expect(await screen.findByText(/invalid ledger/)).toBeInTheDocument();
@@ -507,7 +505,7 @@ describe("ledger", () => {
       { path: "/transactions", reply: page([trade]) },
     ]);
     renderAt("/ledger/trades/new?asset=1");
-    await screen.findByRole("option", { name: /WEGE3/ });
+    await screen.findByDisplayValue(/WEGE3/);
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText(/Preço unitário/), { target: { value: "40,5" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
@@ -553,7 +551,7 @@ describe("ledger", () => {
       { path: "/accounts", reply: accounts },
     ]);
     renderAt("/ledger/trades/new?asset=1");
-    await screen.findByRole("option", { name: /WEGE3/ });
+    await screen.findByDisplayValue(/WEGE3/);
     expect(screen.queryByLabelText(/Câmbio/)).not.toBeInTheDocument();
   });
 
@@ -610,19 +608,19 @@ describe("ledger", () => {
     fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [file] } });
     expect(await screen.findByText("Ativos que ainda não estão cadastrados")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /ITSA4/ })).toBeChecked();
-    expect(screen.getByRole("combobox", { name: "Classe ARCA de ITSA4" })).toHaveValue("ACOES");
+    expect(screen.getByRole("combobox", { name: "Classe ARCA de ITSA4" })).toHaveValue("Ações (sugerida)");
 
     // A ticker of unknown type stays off until its type is chosen; the quadrant follows the type.
     const xpto = screen.getByRole("checkbox", { name: /XPTO1/ });
     expect(xpto).toBeDisabled();
-    fireEvent.change(screen.getByRole("combobox", { name: "Tipo de XPTO1" }), { target: { value: "BDR" } });
+    pick(screen.getByRole("combobox", { name: "Tipo de XPTO1" }), "BDR");
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Classe ARCA de XPTO1" })).toHaveValue("ATIVOS_INTERNACIONAIS"),
+      expect((screen.getByRole("combobox", { name: "Classe ARCA de XPTO1" }) as HTMLInputElement).value).toMatch(/^Ativos internacionais/),
     );
     expect(xpto).toBeChecked();
     fireEvent.click(xpto);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Classe ARCA de ITSA4" }), { target: { value: "CAIXA" } });
+    pick(screen.getByRole("combobox", { name: "Classe ARCA de ITSA4" }), "Caixa");
     fireEvent.click(screen.getByRole("button", { name: "Importar 2 linha(s)" }));
     expect(await screen.findByText(/Importado: 2 operação/)).toBeInTheDocument();
     const body = last(calls, "POST", "/imports/b3/commit")?.body as Record<string, string>;
@@ -713,7 +711,7 @@ describe("ledger", () => {
 
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "CDB Itaú liquidez diária" } });
     fireEvent.change(screen.getByLabelText("Taxa contratada"), { target: { value: "100" } });
-    fireEvent.change(screen.getByLabelText("Liquidez"), { target: { value: "DAILY" } });
+    pick(screen.getByLabelText("Liquidez"), "Diária");
     expect(security).toBeChecked();
 
     fireEvent.click(screen.getByRole("button", { name: "Importar 1 linha(s)" }));

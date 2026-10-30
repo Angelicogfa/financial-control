@@ -6,6 +6,7 @@ import { errorMessage } from "../../api/http";
 import type { PageMetaDTO } from "../../api/types";
 import { useApi, type ApiState } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
+import { Combobox } from "../../components/Combobox";
 import { Pagination } from "../../components/Pagination";
 import { IconButton, IconLink } from "../../components/RowActions";
 import { Async, Empty } from "../../components/States";
@@ -33,33 +34,22 @@ function Filters({
     <div className="app-filter-bar">
       <div className="app-field">
         <label htmlFor="ledger-asset">Ativo</label>
-        <select
+        <Combobox<number | "">
           id="ledger-asset"
           value={filters.asset_id ?? ""}
-          onChange={(e) => onChange({ ...filters, asset_id: e.target.value ? Number(e.target.value) : undefined })}
-        >
-          <option value="">Todos</option>
-          {(assets.data?.items ?? []).map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.ticker}
-            </option>
-          ))}
-        </select>
+          loading={assets.loading}
+          onChange={(v) => onChange({ ...filters, asset_id: v === "" ? undefined : v })}
+          options={[{ value: "", label: "Todos" }, ...(assets.data?.items ?? []).map((a) => ({ value: a.id, label: a.ticker }))]}
+        />
       </div>
       <div className="app-field">
         <label htmlFor="ledger-account">Conta</label>
-        <select
+        <Combobox<number | "">
           id="ledger-account"
           value={filters.account_id ?? ""}
-          onChange={(e) => onChange({ ...filters, account_id: e.target.value ? Number(e.target.value) : undefined })}
-        >
-          <option value="">Todas</option>
-          {(accounts.data ?? []).map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => onChange({ ...filters, account_id: v === "" ? undefined : v })}
+          options={[{ value: "", label: "Todas" }, ...(accounts.data ?? []).map((a) => ({ value: a.id, label: a.name }))]}
+        />
       </div>
       <div className="app-field">
         <label htmlFor="ledger-from">De</label>

@@ -135,6 +135,26 @@ export interface TreasuryFilters {
 
 const newestFirst = { sort_by: "id", sort_order: "desc" };
 
+/** Largest page the API serves (`page_size` is capped at 200). */
+const MAX_PAGE_SIZE = 200;
+
+/**
+ * Every asset, in ticker order: the API serves at most 200 per page, so the first page says
+ * how many pages there are and the rest are fetched together. Pickers filter this list on the
+ * client, so stopping at the first page would hide every ticker past the 200th.
+ */
+async function listAllAssets(activeOnly: boolean): Promise<PaginatedResponse_AssetResponseDTO_> {
+  const fetchPage = (page: number) =>
+    request<PaginatedResponse_AssetResponseDTO_>("/assets", {
+      query: { page, page_size: MAX_PAGE_SIZE, active_only: activeOnly, sort_by: "ticker" },
+    });
+  const first = await fetchPage(1);
+  const totalPages = first.meta?.total_pages ?? 1;
+  if (totalPages <= 1) return first;
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(i + 2)));
+  return { ...first, items: [...first.items, ...rest.flatMap((p) => p.items)] };
+}
+
 export const api = {
   portfolio: {
     report: (accountId?: number) =>
@@ -160,10 +180,7 @@ export const api = {
       request<void>("/alerts/dismissals", { method: "DELETE", query: { key } }),
   },
   assets: {
-    list: (activeOnly = true) =>
-      request<PaginatedResponse_AssetResponseDTO_>("/assets", {
-        query: { page_size: 200, active_only: activeOnly, sort_by: "ticker" },
-      }),
+    list: (activeOnly = true) => listAllAssets(activeOnly),
     get: (id: number) => request<AssetResponseDTO>(`/assets/${id}`),
     analysis: (id: number) => request<AssetAnalysisResponseDTO>(`/assets/${id}/analysis`),
     prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>

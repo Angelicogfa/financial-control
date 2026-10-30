@@ -6,6 +6,7 @@ import { errorMessage } from "../../api/http";
 import type { TransactionKind, TransactionResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { Async, Spinner } from "../../components/States";
 import { brl, parseDecimal, today } from "../../utils/format";
 import { TRADE_LABELS } from "../../utils/labels";
@@ -82,13 +83,13 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
         </div>
         <div className="app-field">
           <label htmlFor="trade-kind">Operação</label>
-          <select id="trade-kind" value={kind} onChange={(e) => setKind(e.target.value as TransactionKind)} disabled={saving}>
-            {(Object.keys(TRADE_LABELS) as TransactionKind[]).map((k) => (
-              <option key={k} value={k}>
-                {TRADE_LABELS[k]}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            id="trade-kind"
+            value={kind}
+            onChange={setKind}
+            disabled={saving}
+            options={codeOptions(Object.keys(TRADE_LABELS) as TransactionKind[], TRADE_LABELS)}
+          />
         </div>
         <div className="app-field">
           <label htmlFor="trade-date">Data</label>

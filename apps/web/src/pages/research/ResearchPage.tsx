@@ -14,6 +14,7 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { Lead, Notes } from "../../components/Section";
 import { Pagination } from "../../components/Pagination";
@@ -254,14 +255,14 @@ function Screener() {
           </div>
           <div className="app-field">
             <label htmlFor="screen-sector">Setor</label>
-            <select id="screen-sector" value={form.sector} onChange={(e) => set("sector", e.target.value)} disabled={loading}>
-              <option value="">Todos</option>
-              {(sectors.data ?? []).map((sector) => (
-                <option key={sector} value={sector}>
-                  {sector}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              id="screen-sector"
+              value={form.sector}
+              onChange={(v) => set("sector", v)}
+              disabled={loading}
+              loading={sectors.loading}
+              options={[{ value: "", label: "Todos" }, ...codeOptions(sectors.data ?? [])]}
+            />
           </div>
           <div className="app-field">
             <label htmlFor="screen-types">Tipo</label>
@@ -455,19 +456,13 @@ function Watchlist() {
         </div>
         <div className="app-field">
           <label htmlFor="watch-type">Tipo</label>
-          <select
+          <Combobox<AssetType | "">
             id="watch-type"
             value={assetType}
             disabled={adding}
-            onChange={(e) => setAssetType(e.target.value as AssetType | "")}
-          >
-            <option value="">Pelo catálogo da B3</option>
-            {SCREEN_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {ASSET_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </select>
+            onChange={setAssetType}
+            options={[{ value: "", label: "Pelo catálogo da B3" }, ...codeOptions(SCREEN_TYPES, ASSET_TYPE_LABELS)]}
+          />
         </div>
         <div className="app-field">
           <label htmlFor="watch-arca">Classe ARCA</label>
@@ -652,30 +647,27 @@ function TreasuryScreener() {
           </div>
           <div className="app-field">
             <label htmlFor="treasury-indexer">Indexador</label>
-            <select
+            <Combobox<FixedIncomeIndexer | "">
               id="treasury-indexer"
               value={indexer}
               disabled={loading}
-              onChange={(e) => setIndexer(e.target.value as FixedIncomeIndexer | "")}
-            >
-              <option value="">Todos</option>
-              <option value="SELIC">SELIC</option>
-              <option value="IPCA">IPCA</option>
-              <option value="PRE">PRE</option>
-            </select>
+              onChange={setIndexer}
+              options={[{ value: "", label: "Todos" }, ...codeOptions<FixedIncomeIndexer>(["SELIC", "IPCA", "PRE"])]}
+            />
           </div>
           <div className="app-field">
             <label htmlFor="treasury-coupon">Cupom</label>
-            <select
+            <Combobox<"" | "zero" | "semestral">
               id="treasury-coupon"
               value={couponType}
               disabled={loading}
-              onChange={(e) => setCouponType(e.target.value as "" | "zero" | "semestral")}
-            >
-              <option value="">Todos</option>
-              <option value="zero">Sem cupom</option>
-              <option value="semestral">Juros semestrais</option>
-            </select>
+              onChange={setCouponType}
+              options={[
+                { value: "", label: "Todos" },
+                { value: "zero", label: "Sem cupom" },
+                { value: "semestral", label: "Juros semestrais" },
+              ]}
+            />
           </div>
           <button type="submit" className="app-primary-button" disabled={loading}>
             {loading && <Spinner size="sm" />}

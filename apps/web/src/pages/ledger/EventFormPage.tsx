@@ -5,6 +5,7 @@ import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import type { CorporateEventKind } from "../../api/types";
 import { Hint } from "../../components/Hint";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/States";
 import { parseDecimal, today } from "../../utils/format";
@@ -75,13 +76,7 @@ export function EventFormPage() {
           </div>
           <div className="app-field">
             <label htmlFor="event-kind">Evento</label>
-            <select id="event-kind" value={kind} onChange={(e) => setKind(e.target.value as CorporateEventKind)} disabled={saving}>
-              {EVENT_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {EVENT_LABELS[k]}
-                </option>
-              ))}
-            </select>
+            <Combobox id="event-kind" value={kind} onChange={setKind} disabled={saving} options={codeOptions(EVENT_KINDS, EVENT_LABELS)} />
           </div>
           <div className="app-field">
             <label htmlFor="event-date">Data ex</label>
