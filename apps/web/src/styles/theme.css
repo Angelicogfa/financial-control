@@ -1979,6 +1979,50 @@ ul.app-info-banner li + li {
   word-break: break-all;
 }
 
+.app-run-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-run-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.app-run-item:first-child {
+  border-top: 0;
+  padding-top: var(--space-2);
+}
+
+.app-run-text {
+  display: flex;
+  flex: 1 1 24rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.app-run-text .app-card-hint {
+  margin: 0;
+}
+
+.app-run-status {
+  font-size: var(--text-sm);
+  color: var(--app-text-muted);
+}
+
+.app-run-item > button {
+  flex: 0 0 auto;
+}
+
 .app-key-renew-row {
   display: flex;
   flex-wrap: wrap;

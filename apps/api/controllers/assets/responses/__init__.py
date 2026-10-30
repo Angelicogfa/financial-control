@@ -291,6 +291,8 @@ class AssetForecastDTO(BaseModel):
     horizons: list[ForecastHorizonDTO] = Field(default_factory=list)
     drivers: list[ForecastDriverDTO] = Field(default_factory=list)
     seal: ForecastSealDTO | None = None
+    requested: bool = False  # asked for by the user: shown with a warning, from 12 months
+    cautions: list[str] = Field(default_factory=list)  # why to read it with care
     warnings: list[str] = Field(default_factory=list)
     model_version: str | None = None
 

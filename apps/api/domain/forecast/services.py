@@ -2,12 +2,14 @@
 
 The screen never computes: it reads the latest forecast of the asset and the latest
 calibration, adds the prices that matter to the user (today's, the average paid, the fair
-value) and hides the forecast while its confidence is below "Use com cautela" (decision 42.0-5).
+value) and hides the forecast while its confidence is below "Use com cautela" (decision 42.0-5),
+unless the user asked for that asset by itself: then it is shown with a warning, from 12 months
+of history on.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from controllers.assets.responses import (
     AssetForecastDTO,
@@ -19,13 +21,16 @@ from controllers.assets.responses import (
     ForecastThresholdDTO,
 )
 from controllers.shared.dependencies import UoWFactory
-from core.errors import NotFoundError
+from core.errors import NotFoundError, ValidationError
 from domain.forecast.calibration import ForecastCalibration
 from domain.forecast.model import FALL_THRESHOLD, PriceForecast, chance_above
 from domain.forecast.repositories import StoredCalibration
+from domain.forecast.runs import REQUESTED_MIN_MONTHS, refresh_forecasts
+from domain.policy.services.policy import current_policy
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.simulation.candidates import MIN_HISTORY_MONTHS
 from domain.simulation.studies import Seal, confidence_seal, money, pct
-from infra.providers.stored import stored_fundamentals
+from infra.providers.stored import stored_fundamentals, stored_macro_rates, stored_usd_brl
 
 MIN_SEAL_LEVEL = 2  # "Use com cautela" or better (decision 42.0-5)
 LEAD_HORIZON = 12
@@ -53,10 +58,43 @@ def forecast_lead(ticker: str, forecast: PriceForecast, months: int = LEAD_HORIZ
 
 class ForecastHandler:
     def __init__(
-        self, uow_factory: UoWFactory, portfolio_service: PortfolioApplicationService
+        self,
+        uow_factory: UoWFactory,
+        portfolio_service: PortfolioApplicationService,
+        catalog_top: int = 0,
     ) -> None:
         self.uow_factory = uow_factory
         self.portfolio_service = portfolio_service
+        self.catalog_top = catalog_top
+
+    def refresh(self, asset_id: int, *, today: date | None = None) -> AssetForecastDTO:
+        """Forecast this asset now, from the stored history, and keep following it on demand."""
+        with self.uow_factory() as uow:
+            asset = uow.assets.get_by_id(asset_id)
+            if asset is None:
+                raise NotFoundError(f"Asset id={asset_id} not found")
+            as_of = today or date.today()
+            cdi, _ipca = stored_macro_rates(uow, self.portfolio_service.gateway, today=as_of)
+            projections = current_policy(uow.policies).valuation.projections
+            if projections.projected_cdi_rate is not None:
+                cdi = projections.projected_cdi_rate
+            counts = refresh_forecasts(
+                uow,
+                cdi_annual=cdi,
+                usd_brl=stored_usd_brl(uow, self.portfolio_service.gateway),
+                catalog_top=self.catalog_top,
+                today=as_of,
+                tickers=[asset.ticker],
+                on_demand=True,
+            )
+            if counts["forecasts"] + counts["insufficient"] == 0:
+                raise ValidationError(
+                    f"Não há preço nem histórico guardado de {asset.ticker} para calcular a "
+                    "previsão; carregue o histórico da simulação em Dados de mercado.",
+                    code="FORECAST_NO_DATA",
+                )
+            uow.commit()
+        return self.get(asset_id)
 
     def get(self, asset_id: int) -> AssetForecastDTO:
         with self.uow_factory() as uow:
@@ -65,22 +103,36 @@ class ForecastHandler:
                 raise NotFoundError(f"Asset id={asset_id} not found")
             stored = uow.forecasts.latest(asset.ticker)
             seal = forecast_seal(uow.forecasts.latest_calibration())
-            base = {"asset_id": asset_id, "ticker": asset.ticker, "seal": _seal_dto(seal)}
+            requested = bool(stored is not None and stored.payload.get("on_demand"))
+            base = {
+                "asset_id": asset_id,
+                "ticker": asset.ticker,
+                "seal": _seal_dto(seal),
+                "requested": requested,
+            }
             if stored is None:
                 return AssetForecastDTO(**base, status="NOT_COMPUTED")
             if stored.payload.get("status") != "OK":
                 months = stored.payload.get("months", 0)
+                needed = REQUESTED_MIN_MONTHS if requested else MIN_HISTORY_MONTHS
+                hint = (
+                    ""
+                    if requested or months < REQUESTED_MIN_MONTHS
+                    else f" Com {REQUESTED_MIN_MONTHS} meses ou mais dá para pedir a previsão só "
+                    "deste ativo, com aviso de confiança."
+                )
                 return AssetForecastDTO(
                     **base,
                     status="INSUFFICIENT_HISTORY",
                     as_of=stored.as_of,
                     months_used=months,
                     warnings=[
-                        f"São precisos 36 meses de histórico de preço; {asset.ticker} tem {months}."
+                        f"São precisos {needed} meses de histórico de preço; "
+                        f"{asset.ticker} tem {months}.{hint}"
                     ],
                 )
             forecast = PriceForecast.from_dict(stored.payload)
-            if seal.level < MIN_SEAL_LEVEL:
+            if seal.level < MIN_SEAL_LEVEL and not requested:
                 return AssetForecastDTO(
                     **base,
                     status="LOW_CONFIDENCE",
@@ -92,7 +144,18 @@ class ForecastHandler:
                 )
             average = self._average_price(uow, asset.ticker)
             fair = self._fair_value(uow, asset, forecast.price_now)
-        return self._dto(base, forecast, average, fair)
+        cautions = []
+        if forecast.months_used < MIN_HISTORY_MONTHS:
+            cautions.append(
+                f"Histórico curto: {forecast.months_used} meses de {MIN_HISTORY_MONTHS}. A faixa "
+                "se apoia mais na classe do que no próprio ativo; leia com cautela."
+            )
+        if seal.level < MIN_SEAL_LEVEL:
+            cautions.append(
+                f"A calibração ainda não confirma estas faixas (selo “{seal.label}”); a previsão "
+                "aparece porque foi pedida para este ativo."
+            )
+        return self._dto(base, forecast, average, fair, cautions)
 
     def quality(self) -> ForecastQualityDTO:
         with self.uow_factory() as uow:
@@ -140,7 +203,11 @@ class ForecastHandler:
 
     @staticmethod
     def _dto(
-        base: dict, forecast: PriceForecast, average: float | None, fair: float | None
+        base: dict,
+        forecast: PriceForecast,
+        average: float | None,
+        fair: float | None,
+        cautions: list[str],
     ) -> AssetForecastDTO:
         horizons = []
         for h in forecast.horizons:
@@ -218,6 +285,7 @@ class ForecastHandler:
                 ForecastDriverDTO(key=d.key, label=d.label, annual=d.annual, note=d.note)  # type: ignore[arg-type]
                 for d in forecast.drivers
             ],
+            cautions=cautions,
             warnings=forecast.warnings,
             model_version=forecast.model_version,
         )

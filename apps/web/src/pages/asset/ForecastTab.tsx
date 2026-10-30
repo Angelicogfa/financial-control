@@ -1,14 +1,16 @@
 /** "Probabilidades" tab (Phase 42.1): the probable price range of the asset at 3, 6, 12 and
  *  24 months, the chances that matter (above today's price, the average paid and the fair
- *  value; a 20% fall) and what weighed on them. A distribution, never a target price. */
+ *  value; a 20% fall) and what weighed on them. A distribution, never a target price.
+ *  The user can compute it now for this asset alone: from 12 months of history, with a warning. */
 
 import { useState } from "react";
 
 import { api } from "../../api/endpoints";
+import { errorMessage } from "../../api/http";
 import type { AssetForecastDTO, ForecastHorizonDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { KpiGrid, Lead, Notes, Section, Segmented, type KpiSpec } from "../../components/Section";
-import { Async, Empty } from "../../components/States";
+import { Async, Empty, Spinner } from "../../components/States";
 import { brl, day, parseDecimal, pct } from "../../utils/format";
 import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
 import { SealBox } from "../simulation/shared";
@@ -25,6 +27,49 @@ export function chanceAbove(grid: number[], price: number): number | null {
   const span = grid[i] - grid[i - 1];
   const level = span > 0 ? LEVELS[i - 1] + ((price - grid[i - 1]) / span) * (LEVELS[i] - LEVELS[i - 1]) : LEVELS[i];
   return 1 - level;
+}
+
+/** Months of history the API accepts when the user asks for one asset. */
+const REQUESTED_MIN_MONTHS = 12;
+
+function RefreshButton({
+  assetId,
+  onDone,
+  primary = false,
+  label = "Calcular só para este ativo",
+}: Readonly<{ assetId: number; onDone: () => void; primary?: boolean; label?: string }>) {
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      await api.assets.refreshForecast(assetId);
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRunning(false);
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className={primary ? "app-primary-button" : "app-secondary-button"}
+        disabled={running}
+        onClick={run}
+      >
+        {running && <Spinner size="sm" />}
+        <span>{running ? "Calculando…" : label}</span>
+      </button>
+      {error && (
+        <p className="app-error-banner" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  );
 }
 
 const REFERENCE_COLORS: Record<string, string> = {
@@ -88,7 +133,7 @@ function Calculator({ horizon }: Readonly<{ horizon: ForecastHorizonDTO }>) {
   );
 }
 
-function Forecast({ forecast }: Readonly<{ forecast: AssetForecastDTO }>) {
+function Forecast({ forecast, onRefreshed }: Readonly<{ forecast: AssetForecastDTO; onRefreshed: () => void }>) {
   const horizons = forecast.horizons ?? [];
   const [months, setMonths] = useState(12);
   const horizon = horizons.find((h) => h.months === months) ?? horizons[horizons.length - 1];
@@ -127,14 +172,18 @@ function Forecast({ forecast }: Readonly<{ forecast: AssetForecastDTO }>) {
     ...(forecast.warnings ?? []),
   ];
 
+  const cautions = forecast.cautions ?? [];
   return (
     <div className="app-page-stack">
-      <Lead tone={horizon.up.value >= 0.5 ? "positive" : "caution"}>
+      <Lead tone={cautions.length > 0 ? "caution" : horizon.up.value >= 0.5 ? "positive" : "caution"}>
         <p>{forecast.lead}</p>
       </Lead>
+      <Notes items={cautions} title="Leia com cautela" tone="caution" />
       <Section
         title="Faixa provável do preço"
-        subtitle={`Calculada em ${day(forecast.as_of)} a partir de ${brl(forecast.price_now)}.`}
+        subtitle={`Calculada em ${day(forecast.as_of)} a partir de ${brl(forecast.price_now)}${
+          forecast.requested ? ", a seu pedido" : ""
+        }.`}
         actions={
           <Segmented
             label="Horizonte"
@@ -185,6 +234,9 @@ function Forecast({ forecast }: Readonly<{ forecast: AssetForecastDTO }>) {
       </Section>
       <SealBox title="Quanto confiar" seal={forecast.seal} />
       <Notes items={notes} />
+      <div className="app-button-row">
+        <RefreshButton assetId={forecast.asset_id} onDone={onRefreshed} label="Recalcular agora" />
+      </div>
     </div>
   );
 }
@@ -194,20 +246,31 @@ export function ForecastTab({ assetId }: Readonly<{ assetId: number }>) {
   return (
     <Async state={state}>
       {(forecast) => {
-        if (forecast.status === "OK") return <Forecast forecast={forecast} />;
+        if (forecast.status === "OK") return <Forecast forecast={forecast} onRefreshed={state.reload} />;
+        const refresh = <RefreshButton assetId={assetId} onDone={state.reload} primary />;
         if (forecast.status === "NOT_COMPUTED")
           return (
             <Empty
               title="Previsão ainda não calculada"
-              hint="O worker calcula a previsão todo dia útil; em Dados de mercado dá para pedir agora."
-            />
+              hint="O worker calcula a previsão todo dia útil; dá para calcular agora só para este ativo."
+            >
+              {refresh}
+            </Empty>
           );
+        const short = forecast.status === "INSUFFICIENT_HISTORY";
+        const canAsk = !short || (!forecast.requested && (forecast.months_used ?? 0) >= REQUESTED_MIN_MONTHS);
         return (
           <div className="app-page-stack">
             <Empty
-              title={forecast.status === "LOW_CONFIDENCE" ? "Previsão oculta por baixa confiança" : "Histórico insuficiente"}
-              hint={(forecast.warnings ?? []).join(" ")}
-            />
+              title={short ? "Histórico insuficiente" : "Previsão oculta por baixa confiança"}
+              hint={
+                short
+                  ? (forecast.warnings ?? []).join(" ")
+                  : "As faixas ainda não se confirmaram bem no passado. Dá para ver a previsão deste ativo mesmo assim, com aviso de confiança."
+              }
+            >
+              {canAsk && refresh}
+            </Empty>
             <SealBox title="Quanto confiar" seal={forecast.seal} />
           </div>
         );

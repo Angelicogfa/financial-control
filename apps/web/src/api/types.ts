@@ -213,6 +213,8 @@ export interface AssetForecastDTO {
   horizons?: ForecastHorizonDTO[];
   drivers?: ForecastDriverDTO[];
   seal?: ForecastSealDTO | null;
+  requested?: boolean;
+  cautions?: string[];
   warnings?: string[];
   model_version?: string | null;
 }

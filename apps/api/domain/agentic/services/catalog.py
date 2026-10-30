@@ -682,6 +682,18 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, p: h.forecasts.get(p.asset_id),
     ),
     OperationSpec(
+        name="assets.forecast_refresh",
+        kind="command",
+        description=(
+            "Calcula agora a previsão de preço de um ativo, só dele, a partir do histórico "
+            "guardado. Aceita a partir de 12 meses de histórico e mostra a previsão mesmo com "
+            "selo baixo, com aviso de confiança; o ativo segue acompanhado no cálculo diário."
+        ),
+        input_model=AssetIdInput,
+        output_type=AssetForecastDTO,
+        invoke=lambda h, p: h.forecasts.refresh(p.asset_id),
+    ),
+    OperationSpec(
         name="market.forecast_quality",
         kind="query",
         description=(

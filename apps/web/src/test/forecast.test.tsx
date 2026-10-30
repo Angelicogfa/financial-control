@@ -102,4 +102,52 @@ describe("Probabilidades tab (Phase 42.1)", () => {
     expect(screen.getByText("Poucas janelas.")).toBeInTheDocument();
     expect(screen.queryByText("Chance de subir")).not.toBeInTheDocument();
   });
+
+  it("computes the forecast of this asset alone and shows the cautions", async () => {
+    let computed = false;
+    const short = forecast({
+      status: "INSUFFICIENT_HISTORY",
+      horizons: [],
+      months_used: 13,
+      warnings: ["São precisos 36 meses de histórico de preço; AUVP11 tem 13."],
+      seal: { level: 0, label: "Sem medição", text: "Ainda não há calibração." },
+    });
+    const requested = forecast({
+      requested: true,
+      months_used: 13,
+      cautions: ["Histórico curto: 13 meses de 36.", "A calibração ainda não confirma estas faixas."],
+    });
+    const { calls } = mockApi([
+      { path: "/assets/1/analysis", reply: analysis() },
+      { method: "GET", path: "/assets/1/forecast", reply: () => (computed ? requested : short) },
+      {
+        method: "POST",
+        path: "/assets/1/forecast",
+        reply: () => {
+          computed = true;
+          return requested;
+        },
+      },
+    ]);
+    renderAt("/asset/1?tab=forecast");
+    expect(await screen.findByText("Histórico insuficiente")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Calcular só para este ativo" }));
+    expect(await screen.findByText("Histórico curto: 13 meses de 36.")).toBeInTheDocument();
+    expect(screen.getByText(/a seu pedido/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Recalcular agora" })).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+
+  it("offers no request below 12 months of history", async () => {
+    mockApi([
+      { path: "/assets/1/analysis", reply: analysis() },
+      {
+        path: "/assets/1/forecast",
+        reply: forecast({ status: "INSUFFICIENT_HISTORY", horizons: [], months_used: 8, warnings: ["Tem 8."] }),
+      },
+    ]);
+    renderAt("/asset/1?tab=forecast");
+    expect(await screen.findByText("Histórico insuficiente")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Calcular só para este ativo" })).not.toBeInTheDocument();
+  });
 });

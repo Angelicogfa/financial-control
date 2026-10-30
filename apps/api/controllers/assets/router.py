@@ -117,6 +117,15 @@ def get_asset_forecast(
     return handler.get(asset_id)
 
 
+@assets_router.post("/{asset_id}/forecast", response_model=AssetForecastDTO)
+def refresh_asset_forecast(
+    asset_id: int,
+    handler: ForecastHandler = Depends(get_forecast_handler),
+) -> AssetForecastDTO:
+    """Compute this asset's forecast now from the stored history (12 months on, with a warning)."""
+    return handler.refresh(asset_id)
+
+
 @assets_router.get("/{asset_id}/prices", response_model=AssetPriceHistoryDTO)
 def get_asset_prices(
     asset_id: int,

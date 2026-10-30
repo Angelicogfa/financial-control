@@ -60,7 +60,7 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     action: "Recalcular a previsão de preço",
     hint:
       "Recalcula a faixa provável de preço de cada ativo em 3, 6, 12 e 24 meses a partir do histórico guardado. " +
-      "Roda sozinha todo dia útil; use aqui depois de carregar o histórico da simulação.",
+      "Roda sozinha todo dia útil; para um ativo só, use a aba Probabilidades do ativo.",
   },
   {
     name: "calibrate_forecasts",
@@ -106,7 +106,8 @@ export function MarketDataPage() {
   const reloading = series.loading || jobs.loading || workerErrors.loading;
   const [requesting, setRequesting] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
-  const statusOf = (name: string) => jobs.data?.find((j) => j.job_name === name)?.status;
+  const lastRun = (name: string) => jobs.data?.find((j) => j.job_name === name);
+  const statusOf = (name: string) => lastRun(name)?.status;
   const anyActive = MANUAL_JOBS.some((j) => ["REQUESTED", "RUNNING"].includes(statusOf(j.name) ?? ""));
 
   // Follow a manual run until the worker finishes it.
@@ -320,31 +321,42 @@ export function MarketDataPage() {
               {requestError}
             </p>
           )}
-          {MANUAL_JOBS.map((job) => {
-            const status = statusOf(job.name);
-            const active = status === "REQUESTED" || status === "RUNNING";
-            return (
-              <div key={job.name} className="app-page-stack">
-                <p className="app-card-hint">{job.hint}</p>
-                <div className="app-form-actions">
+          <ul className="app-run-list">
+            {MANUAL_JOBS.map((job) => {
+              const run = lastRun(job.name);
+              const status = run?.status;
+              const active = status === "REQUESTED" || status === "RUNNING";
+              return (
+                <li key={job.name} className="app-run-item">
+                  <div className="app-run-text">
+                    <strong>{JOB_LABELS[job.name] ?? job.name}</strong>
+                    <p className="app-card-hint">{job.hint}</p>
+                    {active ? (
+                      <span className="app-run-status" role="status">
+                        {status === "REQUESTED" ? "Pedido registrado; o worker começa em até 15 segundos." : "Rodando…"}
+                      </span>
+                    ) : (
+                      run && (
+                        <span className="app-run-status">
+                          Última vez: {dateTime(run.finished_at ?? run.started_at)}{" "}
+                          <Badge tone={JOB_TONES[run.status] ?? "neutral"}>{JOB_STATUS_LABELS[run.status] ?? run.status}</Badge>
+                        </span>
+                      )
+                    )}
+                  </div>
                   <button
                     type="button"
-                    className="app-primary-button"
+                    className="app-secondary-button"
                     disabled={active || requesting !== null}
                     onClick={() => handleRequest(job.name)}
                   >
                     {(active || requesting === job.name) && <Spinner size="sm" />}
                     <span>{job.action}</span>
                   </button>
-                  {active && (
-                    <span className="app-muted" role="status">
-                      {status === "REQUESTED" ? "Pedido registrado; o worker começa em até 15 segundos." : "Rodando…"}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                </li>
+              );
+            })}
+          </ul>
         </section>
         <section>
           <h2 className="app-card-heading">Rotinas do worker</h2>
