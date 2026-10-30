@@ -73,6 +73,7 @@ class PricePoint:
     low: float | None = None
     adj_close: float | None = None
     volume: float | None = None
+    split: float | None = None  # shares after / before when a split or bonus happened that day
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

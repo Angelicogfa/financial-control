@@ -31,6 +31,7 @@ from domain.simulation.market import MarketHistory, PriceSeries, accumulate_rate
 TR_PREFIX = "SIM:TR:"
 PX_PREFIX = "SIM:PX:"
 IDX_PREFIX = "SIM:IDX:"
+SPLIT_PREFIX = "SIM:SPLIT:"
 FX_USDBRL = "SIM:FX:USDBRL"
 
 # Long index series loaded from Yahoo: label -> Yahoo symbol.
@@ -55,6 +56,11 @@ def tr_symbol(ticker: str) -> str:
 
 def px_symbol(ticker: str) -> str:
     return f"{PX_PREFIX}{ticker.strip().upper()}"
+
+
+def split_symbol(ticker: str) -> str:
+    """Splits and bonus issues of a ticker (shares after / before), from Yahoo (Phase 42.3)."""
+    return f"{SPLIT_PREFIX}{ticker.strip().upper()}"
 
 
 def index_symbol(label: str) -> str:

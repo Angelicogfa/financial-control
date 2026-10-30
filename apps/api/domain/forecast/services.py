@@ -19,13 +19,16 @@ from controllers.assets.responses import (
     ForecastQualityDTO,
     ForecastSealDTO,
     ForecastThresholdDTO,
+    ForecastValuationDTO,
+    ValuationOriginDTO,
 )
 from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError, ValidationError
 from domain.forecast.calibration import ForecastCalibration
 from domain.forecast.model import FALL_THRESHOLD, PriceForecast, chance_above
 from domain.forecast.repositories import StoredCalibration
-from domain.forecast.runs import REQUESTED_MIN_MONTHS, refresh_forecasts
+from domain.forecast.runs import REQUESTED_MIN_MONTHS, VALUATION, refresh_forecasts
+from domain.forecast.valuation_model import ValuationModel
 from domain.policy.services.policy import current_policy
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.simulation.candidates import MIN_HISTORY_MONTHS
@@ -45,6 +48,34 @@ def forecast_seal(stored: StoredCalibration | None) -> Seal:
 
 def _seal_dto(seal: Seal) -> ForecastSealDTO:
     return ForecastSealDTO(level=seal.level, label=seal.label, text=seal.text)
+
+
+def _annual(monthly: float) -> float:
+    return round((1.0 + monthly) ** 12 - 1.0, 4)
+
+
+def _valuation_dto(model: ValuationModel) -> ForecastValuationDTO:
+    return ForecastValuationDTO(
+        as_of=model.as_of,
+        passed=model.passed,
+        reason=model.reason,
+        gamma_annual_per_z=_annual(model.gamma_estimate),
+        gamma_used_annual_per_z=_annual(model.gamma),
+        sign_probability=model.sign_probability,
+        months=model.months,
+        companies=model.companies,
+        oos_improvement=model.oos_improvement,
+        oos_win_share=model.oos_win_share,
+        origins=[
+            ValuationOriginDTO(
+                origin=o.origin,
+                mse_model=o.mse_model,
+                mse_zero=o.mse_zero,
+                observations=o.observations,
+            )
+            for o in model.origins
+        ],
+    )
 
 
 def forecast_lead(ticker: str, forecast: PriceForecast, months: int = LEAD_HORIZON) -> str:
@@ -160,8 +191,12 @@ class ForecastHandler:
     def quality(self) -> ForecastQualityDTO:
         with self.uow_factory() as uow:
             stored = uow.forecasts.latest_calibration()
+            model = uow.forecasts.latest_model(VALUATION)
+        valuation = _valuation_dto(ValuationModel.from_dict(model.payload)) if model else None
         if stored is None:
-            return ForecastQualityDTO(status="NOT_COMPUTED", seal=_seal_dto(forecast_seal(None)))
+            return ForecastQualityDTO(
+                status="NOT_COMPUTED", seal=_seal_dto(forecast_seal(None)), valuation=valuation
+            )
         cal = ForecastCalibration.from_dict(stored.payload)
         return ForecastQualityDTO(
             status="OK",
@@ -178,6 +213,7 @@ class ForecastHandler:
             first_origin=cal.first_origin,
             last_origin=cal.last_origin,
             seal=_seal_dto(forecast_seal(stored)),
+            valuation=valuation,
         )
 
     # --- internals --------------------------------------------------------------------------

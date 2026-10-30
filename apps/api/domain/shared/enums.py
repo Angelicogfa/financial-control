@@ -105,6 +105,7 @@ class SeriesUnit(StrEnum):
     PERCENT_PER_YEAR = "PERCENT_PER_YEAR"
     PRICE = "PRICE"
     INDEX_POINTS = "INDEX_POINTS"
+    RATIO = "RATIO"  # e.g. a split: shares after / shares before
 
 
 class AccountKind(StrEnum):

@@ -21,6 +21,7 @@ from worker.jobs import (
     backfill_snapshots_job,
     calibrate_forecasts_job,
     ensure_series_coverage_job,
+    estimate_forecast_models_job,
     has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
@@ -93,6 +94,9 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         ),
         "calibrate_forecasts": partial(
             calibrate_forecasts_job, catalog_top=cfg.simulation_catalog_top
+        ),
+        "estimate_forecast_models": partial(
+            estimate_forecast_models_job, catalog_top=cfg.simulation_catalog_top
         ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
@@ -244,6 +248,19 @@ def create_scheduler(
         hour=(cfg.fundamentals_cron_hour + 1) % 24,
         minute=0,
         id="calibrate_forecasts",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "estimate_forecast_models",
+            partial(estimate_forecast_models_job, catalog_top=cfg.simulation_catalog_top),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=(cfg.fundamentals_cron_hour + 2) % 24,
+        minute=0,
+        id="estimate_forecast_models",
         replace_existing=True,
         **defaults,
     )

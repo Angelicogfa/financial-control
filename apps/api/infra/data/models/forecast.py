@@ -39,3 +39,17 @@ class ForecastCalibrationModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class ForecastModelModel(Base):
+    """An estimated layer of the forecast (valuation, events) with its out-of-sample gate."""
+
+    __tablename__ = "forecast_models"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )

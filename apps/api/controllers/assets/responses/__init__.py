@@ -297,6 +297,29 @@ class AssetForecastDTO(BaseModel):
     model_version: str | None = None
 
 
+class ValuationOriginDTO(BaseModel):
+    origin: str
+    mse_model: float
+    mse_zero: float
+    observations: int
+
+
+class ForecastValuationDTO(BaseModel):
+    """Layer B (42.3): what the valuation said about the next 12 months, and if it is used."""
+
+    as_of: date
+    passed: bool
+    reason: str
+    gamma_annual_per_z: float  # extra return a year per unit of z (estimate, before the gate)
+    gamma_used_annual_per_z: float
+    sign_probability: float
+    months: int
+    companies: int
+    oos_improvement: float
+    oos_win_share: float
+    origins: list[ValuationOriginDTO] = Field(default_factory=list)
+
+
 class ForecastQualityDTO(BaseModel):
     """How often the forecast bands held in a rolling-origin backtest."""
 
@@ -314,3 +337,4 @@ class ForecastQualityDTO(BaseModel):
     first_origin: date | None = None
     last_origin: date | None = None
     seal: ForecastSealDTO | None = None
+    valuation: ForecastValuationDTO | None = None

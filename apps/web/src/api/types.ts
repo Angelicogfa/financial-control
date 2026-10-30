@@ -999,6 +999,7 @@ export interface ForecastQualityDTO {
   first_origin?: string | null;
   last_origin?: string | null;
   seal?: ForecastSealDTO | null;
+  valuation?: ForecastValuationDTO | null;
 }
 
 export interface ForecastSealDTO {
@@ -1013,6 +1014,20 @@ export interface ForecastThresholdDTO {
   price: number;
   direction: "above" | "below";
   probability: number;
+}
+
+export interface ForecastValuationDTO {
+  as_of: string;
+  passed: boolean;
+  reason: string;
+  gamma_annual_per_z: number;
+  gamma_used_annual_per_z: number;
+  sign_probability: number;
+  months: number;
+  companies: number;
+  oos_improvement: number;
+  oos_win_share: number;
+  origins?: ValuationOriginDTO[];
 }
 
 export interface FundamentalSnapshotDTO {
@@ -1792,7 +1807,7 @@ export interface SeriesStatusDTO {
   missing_business_days: number;
 }
 
-export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PERCENT_PER_YEAR" | "PRICE" | "INDEX_POINTS";
+export type SeriesUnit = "PERCENT_PER_DAY" | "PERCENT_PER_MONTH" | "PERCENT_PER_YEAR" | "PRICE" | "INDEX_POINTS" | "RATIO";
 
 export interface ShockDTO {
   key: string;
@@ -2148,6 +2163,13 @@ export interface UnknownTickerDTO {
   asset_type?: AssetType | null;
   arca_class?: ArcaClass | null;
   fixed_income_term?: ImportFixedIncomeTermDTO | null;
+}
+
+export interface ValuationOriginDTO {
+  origin: string;
+  mse_model: number;
+  mse_zero: number;
+  observations: number;
 }
 
 export interface ValuationPolicyDTO {

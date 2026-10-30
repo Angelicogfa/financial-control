@@ -15,8 +15,13 @@ from domain.forecast.repositories import (
     AbstractForecastRepository,
     StoredCalibration,
     StoredForecast,
+    StoredModel,
 )
-from infra.data.models.forecast import AssetForecastModel, ForecastCalibrationModel
+from infra.data.models.forecast import (
+    AssetForecastModel,
+    ForecastCalibrationModel,
+    ForecastModelModel,
+)
 
 
 class SqlAlchemyForecastRepository(AbstractForecastRepository):
@@ -67,4 +72,21 @@ class SqlAlchemyForecastRepository(AbstractForecastRepository):
             return None
         return StoredCalibration(
             as_of=row.as_of, payload=dict(row.payload), created_at=row.created_at
+        )
+
+    def save_model(self, kind: str, as_of: date, payload: dict[str, Any]) -> None:
+        self.session.add(ForecastModelModel(kind=kind, as_of=as_of, payload=payload))
+        self.session.flush()
+
+    def latest_model(self, kind: str) -> StoredModel | None:
+        row = self.session.scalars(
+            select(ForecastModelModel)
+            .where(ForecastModelModel.kind == kind)
+            .order_by(ForecastModelModel.id.desc())
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        return StoredModel(
+            kind=row.kind, as_of=row.as_of, payload=dict(row.payload), created_at=row.created_at
         )

@@ -168,6 +168,7 @@ def forecast_asset(
     horizons: Sequence[int] = HORIZONS,
     mean_block: float = MEAN_BLOCK_MONTHS,
     class_expected_excess_monthly: float = 0.0,
+    valuation_note: str | None = None,
 ) -> PriceForecast:
     """Price paths of one asset on the class paths `class_excess` (paths, months ≥ max horizon)."""
     rng = np.random.default_rng(seed)
@@ -200,8 +201,11 @@ def forecast_asset(
     market_annual = (1.0 + cdi_monthly) ** 12 * (
         1.0 + fit.beta_post * class_expected_excess_monthly
     ) ** 12 - 1.0
-    own_annual = (1.0 + fit.alpha_post) ** 12 - 1.0
-    expected = (1.0 + market_annual) * (1.0 + own_annual) - 1.0
+    # α_post = w·α̂ + (1 - w)·μ: the part pulled to μ is the valuation signal (42.3).
+    valuation_monthly = fit.shrinkage * fit.alpha_prior_mean
+    own_annual = (1.0 + fit.alpha_post - valuation_monthly) ** 12 - 1.0
+    valuation_annual = (1.0 + valuation_monthly) ** 12 - 1.0
+    expected = (1.0 + market_annual) * (1.0 + fit.alpha_post) ** 12 - 1.0
     drivers = [
         Driver(
             "MARKET",
@@ -215,7 +219,12 @@ def forecast_asset(
             round(own_annual, 4),
             f"Encolhido em {fit.shrinkage:.0%} pela dispersão da classe, para não premiar sorte.",
         ),
-        Driver("VALUATION", "Valuation (balanços da CVM)", None, "Entra na Fase 42.3."),
+        Driver(
+            "VALUATION",
+            "Valuation (balanços da CVM)",
+            round(valuation_annual, 4) if fit.alpha_prior_mean else None,
+            valuation_note or "Sem sinal de valuation para este ativo.",
+        ),
         Driver("EVENTS", "Eventos recentes da CVM", None, "Entra na Fase 42.5."),
     ]
     warnings = []
