@@ -218,6 +218,23 @@ Smoke e E2E sobem stacks **isoladas** (outro nome de projeto, outros volumes e p
 
 `scripts/install-hooks.sh` instala um hook de `pre-push` que roda o modo `--fast`.
 
+### Releases e imagens Docker
+
+Cada release é uma tag `vX.Y.Z` e publica uma imagem por módulo no GitHub Container Registry:
+
+| Imagem | Usada por |
+|---|---|
+| `ghcr.io/angelicogfa/finance-controle-api:vX.Y.Z` | `api`, `worker` e `migrate` |
+| `ghcr.io/angelicogfa/finance-controle-web:vX.Y.Z` | `web` |
+
+A release mais nova também recebe a tag `latest`.
+
+- **Criar uma release:** em *Actions → Create release tag → Run workflow*, escolha `patch`, `minor` ou `major`. O workflow lê a maior tag `vX.Y.Z` (começa de `v0.0.0`), cria a próxima no topo da `main`, abre o GitHub Release com as notas geradas e publica as imagens. Ele recusa a execução se o topo da `main` já tiver uma release.
+- **Tag manual:** `git push origin vX.Y.Z` (ou um release criado na interface do GitHub) dispara o mesmo build (`.github/workflows/release.yml`).
+- **Rebuild:** *Actions → Release images → Run workflow*, informando uma tag que já existe.
+
+Como o CI, esses workflows só rodam quando a conta tiver crédito de GitHub Actions.
+
 ### Convenções
 
 As regras do projeto estão em [`AGENTS.md`](AGENTS.md): código, commits e banco em inglês; testes de unidade obrigatórios; migrations Alembic sequenciais (`script_#####`); camadas estritas no backend; unidades numéricas pela [ADR 0006](docs/architecture/adr/0006-units-and-numeric-conventions.md).
