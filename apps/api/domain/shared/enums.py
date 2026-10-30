@@ -153,6 +153,27 @@ class IntraClassStrategy(StrEnum):
     EQUAL_WEIGHT = "EQUAL_WEIGHT"
 
 
+class ContributionClassReason(StrEnum):
+    """Which first-level rule decided what an ARCA class receives from a contribution."""
+
+    REFILL_BELOW_BAND = "REFILL_BELOW_BAND"  # below its band: refilled toward the target first
+    BELOW_BAND_PRIORITY = "BELOW_BAND_PRIORITY"  # nothing left after refilling the others
+    BELOW_TARGET = "BELOW_TARGET"  # share of the money in proportion to what it lacks
+    ABOVE_TARGET = "ABOVE_TARGET"  # at or above its target: receives nothing
+    NO_ELIGIBLE_ASSETS = "NO_ELIGIBLE_ASSETS"  # its share passes to the other classes
+
+
+class ContributionOrderReason(StrEnum):
+    """Why one asset of a contribution plan got (or did not get) a purchase."""
+
+    BOUGHT = "BOUGHT"
+    LEFTOVER_FILL = "LEFTOVER_FILL"  # bought only with the rounding leftovers of other assets
+    PRICE_ABOVE_BUDGET = "PRICE_ABOVE_BUDGET"  # its share does not buy one unit
+    ABOVE_TARGET = "ABOVE_TARGET"  # already at or above its weight inside the class
+    ZERO_WEIGHT = "ZERO_WEIGHT"  # the class strategy gives it no weight
+    NO_PRICE = "NO_PRICE"
+
+
 class CorporateEventKind(StrEnum):
     """Share-count events. Factor = shares after / shares before (ex-date)."""
 

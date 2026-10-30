@@ -434,11 +434,13 @@ class PortfolioApplicationService:
     ) -> ContributionPlan:
         """Build a 2-level contribution plan from the current consolidated portfolio."""
         report = self.build_portfolio_report(uow)
+        arca = self.load_policy(uow).arca
         return plan_contribution(
             report=report,
-            targets=self.load_policy(uow).arca.targets,
+            targets=arca.targets,
             amount_brl=amount_brl,
             strategy_override=strategy_override,
+            class_strategies=arca.strategies,
         )
 
     def analyze_single_asset(self, uow: AbstractUnitOfWork, asset: AssetEntity) -> dict[str, Any]:
