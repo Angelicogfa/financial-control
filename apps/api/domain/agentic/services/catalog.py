@@ -204,6 +204,7 @@ class JobRequestInput(BaseModel):
         "calibrate_forecasts",
         "estimate_forecast_models",
         "sync_mining_universe",
+        "run_mining",
     ]
 
 
@@ -1255,7 +1256,7 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "(proventos declarados), `refresh_catalog_fundamentals` (indicadores do "
             "screener), `refresh_asset_forecasts`, `calibrate_forecasts`, "
             "`estimate_forecast_models` (previsão de preço) e `sync_mining_universe` "
-            "(histórico do garimpo). O "
+            "(histórico do garimpo), `run_mining` (sinais do garimpo). O "
             "worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),

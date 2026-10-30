@@ -33,6 +33,7 @@ const JOB_LABELS: Record<string, string> = {
   calibrate_forecasts: "Calibração da previsão de preço",
   estimate_forecast_models: "Valuation na previsão de preço",
   sync_mining_universe: "Histórico do garimpo",
+  run_mining: "Garimpo",
 };
 
 const JOB_STATUS_LABELS: Record<string, string> = {
@@ -72,6 +73,13 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Baixa o histórico longo de preço (com desdobramentos) das ações líquidas de todo o catálogo, que o garimpo usa para medir os sinais. " +
       "Roda sozinha todo dia útil, alguns papéis por vez, até cobrir o universo; depois mantém cada um com até uma semana.",
+  },
+  {
+    name: "run_mining",
+    action: "Rodar o garimpo",
+    hint:
+      "Recalcula, mês a mês e só com o que se sabia em cada mês, os sinais de valor, qualidade, melhora dos resultados e momentum de todas as ações líquidas. " +
+      "Roda sozinho uma vez por semana, depois dos balanços e do histórico.",
   },
   {
     name: "refresh_asset_forecasts",

@@ -56,7 +56,7 @@
 | **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
 | **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[x]` Concluída | 100% |
 | **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.3 feitas; antes das Fases 34 e 36) | 50% |
-| **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 e 43.1 feitas) | 25% |
+| **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 a 43.2 feitas) | 40% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -825,7 +825,7 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 - `[x]` **43.0** Decisões da seção 9 do desenho, aprovadas com as recomendações: liquidez acima de R$ 1 milhão por dia, até 10 achados por semana, sinais de valor, qualidade, melhora e momentum, antes de 42.4–42.7, alerta criado e desligado.
 - `[x]` **43.1** Universo (`domain/mining/universe.py`): ações brasileiras do catálogo com CNPJ no mapa da CVM e volume médio diário acima do piso (`MINING_MIN_DAILY_VOLUME`; o volume da última sessão enquanto o indicador não existe), uma classe por empresa (a mais líquida). Job `sync_mining_universe` (dias úteis, também manual): recarrega o histórico longo (retorno total, preço e desdobramentos) dos papéis com histórico de mais de uma semana, os mais antigos primeiro, `MINING_HISTORY_BATCH` por vez; a gravação é a mesma do histórico da simulação (`store_long_history`). `GET /research/mining/universe` e MCP `research.mining_universe` mostram o universo e a cobertura.
-- `[ ]` **43.2** Sinais point-in-time e `mining_signals`.
+- `[x]` **43.2** Sinais point-in-time (`domain/mining/signals.py`), cada um um z frente ao setor (centro puxado para o mercado), limitado a ±3: VALOR (o z de valuation da 42.3), QUALIDADE (ROE, margem, alavancagem baixa e estabilidade do ROE em dois anos de entregas), MELHORA (crescimento do lucro de 12 meses sobre o patrimônio e variação da margem em um ano) e MOMENTUM (retorno sobre a classe de t-11 a t-1). Bancos e seguradoras só com ROE, estabilidade e crescimento do lucro. Tabela `mining_signals` (migração `script_00033`), recalculada inteira toda semana pelo job `run_mining` (também manual), com o painel do universo do garimpo.
 - `[ ]` **43.3** Pesos bayesianos, portões, PBO e custos.
 - `[ ]` **43.4** Achados semanais, `mining_findings`, página "Garimpo", "Seguir" e MCP.
 - `[ ]` **43.5** Placar dos achados contra a classe e o acaso.

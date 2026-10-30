@@ -39,6 +39,7 @@ from infra.data.repositories.market import (
     SqlAlchemyPriceHistoryRepository,
     SqlAlchemyTreasuryCatalogRepository,
 )
+from infra.data.repositories.mining import SqlAlchemyMiningRepository
 from infra.data.repositories.policy import SqlAlchemyPolicyRepository
 from infra.data.repositories.portfolio import (
     SqlAlchemyContributionPlanRepository,
@@ -87,6 +88,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.market_data = SqlAlchemyMarketDataRepository(self.session)
         self.price_history = SqlAlchemyPriceHistoryRepository(self.session)
         self.forecasts = SqlAlchemyForecastRepository(self.session)
+        self.mining = SqlAlchemyMiningRepository(self.session)
         return self
 
     def __exit__(

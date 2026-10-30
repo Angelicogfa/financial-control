@@ -30,6 +30,7 @@ from worker.jobs import (
     refresh_distributions_job,
     refresh_fundamentals_job,
     refresh_watchlist_quotes_job,
+    run_mining_job,
     run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_cvm_documents_job,
@@ -104,6 +105,7 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
             min_daily_volume=cfg.mining_min_daily_volume,
             batch=cfg.mining_history_batch,
         ),
+        "run_mining": partial(run_mining_job, min_daily_volume=cfg.mining_min_daily_volume),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
 
@@ -284,6 +286,19 @@ def create_scheduler(
         hour=(cfg.catalog_sync_cron_hour + 3) % 24,
         minute=0,
         id="sync_mining_universe",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "run_mining",
+            partial(run_mining_job, min_daily_volume=cfg.mining_min_daily_volume),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=(cfg.fundamentals_cron_hour + 3) % 24,
+        minute=0,
+        id="run_mining",
         replace_existing=True,
         **defaults,
     )

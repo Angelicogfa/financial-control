@@ -37,6 +37,7 @@ from infra.data.models.market import (
     MarketSeriesModel,
     TreasuryCatalogModel,
 )
+from infra.data.models.mining import MiningSignalModel
 from infra.data.models.policy import InvestmentPolicyModel
 from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshotModel
 from infra.data.models.simulation import (
@@ -69,6 +70,7 @@ __all__ = [
     "InstrumentCatalogModel",
     "InvestmentPolicyModel",
     "JobRunModel",
+    "MiningSignalModel",
     "MarketDataModel",
     "MarketQuoteHistoryModel",
     "MarketSeriesModel",
