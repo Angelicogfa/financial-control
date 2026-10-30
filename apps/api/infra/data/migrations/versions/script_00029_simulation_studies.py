@@ -101,7 +101,8 @@ def upgrade() -> None:
         if isinstance(created_at, str):  # SQLite hands back text
             created_at = datetime.fromisoformat(created_at[:19])
         result = bind.execute(
-            studies.insert().values(
+            studies.insert()
+            .values(
                 label=(label or default)[:120],
                 question=question,
                 premises=_premises(kind, data),
