@@ -19,8 +19,10 @@ from domain.assets.services.cerrado import (
     record_if_changed,
 )
 from domain.assets.services.history import STATEMENT_TYPES
+from domain.disclosures.services.events_sync import sync_event_history
 from domain.disclosures.services.statements_sync import sync_statements
 from domain.disclosures.services.sync import sync_documents
+from domain.forecast.event_runs import run_event_study
 from domain.forecast.runs import (
     estimate_valuation_model,
     refresh_forecasts,
@@ -466,21 +468,27 @@ def estimate_forecast_models_job(
     gateway: CachedMarketGateway,
     *,
     catalog_top: int = 0,
+    min_daily_volume: float = 1_000_000.0,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Estimate layer B (valuation) of the forecast, with its out-of-sample gate (42.3)."""
+    """Estimate layer B (valuation, 42.3) and the event study (42.4) of the forecast."""
     at = now or datetime.now(UTC)
     with uow_factory() as uow:
         result = estimate_valuation_model(uow, catalog_top=catalog_top, today=at.date())
+        events = run_event_study(uow, min_daily_volume=min_daily_volume, today=at.date())
         uow.commit()
-    if result is None:
-        return {"companies": 0}
-    return {
-        "companies": result["companies"],
-        "months": result["months"],
-        "passed": result["passed"],
-        "oos_improvement": result["oos_improvement"],
-    }
+    details: dict[str, Any] = {"companies": 0}
+    if result is not None:
+        details = {
+            "companies": result["companies"],
+            "months": result["months"],
+            "passed": result["passed"],
+            "oos_improvement": result["oos_improvement"],
+        }
+    if events is not None:
+        details["events"] = events["events"]
+        details["event_classes"] = len(events["classes"])
+    return details
 
 
 def calibrate_forecasts_job(
@@ -983,6 +991,27 @@ def run_mining_job(
         uow.commit()
     last = result.get("last_month")
     return {**result, "last_month": last.isoformat() if last else None}
+
+
+def sync_cvm_event_history_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    as_of_date: date | None = None,
+    max_files: int = 5,
+    timeout_seconds: float = 1500.0,
+) -> dict[str, object]:
+    """Disclosures of every listed company since 2010, classified, for the event study (42.4)."""
+    started = time.monotonic()
+    result = sync_event_history(
+        uow_factory,
+        fetch_stamp=gateway.get_cvm_document_stamp,
+        fetch_documents=gateway.get_cvm_documents,
+        today=as_of_date,
+        max_files=max_files,
+        deadline=lambda: time.monotonic() - started > timeout_seconds,
+    )
+    return result.as_details()
 
 
 def sync_simulation_history_job(

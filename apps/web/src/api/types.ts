@@ -742,6 +742,10 @@ export interface CvmDocumentDTO {
   link?: string;
   read?: boolean;
   first_seen_at?: string | null;
+  event_class?: string | null;
+  event_label?: string | null;
+  reaction?: EventReactionDTO | null;
+  typical_20?: number | null;
 }
 
 export interface DatedPriceDTO {
@@ -859,6 +863,23 @@ export interface EvaluatedAnswerDTO {
   stale_reason?: string | null;
 }
 
+export interface EventClassDTO {
+  event_class: string;
+  label: string;
+  events: number;
+  horizons?: EventHorizonDTO[];
+  volatility_ratio?: number | null;
+}
+
+export interface EventHorizonDTO {
+  horizon: number;
+  events: number;
+  mean: number;
+  effect: number;
+  effect_sd: number;
+  sign_probability: number;
+}
+
 export interface EventOutcomeDTO {
   key: string;
   label: string;
@@ -867,6 +888,22 @@ export interface EventOutcomeDTO {
   low: number;
   high: number;
   by_generator?: Record<string, number>;
+}
+
+export interface EventReactionDTO {
+  event_date: string;
+  car_1?: number | null;
+  car_5?: number | null;
+  car_20?: number | null;
+  confounded?: boolean;
+}
+
+export interface EventStudyDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  events?: number;
+  confounded?: number;
+  classes?: EventClassDTO[];
 }
 
 export interface ExcludedCandidateDTO {

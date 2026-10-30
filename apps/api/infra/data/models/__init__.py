@@ -17,6 +17,7 @@ from infra.data.models.assets import (
 )
 from infra.data.models.disclosures import (
     CvmDocumentModel,
+    CvmEventEffectModel,
     CvmIssuerTickerModel,
     CvmStatementFactModel,
     CvmStatementLoadModel,
@@ -59,6 +60,7 @@ __all__ = [
     "ContributionPlanModel",
     "CorporateEventModel",
     "CvmDocumentModel",
+    "CvmEventEffectModel",
     "CvmIssuerTickerModel",
     "CvmStatementFactModel",
     "CvmStatementLoadModel",

@@ -312,6 +312,27 @@ class CvmOpenDataProvider:
         text = self._csv(url, "fca", year, "valor_mobiliario")
         return parse_fca_tickers(text) if text else []
 
+    def _stamp(self, url: str, operation: str, year: int) -> str | None:
+        """Last-Modified of a yearly file; None when it does not exist (yet) or on failure."""
+        try:
+            resp = self._client.head(url)
+        except Exception as exc:
+            report_provider_error(
+                provider=self.PROVIDER_NAME,
+                operation=operation,
+                target=str(year),
+                request_url=url,
+                exc=exc,
+            )
+            return None
+        if resp.status_code == 404:
+            return None
+        return resp.headers.get("last-modified") or resp.headers.get("etag") or "unknown"
+
+    def document_stamp(self, year: int) -> str | None:
+        """Last-Modified of the yearly IPE file (Phase 42.4)."""
+        return self._stamp(f"{self.base_url}{IPE_PATH.format(year=year)}", "ipe", year)
+
     def _statement_url(self, kind: str, year: int) -> str:
         path = STATEMENT_PATH.format(kind=kind.upper(), lower=kind.lower(), year=year)
         return f"{self.base_url}{path}"

@@ -38,6 +38,7 @@ from controllers.disclosures.requests import MarkReadRequest
 from controllers.disclosures.responses import (
     AssetStatementsDTO,
     DisclosureFeedDTO,
+    EventStudyDTO,
     MarkReadResultDTO,
 )
 from controllers.ledger.requests import (
@@ -205,6 +206,7 @@ class JobRequestInput(BaseModel):
         "sync_simulation_history",
         "sync_cvm_documents",
         "sync_cvm_statements",
+        "sync_cvm_event_history",
         "warm_portfolio_quotes",
         "sync_price_history",
         "refresh_distributions",
@@ -742,6 +744,19 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=MiningUniverseDTO,
         invoke=lambda h, _p: h.mining.universe(),
+    ),
+    OperationSpec(
+        name="disclosures.event_study",
+        kind="query",
+        description=(
+            "Estudo de eventos da CVM: para cada tipo de fato relevante (recompra, dividendos, "
+            "emissão de ações, aquisição, recuperação judicial etc.), o retorno anormal médio em "
+            "1, 5 e 20 pregões, encolhido para zero quando há poucos eventos, e a mudança na "
+            "volatilidade. Eventos perto da entrega de balanço ficam de fora."
+        ),
+        input_model=EmptyInput,
+        output_type=EventStudyDTO,
+        invoke=lambda h, _p: h.disclosures.event_study(),
     ),
     OperationSpec(
         name="assets.statements",
@@ -1295,7 +1310,8 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "Pede ao worker que rode agora uma rotina que aceita disparo manual: "
             "`sync_simulation_history` (histórico longo da simulação), `sync_cvm_documents` "
             "(fatos relevantes e comunicados da CVM), `sync_cvm_statements` (balanços DFP e ITR da "
-            "CVM), `warm_portfolio_quotes` (cotações das "
+            "CVM), `sync_cvm_event_history` (histórico de comunicados), `warm_portfolio_quotes` "
+            "(cotações das "
             "posições), `sync_price_history` (histórico de preços), `refresh_distributions` "
             "(proventos declarados), `refresh_catalog_fundamentals` (indicadores do "
             "screener), `refresh_asset_forecasts`, `calibrate_forecasts`, "

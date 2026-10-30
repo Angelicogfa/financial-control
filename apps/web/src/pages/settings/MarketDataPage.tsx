@@ -28,6 +28,7 @@ const JOB_LABELS: Record<string, string> = {
   sync_simulation_history: "Histórico longo da simulação",
   sync_cvm_documents: "Comunicados da CVM",
   sync_cvm_statements: "Balanços da CVM (DFP e ITR)",
+  sync_cvm_event_history: "Histórico de comunicados da CVM",
   run_pending_simulations: "Simulações na fila",
   refresh_asset_forecasts: "Previsão de preço dos ativos",
   calibrate_forecasts: "Calibração da previsão de preço",
@@ -66,6 +67,13 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Baixa da CVM os balanços anuais e trimestrais (DFP e ITR) das empresas listadas, com a data em que cada um foi entregue. " +
       "Roda sozinha todo dia: confere os dois últimos anos e traz o histórico desde 2010 aos poucos (alguns arquivos por vez).",
+  },
+  {
+    name: "sync_cvm_event_history",
+    action: "Carregar o histórico de comunicados",
+    hint:
+      "Baixa os comunicados da CVM de todas as empresas listadas desde 2010 e classifica cada fato relevante por tipo de evento, para medir o que costuma acontecer com o preço depois. " +
+      "Roda sozinha todo dia, alguns anos por vez; os antigos entram como lidos.",
   },
   {
     name: "sync_mining_universe",

@@ -7,7 +7,7 @@ import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { Combobox } from "../../components/Combobox";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
-import { day, plural } from "../../utils/format";
+import { day, pct, plural } from "../../utils/format";
 import { useStoredState } from "../../utils/storedState";
 
 /** The categories of most interest first; the others come from what the companies filed. */
@@ -33,6 +33,24 @@ function DocumentRow({
         {!doc.read && <Badge tone="info">Novo</Badge>}
       </div>
       <p className="disclosure-subject">{doc.subject || [doc.doc_type, doc.species].filter(Boolean).join(" · ")}</p>
+      {doc.event_label && (
+        <p className="app-muted disclosure-event">
+          <Badge>{doc.event_label}</Badge>{" "}
+          {doc.reaction && doc.reaction.car_5 !== null && doc.reaction.car_5 !== undefined ? (
+            <>
+              Reação além do mercado: {pct(doc.reaction.car_1, 1, true)} no dia, {pct(doc.reaction.car_5, 1, true)} em 5
+              pregões
+              {doc.reaction.car_20 !== null && doc.reaction.car_20 !== undefined && (
+                <>, {pct(doc.reaction.car_20, 1, true)} em 20</>
+              )}
+              {doc.reaction.confounded && " (junto com a divulgação de balanço)"}.
+            </>
+          ) : null}
+          {doc.typical_20 !== null && doc.typical_20 !== undefined && (
+            <> Esse tipo de evento costuma render {pct(doc.typical_20, 1, true)} em 20 pregões.</>
+          )}
+        </p>
+      )}
       <div className="app-button-row">
         {doc.link && (
           <a className="app-link" href={doc.link} target="_blank" rel="noreferrer noopener">

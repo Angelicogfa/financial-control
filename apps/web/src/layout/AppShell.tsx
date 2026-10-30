@@ -7,6 +7,11 @@ import { Breadcrumbs } from "./Breadcrumbs";
 import { DESKTOP_QUERY, NAV_SECTIONS } from "./navigation";
 import { applyTheme, currentTheme, type Theme } from "./theme";
 
+/** Items with another menu item under their path (Pesquisar and Garimpo) are active only on
+ *  their own page, so the nested one does not light both. */
+const NAV_PATHS = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.to));
+const NESTED_ITEMS = new Set(NAV_PATHS.filter((to) => NAV_PATHS.some((other) => other.startsWith(`${to}/`))));
+
 function matchesDesktop(): boolean {
   return typeof window.matchMedia === "function" ? window.matchMedia(DESKTOP_QUERY).matches : true;
 }
@@ -113,6 +118,7 @@ export function AppShell({
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  end={NESTED_ITEMS.has(item.to)}
                   onClick={closeIfOverlay}
                   className={({ isActive }) => `app-nav-item${isActive ? " active" : ""}`}
                 >

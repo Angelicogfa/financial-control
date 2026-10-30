@@ -6,11 +6,21 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import CvmDocumentDTO, DisclosureFeedDTO
+from controllers.disclosures.responses import (
+    CvmDocumentDTO,
+    DisclosureFeedDTO,
+    EventClassDTO,
+    EventHorizonDTO,
+    EventReactionDTO,
+    EventStudyDTO,
+)
 from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError
-from domain.disclosures.entities import CvmDocument
+from domain.disclosures.entities import CvmDocument, EventEffect
+from domain.disclosures.events import EVENT_LABELS
 from domain.disclosures.services.sync import COMPANY_TYPES, base_ticker, company_assets
+from domain.forecast.event_runs import EVENTS
+from domain.forecast.events import EventStudy
 from domain.shared.entities import AssetEntity
 from domain.shared.unit_of_work import AbstractUnitOfWork
 
@@ -20,8 +30,25 @@ NOT_COVERED_NOTE = (
 )
 
 
-def to_document_dto(doc: CvmDocument, tickers: Sequence[str]) -> CvmDocumentDTO:
+def to_document_dto(
+    doc: CvmDocument,
+    tickers: Sequence[str],
+    effect: EventEffect | None = None,
+    typical: float | None = None,
+) -> CvmDocumentDTO:
     return CvmDocumentDTO(
+        event_class=doc.event_class or None,
+        event_label=EVENT_LABELS.get(doc.event_class or "") if doc.event_class else None,
+        reaction=EventReactionDTO(
+            event_date=effect.event_date,
+            car_1=effect.car_1,
+            car_5=effect.car_5,
+            car_20=effect.car_20,
+            confounded=effect.confounded,
+        )
+        if effect is not None
+        else None,
+        typical_20=typical,
         id=doc.id,  # type: ignore[arg-type]
         protocol=doc.protocol,
         tickers=list(tickers),
@@ -75,17 +102,67 @@ class DisclosureHandler:
             unread = uow.cvm_documents.count_unread(cnpjs)
             counts = uow.cvm_documents.category_counts(cnpjs)
             last = uow.cvm_documents.latest_delivery()
+            effects = {
+                e.document_id: e
+                for e in uow.cvm_documents.effects([d.id for d in docs if d.id is not None])
+            }
+            stored = uow.forecasts.latest_model(EVENTS)
+        found = EventStudy.from_dict(stored.payload) if stored is not None else None
+
+        def typical(doc: CvmDocument) -> float | None:
+            effect = found.effect(doc.event_class, 20) if found and doc.event_class else None
+            return effect.effect if effect is not None else None
+
         tickers_by_cnpj: dict[str, list[str]] = {}
         for ticker, cnpj in sorted(cnpj_by_ticker.items()):
             tickers_by_cnpj.setdefault(cnpj, []).append(ticker)
         return DisclosureFeedDTO(
-            items=[to_document_dto(d, tickers_by_cnpj.get(d.cnpj, [])) for d in docs],
+            items=[
+                to_document_dto(
+                    d, tickers_by_cnpj.get(d.cnpj, []), effects.get(d.id or 0), typical(d)
+                )
+                for d in docs
+            ],
             unread_count=unread,
             category_counts=counts,
             companies=len(tickers),
             unmapped=[t for t in tickers if t not in cnpj_by_ticker],
             latest_delivery=last,
             note=NOT_COVERED_NOTE if not_covered or asset_id is None else None,
+        )
+
+    def event_study(self) -> EventStudyDTO:
+        """What usually happens to the price after each kind of event (Phase 42.4)."""
+        with self.uow_factory() as uow:
+            stored = uow.forecasts.latest_model(EVENTS)
+        if stored is None:
+            return EventStudyDTO(status="NOT_COMPUTED")
+        found = EventStudy.from_dict(stored.payload)
+        return EventStudyDTO(
+            status="OK",
+            as_of=found.as_of,
+            events=found.events,
+            confounded=found.confounded,
+            classes=[
+                EventClassDTO(
+                    event_class=c.event_class,
+                    label=EVENT_LABELS.get(c.event_class, c.event_class),
+                    events=c.events,
+                    horizons=[
+                        EventHorizonDTO(
+                            horizon=h.horizon,
+                            events=h.events,
+                            mean=h.mean,
+                            effect=h.effect,
+                            effect_sd=h.effect_sd,
+                            sign_probability=h.sign_probability,
+                        )
+                        for h in c.horizons
+                    ],
+                    volatility_ratio=c.volatility_ratio,
+                )
+                for c in sorted(found.classes, key=lambda c: -c.events)
+            ],
         )
 
     def mark_read(self, req: MarkReadRequest, *, now: datetime | None = None) -> int:

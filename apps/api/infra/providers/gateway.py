@@ -229,6 +229,10 @@ class CachedMarketGateway:
         """Trading codes of each CNPJ declared in the FCA of `year` (Phase 28)."""
         return self.cvm.issuer_tickers(year)
 
+    def get_cvm_document_stamp(self, year: int) -> str | None:
+        """Last-Modified of the yearly IPE file (Phase 42.4; not cached)."""
+        return self.cvm.document_stamp(year)
+
     def get_cvm_statement_stamp(self, kind: str, year: int) -> str | None:
         """Last-Modified of the yearly DFP/ITR file (Phase 42.2; not cached)."""
         return self.cvm.statement_stamp(kind, year)

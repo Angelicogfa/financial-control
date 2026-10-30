@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from domain.disclosures.entities import CvmDocument, IssuerTicker
+from domain.disclosures.entities import CvmDocument, EventEffect, IssuerTicker
 from domain.disclosures.statements import StatementDoc, StatementFact
 
 
@@ -61,6 +61,29 @@ class AbstractCvmDocumentRepository(ABC):
 
     @abstractmethod
     def mark_all_read(self, cnpjs: Sequence[str], *, read_at: datetime) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def unclassified(self, limit: int) -> list[CvmDocument]:
+        """Documents never classified (event_class is None), oldest first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_event_classes(self, classes: dict[int, str]) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def events(self, cnpjs: Sequence[str] | None = None) -> list[CvmDocument]:
+        """Documents that are events (a non-empty class), oldest first."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def replace_effects(self, effects: Sequence[EventEffect]) -> int:
+        """Replace the measured reactions (recomputed every week)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def effects(self, document_ids: Sequence[int] | None = None) -> list[EventEffect]:
         raise NotImplementedError
 
     @abstractmethod

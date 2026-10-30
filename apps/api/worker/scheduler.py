@@ -34,6 +34,7 @@ from worker.jobs import (
     run_pending_simulations_job,
     sync_bcb_and_benchmarks_job,
     sync_cvm_documents_job,
+    sync_cvm_event_history_job,
     sync_cvm_statements_job,
     sync_instrument_catalog_job,
     sync_mining_universe_job,
@@ -81,6 +82,7 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         ),
         "sync_cvm_documents": sync_cvm_documents_job,
         "sync_cvm_statements": sync_cvm_statements_job,
+        "sync_cvm_event_history": sync_cvm_event_history_job,
         "warm_portfolio_quotes": partial(
             warm_portfolio_quotes_job, max_workers=cfg.market_fetch_workers
         ),
@@ -98,7 +100,9 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
             calibrate_forecasts_job, catalog_top=cfg.simulation_catalog_top
         ),
         "estimate_forecast_models": partial(
-            estimate_forecast_models_job, catalog_top=cfg.simulation_catalog_top
+            estimate_forecast_models_job,
+            catalog_top=cfg.simulation_catalog_top,
+            min_daily_volume=cfg.mining_min_daily_volume,
         ),
         "sync_mining_universe": partial(
             sync_mining_universe_job,
@@ -262,7 +266,11 @@ def create_scheduler(
     scheduler.add_job(
         guard(
             "estimate_forecast_models",
-            partial(estimate_forecast_models_job, catalog_top=cfg.simulation_catalog_top),
+            partial(
+                estimate_forecast_models_job,
+                catalog_top=cfg.simulation_catalog_top,
+                min_daily_volume=cfg.mining_min_daily_volume,
+            ),
         ),
         trigger="cron",
         day_of_week=cfg.fundamentals_cron_day_of_week,
@@ -328,6 +336,15 @@ def create_scheduler(
         hour=(cfg.cvm_sync_cron_hour + 1) % 24,
         minute=10,
         id="sync_cvm_statements",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("sync_cvm_event_history", sync_cvm_event_history_job),
+        trigger="cron",
+        hour=(cfg.cvm_sync_cron_hour + 1) % 24,
+        minute=40,
+        id="sync_cvm_event_history",
         replace_existing=True,
         **defaults,
     )
