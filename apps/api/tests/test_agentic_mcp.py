@@ -141,6 +141,10 @@ def test_catalog_completeness_and_grant_validation() -> None:
     }
     assert cited
     assert cited - set(CATALOG_BY_NAME) == set()
+    # ...and every operation must be cited, so new tools are not left out of the guidance
+    assert set(CATALOG_BY_NAME) - cited == set()
+    # No leftover single-word lines (e.g. a stray merge marker) in the guidance text
+    assert all(" " in line or line.endswith(":") for line in INSTRUCTIONS.splitlines() if line)
 
     with pytest.raises(ValidationError) as exc_empty:
         validate_grant(AgentGrant())

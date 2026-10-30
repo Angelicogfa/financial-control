@@ -778,7 +778,8 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         description=(
             "Previsão probabilística do preço de um ativo (bayesiana): faixa provável em 3, 6, "
             "12 e 24 meses, chance de subir, de cair 20% e de passar do preço médio e do preço "
-            "justo, o que pesou e o selo de confiança. É uma distribuição, não um preço-alvo."
+            "justo, o que pesou e o selo de confiança. É uma distribuição, não um preço-alvo. "
+            "Para projetar o patrimônio da carteira, use simulation.project."
         ),
         input_model=AssetIdInput,
         output_type=AssetForecastDTO,
@@ -870,7 +871,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
     OperationSpec(
         name="assets.classify",
         kind="query",
-        description="Sugere o quadrante ARCA adequado para um ticker e tipo de ativo.",
+        description=(
+            "Sugere o quadrante ARCA adequado para um ticker e tipo de ativo, por regra; não "
+            "grava nada. Para mudar o quadrante de um ativo da watchlist, use research.classify."
+        ),
         input_model=AssetClassifyInput,
         output_type=ArcaSuggestionDTO,
         invoke=lambda h, p: h.assets.suggest_classification(p.ticker, p.asset_type),
@@ -890,7 +894,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
     OperationSpec(
         name="contributions.draft",
         kind="command",
-        description="Cria e salva um plano de aporte como rascunho (DRAFT).",
+        description=(
+            "Cria e salva um plano de aporte como rascunho (DRAFT), com o mesmo cálculo de "
+            "contributions.simulate; efetive com contributions.confirm."
+        ),
         input_model=ContributionSimulationRequest,
         output_type=SavedContributionPlanDTO,
         invoke=lambda h, p: h.contributions.create_draft(p),
@@ -1131,7 +1138,8 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "em cinco grupos (valuation, endividamento, eficiência, rentabilidade, "
             "crescimento) com o melhor de cada linha em `best`, histórico anual (receita, "
             "lucro, ROE, DY), veredito de valuation e nota do checklist. `indicators` escolhe "
-            "as linhas (todas quando vazio). Busca sob demanda os demonstrativos que faltarem."
+            "as linhas (todas quando vazio). Busca sob demanda os demonstrativos que faltarem. "
+            "Para comparar estudos de simulação, use study.compare."
         ),
         input_model=CompareInput,
         output_type=AssetComparisonDTO,
@@ -1156,7 +1164,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
     OperationSpec(
         name="research.classify",
         kind="command",
-        description="Altera o quadrante ARCA de um ativo acompanhado na watchlist.",
+        description=(
+            "Altera (grava) o quadrante ARCA de um ativo acompanhado na watchlist. Para só "
+            "pedir uma sugestão de quadrante, use assets.classify."
+        ),
         input_model=WatchlistClassifyToolInput,
         output_type=WatchlistItemDTO,
         invoke=lambda h, p: h.research.classify(p.asset_id, p),
@@ -1403,8 +1414,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         description=(
             "Agenda um backtest da estratégia: as regras reais de aporte (metas, bandas ARCA, "
             "checklist e política) reaplicadas mês a mês sobre o histórico, com taxas, IR na "
-            "venda e comparação com CDI, Ibovespa, IFIX ou S&P 500 em reais. Roda no worker; "
-            "acompanhe com simulation.get."
+            "venda e comparação com CDI, Ibovespa, IFIX ou S&P 500 em reais. Só agenda: roda "
+            "no worker e o resultado sai em simulation.get (não há consulta própria de "
+            "backtest). Para uma pergunta de ponta a ponta, prefira study.create."
         ),
         input_model=BacktestRequest,
         output_type=SimulationRunDTO,
@@ -1443,8 +1455,8 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "históricos de Ações, FIIs e Internacional acima do CDI, somados ao CDI dos "
             "cenários de juros da política (base, queda e alta), com aporte mensal constante "
             "em termos reais e metas de patrimônio e de renda passiva mensal, tudo em R$ de "
-            "hoje. Sem `initial_by_class`, parte da carteira atual. Roda no worker; acompanhe "
-            "com simulation.projection."
+            "hoje. Sem `initial_by_class`, parte da carteira atual. Só agenda: roda no worker e "
+            "o resultado sai em simulation.projection."
         ),
         input_model=ProjectionRequest,
         output_type=SimulationRunDTO,
@@ -1578,7 +1590,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         kind="command",
         description=(
             "Cria um estudo e põe os capítulos na fila do worker: question COMPLETE (1, 2 e 3), "
-            "PAST, GOAL ou IMPROVE; premissas únicas (aporte, horizonte, meta, passado, regras)."
+            "PAST, GOAL ou IMPROVE; premissas únicas (aporte, horizonte, meta, passado, regras). "
+            "Ponto de partida para perguntas de ponta a ponta: agenda por conta própria o "
+            "backtest, a projeção e os candidatos que as ferramentas simulation.* rodam avulsos."
         ),
         input_model=StudyRequest,
         output_type=StudyDTO,
@@ -1608,7 +1622,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
     OperationSpec(
         name="study.compare",
         kind="query",
-        description="Compara dois estudos capítulo por capítulo, com as premissas que diferem.",
+        description=(
+            "Compara dois estudos capítulo por capítulo, com as premissas que diferem. Para "
+            "comparar ativos lado a lado, use research.compare."
+        ),
         input_model=StudyCompareInput,
         output_type=StudyComparisonDTO,
         invoke=lambda h, p: h.studies.compare(p.a, p.b),
