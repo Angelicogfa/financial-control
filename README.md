@@ -86,7 +86,7 @@ Gerar o hash da senha de login (pede a senha duas vezes, sem ecoar, e imprime a 
 uv run python -m fincontrol_api hash-password
 ```
 
-Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python -m fincontrol_api hash-password`.
+Cole a linha `AUTH_PASSWORD_HASH='$argon2id$...'` inteira no `.env`. O valor precisa começar com `$argon2id$`: sem as aspas simples, os `$` são expandidos e o hash se perde, e a tela de login avisa que a autenticação não está configurada. Com a stack no ar, dá para gerar o hash dentro do container: `docker compose exec api python cli.py hash-password`.
 
 Gerar o segredo do JWT:
 
@@ -137,7 +137,7 @@ O worker sincroniza séries, cotações, catálogo da B3, demonstrativos e os co
 Para explorar o app sem os seus dados, use um banco **vazio** (por exemplo uma stack isolada com outros volumes). O comando recusa rodar em um banco que já tenha ativos:
 
 ```bash
-docker compose exec worker python -m fincontrol_worker.seed_demo
+docker compose exec worker python -m worker.seed_demo
 ```
 
 Ele cria uma carteira com dois anos de histórico (aportes mensais, proventos, renda fixa, reserva e retratos diários).
@@ -232,7 +232,7 @@ Cada release é uma tag `vX.Y.Z` e publica uma imagem por módulo no GitHub Cont
 | `ghcr.io/angelicogfa/finance-controle-api:vX.Y.Z` | `api`, `worker` e `migrate` |
 | `ghcr.io/angelicogfa/finance-controle-web:vX.Y.Z` | `web` |
 
-A release mais nova também recebe a tag `latest`.
+A release mais nova também recebe a tag `latest`. Para rodar o app a partir dessas imagens, sem clonar o repositório nem compilar nada, siga o passo a passo de [`stand-alone/`](stand-alone/README.md).
 
 - **Criar uma release:** em *Actions → Create release tag → Run workflow*, escolha `patch`, `minor` ou `major`. O workflow lê a maior tag `vX.Y.Z` (começa de `v0.0.0`), cria a próxima no topo da `main`, abre o GitHub Release com as notas geradas e publica as imagens. Ele recusa a execução se o topo da `main` já tiver uma release.
 - **Tag manual:** `git push origin vX.Y.Z` (ou um release criado na interface do GitHub) dispara o mesmo build (`.github/workflows/release.yml`).
