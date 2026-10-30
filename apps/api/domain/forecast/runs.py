@@ -4,17 +4,23 @@ The inputs are the simulation's own (Phase 33): the long total-return history in
 `market_series`, the class sample, the calibrated mixture of generators. The estimation
 universe is the portfolio, the watchlist and the most traded catalog instruments (decision
 42.0-3); forecasts are stored for the registered assets only.
+
+Layer B (42.3): `estimate_valuation_model` measures, weekly, how much the valuation of the
+statements delivered to the CVM said about the next 12 months, with an out-of-sample gate; the
+daily forecast pulls each company's α to γ·z instead of zero when the gate passed.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
 import numpy as np
 
+from domain.disclosures.services.sync import base_ticker
+from domain.disclosures.statements import delivery_history
 from domain.forecast.calibration import calibrate
 from domain.forecast.model import (
     DEFAULT_PATHS,
@@ -22,6 +28,16 @@ from domain.forecast.model import (
     MODEL_VERSION,
     dividend_drag,
     forecast_asset,
+)
+from domain.forecast.valuation_model import (
+    CompanyInput,
+    Month,
+    ValuationModel,
+    company_yields,
+    estimate,
+    forward_alpha,
+    month_of,
+    value_scores,
 )
 from domain.market.entities import Quote
 from domain.shared.entities import AssetEntity
@@ -40,6 +56,7 @@ from domain.simulation.data import (
     build_market_history,
     px_symbol,
     simulation_universe,
+    split_symbol,
     tr_symbol,
 )
 from domain.simulation.generators import draw_mixture, sample_posterior
@@ -53,6 +70,7 @@ from domain.simulation.scenarios import (
     class_sample,
 )
 
+VALUATION = "VALUATION"
 DEFAULT_SEED = 42
 DRAG_MONTHS = 36
 MEAN_BLOCK_MONTHS = 12.0
@@ -100,7 +118,11 @@ def _universe(uow: AbstractUnitOfWork, *, catalog_top: int, today: date) -> _Uni
     return _Universe(registered, classes, history, sample)
 
 
-def _fits(universe: _Universe, requested: Collection[str] = ()) -> dict[str, FactorFit]:
+def _fits(
+    universe: _Universe,
+    requested: Collection[str] = (),
+    prior_means: Mapping[str, float] | None = None,
+) -> dict[str, FactorFit]:
     raw: dict[str, FactorFit] = {}
     for ticker, cls in universe.classes.items():
         if cls in universe.sample.classes:
@@ -115,7 +137,8 @@ def _fits(universe: _Universe, requested: Collection[str] = ()) -> dict[str, Fac
         )
         for cls in {f.arca_class for f in raw.values()}
     }
-    return {t: shrink(f, taus[f.arca_class]) for t, f in raw.items()}
+    means = prior_means or {}
+    return {t: shrink(f, taus[f.arca_class], means.get(t, 0.0)) for t, f in raw.items()}
 
 
 def _monthly_points(uow: AbstractUnitOfWork, symbol: str, start: date, end: date) -> list[float]:
@@ -184,7 +207,9 @@ def refresh_forecasts(
             (prior := uow.forecasts.latest(a.ticker)) is not None and prior.payload.get("on_demand")
         )
     }
-    fits = _fits(universe, requested)
+    model, sectors = _valuation_inputs(uow)
+    prior_means, notes = _valuation_priors(model, sectors, universe.classes)
+    fits = _fits(universe, requested, prior_means)
     weights, _run, _note = mixture_weights(uow, STACKED, universe.sample)
     excess, _labels = draw_mixture(
         universe.sample,
@@ -230,6 +255,7 @@ def refresh_forecasts(
             as_of=as_of,
             seed=seed + k,
             class_expected_excess_monthly=float(np.mean(universe.sample.excess[:, k])),
+            valuation_note=notes.get(ticker),
         )
         uow.forecasts.save(
             ticker,
@@ -263,4 +289,113 @@ def run_calibration(
         return None
     payload = result.to_dict()
     uow.forecasts.save_calibration(as_of, payload)
+    return payload
+
+
+# --- layer B: valuation (42.3) ----------------------------------------------------------------
+
+
+def _monthly_prices(
+    uow: AbstractUnitOfWork, symbol: str, start: date, end: date
+) -> dict[Month, float]:
+    out: dict[Month, float] = {}
+    for p in uow.market_series.list_series(symbol, date_from=start, date_to=end):
+        out[month_of(p.reference_date)] = p.value
+    return out
+
+
+def _sectors(uow: AbstractUnitOfWork) -> dict[str, str]:
+    return {i.ticker.upper(): (i.sector or "") for i in uow.catalog.list_all()}
+
+
+def _valuation_inputs(uow: AbstractUnitOfWork) -> tuple[ValuationModel | None, dict[str, str]]:
+    stored = uow.forecasts.latest_model(VALUATION)
+    model = ValuationModel.from_dict(stored.payload) if stored is not None else None
+    return model, _sectors(uow) if model is not None else {}
+
+
+def _valuation_priors(
+    model: ValuationModel | None, sectors: Mapping[str, str], tickers: Collection[str]
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Monthly prior mean of α (γ·z) and the note of the driver, per ticker."""
+    if model is None:
+        return {}, {}
+    means: dict[str, float] = {}
+    notes: dict[str, str] = {}
+    for ticker in tickers:
+        score = model.scores.get(ticker)
+        if score is None:
+            continue
+        z = float(score["z"])
+        side = "mais barata" if z > 0 else "mais cara"
+        if model.passed:
+            means[ticker] = model.gamma_for(sectors.get(ticker)) * z
+            notes[ticker] = (
+                f"z de valuation {z:+.1f} ({side} que o próprio histórico e o setor, "
+                f"balanços até {score['month']}). {model.reason}"
+            )
+        else:
+            notes[ticker] = f"z de valuation {z:+.1f} ({side}). {model.reason}"
+    return means, notes
+
+
+def valuation_panel(
+    uow: AbstractUnitOfWork, universe: _Universe, today: date
+) -> tuple[dict[str, CompanyInput], dict[str, dict[Month, float]]]:
+    """Companies with statements and prices, and their monthly α over the class."""
+    tickers = sorted(universe.classes)
+    cnpjs = uow.cvm_issuers.cnpjs_for([base_ticker(t) for t in tickers])
+    sectors = _sectors(uow)
+    companies: dict[str, CompanyInput] = {}
+    alphas: dict[str, dict[Month, float]] = {}
+    seen: set[str] = set()
+    for ticker in tickers:
+        cnpj = cnpjs.get(base_ticker(ticker))
+        if cnpj is None or cnpj in seen:  # one share class per company
+            continue
+        facts = uow.cvm_statements.facts_for(cnpj)
+        if not facts:
+            continue
+        seen.add(cnpj)
+        companies[ticker] = CompanyInput(
+            ticker=ticker,
+            sector=sectors.get(ticker, ""),
+            snapshots=list(reversed(delivery_history(facts))),
+            prices=_monthly_prices(uow, px_symbol(ticker), SIMULATION_HISTORY_START, today),
+            splits=[
+                (p.reference_date, p.value)
+                for p in uow.market_series.list_series(split_symbol(ticker))
+            ],
+        )
+        cls = universe.classes[ticker]
+        if cls in universe.sample.classes:
+            k = CLASS_ORDER.index(cls)
+            excess, mask = monthly_excess(universe.history, ticker, universe.sample)
+            alphas[ticker] = {
+                month_of(universe.sample.months[i]): float(excess[i] - universe.sample.excess[i, k])
+                for i in range(universe.sample.size)
+                if mask[i]
+            }
+    return companies, alphas
+
+
+def estimate_valuation_model(
+    uow: AbstractUnitOfWork, *, catalog_top: int = 0, today: date | None = None
+) -> dict[str, Any] | None:
+    """Estimate layer B on the universe and store it (None without a usable universe)."""
+    as_of = today or date.today()
+    try:
+        universe = _universe(uow, catalog_top=catalog_top, today=as_of)
+    except InsufficientHistory:
+        return None
+    companies, alphas = valuation_panel(uow, universe, as_of)
+    if not companies:
+        return None
+    yields = {t: company_yields(c) for t, c in companies.items()}
+    sectors = {t: c.sector for t, c in companies.items()}
+    scores = value_scores(yields, sectors)
+    forward = {t: forward_alpha(a) for t, a in alphas.items()}
+    model = estimate(scores, forward, sectors, as_of=as_of)
+    payload = model.to_dict()
+    uow.forecasts.save_model(VALUATION, as_of, payload)
     return payload

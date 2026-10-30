@@ -197,12 +197,14 @@ class YFinanceProvider:
                 if close_val is None or close_val <= 0:
                     continue
                 adj = _safe_float(row.get("Adj Close"))
+                split = _safe_float(row.get("Stock Splits"))
                 points.append(
                     PricePoint(
                         date=idx.date() if hasattr(idx, "date") else idx,
                         close=close_val,
                         adj_close=adj if adj is not None and adj > 0 else close_val,
                         volume=_safe_float(row.get("Volume")),
+                        split=split if split is not None and split > 0 else None,
                     )
                 )
             points.sort(key=lambda p: p.date)

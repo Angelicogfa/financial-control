@@ -13,6 +13,7 @@ const UNIT_LABELS: Record<string, string> = {
   PERCENT_PER_MONTH: "% ao mês",
   PRICE: "Preço",
   INDEX_POINTS: "Pontos",
+  RATIO: "Razão",
 };
 
 const JOB_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ const JOB_LABELS: Record<string, string> = {
   run_pending_simulations: "Simulações na fila",
   refresh_asset_forecasts: "Previsão de preço dos ativos",
   calibrate_forecasts: "Calibração da previsão de preço",
+  estimate_forecast_models: "Valuation na previsão de preço",
 };
 
 const JOB_STATUS_LABELS: Record<string, string> = {
@@ -69,6 +71,13 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Recalcula a faixa provável de preço de cada ativo em 3, 6, 12 e 24 meses a partir do histórico guardado. " +
       "Roda sozinha todo dia útil; para um ativo só, use a aba Probabilidades do ativo.",
+  },
+  {
+    name: "estimate_forecast_models",
+    action: "Medir o valuation na previsão",
+    hint:
+      "Mede, com os balanços entregues à CVM, quanto estar barata ou cara frente ao histórico e ao setor disse sobre os 12 meses seguintes, " +
+      "e só usa na previsão se isso melhorou as previsões do passado. Roda sozinha uma vez por semana; depois, recalcule a previsão.",
   },
   {
     name: "calibrate_forecasts",

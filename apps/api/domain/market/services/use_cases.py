@@ -36,6 +36,7 @@ MANUAL_JOBS: dict[str, str] = {
     "refresh_catalog_fundamentals": "Atualização dos indicadores do catálogo da B3 (screener)",
     "refresh_asset_forecasts": "Previsão probabilística do preço dos ativos",
     "calibrate_forecasts": "Calibração da previsão de preço (quanto as faixas se confirmaram)",
+    "estimate_forecast_models": "Valuation na previsão de preço, com teste fora da amostra",
 }
 
 

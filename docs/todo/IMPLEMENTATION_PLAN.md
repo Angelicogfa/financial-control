@@ -55,7 +55,8 @@
 | **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
 | **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
 | **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[x]` Concluída | 100% |
-| **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.2 feitas; antes das Fases 34 e 36) | 35% |
+| **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.3 feitas; antes das Fases 34 e 36) | 50% |
+| **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[ ]` Proposta (aguarda decisões da seção 9 do desenho) | 0% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -812,11 +813,23 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **42.1** Camada A por ativo (`domain/forecast`): excesso sobre o CDI = α + β·classe + ε, com α encolhido pela dispersão da classe e β puxado para 1, nos caminhos da mistura calibrada; o preço desconta os proventos (diferença TR − PX). Tabelas `asset_forecasts` e `forecast_calibrations` (migração `script_00030`); jobs `refresh_asset_forecasts` (diário) e `calibrate_forecasts` (semanal, origem móvel: cobertura das faixas de 50% e 90%, PIT, Brier de bater o CDI), também manuais; `GET /assets/{id}/forecast` e `GET /market/forecast-quality`; MCP `assets.forecast` e `market.forecast_quality`; aba "Probabilidades" com resumo, chances (hoje, preço médio, preço justo, queda de 20%), faixa por horizonte, calculadora de preço, "o que pesou" e selo; oculta enquanto o selo estiver abaixo de "Use com cautela".
   - `[x]` Previsão sob pedido, só do ativo: botão "Calcular só para este ativo" na aba e `POST /assets/{id}/forecast` (MCP `assets.forecast_refresh`). O pedido aceita a partir de 12 meses de histórico e mostra a previsão mesmo com selo baixo, com avisos de confiança ("Leia com cautela"); o ativo pedido segue acompanhado no cálculo diário. "Rodar agora" em Dados de mercado virou uma lista com descrição, última execução e botão de cada rotina.
 - `[x]` **42.2** DFP/ITR point-in-time: tabelas `cvm_statements` (métricas de cada balanço e versão, com a data de entrega) e `cvm_statement_loads` (migração `script_00031`); leitura dos ZIPs anuais da CVM por streaming, filtrada pelas empresas com código de negociação; três modelos de plano de contas (empresa, banco, seguradora), contas livres de depreciação e dividendos pagos achadas pelo nome, escala mil/unidade e quantidade de ações informada em milhares corrigidas; últimos 12 meses reconstruídos do acumulado do ITR com a última DFP; job `sync_cvm_statements` (diário: confere os dois últimos anos pelo Last-Modified e traz o histórico desde 2010 alguns arquivos por vez, também manual); `domain/forecast/valuation_pit.py` (P/L, P/VP, EV/EBITDA, dividendos/valor com o balanço conhecido na data); `GET /assets/{id}/statements`, MCP `assets.statements` e a seção "Balanços entregues à CVM" na aba Fundamentos.
-- `[ ]` **42.3** Camada B: valuation no prior de α, hierárquica por setor, com portões.
+- `[x]` **42.3** Camada B (`domain/forecast/valuation_model.py`): a cada mês, quatro rendimentos (lucro, patrimônio, EBITDA/EV e dividendos sobre o valor) com o último balanço entregue e o preço do mês; o valor de mercado desfaz o ajuste de desdobramentos e bonificações do Yahoo (série `SIM:SPLIT:`, guardada pelo histórico da simulação). z de valuation = média do z frente ao próprio passado e do z frente ao setor (centro do setor puxado para o mercado), limitado a ±3. γ por Fama-MacBeth com erro alargado pela sobreposição das janelas de 12 meses, prior cético N(0; 0,2% ao mês por z) e γ por setor puxado para o global. Portão por origem móvel anual: só entra se reduzir o erro fora da amostra no total e na maioria dos anos e se o sinal tiver ≥ 90% de confiança; senão γ = 0 e a nota diz que não foi usado. Na previsão, o α é encolhido para γ·z (antes, para zero) e "O que pesou → Valuation" mostra essa parte. Tabela `forecast_models` (migração `script_00032`); job semanal `estimate_forecast_models` (também manual); `GET /market/forecast-quality` e o MCP `market.forecast_quality` trazem o resultado do portão.
 - `[ ]` **42.4** IPE histórico, taxonomia de eventos e estudo de eventos hierárquico.
 - `[ ]` **42.5** Camada C: efeito dos eventos recentes, com portões e "o que pesou".
 - `[ ]` **42.6** Negociações de administradores (VLMO), se houver o conjunto estruturado.
 - `[ ]` **42.7** Integração com os estudos, alerta opcional, testes de UI e integração, `docker compose build`.
+
+## Fase 43 — Garimpo: Achados no Catálogo Inteiro (`[ ]` Proposta)
+
+**Objetivo:** procurar, em todas as ações líquidas com balanço na CVM, empresas que ninguém está olhando e que os dados dizem merecer um olhar (valor, qualidade, melhora dos fundamentos, momentum e, depois, eventos e administradores), com pesos bayesianos, portões fora da amostra, PBO, custos e um placar dos achados contra a classe e o acaso. Um achado vira candidato só quando você o segue. Desenho: [ASSET_MINING_DESIGN.md](../features/ASSET_MINING_DESIGN.md).
+
+- `[ ]` **43.0** Decisões da seção 9 do desenho.
+- `[ ]` **43.1** Universo e histórico de preço com desdobramentos de todas as ações líquidas.
+- `[ ]` **43.2** Sinais point-in-time e `mining_signals`.
+- `[ ]` **43.3** Pesos bayesianos, portões, PBO e custos.
+- `[ ]` **43.4** Achados semanais, `mining_findings`, página "Garimpo", "Seguir" e MCP.
+- `[ ]` **43.5** Placar dos achados contra a classe e o acaso.
+- `[ ]` **43.6** Eventos e administradores como sinais (depois de 42.4–42.6).
 
 
 ## Fase 43 — Campos de Seleção com Busca (`[x]` Concluída)

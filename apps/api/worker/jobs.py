@@ -21,7 +21,11 @@ from domain.assets.services.cerrado import (
 from domain.assets.services.history import STATEMENT_TYPES
 from domain.disclosures.services.statements_sync import sync_statements
 from domain.disclosures.services.sync import sync_documents
-from domain.forecast.runs import refresh_forecasts, run_calibration
+from domain.forecast.runs import (
+    estimate_valuation_model,
+    refresh_forecasts,
+    run_calibration,
+)
 from domain.market.entities import Quote, QuoteFreshness
 from domain.market.services.treasury_prices import (
     RATE_SUFFIX,
@@ -61,6 +65,7 @@ from domain.simulation.data import (
     index_symbol,
     px_symbol,
     simulation_universe,
+    split_symbol,
     tr_symbol,
 )
 from domain.simulation.runs import execute_next_run, queue_calibration
@@ -452,6 +457,28 @@ def refresh_asset_forecasts_job(
         )
         uow.commit()
     return counts
+
+
+def estimate_forecast_models_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    catalog_top: int = 0,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Estimate layer B (valuation) of the forecast, with its out-of-sample gate (42.3)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        result = estimate_valuation_model(uow, catalog_top=catalog_top, today=at.date())
+        uow.commit()
+    if result is None:
+        return {"companies": 0}
+    return {
+        "companies": result["companies"],
+        "months": result["months"],
+        "passed": result["passed"],
+        "oos_improvement": result["oos_improvement"],
+    }
 
 
 def calibrate_forecasts_job(
@@ -894,6 +921,11 @@ def sync_simulation_history_job(
                 [(p.date, p.close) for p in points if p.date <= end],
                 unit=SeriesUnit.PRICE,
             )
+            splits = [(p.date, p.split) for p in points if p.split and p.date <= end]
+            if splits:  # Yahoo's prices are split-adjusted; the valuation undoes it (42.3)
+                uow.market_series.upsert_points(
+                    split_symbol(asset.ticker), splits, unit=SeriesUnit.RATIO
+                )
             uow.commit()
 
     for label, yahoo_symbol in INDEX_SOURCES.items():

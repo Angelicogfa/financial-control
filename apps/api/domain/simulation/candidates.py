@@ -155,6 +155,7 @@ class FactorFit:
     beta_post: float = 1.0
     beta_post_sd: float = BETA_PRIOR_SD
     shrinkage: float = 1.0  # share of α̂ removed by the prior (1 = all)
+    alpha_prior_mean: float = 0.0  # where α is pulled to (the valuation signal, Phase 42.3)
 
 
 def ols_fit(y: np.ndarray, x: np.ndarray) -> tuple[float, float, float, float, np.ndarray]:
@@ -201,12 +202,13 @@ def class_tau(fits: Sequence[FactorFit]) -> float:
     return math.sqrt(max(float(np.var(alphas, ddof=1)) - noise, 0.0))
 
 
-def shrink(fit: FactorFit, tau: float) -> FactorFit:
-    """Normal-normal posteriors: α to 0 with prior sd τ, β to 1 with prior sd 0.5."""
+def shrink(fit: FactorFit, tau: float, prior_mean: float = 0.0) -> FactorFit:
+    """Normal-normal posteriors: α to `prior_mean` (0 without a signal) with prior sd τ, β to 1
+    with prior sd 0.5."""
     se2 = max(fit.alpha_se**2, 1e-18)
     tau2 = tau * tau
     weight = tau2 / (tau2 + se2) if tau2 > 0 else 0.0
-    alpha_post = weight * fit.alpha
+    alpha_post = weight * fit.alpha + (1.0 - weight) * prior_mean
     alpha_post_sd = math.sqrt(tau2 * se2 / (tau2 + se2)) if tau2 > 0 else 0.0
     b_prec = 1.0 / max(fit.beta_se**2, 1e-18)
     p_prec = 1.0 / BETA_PRIOR_SD**2
@@ -226,6 +228,7 @@ def shrink(fit: FactorFit, tau: float) -> FactorFit:
         beta_post=beta_post,
         beta_post_sd=beta_post_sd,
         shrinkage=round(1.0 - weight, 4),
+        alpha_prior_mean=prior_mean,
     )
 
 

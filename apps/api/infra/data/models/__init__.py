@@ -21,7 +21,11 @@ from infra.data.models.disclosures import (
     CvmStatementFactModel,
     CvmStatementLoadModel,
 )
-from infra.data.models.forecast import AssetForecastModel, ForecastCalibrationModel
+from infra.data.models.forecast import (
+    AssetForecastModel,
+    ForecastCalibrationModel,
+    ForecastModelModel,
+)
 from infra.data.models.jobs import JobRunModel, WorkerRequestErrorModel
 from infra.data.models.ledger import CorporateEventModel, EarningModel, TransactionModel
 from infra.data.models.market import (
@@ -60,6 +64,7 @@ __all__ = [
     "EarningModel",
     "FixedIncomeTermModel",
     "ForecastCalibrationModel",
+    "ForecastModelModel",
     "FundamentalSnapshotModel",
     "InstrumentCatalogModel",
     "InvestmentPolicyModel",

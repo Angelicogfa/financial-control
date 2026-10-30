@@ -200,6 +200,7 @@ class JobRequestInput(BaseModel):
         "refresh_catalog_fundamentals",
         "refresh_asset_forecasts",
         "calibrate_forecasts",
+        "estimate_forecast_models",
     ]
 
 
@@ -1234,7 +1235,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "CVM), `warm_portfolio_quotes` (cotações das "
             "posições), `sync_price_history` (histórico de preços), `refresh_distributions` "
             "(proventos declarados), `refresh_catalog_fundamentals` (indicadores do "
-            "screener), `refresh_asset_forecasts` e `calibrate_forecasts` (previsão de preço). O "
+            "screener), `refresh_asset_forecasts`, `calibrate_forecasts` e "
+            "`estimate_forecast_models` (previsão "
+            "de preço). O "
             "worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),
