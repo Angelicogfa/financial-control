@@ -67,22 +67,34 @@ operações concedidas a esta chave; chamar uma operação fora do escopo retorn
 
 Visão Geral e Carteira:
 - Chame `portfolio.report` para consultar posições atuais, preços, rentabilidade, alocação nos \
-quatro quadrantes ARCA (Ações, Real Estate, Caixa, Ativos Internacionais) e desvios das bandas.
+quatro quadrantes ARCA (Ações, Real Estate, Caixa, Ativos Internacionais) e desvios das bandas; \
+`portfolio.by_account` separa o patrimônio por conta de custódia.
 - Use `portfolio.analytics` para métricas de risco e retorno (TWR, CAGR, Sharpe, Sortino, \
 drawdown e comparação com CDI, IPCA e IBOV) e `portfolio.snapshots` para a evolução diária.
+- `portfolio.health` dá o diagnóstico em sete pilares com ação sugerida; \
+`portfolio.earnings_agenda` lista os proventos anunciados e ainda não pagos; \
+`portfolio.treasury_market` compara o Tesouro Direto na curva × a mercado.
 
 Ativos e Análise Fundamentalista:
 - Use `assets.list` para buscar ativos cadastrados e `assets.get` para detalhes de um ativo.
 - Chame `assets.analysis` para ver múltiplos fundamentalistas históricos, valuation (Graham, \
-Bazin, P/VP) e avaliação do Diagrama do Cerrado; `assets.prices` dá os fechamentos de 6 \
-meses, 1, 2 ou 5 anos, ou de todo o histórico.
+Bazin, P/VP) e avaliação do Diagrama do Cerrado; `assets.statements` traz os balanços DFP/ITR \
+da CVM; `assets.prices` dá os fechamentos limpos de 6 meses, 1, 2 ou 5 anos, ou de todo o \
+histórico (para auditar de qual provedor veio cada cotação, use `market.quote_history`).
+- Previsão de preço de UM ativo: `assets.forecast` lê a última; `assets.forecast_refresh` \
+recalcula só esse ativo agora; `market.forecast_quality` mostra o quanto essas faixas acertaram. \
+Para projetar o patrimônio da CARTEIRA, use `simulation.project`.
 - Use `assets.create`, `assets.update`, `assets.checklist` e `assets.archive` para gerenciar o \
-cadastro e o checklist fundamentalista.
+cadastro e o checklist fundamentalista. `assets.classify` só SUGERE o quadrante ARCA de um \
+ticker (consulta, não grava); para mudar o quadrante de um ativo da watchlist, use \
+`research.classify`.
 
 Aportes e Rebalanceamento:
 - Use `contributions.simulate` para simular como distribuir um novo aporte em R$ respeitando as \
-bandas ARCA.
-- Para salvar e efetivar um aporte, use `contributions.draft` seguido de `contributions.confirm`.
+bandas ARCA; nada é gravado.
+- Para salvar e efetivar um aporte, use `contributions.draft` (mesmo cálculo do simulate, mas \
+grava o rascunho) seguido de `contributions.confirm`, ou descarte com `contributions.discard`. \
+`contributions.list` e `contributions.get` consultam os planos gravados.
 
 Lançamentos (Ledger) e Extrato B3:
 - Negociações de compra/venda: `ledger.trades.list`, `ledger.trades.get`, `ledger.trades.create`, \
@@ -97,6 +109,12 @@ com `ledger.imports.commit`.
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \
 `research.classify`, `research.unfollow`.
+- `research.compare` põe de 2 a 5 ATIVOS lado a lado (não confunda com `study.compare`, que \
+compara dois estudos de simulação).
+- Garimpo semanal de ações: `research.mining` (achados), `research.mining_why` (por que um ticker \
+entrou ou não), `research.mining_record` (placar) e `research.mining_universe` (universo).
+- Documentos da CVM: `disclosures.list`, `disclosures.mark_read` e `disclosures.event_study` \
+(retorno anormal médio por tipo de fato relevante).
 - Política de investimentos e metas ARCA: `policy.get`, `policy.update`, `policy.versions`, \
 `policy.get_arca_targets`, `policy.update_arca_targets`.
 - Contas de custódia e alertas: `accounts.list`, `accounts.create`, `accounts.update`, \
@@ -107,13 +125,31 @@ Tributação:
 e o IR estimado resgatando hoje × na próxima faixa; para renda variável, o regime do tipo.
 - `tools.fixed_income_compare` compara títulos tributados e isentos (valor e taxa líquidos, \
 taxas equivalentes por faixa, ponto de empate); `tools.tax_rules` lista as alíquotas com vigência.
-merge
-Simulação, Projeção e Calibração:
-- Cobertura de histórico e disparos: `simulation.coverage`, `market.request_job`.
-- Backtests da estratégia e robustez a crises: `simulation.backtest`, `simulation.robustness`.
-- Projeção probabilística de longo prazo e cenários: `simulation.project`, `simulation.projection`.
-- Calibração bayesiana walk-forward: `simulation.calibrate`, `simulation.calibration`.
-- Consulta geral de execuções: `simulation.list`, `simulation.get`.
+
+Dados de Mercado e Worker:
+- Situação dos dados: `market.quote_status` (idade das cotações das posições), \
+`market.series_status` (séries de mercado), `simulation.coverage` (histórico que a simulação usa) \
+e `market.job_runs` (execuções do worker).
+- `market.request_job` dispara uma rotina do worker agora. Erros dos provedores: \
+`market.worker_errors`, `market.resolve_worker_error` (um) e `market.resolve_all_worker_errors` \
+(todos).
+
+Estudos de Simular Carteira (comece por aqui):
+- Para uma pergunta de ponta a ponta ("como foi", "chego na meta", "o que melhora"), use \
+`study.create`: ele agenda as simulações necessárias e monta capítulos com selo de confiança. \
+Leia com `study.get`; `study.list`, `study.refresh`, `study.variation`, `study.compare` e \
+`study.delete` completam o ciclo.
+
+Simulação, Projeção e Calibração (etapas avulsas):
+- As ferramentas `simulation.*` rodam uma etapa por vez. Cada comando só AGENDA o job no worker; \
+o resultado sai na consulta correspondente:
+  - backtest: `simulation.backtest` → `simulation.get` (e `simulation.robustness` depois);
+  - projeção: `simulation.project` → `simulation.projection`;
+  - candidatos: `simulation.find_candidates` → `simulation.candidates`;
+  - laboratório de ML: `simulation.run_lab` → `simulation.lab`;
+  - calibração walk-forward: `simulation.calibrate` → `simulation.calibration`.
+- `simulation.list` lista as execuções, `simulation.get` dá status e resumo de qualquer uma e \
+`simulation.delete` exclui.
 
 Repetição segura (Idempotência):
 - Ferramentas de comando aceitam `idempotency_key` opcional. Após um timeout de rede, repita \
