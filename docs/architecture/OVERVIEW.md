@@ -141,7 +141,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00029`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00030`):
 
 ```mermaid
 erDiagram
@@ -355,4 +355,8 @@ A barra do topo mostra a trilha (`layout/trail.ts`, `layout/Breadcrumbs.tsx`): a
 ### Simular carteira em estudos (Fase 41)
 
 A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, premissas definidas uma vez e capítulos que respondem, cada um sendo uma rodada dos motores da Fase 33 ligada por `study_id`/`chapter`. De onde viemos = backtest com variantes (robustez); Para onde vamos = projeção; O que pode melhorar = candidatos com as mesmas premissas. `domain/simulation/studies.py` monta, só a partir dos resultados, o resumo de cada capítulo, o selo "Quanto confiar" e a conclusão com próximos passos; `domain/simulation/services/studies.py` cria, versiona (`origin_id`), varia (`variation_of`), compara e exclui. Calibração e Laboratório ficam em "Qualidade dos modelos", que alimenta os selos.
+
+### Previsão probabilística do preço (Fase 42)
+
+`domain/forecast` dá a cada ativo a faixa provável do preço em 3, 6, 12 e 24 meses e a chance de passar de preços que importam. A camada A reaproveita o modelo de fatores dos candidatos (excesso sobre o CDI = α + β·classe + ε, α encolhido pela classe) sobre os caminhos da mistura calibrada, e desconta os proventos para chegar ao preço. O worker grava em `asset_forecasts` (`refresh_asset_forecasts`, diário) e mede, por origem móvel, quantas vezes as faixas se confirmaram em `forecast_calibrations` (`calibrate_forecasts`, semanal); a tela só lê. A aba "Probabilidades" do ativo fica oculta enquanto o selo estiver abaixo de "Use com cautela". As camadas B (fundamentos da CVM) e C (eventos da CVM) entram nas etapas 42.2–42.5.
 

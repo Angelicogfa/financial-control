@@ -16,6 +16,7 @@ from infra.data.models.assets import (
     FixedIncomeTermModel,
 )
 from infra.data.models.disclosures import CvmDocumentModel, CvmIssuerTickerModel
+from infra.data.models.forecast import AssetForecastModel, ForecastCalibrationModel
 from infra.data.models.jobs import JobRunModel, WorkerRequestErrorModel
 from infra.data.models.ledger import CorporateEventModel, EarningModel, TransactionModel
 from infra.data.models.market import (
@@ -40,6 +41,7 @@ __all__ = [
     "AccountModel",
     "AgentApiKeyModel",
     "AlertDismissalModel",
+    "AssetForecastModel",
     "AssetModel",
     "AssetPriceHistoryModel",
     "ChecklistAnswerModel",
@@ -50,6 +52,7 @@ __all__ = [
     "CvmIssuerTickerModel",
     "EarningModel",
     "FixedIncomeTermModel",
+    "ForecastCalibrationModel",
     "FundamentalSnapshotModel",
     "InstrumentCatalogModel",
     "InvestmentPolicyModel",

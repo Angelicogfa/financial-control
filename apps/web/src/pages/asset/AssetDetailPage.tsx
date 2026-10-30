@@ -26,6 +26,7 @@ import {
 } from "../../utils/labels";
 import { ColumnChart } from "../../viz/ColumnChart";
 import { ChecklistTab } from "./ChecklistTab";
+import { ForecastTab } from "./ForecastTab";
 import { MarketTab } from "./MarketTab";
 import { PriceHistory } from "./PriceHistory";
 import { TaxTab } from "./TaxTab";
@@ -44,6 +45,7 @@ type TabKey =
   | "market"
   | "fundamentals"
   | "valuation"
+  | "forecast"
   | "checklist"
   | "tax"
   | "earnings"
@@ -53,6 +55,7 @@ const TABS: TabSpec<TabKey>[] = [
   { key: "summary", label: "Resumo" },
   { key: "fundamentals", label: "Fundamentos" },
   { key: "valuation", label: "Valuation" },
+  { key: "forecast", label: "Probabilidades" },
   { key: "checklist", label: "Checklist" },
   { key: "tax", label: "Tributação" },
   { key: "earnings", label: "Proventos" },
@@ -543,6 +546,7 @@ export function AssetDetailPage() {
               {tab === "summary" && <Summary analysis={data} />}
               {tab === "fundamentals" && <Fundamentals analysis={data} />}
               {tab === "valuation" && <Valuation analysis={data} />}
+              {tab === "forecast" && <ForecastTab assetId={assetId} />}
               {tab === "checklist" && (
                 <>
                   {checklistSaved && (

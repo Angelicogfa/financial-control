@@ -11,6 +11,7 @@ from composition import get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
 from controllers.shared.dependencies import UoWFactory
 from domain.assets.services.use_cases import AssetHandler
+from domain.forecast.services import ForecastHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 
 
@@ -20,3 +21,11 @@ def get_asset_handler(
 ) -> AssetHandler:
     """Provide the AssetHandler instance."""
     return AssetHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)
+
+
+def get_forecast_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+    portfolio_service: PortfolioApplicationService = Depends(get_portfolio_service),
+) -> ForecastHandler:
+    """Provide the ForecastHandler (Phase 42): reads the forecasts the worker stored."""
+    return ForecastHandler(uow_factory=uow_factory, portfolio_service=portfolio_service)

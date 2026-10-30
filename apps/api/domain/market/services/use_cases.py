@@ -33,6 +33,8 @@ MANUAL_JOBS: dict[str, str] = {
     "sync_price_history": "Carga do histórico diário de preços dos ativos",
     "refresh_distributions": "Atualização dos proventos declarados na B3",
     "refresh_catalog_fundamentals": "Atualização dos indicadores do catálogo da B3 (screener)",
+    "refresh_asset_forecasts": "Previsão probabilística do preço dos ativos",
+    "calibrate_forecasts": "Calibração da previsão de preço (quanto as faixas se confirmaram)",
 }
 
 

@@ -27,6 +27,8 @@ const JOB_LABELS: Record<string, string> = {
   sync_simulation_history: "Histórico longo da simulação",
   sync_cvm_documents: "Comunicados da CVM",
   run_pending_simulations: "Simulações na fila",
+  refresh_asset_forecasts: "Previsão de preço dos ativos",
+  calibrate_forecasts: "Calibração da previsão de preço",
 };
 
 const JOB_STATUS_LABELS: Record<string, string> = {
@@ -52,6 +54,20 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     hint:
       "Baixa da CVM os fatos relevantes, comunicados e avisos das ações da carteira e da watchlist. " +
       "Roda sozinha todo dia; use aqui para ver já os documentos de hoje.",
+  },
+  {
+    name: "refresh_asset_forecasts",
+    action: "Recalcular a previsão de preço",
+    hint:
+      "Recalcula a faixa provável de preço de cada ativo em 3, 6, 12 e 24 meses a partir do histórico guardado. " +
+      "Roda sozinha todo dia útil; use aqui depois de carregar o histórico da simulação.",
+  },
+  {
+    name: "calibrate_forecasts",
+    action: "Calibrar a previsão de preço",
+    hint:
+      "Refaz as previsões do passado e mede quantas vezes as faixas se confirmaram; é isso que decide o selo de confiança. " +
+      "Roda sozinha uma vez por semana. Pode levar alguns minutos.",
   },
 ];
 const JOB_POLL_MS = 5000;

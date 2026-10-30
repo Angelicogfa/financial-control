@@ -9,6 +9,8 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
+from controllers.assets.dependencies import get_forecast_handler
+from controllers.assets.responses import ForecastQualityDTO
 from controllers.market.dependencies import get_market_data_handler
 from controllers.market.responses import (
     JobRunDTO,
@@ -17,6 +19,7 @@ from controllers.market.responses import (
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
+from domain.forecast.services import ForecastHandler
 from domain.market.services.use_cases import MarketDataHandler
 
 market_router = APIRouter(prefix="/market", tags=["Market Data"])
@@ -59,6 +62,14 @@ def get_quote_history(
 ) -> list[QuoteDayDTO]:
     """The last stored quote of each day for a ticker (audit of the prices shown)."""
     return handler.quote_history(ticker, date_from=date_from, date_to=date_to)
+
+
+@market_router.get("/forecast-quality", response_model=ForecastQualityDTO)
+def get_forecast_quality(
+    handler: ForecastHandler = Depends(get_forecast_handler),
+) -> ForecastQualityDTO:
+    """How often the price forecast bands held in the past (rolling-origin calibration)."""
+    return handler.quality()
 
 
 @market_router.get("/series-status", response_model=list[SeriesStatusDTO])

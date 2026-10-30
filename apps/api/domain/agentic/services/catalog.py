@@ -27,8 +27,10 @@ from controllers.assets.requests import (
 from controllers.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
+    AssetForecastDTO,
     AssetPriceHistoryDTO,
     AssetResponseDTO,
+    ForecastQualityDTO,
 )
 from controllers.contributions.requests import ContributionConfirmRequest
 from controllers.contributions.responses import SavedContributionPlanDTO
@@ -110,6 +112,7 @@ from domain.alerts.services.use_cases import AlertHandler
 from domain.assets.services.use_cases import AssetHandler
 from domain.contributions.services.use_cases import ContributionHandler
 from domain.disclosures.services.use_cases import DisclosureHandler
+from domain.forecast.services import ForecastHandler
 from domain.ledger.services.use_cases.b3_import import ImportHandler
 from domain.ledger.services.use_cases.corporate_events import CorporateEventHandler
 from domain.ledger.services.use_cases.earnings import EarningHandler
@@ -189,6 +192,8 @@ class JobRequestInput(BaseModel):
         "sync_price_history",
         "refresh_distributions",
         "refresh_catalog_fundamentals",
+        "refresh_asset_forecasts",
+        "calibrate_forecasts",
     ]
 
 
@@ -502,6 +507,12 @@ class AgenticRuntimeHandlers:
         )
 
     @property
+    def forecasts(self) -> ForecastHandler:
+        return ForecastHandler(
+            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
+        )
+
+    @property
     def studies(self) -> StudyHandler:
         return StudyHandler(uow_factory=self.uow_factory, simulations=self.simulation)
 
@@ -657,6 +668,29 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AssetIdInput,
         output_type=AssetAnalysisResponseDTO,
         invoke=lambda h, p: h.assets.get_analysis(p.asset_id),
+    ),
+    OperationSpec(
+        name="assets.forecast",
+        kind="query",
+        description=(
+            "Previsão probabilística do preço de um ativo (bayesiana): faixa provável em 3, 6, "
+            "12 e 24 meses, chance de subir, de cair 20% e de passar do preço médio e do preço "
+            "justo, o que pesou e o selo de confiança. É uma distribuição, não um preço-alvo."
+        ),
+        input_model=AssetIdInput,
+        output_type=AssetForecastDTO,
+        invoke=lambda h, p: h.forecasts.get(p.asset_id),
+    ),
+    OperationSpec(
+        name="market.forecast_quality",
+        kind="query",
+        description=(
+            "Calibração da previsão de preço: com que frequência as faixas de 50% e 90% se "
+            "confirmaram no passado e o selo 'quanto confiar'."
+        ),
+        input_model=EmptyInput,
+        output_type=ForecastQualityDTO,
+        invoke=lambda h, _p: h.forecasts.quality(),
     ),
     OperationSpec(
         name="assets.prices",

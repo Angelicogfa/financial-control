@@ -197,6 +197,26 @@ export interface AssetCreateRequest {
   fixed_income_term?: FixedIncomeTermPayload_Input | null;
 }
 
+export interface AssetForecastDTO {
+  asset_id: number;
+  ticker: string;
+  status: "OK" | "INSUFFICIENT_HISTORY" | "NOT_COMPUTED" | "LOW_CONFIDENCE";
+  as_of?: string | null;
+  price_now?: number | null;
+  lead?: string | null;
+  months_used?: number | null;
+  beta?: number | null;
+  alpha_annual?: number | null;
+  shrinkage?: number | null;
+  dividend_yield_annual?: number | null;
+  expected_total_return_annual?: number | null;
+  horizons?: ForecastHorizonDTO[];
+  drivers?: ForecastDriverDTO[];
+  seal?: ForecastSealDTO | null;
+  warnings?: string[];
+  model_version?: string | null;
+}
+
 export interface AssetHistoryDTO {
   ticker: string;
   points?: HistoryPointDTO[];
@@ -920,6 +940,65 @@ export interface FixedIncomeValuationDTO {
   projected_12m_net_yield: number;
   realized_pnl?: number;
   curve_coverage?: number;
+}
+
+export interface ForecastDriverDTO {
+  key: "MARKET" | "OWN" | "VALUATION" | "EVENTS";
+  label: string;
+  annual?: number | null;
+  note?: string;
+}
+
+export interface ForecastHorizonDTO {
+  months: number;
+  target_date: string;
+  p5: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p95: number;
+  total_return_p50: number;
+  up: ForecastProbabilityDTO;
+  fall_20: ForecastProbabilityDTO;
+  thresholds?: ForecastThresholdDTO[];
+  price_quantiles?: number[];
+}
+
+export interface ForecastProbabilityDTO {
+  value: number;
+  low: number;
+  high: number;
+}
+
+export interface ForecastQualityDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  horizon_months?: number | null;
+  windows?: number;
+  effective_windows?: number;
+  assets?: number;
+  coverage_50?: number | null;
+  coverage_90?: number | null;
+  mean_pit?: number | null;
+  brier?: number | null;
+  brier_reference?: number | null;
+  first_origin?: string | null;
+  last_origin?: string | null;
+  seal?: ForecastSealDTO | null;
+}
+
+export interface ForecastSealDTO {
+  level: number;
+  label: string;
+  text: string;
+}
+
+export interface ForecastThresholdDTO {
+  key: "NOW" | "AVERAGE" | "FAIR" | "FALL_20";
+  label: string;
+  price: number;
+  direction: "above" | "below";
+  probability: number;
 }
 
 export interface FundamentalSnapshotDTO {

@@ -226,3 +226,89 @@ class AssetPriceHistoryDTO(BaseModel):
     high: DatedPriceDTO | None = None
     low: DatedPriceDTO | None = None
     dropped_spikes: int = 0
+
+
+class ForecastProbabilityDTO(BaseModel):
+    value: float
+    low: float
+    high: float
+
+
+class ForecastThresholdDTO(BaseModel):
+    """A price that matters and the chance of being past it at the horizon."""
+
+    key: Literal["NOW", "AVERAGE", "FAIR", "FALL_20"]
+    label: str
+    price: float
+    direction: Literal["above", "below"]
+    probability: float
+
+
+class ForecastHorizonDTO(BaseModel):
+    months: int
+    target_date: date
+    p5: float
+    p25: float
+    p50: float
+    p75: float
+    p95: float
+    total_return_p50: float
+    up: ForecastProbabilityDTO
+    fall_20: ForecastProbabilityDTO
+    thresholds: list[ForecastThresholdDTO] = Field(default_factory=list)
+    # 99 price quantiles (1% to 99%): any "chance of passing R$ X" is read from them.
+    price_quantiles: list[float] = Field(default_factory=list)
+
+
+class ForecastDriverDTO(BaseModel):
+    key: Literal["MARKET", "OWN", "VALUATION", "EVENTS"]
+    label: str
+    annual: float | None = None
+    note: str = ""
+
+
+class ForecastSealDTO(BaseModel):
+    level: int
+    label: str
+    text: str
+
+
+class AssetForecastDTO(BaseModel):
+    """Probabilistic price forecast of an asset (Phase 42): a distribution, not a target."""
+
+    asset_id: int
+    ticker: str
+    status: Literal["OK", "INSUFFICIENT_HISTORY", "NOT_COMPUTED", "LOW_CONFIDENCE"]
+    as_of: date | None = None
+    price_now: float | None = None
+    lead: str | None = None
+    months_used: int | None = None
+    beta: float | None = None
+    alpha_annual: float | None = None
+    shrinkage: float | None = None
+    dividend_yield_annual: float | None = None
+    expected_total_return_annual: float | None = None
+    horizons: list[ForecastHorizonDTO] = Field(default_factory=list)
+    drivers: list[ForecastDriverDTO] = Field(default_factory=list)
+    seal: ForecastSealDTO | None = None
+    warnings: list[str] = Field(default_factory=list)
+    model_version: str | None = None
+
+
+class ForecastQualityDTO(BaseModel):
+    """How often the forecast bands held in a rolling-origin backtest."""
+
+    status: Literal["OK", "NOT_COMPUTED"]
+    as_of: date | None = None
+    horizon_months: int | None = None
+    windows: int = 0
+    effective_windows: float = 0.0
+    assets: int = 0
+    coverage_50: float | None = None
+    coverage_90: float | None = None
+    mean_pit: float | None = None
+    brier: float | None = None
+    brier_reference: float | None = None
+    first_origin: date | None = None
+    last_origin: date | None = None
+    seal: ForecastSealDTO | None = None
