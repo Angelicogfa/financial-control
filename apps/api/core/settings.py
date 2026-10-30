@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     # Simulation (Phase 33.1): most traded catalog instruments loaded besides the
     # portfolio and the watchlist (0 = none).
     simulation_catalog_top: int = Field(default=50, ge=0, le=500)
+    # Garimpo (Phase 43): liquidity floor of the mining universe (average daily financial
+    # volume, R$) and how many stale long histories one daily run reloads.
+    mining_min_daily_volume: float = Field(default=1_000_000.0, ge=0)
+    mining_history_batch: int = Field(default=60, ge=1, le=1000)
     # Phase 33.3: time limit of one run and how often the worker looks for queued runs.
     simulation_timeout_seconds: int = Field(default=120, ge=5, le=3600)
     simulation_poll_seconds: int = Field(default=15, ge=1, le=3600)

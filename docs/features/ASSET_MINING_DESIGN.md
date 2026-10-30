@@ -1,4 +1,4 @@
-# Garimpo: achados no catálogo inteiro (Fase 43, proposta)
+# Garimpo: achados no catálogo inteiro (Fase 43)
 
 ## 1. O problema
 
@@ -87,7 +87,16 @@ A tela só lê tabelas, como em toda a aplicação desde a Fase 39.
 | 43.5 | Placar dos achados contra a classe e o acaso |
 | 43.6 | Eventos e administradores entram como sinais quando 42.4–42.6 estiverem prontos |
 
-## 9. Decisões para você
+## 9. Decisões (aprovadas em 30/10/2026, todas as recomendações)
+
+1. Liquidez mínima: volume médio diário acima de R$ 1 milhão (`MINING_MIN_DAILY_VOLUME`).
+2. Até 10 achados por semana.
+3. Sinais da primeira versão: valor, qualidade, melhora e momentum.
+4. Momentum de preço entra.
+5. A Fase 43 vem depois da 42.3 e antes de 42.4–42.7.
+6. Alerta de achado novo criado, desligado por padrão.
+
+### Opções que estavam em aberto
 
 1. **Liquidez mínima:** volume médio diário acima de R$ 1 milhão (recomendado), de R$ 5 milhões (só as mais líquidas) ou sem piso.
 2. **Quantos achados por semana:** até 10 (recomendado) ou todos acima de um escore.

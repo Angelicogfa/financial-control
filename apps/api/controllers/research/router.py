@@ -8,16 +8,19 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from controllers.research.dependencies import (
+    get_mining_handler,
     get_research_handler,
     get_statement_refresher,
 )
 from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
 from controllers.research.responses import (
     AssetComparisonDTO,
+    MiningUniverseDTO,
     ScreenerResponseDTO,
     TreasurySearchResponseDTO,
     WatchlistItemDTO,
 )
+from domain.mining.services import MiningHandler
 from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.service import StatementRefresher
 from domain.research.services.use_cases import ResearchHandler
@@ -60,6 +63,14 @@ def run_screener(
         offset=(page - 1) * limit,
     )
     return handler.screener(criteria, below_band=below_band)
+
+
+@research_router.get("/mining/universe", response_model=MiningUniverseDTO)
+def get_mining_universe(
+    handler: MiningHandler = Depends(get_mining_handler),
+) -> MiningUniverseDTO:
+    """The liquid stocks the Garimpo looks at and how far their history goes (Phase 43.1)."""
+    return handler.universe()
 
 
 @research_router.get("/sectors", response_model=list[str])

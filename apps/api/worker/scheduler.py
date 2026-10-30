@@ -35,6 +35,7 @@ from worker.jobs import (
     sync_cvm_documents_job,
     sync_cvm_statements_job,
     sync_instrument_catalog_job,
+    sync_mining_universe_job,
     sync_price_history_job,
     sync_simulation_history_job,
     sync_treasury_catalog_job,
@@ -97,6 +98,11 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         ),
         "estimate_forecast_models": partial(
             estimate_forecast_models_job, catalog_top=cfg.simulation_catalog_top
+        ),
+        "sync_mining_universe": partial(
+            sync_mining_universe_job,
+            min_daily_volume=cfg.mining_min_daily_volume,
+            batch=cfg.mining_history_batch,
         ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
@@ -261,6 +267,23 @@ def create_scheduler(
         hour=(cfg.fundamentals_cron_hour + 2) % 24,
         minute=0,
         id="estimate_forecast_models",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "sync_mining_universe",
+            partial(
+                sync_mining_universe_job,
+                min_daily_volume=cfg.mining_min_daily_volume,
+                batch=cfg.mining_history_batch,
+            ),
+        ),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=(cfg.catalog_sync_cron_hour + 3) % 24,
+        minute=0,
+        id="sync_mining_universe",
         replace_existing=True,
         **defaults,
     )

@@ -6,6 +6,7 @@ Scope: B3 catalog screener and watchlist.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -186,3 +187,23 @@ class AssetComparisonDTO(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     groups: list[ComparisonGroupDTO] = Field(default_factory=list)
     indicators: list[ComparisonIndicatorDTO] = Field(default_factory=list)
+
+
+class MiningMemberDTO(BaseModel):
+    """A liquid Brazilian stock the Garimpo looks at (Phase 43.1)."""
+
+    ticker: str
+    company: str
+    sector: str
+    daily_volume: float
+    volume_source: Literal["AVERAGE", "LAST_SESSION"]
+    history_from: date | None = None
+    history_to: date | None = None
+    has_statements: bool = False
+
+
+class MiningUniverseDTO(BaseModel):
+    min_daily_volume: float
+    members: list[MiningMemberDTO] = Field(default_factory=list)
+    with_history: int = 0
+    with_statements: int = 0
