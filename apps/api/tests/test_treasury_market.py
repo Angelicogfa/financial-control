@@ -387,12 +387,13 @@ def test_treasury_market_routes(api: SimpleNamespace) -> None:
 def test_policy_option_weights_the_quadrant_at_market(api: SimpleNamespace) -> None:
     _create_prefixado(api)
     _seed_prices(api, 741.21)
-    before = api.client.get(f"/api/v1/portfolio?as_of_date={AS_OF}").json()["positions"][0]
-
     policy = api.client.get("/api/v1/policy").json()
-    policy["valuation"]["treasury_mark_to_market"] = True
-    assert api.client.put("/api/v1/policy", json=policy).status_code == 200
+    assert policy["valuation"]["treasury_mark_to_market"] is True
     after = api.client.get(f"/api/v1/portfolio?as_of_date={AS_OF}").json()["positions"][0]
+
+    policy["valuation"]["treasury_mark_to_market"] = False
+    assert api.client.put("/api/v1/policy", json=policy).status_code == 200
+    before = api.client.get(f"/api/v1/portfolio?as_of_date={AS_OF}").json()["positions"][0]
 
     assert before["price_freshness"] == "CURVE"
     assert after["price_freshness"] == "LIVE"
