@@ -169,6 +169,7 @@ export const api = {
     prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>
       request<AssetPriceHistoryDTO>(`/assets/${id}/prices`, { query: { range } }),
     forecast: (id: number) => request<AssetForecastDTO>(`/assets/${id}/forecast`),
+    refreshForecast: (id: number) => request<AssetForecastDTO>(`/assets/${id}/forecast`, { method: "POST" }),
     create: (body: AssetCreateRequest) => request<AssetResponseDTO>("/assets", { method: "POST", body }),
     update: (id: number, body: AssetUpdateRequest) =>
       request<AssetResponseDTO>(`/assets/${id}`, { method: "PUT", body }),

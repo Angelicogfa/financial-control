@@ -124,6 +124,9 @@ def _seed(api: SimpleNamespace) -> dict[str, int]:
         uow.market_series.upsert_points(
             tr_symbol("NEWB3"), list(zip(short_days, newb, strict=True)), unit=SeriesUnit.PRICE
         )
+        uow.market_series.upsert_points(
+            px_symbol("NEWB3"), list(zip(short_days, newb, strict=True)), unit=SeriesUnit.PRICE
+        )
         uow.policies.add(
             InvestmentPolicy(
                 arca=ArcaPolicy({c: ClassPolicy(target_pct=targets.get(c, 0.0)) for c in ArcaClass})
@@ -206,3 +209,58 @@ def test_forecast_mcp(api: SimpleNamespace) -> None:
     assert data.status == "OK" and len(data.horizons) == 4
     quality = CATALOG_BY_NAME["market.forecast_quality"]
     assert quality.invoke(handlers, quality.input_model()).seal.level == 4
+
+
+def test_one_asset_on_request_from_12_months_with_a_warning(api: SimpleNamespace) -> None:
+    ids = _seed(api)
+    url = f"/api/v1/assets/{ids['NEWB3']}/forecast"
+    refresh_asset_forecasts_job(api.uow_factory, offline_gateway(), now=NOW)
+    before = api.client.get(url).json()
+    assert before["status"] == "INSUFFICIENT_HISTORY" and not before["requested"]
+    assert "dá para pedir a previsão só deste ativo" in before["warnings"][0]
+
+    # Asked for by itself: 14 months are enough, and it shows despite the empty seal.
+    data = api.client.post(url).json()
+    assert data["status"] == "OK" and data["requested"] and data["months_used"] < 36
+    assert any(c.startswith("Histórico curto") for c in data["cautions"])
+    assert any("foi pedida para este ativo" in c for c in data["cautions"])
+    assert len(data["horizons"]) == 4
+    # Only that asset was computed; the other stays hidden by the seal.
+    wege = api.client.get(f"/api/v1/assets/{ids['WEGE3']}/forecast").json()
+    assert wege["status"] == "LOW_CONFIDENCE" and not wege["requested"]
+
+    # The daily run keeps following the asset the user asked for.
+    tomorrow = NOW + timedelta(days=1)
+    refresh_asset_forecasts_job(api.uow_factory, offline_gateway(), now=tomorrow)
+    later = api.client.get(url).json()
+    assert later["status"] == "OK" and later["requested"] and later["as_of"] == "2026-10-31"
+    assert api.client.post("/api/v1/assets/999/forecast").status_code == 404
+
+
+def test_on_request_without_any_stored_price(api: SimpleNamespace) -> None:
+    _seed(api)
+    days = _weekdays(2)
+    asset_id = api.client.post(
+        "/api/v1/assets", json={"ticker": "TRON3", "name": "TRON3", "asset_type": "STOCK_BR"}
+    ).json()["id"]
+    with api.uow_factory() as uow:  # total return only: no price series, no stored quote
+        uow.market_series.upsert_points(
+            tr_symbol("TRON3"),
+            [(d, 10.0 + i * 0.01) for i, d in enumerate(days)],
+            unit=SeriesUnit.PRICE,
+        )
+        uow.commit()
+    response = api.client.post(f"/api/v1/assets/{asset_id}/forecast")
+    assert response.status_code == 400 and response.json()["code"] == "FORECAST_NO_DATA"
+
+
+def test_forecast_refresh_mcp(api: SimpleNamespace) -> None:
+    ids = _seed(api)
+    handlers = AgenticRuntimeHandlers(
+        uow_factory=api.uow_factory,
+        portfolio_service=PortfolioApplicationService(offline_gateway()),
+    )
+    command = CATALOG_BY_NAME["assets.forecast_refresh"]
+    assert command.kind == "command"
+    data = command.invoke(handlers, command.input_model(asset_id=ids["WEGE3"]))
+    assert data.status == "OK" and data.requested

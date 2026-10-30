@@ -8,7 +8,7 @@ universe is the portfolio, the watchlist and the most traded catalog instruments
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -27,7 +27,14 @@ from domain.market.entities import Quote
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, default_arca_class
 from domain.shared.unit_of_work import AbstractUnitOfWork
-from domain.simulation.candidates import FactorFit, class_tau, fit_asset, monthly_excess, shrink
+from domain.simulation.candidates import (
+    MIN_HISTORY_MONTHS,
+    FactorFit,
+    class_tau,
+    fit_asset,
+    monthly_excess,
+    shrink,
+)
 from domain.simulation.data import (
     SIMULATION_HISTORY_START,
     build_market_history,
@@ -49,6 +56,9 @@ from domain.simulation.scenarios import (
 DEFAULT_SEED = 42
 DRAG_MONTHS = 36
 MEAN_BLOCK_MONTHS = 12.0
+# An asset the user asked for by itself is forecast from 12 months on, with a warning; the
+# rest need the 36 months of the candidates model (decision 42.0-5).
+REQUESTED_MIN_MONTHS = 12
 
 
 @dataclass(frozen=True)
@@ -90,15 +100,19 @@ def _universe(uow: AbstractUnitOfWork, *, catalog_top: int, today: date) -> _Uni
     return _Universe(registered, classes, history, sample)
 
 
-def _fits(universe: _Universe) -> dict[str, FactorFit]:
+def _fits(universe: _Universe, requested: Collection[str] = ()) -> dict[str, FactorFit]:
     raw: dict[str, FactorFit] = {}
     for ticker, cls in universe.classes.items():
         if cls in universe.sample.classes:
-            fit = fit_asset(ticker, cls, universe.history, universe.sample)
+            minimum = REQUESTED_MIN_MONTHS if ticker in requested else MIN_HISTORY_MONTHS
+            fit = fit_asset(ticker, cls, universe.history, universe.sample, min_months=minimum)
             if fit is not None:
                 raw[ticker] = fit
+    # The spread of the class comes from the full histories only.
     taus = {
-        cls: class_tau([f for f in raw.values() if f.arca_class == cls])
+        cls: class_tau(
+            [f for f in raw.values() if f.arca_class == cls and f.months >= MIN_HISTORY_MONTHS]
+        )
         for cls in {f.arca_class for f in raw.values()}
     }
     return {t: shrink(f, taus[f.arca_class]) for t, f in raw.items()}
@@ -147,14 +161,30 @@ def refresh_forecasts(
     seed: int = DEFAULT_SEED,
     paths: int = DEFAULT_PATHS,
     deadline: Callable[[], bool] | None = None,
+    tickers: Collection[str] | None = None,
+    on_demand: bool = False,
 ) -> dict[str, int]:
-    """Forecast every registered asset with history and store it; the rest get a status."""
+    """Forecast every registered asset with history and store it; the rest get a status.
+
+    `tickers` limits the run to those assets; `on_demand` marks them as asked for by the user,
+    which lowers the history needed and keeps them shown with a warning on later runs too.
+    """
     as_of = today or date.today()
     try:
         universe = _universe(uow, catalog_top=catalog_top, today=as_of)
     except InsufficientHistory:
         return {"forecasts": 0, "insufficient": 0, "skipped": 1}
-    fits = _fits(universe)
+    wanted = {t.upper() for t in tickers} if tickers is not None else None
+    targets = [a for a in universe.registered if wanted is None or a.ticker.upper() in wanted]
+    requested = {
+        a.ticker.upper()
+        for a in targets
+        if (on_demand and wanted is not None)
+        or (
+            (prior := uow.forecasts.latest(a.ticker)) is not None and prior.payload.get("on_demand")
+        )
+    }
+    fits = _fits(universe, requested)
     weights, _run, _note = mixture_weights(uow, STACKED, universe.sample)
     excess, _labels = draw_mixture(
         universe.sample,
@@ -167,10 +197,11 @@ def refresh_forecasts(
     )
     cdi_m = annual_to_monthly(cdi_annual)
     counts = {"forecasts": 0, "insufficient": 0, "skipped": 0}
-    for asset in universe.registered:
+    for asset in targets:
         if deadline is not None and deadline():
             break
         ticker = asset.ticker.upper()
+        flag = {"on_demand": True} if ticker in requested else {}
         cls = universe.classes.get(ticker)
         fit = fits.get(ticker)
         if cls is None:
@@ -180,7 +211,7 @@ def refresh_forecasts(
             uow.forecasts.save(
                 ticker,
                 as_of,
-                {"status": "INSUFFICIENT_HISTORY", "months": months},
+                {"status": "INSUFFICIENT_HISTORY", "months": months, **flag},
                 model_version=MODEL_VERSION,
             )
             counts["insufficient"] += 1
@@ -201,7 +232,10 @@ def refresh_forecasts(
             class_expected_excess_monthly=float(np.mean(universe.sample.excess[:, k])),
         )
         uow.forecasts.save(
-            ticker, as_of, {"status": "OK", **forecast.to_dict()}, model_version=MODEL_VERSION
+            ticker,
+            as_of,
+            {"status": "OK", **forecast.to_dict(), **flag},
+            model_version=MODEL_VERSION,
         )
         counts["forecasts"] += 1
     return counts

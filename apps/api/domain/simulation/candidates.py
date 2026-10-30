@@ -176,11 +176,16 @@ def ols_fit(y: np.ndarray, x: np.ndarray) -> tuple[float, float, float, float, n
 
 
 def fit_asset(
-    ticker: str, arca_class: ArcaClass, history: MarketHistory, sample: ClassSample
+    ticker: str,
+    arca_class: ArcaClass,
+    history: MarketHistory,
+    sample: ClassSample,
+    *,
+    min_months: int = MIN_HISTORY_MONTHS,
 ) -> FactorFit | None:
-    """OLS against the class proxy over the months both exist (None below 36 months)."""
+    """OLS against the class proxy over the months both exist (None below `min_months`)."""
     excess, mask = monthly_excess(history, ticker, sample)
-    if mask.sum() < MIN_HISTORY_MONTHS:
+    if mask.sum() < min_months:
         return None
     k = CLASS_ORDER.index(arca_class)
     alpha, alpha_se, beta, beta_se, resid = ols_fit(excess[mask], sample.excess[mask, k])

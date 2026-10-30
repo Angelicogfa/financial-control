@@ -245,7 +245,8 @@ describe("manual job runs", () => {
       },
     ]);
     renderAt("/settings/market-data");
-    expect(await screen.findByText("Concluída")).toBeInTheDocument();
+    expect((await screen.findAllByText("Concluída")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Última vez:/)).toBeInTheDocument();
     expect(screen.getAllByText("Histórico longo da simulação").length).toBeGreaterThan(0);
     const button = screen.getByRole("button", { name: "Carregar o histórico da simulação" });
     fireEvent.click(button);
