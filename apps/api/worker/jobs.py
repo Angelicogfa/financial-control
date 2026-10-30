@@ -34,7 +34,7 @@ from domain.market.services.treasury_prices import (
     bond_family,
     price_symbol,
 )
-from domain.mining.runs import refresh_signals
+from domain.mining.runs import run_mining
 from domain.mining.universe import mining_universe
 from domain.policy.services.allocation import ArcaTargets
 from domain.policy.services.policy import EligibilityPolicy, current_policy
@@ -976,10 +976,10 @@ def run_mining_job(
     min_daily_volume: float = 1_000_000.0,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Recompute the Garimpo's point-in-time signals of the whole universe (Phase 43.2)."""
+    """The weekly Garimpo: signals, gated model, findings and record (Phases 43.2-43.5)."""
     at = now or datetime.now(UTC)
     with uow_factory() as uow:
-        result = refresh_signals(uow, min_daily_volume=min_daily_volume, today=at.date())
+        result = run_mining(uow, min_daily_volume=min_daily_volume, today=at.date())
         uow.commit()
     last = result.get("last_month")
     return {**result, "last_month": last.isoformat() if last else None}

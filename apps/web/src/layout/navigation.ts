@@ -7,6 +7,7 @@ import {
   ColumnsIcon,
   BriefcaseIcon,
   DatabaseIcon,
+  GemIcon,
   HistoryIcon,
   HomeIcon,
   ListIcon,
@@ -50,6 +51,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/portfolio", label: "Carteira", icon: BriefcaseIcon },
       { to: "/research", label: "Pesquisar", icon: SearchIcon },
+      { to: "/research/mining", label: "Garimpo", icon: GemIcon },
       { to: "/contribute", label: "Aportar", icon: PlusCircleIcon },
       { to: "/ledger", label: "Lançamentos", icon: ListIcon },
     ],

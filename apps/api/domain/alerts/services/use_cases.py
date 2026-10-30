@@ -11,6 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 from controllers.alerts.requests import AlertDismissRequest
 from controllers.alerts.responses import AlertDTO, AlertsResponseDTO
 from controllers.shared.dependencies import UoWFactory
+from core.settings import get_settings
 from domain.alerts.services.evaluator import (
     RELEVANT_FACT_WINDOW_DAYS,
     Alert,
@@ -22,6 +23,7 @@ from domain.alerts.services.evaluator import (
     data_quality_alerts,
     early_sale_alerts,
     maturity_alerts,
+    mining_alerts,
     portfolio_alerts,
     relevant_fact_alerts,
     tax_bracket_alerts,
@@ -66,10 +68,17 @@ def _disclosure_alerts(
 
 class AlertHandler:
     def __init__(
-        self, uow_factory: UoWFactory, portfolio_service: PortfolioApplicationService
+        self,
+        uow_factory: UoWFactory,
+        portfolio_service: PortfolioApplicationService,
+        mining_alerts: bool | None = None,
     ) -> None:
         self.uow_factory = uow_factory
         self.portfolio_service = portfolio_service
+        # Garimpo findings raise alerts only when switched on (decision 43.0-6, off by default).
+        self.mining_alerts = (
+            get_settings().mining_alerts_enabled if mining_alerts is None else mining_alerts
+        )
 
     def list_alerts(self, today: date | None = None) -> AlertsResponseDTO:
         reference = today or date.today()
@@ -122,6 +131,8 @@ class AlertHandler:
             ]
             alerts.extend(self._calendar_alerts(uow, report, assets, reference))
             alerts.extend(_disclosure_alerts(uow, assets, reference))
+            if self.mining_alerts:
+                alerts.extend(mining_alerts(uow.mining.findings(), assets))
             dismissals = uow.alert_dismissals.list_all()
         shown = visible_alerts(alerts, dismissals, today=reference)
         return AlertsResponseDTO(

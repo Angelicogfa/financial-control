@@ -18,6 +18,7 @@ from domain.assets.services.valuation import AssetValuation, ValuationVerdict
 from domain.disclosures.entities import CvmDocument
 from domain.market.entities import Fundamentals, QuoteFreshness
 from domain.market.services.series_status import SeriesStatus
+from domain.mining.repositories import MiningFinding
 from domain.policy.services.allocation import BAND_ABOVE, BAND_BELOW
 from domain.portfolio.services.consolidation import LEDGER_INVALID, ConsolidatedPortfolioReport
 from domain.portfolio.services.earnings_agenda import AgendaStatus, EarningsAgenda
@@ -50,6 +51,7 @@ class AlertKind(StrEnum):
     SUSPICIOUS_DATA = "SUSPICIOUS_DATA"
     CHECKLIST_EXPIRED = "CHECKLIST_EXPIRED"
     RELEVANT_FACT = "RELEVANT_FACT"
+    MINING_FINDING = "MINING_FINDING"
 
 
 SEVERITY_ORDER = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}
@@ -449,6 +451,24 @@ def relevant_fact_alerts(
             )
         )
     return alerts
+
+
+def mining_alerts(findings: Iterable[MiningFinding], followed: Iterable[str]) -> list[Alert]:
+    """One alert per trusted finding of the latest Garimpo run not followed yet (Phase 43.4)."""
+    known = {t.upper() for t in followed}
+    return [
+        Alert(
+            f"mining:{f.found_on.isoformat()}:{f.ticker}",
+            AlertKind.MINING_FINDING,
+            AlertSeverity.INFO,
+            f"Garimpo: {f.ticker} entre os achados da semana",
+            f"{f.reason}. Veja os sinais e, se fizer sentido, siga o ativo.",
+            f.ticker,
+            "/research/mining",
+        )
+        for f in findings
+        if f.trusted and f.ticker.upper() not in known
+    ]
 
 
 def visible_alerts(

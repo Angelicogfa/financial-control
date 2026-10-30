@@ -1,4 +1,4 @@
-"""Worker side of the Garimpo (Phase 43): build the monthly panel and store the signals.
+"""Worker side of the Garimpo (Phase 43): panel, signals, model, findings and record.
 
 The panel is the valuation layer's (42.3) on the mining universe: each company's statements by
 delivery date, its split-adjusted monthly prices and splits, and its monthly return over the
@@ -8,11 +8,20 @@ outcome the weights are estimated on.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
 from domain.disclosures.statements import delivery_history
-from domain.forecast.valuation_model import CompanyInput, Month, month_end, month_of
+from domain.forecast.valuation_model import (
+    CompanyInput,
+    Month,
+    forward_alpha,
+    month_end,
+    month_of,
+)
+from domain.mining.findings import record, record_to_dicts, run_findings
+from domain.mining.model import estimate_mining_model
 from domain.mining.repositories import MiningSignal
 from domain.mining.signals import mining_signals, month_list
 from domain.mining.universe import MIN_DAILY_VOLUME, MiningMember, mining_universe
@@ -78,13 +87,16 @@ def mining_panel(
     return companies, alphas
 
 
-def refresh_signals(
+MINING = "MINING"
+
+
+def run_mining(
     uow: AbstractUnitOfWork,
     *,
     min_daily_volume: float = MIN_DAILY_VOLUME,
     today: date | None = None,
 ) -> dict[str, Any]:
-    """Recompute and store the signal panel of the mining universe."""
+    """Signals of the universe, the gated model, this week's findings and the record."""
     as_of = today or date.today()
     members = mining_universe(uow, min_daily_volume)
     companies, alphas = mining_panel(uow, members, as_of)
@@ -100,9 +112,19 @@ def refresh_signals(
         for name, z in values.items()
     ]
     stored = uow.mining.replace_signals(rows)
+
+    forward = {t: forward_alpha(a) for t, a in alphas.items()}
+    model = estimate_mining_model(panel, forward, as_of=as_of)
+    findings = run_findings(panel, model, as_of)
+    uow.mining.replace_run(as_of, findings)
+    past = uow.mining.all_findings()
+    model = replace(model, record=record_to_dicts(record(past, alphas)))
+    uow.forecasts.save_model(MINING, as_of, model.to_dict())
     return {
         "universe": len(members),
         "companies": len(companies),
         "signals": stored,
         "last_month": max((r.month for r in rows), default=None),
+        "findings": len(findings),
+        "trusted": model.passed,
     }

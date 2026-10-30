@@ -141,7 +141,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00033`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00034`):
 
 ```mermaid
 erDiagram
@@ -362,5 +362,5 @@ A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, prem
 
 ### Garimpo (Fase 43)
 
-`domain/mining` procura achados nas ações líquidas de todo o catálogo. O universo (`universe.py`) são as ações brasileiras com CNPJ no mapa da CVM e volume médio acima de `MINING_MIN_DAILY_VOLUME`, uma classe por empresa; `sync_mining_universe` mantém o histórico longo delas (com desdobramentos). `run_mining` monta toda semana o painel mensal e grava em `mining_signals` quatro sinais point-in-time, cada um um z frente ao setor: valor (o z da 42.3), qualidade, melhora dos resultados e momentum. Pesos, portões, achados e placar entram nas 43.3–43.5.
+`domain/mining` procura achados nas ações líquidas de todo o catálogo. O universo (`universe.py`) são as ações brasileiras com CNPJ no mapa da CVM e volume médio acima de `MINING_MIN_DAILY_VOLUME`, uma classe por empresa; `sync_mining_universe` mantém o histórico longo delas (com desdobramentos). `run_mining` monta toda semana o painel mensal e grava em `mining_signals` quatro sinais point-in-time, cada um um z frente ao setor: valor (o z da 42.3), qualidade, melhora dos resultados e momentum. O mesmo job estima os pesos dos sinais (Fama-MacBeth com prior cético), testa a carteira dos 10 melhores por origem móvel contra o universo, com custos e CSCV, e grava os achados da semana em `mining_findings` (achados se o portão passou; senão, ranking em observação) e o placar no modelo (`forecast_models`, `MINING`). A página "Garimpo" e o MCP só leem essas tabelas.
 

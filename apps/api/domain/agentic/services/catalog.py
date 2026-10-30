@@ -82,7 +82,10 @@ from controllers.portfolio.responses import (
 from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import (
     AssetComparisonDTO,
+    MiningOverviewDTO,
+    MiningRecordDTO,
     MiningUniverseDTO,
+    MiningWhyDTO,
     ScreenerResponseDTO,
     WatchlistItemDTO,
 )
@@ -161,6 +164,12 @@ CONTEXT_LABELS: dict[str, str] = {
 
 class EmptyInput(BaseModel):
     """Input model for operations that take no parameters."""
+
+
+class TickerInput(BaseModel):
+    """A B3 trading code."""
+
+    ticker: str = Field(min_length=1, max_length=16)
 
 
 class PortfolioReportInput(BaseModel):
@@ -687,6 +696,41 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AssetIdInput,
         output_type=AssetAnalysisResponseDTO,
         invoke=lambda h, p: h.assets.get_analysis(p.asset_id),
+    ),
+    OperationSpec(
+        name="research.mining",
+        kind="query",
+        description=(
+            "Garimpo da semana: até 10 achados nas ações líquidas de todo o catálogo, com o "
+            "motivo de cada um, os pesos dos sinais (valor, qualidade, melhora e momentum), o "
+            "resultado fora da amostra depois dos custos, o PBO e o placar. Quando o portão não "
+            "passa, a lista é só um ranking em observação, não achados."
+        ),
+        input_model=EmptyInput,
+        output_type=MiningOverviewDTO,
+        invoke=lambda h, _p: h.mining.overview(),
+    ),
+    OperationSpec(
+        name="research.mining_record",
+        kind="query",
+        description=(
+            "Placar do garimpo: quantos achados passados bateram o universo em 3, 6 e 12 "
+            "meses, com intervalo de credibilidade, separando achados de rankings em observação."
+        ),
+        input_model=EmptyInput,
+        output_type=MiningRecordDTO,
+        invoke=lambda h, _p: h.mining.record(),
+    ),
+    OperationSpec(
+        name="research.mining_why",
+        kind="query",
+        description=(
+            "Por que um ticker está ou não entre os achados da semana: posição no ranking, "
+            "escore, corte do último achado e os sinais que faltaram ou pesaram contra."
+        ),
+        input_model=TickerInput,
+        output_type=MiningWhyDTO,
+        invoke=lambda h, p: h.mining.why(p.ticker),
     ),
     OperationSpec(
         name="research.mining_universe",
