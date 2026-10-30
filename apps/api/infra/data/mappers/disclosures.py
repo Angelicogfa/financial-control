@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from domain.disclosures.entities import CvmDocument, IssuerTicker
+from domain.disclosures.events import classify
 from infra.data.models.disclosures import CvmDocumentModel, CvmIssuerTickerModel
 
 
@@ -32,6 +33,7 @@ def to_cvm_document(model: CvmDocumentModel) -> CvmDocument:
         first_seen_at=model.first_seen_at,
         read_at=model.read_at,
         id=model.id,
+        event_class=model.event_class,
     )
 
 
@@ -49,4 +51,5 @@ def apply_cvm_document(model: CvmDocumentModel, doc: CvmDocument) -> CvmDocument
     model.reference_date = doc.reference_date
     model.delivery_date = doc.delivery_date
     model.link = doc.link
+    model.event_class = classify(doc.category, doc.doc_type, doc.subject) or ""
     return model

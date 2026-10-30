@@ -8,6 +8,16 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class EventReactionDTO(BaseModel):
+    """How the price reacted (abnormal return, market model) after the event (Phase 42.4)."""
+
+    event_date: date
+    car_1: float | None = None
+    car_5: float | None = None
+    car_20: float | None = None
+    confounded: bool = False  # a DFP/ITR was delivered around it
+
+
 class CvmDocumentDTO(BaseModel):
     """One IPE document of a followed company."""
 
@@ -25,6 +35,10 @@ class CvmDocumentDTO(BaseModel):
     link: str = ""
     read: bool = False
     first_seen_at: datetime | None = None
+    event_class: str | None = None  # Phase 42.4; None when it is not an event
+    event_label: str | None = None
+    reaction: EventReactionDTO | None = None
+    typical_20: float | None = None  # the class's usual 20-day effect (shrunk), when measured
 
 
 class DisclosureFeedDTO(BaseModel):
@@ -84,3 +98,30 @@ class AssetStatementsDTO(BaseModel):
     valuation: StatementValuationDTO | None = None
     years_loaded: list[int] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+
+class EventHorizonDTO(BaseModel):
+    horizon: int
+    events: int
+    mean: float  # raw mean abnormal return
+    effect: float  # shrunk to zero across the classes
+    effect_sd: float
+    sign_probability: float
+
+
+class EventClassDTO(BaseModel):
+    event_class: str
+    label: str
+    events: int
+    horizons: list[EventHorizonDTO] = Field(default_factory=list)
+    volatility_ratio: float | None = None
+
+
+class EventStudyDTO(BaseModel):
+    """What usually happens to the price after each kind of CVM event (Phase 42.4)."""
+
+    status: Literal["OK", "NOT_COMPUTED"]
+    as_of: date | None = None
+    events: int = 0
+    confounded: int = 0
+    classes: list[EventClassDTO] = Field(default_factory=list)

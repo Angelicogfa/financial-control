@@ -52,7 +52,24 @@ class CvmDocument:
     first_seen_at: datetime | None = None
     read_at: datetime | None = None
     id: int | None = None
+    # Phase 42.4: the event class (see events.classify); "" = not an event, None = not classified.
+    event_class: str | None = None
 
     @property
     def is_relevant_fact(self) -> bool:
         return self.category == RELEVANT_FACT
+
+
+@dataclass(frozen=True)
+class EventEffect:
+    """How the price reacted to a company event (Phase 42.4), market model, in fractions."""
+
+    document_id: int
+    ticker: str
+    event_date: date  # first trading day on or after the delivery
+    event_class: str
+    car_1: float | None  # cumulative abnormal return over 1, 5 and 20 trading days
+    car_5: float | None
+    car_20: float | None
+    volatility_ratio: float | None  # abnormal-return sd after / before the event
+    confounded: bool  # a DFP/ITR was delivered within the window: kept out of the study

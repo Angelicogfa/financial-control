@@ -84,6 +84,13 @@ describe("Breadcrumbs", () => {
     expect(within(nav).getByRole("link", { name: "Início" })).toHaveAttribute("href", "/home");
     expect(within(nav).getByText("Contas")).toHaveClass("app-topbar-title");
   });
+
+  it("lights only the nested menu item on its page", async () => {
+    mockApi([]);
+    renderAt("/research/mining", { shell: true });
+    expect(screen.getByRole("link", { name: "Garimpo" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Pesquisar" })).not.toHaveClass("active");
+  });
 });
 
 function Counter() {

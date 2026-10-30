@@ -39,6 +39,7 @@ import type {
   EarningsAgendaDTO,
   EarningCreateRequest,
   EarningResponseDTO,
+  EventStudyDTO,
   EarningUpdateRequest,
   FixedIncomeCompareRequest,
   FixedIncomeComparisonDTO,
@@ -203,6 +204,7 @@ export const api = {
       }),
   },
   disclosures: {
+    eventStudy: () => request<EventStudyDTO>("/disclosures/event-study"),
     feed: (params: { assetId?: number; category?: string; unread?: boolean; limit?: number } = {}) =>
       request<DisclosureFeedDTO>("/disclosures", {
         query: { asset_id: params.assetId, category: params.category, unread: params.unread, limit: params.limit },

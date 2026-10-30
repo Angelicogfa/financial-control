@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from controllers.disclosures.dependencies import get_disclosure_handler
 from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import DisclosureFeedDTO, MarkReadResultDTO
+from controllers.disclosures.responses import DisclosureFeedDTO, EventStudyDTO, MarkReadResultDTO
 from domain.disclosures.services.use_cases import DisclosureHandler
 
 disclosures_router = APIRouter(prefix="/disclosures", tags=["Disclosures"])
@@ -21,6 +21,14 @@ def get_feed(
     handler: DisclosureHandler = Depends(get_disclosure_handler),
 ) -> DisclosureFeedDTO:
     return handler.feed(asset_id=asset_id, categories=category, unread_only=unread, limit=limit)
+
+
+@disclosures_router.get("/event-study", response_model=EventStudyDTO)
+def get_event_study(
+    handler: DisclosureHandler = Depends(get_disclosure_handler),
+) -> EventStudyDTO:
+    """What usually happens to the price after each kind of CVM event (Phase 42.4)."""
+    return handler.event_study()
 
 
 @disclosures_router.post("/read", response_model=MarkReadResultDTO)

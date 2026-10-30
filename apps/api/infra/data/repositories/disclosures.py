@@ -11,7 +11,7 @@ from datetime import date, datetime
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
-from domain.disclosures.entities import CvmDocument, IssuerTicker
+from domain.disclosures.entities import CvmDocument, EventEffect, IssuerTicker
 from domain.disclosures.repositories import (
     AbstractCvmDocumentRepository,
     AbstractCvmStatementRepository,
@@ -22,6 +22,7 @@ from domain.disclosures.statements import StatementDoc, StatementFact
 from infra.data.mappers.disclosures import apply_cvm_document, to_cvm_document
 from infra.data.models.disclosures import (
     CvmDocumentModel,
+    CvmEventEffectModel,
     CvmIssuerTickerModel,
     CvmStatementFactModel,
     CvmStatementLoadModel,
@@ -162,6 +163,84 @@ class SqlAlchemyCvmDocumentRepository(AbstractCvmDocumentRepository):
             .values(read_at=read_at)
         )
         return int(result.rowcount or 0)
+
+    def unclassified(self, limit: int) -> list[CvmDocument]:
+        stmt = (
+            select(CvmDocumentModel)
+            .where(CvmDocumentModel.event_class.is_(None))
+            .order_by(CvmDocumentModel.id)
+            .limit(limit)
+        )
+        return [to_cvm_document(m) for m in self.session.scalars(stmt).all()]
+
+    def set_event_classes(self, classes: dict[int, str]) -> int:
+        for doc_id, value in classes.items():
+            self.session.execute(
+                update(CvmDocumentModel)
+                .where(CvmDocumentModel.id == doc_id)
+                .values(event_class=value)
+            )
+        self.session.flush()
+        return len(classes)
+
+    def events(self, cnpjs: Sequence[str] | None = None) -> list[CvmDocument]:
+        base = select(CvmDocumentModel).where(
+            CvmDocumentModel.event_class.is_not(None), CvmDocumentModel.event_class != ""
+        )
+        if cnpjs is None:
+            stmt = base.order_by(CvmDocumentModel.delivery_date, CvmDocumentModel.id)
+            return [to_cvm_document(m) for m in self.session.scalars(stmt).all()]
+        out: list[CvmDocument] = []
+        for chunk in _chunks(sorted(set(cnpjs))):
+            stmt = base.where(CvmDocumentModel.cnpj.in_(chunk))
+            out.extend(to_cvm_document(m) for m in self.session.scalars(stmt).all())
+        return sorted(out, key=lambda d: (d.delivery_date, d.id or 0))
+
+    def replace_effects(self, effects: Sequence[EventEffect]) -> int:
+        self.session.execute(delete(CvmEventEffectModel))
+        rows = [
+            {
+                "document_id": e.document_id,
+                "ticker": e.ticker,
+                "event_date": e.event_date,
+                "event_class": e.event_class,
+                "car_1": e.car_1,
+                "car_5": e.car_5,
+                "car_20": e.car_20,
+                "volatility_ratio": e.volatility_ratio,
+                "confounded": e.confounded,
+            }
+            for e in effects
+        ]
+        for i in range(0, len(rows), CHUNK):
+            self.session.execute(insert(CvmEventEffectModel), rows[i : i + CHUNK])
+        self.session.flush()
+        return len(rows)
+
+    def effects(self, document_ids: Sequence[int] | None = None) -> list[EventEffect]:
+        def entity(m: CvmEventEffectModel) -> EventEffect:
+            return EventEffect(
+                document_id=m.document_id,
+                ticker=m.ticker,
+                event_date=m.event_date,
+                event_class=m.event_class,
+                car_1=m.car_1,
+                car_5=m.car_5,
+                car_20=m.car_20,
+                volatility_ratio=m.volatility_ratio,
+                confounded=m.confounded,
+            )
+
+        if document_ids is None:
+            return [entity(m) for m in self.session.scalars(select(CvmEventEffectModel)).all()]
+        out: list[EventEffect] = []
+        ids = sorted(set(document_ids))
+        for i in range(0, len(ids), CHUNK):
+            stmt = select(CvmEventEffectModel).where(
+                CvmEventEffectModel.document_id.in_(ids[i : i + CHUNK])
+            )
+            out.extend(entity(m) for m in self.session.scalars(stmt).all())
+        return out
 
     def latest_delivery(self) -> date | None:
         return self.session.scalar(select(func.max(CvmDocumentModel.delivery_date)))

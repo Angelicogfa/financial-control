@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from infra.data.db import Base
@@ -47,6 +47,8 @@ class CvmDocumentModel(Base):
         DateTime(timezone=True), nullable=False, default=utc_now
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Phase 42.4: "" = not an event, NULL = not classified yet.
+    event_class: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)
 
 
 class CvmStatementFactModel(Base):
@@ -83,3 +85,19 @@ class CvmStatementLoadModel(Base):
     loaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class CvmEventEffectModel(Base):
+    """The price reaction to an event document (Phase 42.4), recomputed every week."""
+
+    __tablename__ = "cvm_event_effects"
+
+    document_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    event_class: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
+    car_1: Mapped[float | None] = mapped_column(Float, nullable=True)
+    car_5: Mapped[float | None] = mapped_column(Float, nullable=True)
+    car_20: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volatility_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confounded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

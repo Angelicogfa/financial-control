@@ -70,7 +70,7 @@ A camada B muda o prior de α: μ_α = γ · z_valuation, onde z_valuation mede 
 
 ### 3.3 Camada C: eventos da CVM (qualitativo transformado em dado)
 
-1. **Taxonomia:** cada documento do IPE recebe uma classe, pela categoria e por palavras-chave do assunto. Classes iniciais:
+1. **Taxonomia (feita na 42.4):** cada documento do IPE recebe uma classe, pela categoria e por palavras-chave do assunto. Nos dados reais, o fato relevante não tem tipo nem espécie, só o assunto; com 20 classes, 21% a 23% ficam em "outros", a maior parte com assunto genérico. Classes iniciais:
    - aquisição/fusão;
    - desinvestimento;
    - recompra;
