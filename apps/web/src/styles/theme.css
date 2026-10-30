@@ -1001,7 +1001,9 @@ a.app-icon-button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-3);
-  align-items: end;
+  /* Labels line up at the top of each row: a field with help text under its control
+     grows downwards instead of pushing its neighbours' labels out of line. */
+  align-items: start;
 }
 
 /* A checkbox keeps its size whatever the label length: the control never shrinks when the

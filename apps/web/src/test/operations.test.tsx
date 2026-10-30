@@ -529,6 +529,34 @@ describe("ledger", () => {
     expect(screen.getByText(/Total em reais/)).toHaveTextContent("R$ 2.618,20");
   });
 
+  it("asks for the FX before saving a USD trade left at rate 1", async () => {
+    const { calls } = mockApi([
+      { path: "/assets", reply: page([asset(), usfr]) },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/ledger/trades/new?asset=7");
+    await screen.findByLabelText("Câmbio USD/BRL do dia");
+    fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText(/Preço unitário/), { target: { value: "50" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Informe o câmbio USD/BRL da data da negociação.");
+    expect(last(calls, "POST", "/transactions")).toBeUndefined();
+  });
+
+  it("asks for the FX before saving a USD earning at rate 1", async () => {
+    const earning = { id: 9, asset_id: 7, kind: "DIVIDEND", payment_date: "2026-02-01", gross_amount: 10, withholding_tax: 0, net_amount: 10, fx_rate: 5, net_amount_brl: 50 };
+    const { calls } = mockApi([
+      { path: "/earnings/9", reply: earning },
+      { path: "/assets", reply: page([asset(), usfr]) },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/ledger/earnings/9/edit");
+    fireEvent.change(await screen.findByLabelText("Câmbio do pagamento"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Informe o câmbio USD/BRL da data do pagamento.");
+    expect(last(calls, "PUT", "/earnings/9")).toBeUndefined();
+  });
+
   it("keeps the FX field and the saved rate when editing a USD trade", async () => {
     const usdTrade = { ...trade, id: 6, asset_id: 7, ticker: "USFR", quantity: 2, unit_price: 50, fees: 0, fx_rate: 5.5, total_brl: 550 };
     const { calls } = mockApi([

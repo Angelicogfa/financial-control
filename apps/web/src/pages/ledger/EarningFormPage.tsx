@@ -38,6 +38,11 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
       setError("Preencha ativo e valor bruto.");
       return;
     }
+    // The API refuses a foreign-currency payment recorded at FX 1 (FX_RATE_REQUIRED).
+    if (currency !== "BRL" && (fxValue === null || fxValue === 1)) {
+      setError(`Informe o câmbio ${currency}/BRL da data do pagamento.`);
+      return;
+    }
     const body = {
       kind,
       payment_date: paymentDate,
