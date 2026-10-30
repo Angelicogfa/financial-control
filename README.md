@@ -1,5 +1,10 @@
 # Financial Control
 
+[![Versão](https://img.shields.io/github/v/tag/Angelicogfa/financial-control?sort=semver&filter=v*&label=vers%C3%A3o)](https://github.com/Angelicogfa/financial-control/releases/latest)
+[![Licença](https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE.md)
+
+**Versão atual:** a do selo acima, lida da maior tag `vX.Y.Z` do repositório; o histórico fica em [Releases](https://github.com/Angelicogfa/financial-control/releases). Veja [Releases e imagens Docker](#releases-e-imagens-docker).
+
 Ferramenta pessoal de gestão de carteira de investimentos que une duas metodologias:
 
 - **ARCA** (Ações, Real Estate, Caixa, Ativos internacionais) para segmentar a carteira, com metas, bandas de tolerância e aportes que corrigem o desvio sem vender nada;
@@ -248,3 +253,18 @@ As regras do projeto estão em [`AGENTS.md`](AGENTS.md): código, commits e banc
 - [Débitos técnicos](docs/tech-debt/TECH_DEBT.md)
 - [Plano de implementação](docs/todo/IMPLEMENTATION_PLAN.md)
 - Desenhos: [simulação de carteira](docs/features/PORTFOLIO_SIMULATION_DESIGN.md), [otimização da composição (proposta)](docs/features/ASSET_COMPOSITION_OPTIMIZATION_DESIGN.md) e [carteiras de comparação (proposta)](docs/features/COMPARISON_PORTFOLIOS_DESIGN.md)
+
+## Licença
+
+Copyright (c) 2026 Guilherme Fernando Angelico. Distribuído sob a **[PolyForm Noncommercial License 1.0.0](LICENSE.md)**. O texto do [`LICENSE.md`](LICENSE.md), em inglês, é o que vale; o resumo abaixo só ajuda a entendê-lo.
+
+| | |
+|---|---|
+| ✅ **Uso pessoal: gratuito** | Uso em casa, estudo, pesquisa, testes e projetos sem fins comerciais, com liberdade para modificar o código. A licença também cobre entidades sem fins lucrativos, como instituições de ensino, de pesquisa pública e órgãos de governo. |
+| ⛔ **Uso empresarial ou comercial: proibido** | Usar o software, ou obras derivadas dele, em empresas, para fins lucrativos, para prestar serviços a terceiros ou para revendê-lo exige uma licença comercial separada, negociada com o autor pelo [perfil no GitHub](https://github.com/Angelicogfa). |
+| 📌 **Citar a fonte: obrigatório** | Quem redistribuir o software, com ou sem modificações, deve entregar junto o texto da licença (ou o link dela) e manter a linha `Required Notice` do topo do [`LICENSE.md`](LICENSE.md), que identifica o autor e o repositório original. |
+| ⚠️ **Sem garantia** | O software é fornecido "como está". Ele não é recomendação de investimento, e o autor não responde por perdas ou danos decorrentes do uso. |
+
+No Brasil, o programa é protegido como obra intelectual pela **Lei nº 9.609/1998 (Lei do Software)** e pela **Lei nº 9.610/1998 (Lei de Direitos Autorais)**. Todo uso fora dos termos da licença depende de autorização prévia e expressa do autor.
+
+Ao citar o projeto, use: *Financial Control, por Guilherme Fernando Angelico — https://github.com/Angelicogfa/financial-control*.
