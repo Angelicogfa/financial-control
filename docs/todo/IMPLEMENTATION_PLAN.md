@@ -57,6 +57,9 @@
 | **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[x]` Concluída | 100% |
 | **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.5 feitas; antes das Fases 34 e 36) | 75% |
 | **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 a 43.5 feitas; 43.6 depois de 42.4–42.6) | 85% |
+| **Fase 44** | Hierarquia de Recomendação (motor analítico do aporte) | `[ ]` Pronta para implementar (decisões tomadas; valores do K na 44.4) | 0% |
+
+> **Pausa 2026-10-30:** a pedido, nenhuma fase nova avança (42.6, 42.7, 43.6, 34 e 36 incluídas) até a revisão da hierarquia de recomendação ser aprovada. Inventário dos mecanismos e proposta em [RECOMMENDATION_HIERARCHY_DESIGN.md](../features/RECOMMENDATION_HIERARCHY_DESIGN.md) (Fase 44).
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -842,3 +845,17 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **43.2** Componente `Combobox` (filtro sem acento nem caixa, todas as palavras em qualquer ordem; setas, Enter, Escape; texto sem correspondência volta à escolha atual; opção vazia como placeholder; lista limitada a 100 itens com aviso para refinar; lista em posição fixa para não ser cortada em tabelas). Substitui todos os `<select>` de escolha única.
 - `[x]` **43.3** Página do estudo: espaço entre o resumo e o corpo, sem margem dobrada entre os cartões, índice lateral fixo ao rolar em telas largas.
 - `[x]` **43.4** Testes de unidade do `Combobox` e da leitura paginada, testes de UI e e2e ajustados, `docker compose build web`.
+
+## Fase 44 — Hierarquia de Recomendação: o Motor Analítico do Aporte (`[ ]` Proposta)
+
+**Objetivo:** substituir a escolha dentro de cada classe ARCA (hoje só a nota do Cerrado, um peso manual ou pesos iguais) por uma cadeia única e auditável: política e objetivo → alocação entre classes → universo → portões eliminatórios (só o objetivo e grave) → evidências por lente (Cerrado como peso, com penalidade para quem não foi analisado, qualidade, valuation, melhora, momentum, renda, risco, projeção, diversificação) → combinação pelo AHP (pesos por comparação par a par com razão de consistência, matriz de decisão; AHP Gaussiano só como referência) → construção dos pesos com tetos por ativo, setor e grupo de correlação e seleção que alterna setores → aporte por déficit, com o registro de cada decisão, a explicação "por que A e não B" e o placar das recomendações. Reaproveita o que já existe (Cerrado, valuation, Piotroski/Altman, previsão, Garimpo, candidatos, Laboratório) e absorve as Fases 34 (construção completa) e 36 (placar ao vivo). Desenho: [RECOMMENDATION_HIERARCHY_DESIGN.md](../features/RECOMMENDATION_HIERARCHY_DESIGN.md).
+
+- `[x]` **44.0** Decisões da seção 10 do desenho, tomadas em 2026-10-30: N1 só pela política; Cerrado como peso (0 a 10, sem análise = 0, pode receber aporte com destaque) e fora do backtest; universo do aporte inclui o catálogo; L7 com as camadas A e C da previsão; K dinâmico pelo ganho de diversificação; AHP clássico com matrizes pré-configuradas; setores (25%, 2 por setor, margem 0,5 desvio) e grupos por correlação; a Recomendação substitui Cerrado, Manual e Igual (que ficam só como referências internas do placar). Os valores do K dinâmico (λ, mínimo, máximo, lote) ficam para a 44.4, com a curva de cada classe à vista.
+- `[ ]` **44.1** Registro único de sinais point-in-time e lentes L0–L7 padronizadas (escore, confiança, explicação); L0 = Cerrado com penalidade para quem não foi analisado.
+- `[ ]` **44.2** Portões eliminatórios consolidados (sem o Cerrado), com motivo por ativo; ciclo de vida desacoplado do Cerrado.
+- `[ ]` **44.3** Combinação pelo AHP clássico (matrizes par a par por objetivo, razão de consistência, versionadas na política), matriz de decisão, AHP Gaussiano como referência e retorno esperado acima da classe.
+- `[ ]` **44.4** Construção simples (K dinâmico pelo ganho de diversificação, tetos por ativo, setor e grupo de correlação, seleção que alterna setores, encolhimento para o peso atual, ativos do catálogo marcados como novos) calculada e mostrada ao lado do aporte atual, ainda sem trocar a origem do peso-alvo.
+- `[ ]` **44.5** Registro da decisão (`recommendation_runs`, `recommendation_items`), tela "Por que estes ativos" e "A e não B", MCP.
+- `[ ]` **44.6** Backtest walk-forward da hierarquia contra as referências (Cerrado e Igual) e placar das recomendações; com o resultado aprovado, a troca: a Recomendação vira a origem do peso-alvo do aporte em todas as classes e substitui Cerrado, Manual e Igual (que ficam só como referências internas do placar).
+- `[ ]` **44.7** Pesos das lentes validados pelos dados, com portão.
+- `[ ]` **44.8** Otimização completa (Fase 34) e placar ao vivo (Fase 36).
