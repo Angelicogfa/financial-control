@@ -28,6 +28,7 @@ from core.errors import ConflictError, ForbiddenError, NotFoundError, Validation
 from core.security import AuthenticationError
 from domain.agentic.services.catalog import (
     CATALOG_BY_NAME,
+    CONTEXT_LABELS,
     KNOWN_CONTEXTS,
     KNOWN_OPERATIONS,
     catalog,
@@ -112,6 +113,10 @@ def test_agent_key_entity_validates_name_and_activity() -> None:
 
 
 @pytest.mark.unit
+def test_every_context_has_a_portuguese_label() -> None:
+    assert set(KNOWN_CONTEXTS) <= set(CONTEXT_LABELS), set(KNOWN_CONTEXTS) - set(CONTEXT_LABELS)
+
+
 def test_catalog_completeness_and_grant_validation() -> None:
     ops = catalog()
     assert len(ops) >= 35

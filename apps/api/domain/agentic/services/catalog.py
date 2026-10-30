@@ -159,6 +159,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "market": "Dados de Mercado",
     "tools": "Ferramentas · Tributação",
     "simulation": "Simulação de carteira",
+    "study": "Estudos de simulação",
     "disclosures": "Comunicados da CVM",
 }
 

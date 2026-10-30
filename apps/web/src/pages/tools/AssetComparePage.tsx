@@ -195,7 +195,7 @@ function SearchResults({
 /** Finds candidates in the B3 catalog by name, sector and ARCA class, like the screener. */
 function AssetSearch({ tickers, onAdd }: Readonly<{ tickers: string[]; onAdd: (ticker: string) => void }>) {
   const [form, setForm] = useStoredState<SearchForm>("compare:search-form", EMPTY_SEARCH);
-  const search = useScreenerSearch();
+  const search = useScreenerSearch("compare:screener-search");
   const { result, error, loading } = search;
   const sectors = useApi("research-sectors", () => api.research.sectors());
   const set = <K extends keyof SearchForm>(key: K, value: SearchForm[K]) => setForm((f) => ({ ...f, [key]: value }));
