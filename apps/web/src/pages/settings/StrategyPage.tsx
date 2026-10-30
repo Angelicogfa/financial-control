@@ -5,6 +5,7 @@ import { errorMessage } from "../../api/http";
 import type { ArcaClass, IntraClassStrategy, PolicyDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { Lead } from "../../components/Section";
 import { Async, Spinner } from "../../components/States";
@@ -242,18 +243,13 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                     />
                   </td>
                   <td>
-                    <select
-                      aria-label={`Divisão interna de ${ARCA_LABELS[c]}`}
+                    <Combobox
+                      label={`Divisão interna de ${ARCA_LABELS[c]}`}
                       value={classes[c].strategy}
                       disabled={saving}
-                      onChange={(e) => setClass(c, { strategy: e.target.value as IntraClassStrategy })}
-                    >
-                      {(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[]).map((s) => (
-                        <option key={s} value={s}>
-                          {STRATEGY_LABELS[s]}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(strategy) => setClass(c, { strategy })}
+                      options={codeOptions(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[], STRATEGY_LABELS)}
+                    />
                   </td>
                 </tr>
               ))}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { pageCount, PAGE_SIZE_OPTIONS } from "../utils/pagination";
+import { Combobox, codeOptions } from "./Combobox";
 
 export interface PaginationProps {
   /** Current page, zero-based. */
@@ -101,13 +102,7 @@ export function Pagination({
       {onPageSizeChange && (
         <label className="app-pagination-size">
           Itens por página
-          <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}>
-            {options.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+          <Combobox value={pageSize} onChange={onPageSizeChange} options={codeOptions(options)} />
         </label>
       )}
 

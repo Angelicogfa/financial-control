@@ -5,6 +5,7 @@ import { errorMessage } from "../../api/http";
 import type { AccountDTO, AccountKind } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { IconButton } from "../../components/RowActions";
 import { Async, Spinner } from "../../components/States";
@@ -87,18 +88,13 @@ export function AccountsPage() {
             </div>
             <div className="app-field">
               <label htmlFor="account-kind">Tipo</label>
-              <select
+              <Combobox
                 id="account-kind"
                 value={draft.kind}
-                onChange={(e) => setDraft({ ...draft, kind: e.target.value as AccountKind })}
+                onChange={(kind) => setDraft({ ...draft, kind })}
                 disabled={saving}
-              >
-                {(Object.keys(ACCOUNT_KIND_LABELS) as AccountKind[]).map((k) => (
-                  <option key={k} value={k}>
-                    {ACCOUNT_KIND_LABELS[k]}
-                  </option>
-                ))}
-              </select>
+                options={codeOptions(Object.keys(ACCOUNT_KIND_LABELS) as AccountKind[], ACCOUNT_KIND_LABELS)}
+              />
             </div>
             <label className="app-check">
               <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} disabled={saving} />

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AssetComparisonDTO } from "../api/types";
 import { compareLink, formatIndicator, parseTickers, searchFilters } from "../pages/tools/AssetComparePage";
+import { pickWhenLoaded } from "./combobox";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -167,8 +168,7 @@ describe("asset comparator", () => {
     ]);
     renderAt("/tools/compare?tickers=WEGE3");
 
-    expect(await screen.findByRole("option", { name: "Finance" })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Setor"), { target: { value: "Finance" } });
+    await pickWhenLoaded(screen.getByLabelText("Setor"), "Finance");
     fireEvent.click(screen.getByLabelText("Classe ARCA"));
     fireEvent.click(screen.getByRole("checkbox", { name: "Ações" }));
     fireEvent.change(screen.getByLabelText("Nome ou código"), { target: { value: "ita" } });

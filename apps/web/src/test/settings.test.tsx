@@ -7,6 +7,7 @@ import { daysLeft, expiryState } from "../pages/settings/agentic/expiry";
 import { mcpClientConfig, mcpEndpoint } from "../pages/settings/agentic/mcpConnection";
 import { scopeSize } from "../pages/settings/agentic/scope";
 import { alerts, analytics, report } from "./fixtures";
+import { pick } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -117,7 +118,7 @@ describe("accounts", () => {
     renderAt("/settings/accounts");
     expect(await screen.findByText("XP")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Inter" } });
-    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "BANK" } });
+    pick(screen.getByLabelText("Tipo"), "Banco");
     fireEvent.click(screen.getByRole("button", { name: "Adicionar conta" }));
     await waitFor(() => expect(last(calls, "POST", "/accounts")?.body).toMatchObject({ name: "Inter", kind: "BANK" }));
 
@@ -493,7 +494,7 @@ describe("agentic mcp settings", () => {
     expect(await screen.findByDisplayValue("Claude Desktop")).toBeInTheDocument();
 
     // Renew validity
-    fireEvent.change(screen.getByLabelText("Renovar por"), { target: { value: "180" } });
+    pick(screen.getByLabelText("Renovar por"), "180 dias");
     fireEvent.click(screen.getByRole("button", { name: "Renovar validade" }));
     expect(await screen.findByText(/Validade renovada até/)).toBeInTheDocument();
     expect(last(calls, "POST", "/agents/keys/1/renew")?.body).toEqual({ expires_in_days: 180 });

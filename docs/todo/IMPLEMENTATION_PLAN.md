@@ -818,3 +818,12 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[ ]` **42.6** Negociações de administradores (VLMO), se houver o conjunto estruturado.
 - `[ ]` **42.7** Integração com os estudos, alerta opcional, testes de UI e integração, `docker compose build`.
 
+
+## Fase 43 — Campos de Seleção com Busca (`[x]` Concluída)
+
+**Objetivo:** todo campo de escolha única filtra as opções enquanto se digita e só aceita um valor da lista; e os seletores de ativo enxergam o catálogo inteiro, não só os 200 primeiros tickers.
+
+- `[x]` **43.1** `GET /assets` lido página a página no cliente (`api.assets.list`): a API serve no máximo 200 por página, e os seletores paravam no 200º ticker.
+- `[x]` **43.2** Componente `Combobox` (filtro sem acento nem caixa, todas as palavras em qualquer ordem; setas, Enter, Escape; texto sem correspondência volta à escolha atual; opção vazia como placeholder; lista limitada a 100 itens com aviso para refinar; lista em posição fixa para não ser cortada em tabelas). Substitui todos os `<select>` de escolha única.
+- `[x]` **43.3** Página do estudo: espaço entre o resumo e o corpo, sem margem dobrada entre os cartões, índice lateral fixo ao rolar em telas largas.
+- `[x]` **43.4** Testes de unidade do `Combobox` e da leitura paginada, testes de UI e e2e ajustados, `docker compose build web`.

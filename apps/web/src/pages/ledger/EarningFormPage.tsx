@@ -7,6 +7,7 @@ import type { EarningKind, EarningResponseDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Hint } from "../../components/Hint";
 import { PageHeader } from "../../components/PageHeader";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { Async, Spinner } from "../../components/States";
 import { brl, parseDecimal, today } from "../../utils/format";
 import { EARNING_KINDS, EARNING_LABELS } from "../../utils/labels";
@@ -78,13 +79,7 @@ function EarningForm({ earning }: Readonly<{ earning: EarningResponseDTO | null 
         </div>
         <div className="app-field">
           <label htmlFor="earning-kind">Tipo</label>
-          <select id="earning-kind" value={kind} onChange={(e) => setKind(e.target.value as EarningKind)} disabled={saving}>
-            {EARNING_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {EARNING_LABELS[k]}
-              </option>
-            ))}
-          </select>
+          <Combobox id="earning-kind" value={kind} onChange={setKind} disabled={saving} options={codeOptions(EARNING_KINDS, EARNING_LABELS)} />
         </div>
         <div className="app-field">
           <label htmlFor="earning-date">Pagamento</label>

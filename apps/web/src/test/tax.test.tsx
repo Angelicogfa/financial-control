@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { AssetTaxStatusDTO, FixedIncomeComparisonDTO, OfferOutcomeDTO, OfferProjectionDTO } from "../api/types";
 import { toOfferRequest } from "../pages/tools/FixedIncomeComparePage";
 import { analysis, asset } from "./fixtures";
+import { optionLabels } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -269,10 +270,9 @@ describe("fixed income comparator", () => {
       },
     ]);
     renderAt("/tools/fixed-income?asset=7");
-    const origin = (await screen.findAllByLabelText("Origem"))[0] as HTMLSelectElement;
-    await waitFor(() => expect(within(origin).getByText("CDB-ITAU — CDB Itaú")).toBeInTheDocument());
-    expect(origin.value).toBe("7");
-    expect(within(origin).queryByText(/WEGE3/)).not.toBeInTheDocument();
+    const origin = (await screen.findAllByLabelText("Origem"))[0];
+    await waitFor(() => expect(origin).toHaveValue("CDB-ITAU — CDB Itaú"));
+    expect(optionLabels(origin)).not.toContainEqual(expect.stringMatching(/WEGE3/));
     expect(screen.getByText(/vêm do cadastro do ativo/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Adicionar título" }));

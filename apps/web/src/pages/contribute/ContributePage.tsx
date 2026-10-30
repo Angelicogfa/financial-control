@@ -11,6 +11,7 @@ import type {
 } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { PageHeader } from "../../components/PageHeader";
 import { KpiGrid, Lead, Notes, Section } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
@@ -111,19 +112,16 @@ function AmountStep() {
           </div>
           <div className="app-field">
             <label htmlFor="contribution-strategy">Divisão dentro de cada classe</label>
-            <select
+            <Combobox<IntraClassStrategy | "">
               id="contribution-strategy"
               value={strategy}
               disabled={busy}
-              onChange={(e) => setStrategy(e.target.value as IntraClassStrategy | "")}
-            >
-              <option value="">Como definido na estratégia</option>
-              {(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[]).map((s) => (
-                <option key={s} value={s}>
-                  {STRATEGY_LABELS[s]}
-                </option>
-              ))}
-            </select>
+              onChange={setStrategy}
+              options={[
+                { value: "", label: "Como definido na estratégia" },
+                ...codeOptions(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[], STRATEGY_LABELS),
+              ]}
+            />
           </div>
           <button type="submit" className="app-primary-button" disabled={busy}>
             {busy && <Spinner size="sm" />}
@@ -418,19 +416,16 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
           </div>
           <div className="app-field">
             <label htmlFor="contribution-account">Conta</label>
-            <select
+            <Combobox<number | "">
               id="contribution-account"
               value={accountId ?? ""}
               disabled={busy || discarding}
-              onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">Conta padrão</option>
-              {(accounts.data ?? []).filter((a) => a.is_active !== false).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setAccountId(v === "" ? null : v)}
+              options={[
+                { value: "", label: "Conta padrão" },
+                ...(accounts.data ?? []).filter((a) => a.is_active !== false).map((a) => ({ value: a.id, label: a.name })),
+              ]}
+            />
           </div>
           <div>
             <span className="app-muted">Total das compras</span>

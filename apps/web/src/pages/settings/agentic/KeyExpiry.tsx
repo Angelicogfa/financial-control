@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { KeyExpiryDays } from "../../../api/types";
 import { Spinner } from "../../../components/States";
+import { Combobox } from "../../../components/Combobox";
 import { daysLeft, DEFAULT_EXPIRY, EXPIRY_OPTIONS, expiryState } from "./expiry";
 
 const BADGE_CLASS = {
@@ -40,13 +41,7 @@ export function ExpirySelect({
   return (
     <div className="app-field">
       <label htmlFor={id}>Validade da chave</label>
-      <select id={id} value={value} onChange={(e) => onChange(Number(e.target.value) as KeyExpiryDays)}>
-        {EXPIRY_OPTIONS.map((days) => (
-          <option key={days} value={days}>
-            {days} dias
-          </option>
-        ))}
-      </select>
+      <Combobox<KeyExpiryDays> id={id} value={value} onChange={onChange} options={EXPIRY_OPTIONS.map((d) => ({ value: d, label: `${d} dias` }))} />
     </div>
   );
 }
@@ -89,17 +84,7 @@ export function RenewPanel({
       </p>
       <div className="app-key-renew-row">
         <label htmlFor="key-renew-days">Renovar por</label>
-        <select
-          id="key-renew-days"
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value) as KeyExpiryDays)}
-        >
-          {EXPIRY_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option} dias
-            </option>
-          ))}
-        </select>
+        <Combobox<KeyExpiryDays> id="key-renew-days" value={days} onChange={setDays} options={EXPIRY_OPTIONS.map((d) => ({ value: d, label: `${d} dias` }))} />
         <button type="button" className="app-secondary-button" disabled={renewing} onClick={() => void handleRenew()}>
           {renewing && <Spinner size="sm" />}
           <span>{renewing ? "Renovando…" : "Renovar validade"}</span>

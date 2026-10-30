@@ -1,4 +1,5 @@
 import type { ArcaClass } from "../api/types";
+import { Combobox } from "./Combobox";
 import { ARCA_CLASSES, ARCA_LABELS } from "../utils/labels";
 
 /** Picks an ARCA quadrant; the suggested one is marked so the user sees what was proposed. */
@@ -22,20 +23,19 @@ export function ArcaClassSelect({
   label?: string;
 }>) {
   return (
-    <select
+    <Combobox<ArcaClass | "">
       id={id}
-      aria-label={label}
+      label={label}
       value={value}
       disabled={disabled}
-      onChange={(e) => onChange(e.target.value as ArcaClass | "")}
-    >
-      {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-      {ARCA_CLASSES.map((arca) => (
-        <option key={arca} value={arca}>
-          {ARCA_LABELS[arca]}
-          {arca === suggested ? " (sugerida)" : ""}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={[
+        ...(emptyLabel === undefined ? [] : [{ value: "" as const, label: emptyLabel }]),
+        ...ARCA_CLASSES.map((arca) => ({
+          value: arca,
+          label: `${ARCA_LABELS[arca]}${arca === suggested ? " (sugerida)" : ""}`,
+        })),
+      ]}
+    />
   );
 }

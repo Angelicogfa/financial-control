@@ -5,6 +5,7 @@ import { errorMessage } from "../../api/http";
 import type { CvmDocumentDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { Combobox } from "../../components/Combobox";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
 import { day, plural } from "../../utils/format";
 import { useStoredState } from "../../utils/storedState";
@@ -98,19 +99,15 @@ export function DisclosureFeed({
       <div className="app-filter-bar">
         <div className="app-field">
           <label htmlFor={`disclosure-category-${assetId ?? "all"}`}>Categoria</label>
-          <select
+          <Combobox
             id={`disclosure-category-${assetId ?? "all"}`}
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="">Todas</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-                {counts[c] ? ` (${counts[c]})` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={setCategory}
+            options={[
+              { value: "", label: "Todas" },
+              ...categories.map((c) => ({ value: c, label: counts[c] ? `${c} (${counts[c]})` : c })),
+            ]}
+          />
         </div>
         <label className="app-check">
           <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} />

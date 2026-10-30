@@ -9,6 +9,7 @@ import type {
   EvaluatedAnswerDTO,
 } from "../../api/types";
 import { Badge } from "../../components/Badge";
+import { Combobox, codeOptions } from "../../components/Combobox";
 import { Spinner } from "../../components/States";
 import { dateTime, points } from "../../utils/format";
 import { ANSWER_LABELS, PROFILE_LABELS, PROFILES, RECOMMENDATION_LABELS } from "../../utils/labels";
@@ -83,18 +84,13 @@ export function ChecklistTab({
         <div className="app-field-grid">
           <div className="app-field">
             <label htmlFor="checklist-profile">Perfil do checklist</label>
-            <select
+            <Combobox
               id="checklist-profile"
               value={profile}
               disabled={saving}
-              onChange={(e) => setProfile(e.target.value as ChecklistProfile)}
-            >
-              {PROFILES.map((p) => (
-                <option key={p} value={p}>
-                  {PROFILE_LABELS[p]}
-                </option>
-              ))}
-            </select>
+              onChange={setProfile}
+              options={codeOptions(PROFILES, PROFILE_LABELS)}
+            />
           </div>
           <label className="app-check">
             <input type="checkbox" checked={enabled} disabled={saving} onChange={(e) => setEnabled(e.target.checked)} />

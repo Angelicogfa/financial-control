@@ -32,14 +32,16 @@ test("operational journey", async ({ page }) => {
   await navigate(page, "Pesquisar");
   await page.getByRole("tab", { name: "Em observação" }).click();
   await page.getByLabel("Observar código").fill("BBAS3");
-  await page.getByLabel("Tipo").selectOption("STOCK_BR");
+  await page.getByLabel("Tipo").fill("Ação B3");
+  await page.getByRole("option", { name: "Ação B3", exact: true }).click();
   await page.getByRole("button", { name: "Adicionar" }).click();
   await expect(page.getByRole("link", { name: "BBAS3" })).toBeVisible();
 
   // A cash asset so the class below its band can receive the contribution.
   await navigate(page, "Carteira");
   await page.getByRole("link", { name: "Novo ativo" }).click();
-  await page.getByLabel("Tipo").selectOption("CASH");
+  await page.getByLabel("Tipo").fill("Caixa");
+  await page.getByRole("option", { name: "Caixa", exact: true }).click();
   await page.getByLabel("Nome").fill("Reserva corretora");
   await page.getByLabel("Preço manual").fill("1");
   await page.getByRole("button", { name: "Cadastrar ativo" }).click();

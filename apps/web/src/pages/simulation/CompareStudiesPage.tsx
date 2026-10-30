@@ -6,6 +6,7 @@ import { api } from "../../api/endpoints";
 import type { StudyComparisonRowDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { PageHeader } from "../../components/PageHeader";
+import { Combobox } from "../../components/Combobox";
 import { Lead, Section } from "../../components/Section";
 import { Async, Empty } from "../../components/States";
 
@@ -47,14 +48,16 @@ export function CompareStudiesPage() {
           {(["a", "b"] as const).map((key) => (
             <div key={key} className="app-field">
               <label htmlFor={`compare-${key}`}>Estudo {key.toUpperCase()}</label>
-              <select id={`compare-${key}`} value={(key === "a" ? a : b) ?? ""} onChange={(e) => pick(key, e.target.value)}>
-                <option value="">Escolha um estudo</option>
-                {(studies.data ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label} (versão {s.version})
-                  </option>
-                ))}
-              </select>
+              <Combobox<number | "">
+                id={`compare-${key}`}
+                value={(key === "a" ? a : b) ?? ""}
+                loading={studies.loading}
+                onChange={(v) => pick(key, String(v))}
+                options={[
+                  { value: "", label: "Escolha um estudo" },
+                  ...(studies.data ?? []).map((s) => ({ value: s.id, label: `${s.label} (versão ${s.version})` })),
+                ]}
+              />
             </div>
           ))}
         </div>

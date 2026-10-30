@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Pagination } from "../components/Pagination";
 import { clampPage, pageCount, paginate, usePagedRows, usePagination } from "../utils/pagination";
 import { asset } from "./fixtures";
+import { optionLabels, pick, pickWhenLoaded } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -75,8 +76,8 @@ describe("pagination bar", () => {
     const { onPageSizeChange } = renderBar({ pageSize: 20 });
     const select = screen.getByLabelText("Itens por página");
     expect(select).toHaveValue("20");
-    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["5", "10", "20", "50", "100"]);
-    fireEvent.change(select, { target: { value: "50" } });
+    expect(optionLabels(select)).toEqual(["5", "10", "20", "50", "100"]);
+    pick(select, "50");
     expect(onPageSizeChange).toHaveBeenCalledWith(50);
   });
 
@@ -207,7 +208,7 @@ describe("paged ledger", () => {
     expect(last(calls, "GET", "/transactions")?.query.get("page")).toBe("3");
     expect(screen.getByText("21–23 de 23")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Itens por página"), { target: { value: "50" } });
+    pick(screen.getByLabelText("Itens por página"), "50");
     await waitFor(() => expect(last(calls, "GET", "/transactions")?.query.get("page_size")).toBe("50"));
     expect(last(calls, "GET", "/transactions")?.query.get("page")).toBe("1");
     expect(await screen.findByText("1–23 de 23")).toBeInTheDocument();
@@ -215,8 +216,7 @@ describe("paged ledger", () => {
     fireEvent.click(screen.getByRole("button", { name: "Recarregar" }));
     await waitFor(() => expect(calls.filter((c) => c.path === "/transactions").length).toBe(4));
 
-    await screen.findByRole("option", { name: "WEGE3" });
-    fireEvent.change(screen.getByLabelText("Ativo"), { target: { value: "1" } });
+    await pickWhenLoaded(screen.getByLabelText("Ativo"), "WEGE3");
     await waitFor(() => expect(last(calls, "GET", "/transactions")?.query.get("asset_id")).toBe("1"));
     expect(last(calls, "GET", "/transactions")?.query.get("page")).toBe("1");
   });
@@ -294,7 +294,7 @@ describe("paged research", () => {
     expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("242");
     expect(screen.getByText("2411–2415 de 2415")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Itens por página"), { target: { value: "100" } });
+    pick(screen.getByLabelText("Itens por página"), "100");
     expect(await screen.findByText("AAAA100")).toBeInTheDocument();
     expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("1");
     expect(last(calls, "GET", "/research/screener")?.query.get("limit")).toBe("100");
@@ -327,7 +327,7 @@ describe("paged research", () => {
     mockApi([{ path: "/research/watchlist", reply: watched }]);
     renderAt("/research?tab=watchlist");
     expect(await screen.findByRole("link", { name: "WWWW6" })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Itens por página"), { target: { value: "5" } });
+    pick(screen.getByLabelText("Itens por página"), "5");
     expect(screen.queryByRole("link", { name: "WWWW6" })).not.toBeInTheDocument();
     expect(screen.getByText("Página 1 de 2")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Última página" }));

@@ -7,6 +7,7 @@ import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
 import type { StudyRequest } from "../../api/types";
 import { PageHeader } from "../../components/PageHeader";
+import { Combobox } from "../../components/Combobox";
 import { Section } from "../../components/Section";
 import { Spinner } from "../../components/States";
 import { parseDecimal } from "../../utils/format";
@@ -248,17 +249,27 @@ export function NewStudyPage() {
                   </div>
                   <div className="app-field">
                     <label htmlFor="study-policy">Regras aplicadas</label>
-                    <select id="study-policy" value={form.policyMode} onChange={(e) => set({ policyMode: e.target.value as StudyForm["policyMode"] })}>
-                      <option value="CURRENT">As de hoje, no período inteiro</option>
-                      <option value="AS_OF">As vigentes em cada data</option>
-                    </select>
+                    <Combobox<StudyForm["policyMode"]>
+                      id="study-policy"
+                      value={form.policyMode}
+                      onChange={(policyMode) => set({ policyMode })}
+                      options={[
+                        { value: "CURRENT", label: "As de hoje, no período inteiro" },
+                        { value: "AS_OF", label: "As vigentes em cada data" },
+                      ]}
+                    />
                   </div>
                   <div className="app-field">
                     <label htmlFor="study-answers">Checklist no passado</label>
-                    <select id="study-answers" value={form.answersMode} onChange={(e) => set({ answersMode: e.target.value as StudyForm["answersMode"] })}>
-                      <option value="TODAY">As respostas de hoje valem no período inteiro</option>
-                      <option value="DATED">Cada resposta vale a partir da data em que foi dada</option>
-                    </select>
+                    <Combobox<StudyForm["answersMode"]>
+                      id="study-answers"
+                      value={form.answersMode}
+                      onChange={(answersMode) => set({ answersMode })}
+                      options={[
+                        { value: "TODAY", label: "As respostas de hoje valem no período inteiro" },
+                        { value: "DATED", label: "Cada resposta vale a partir da data em que foi dada" },
+                      ]}
+                    />
                   </div>
                 </fieldset>
               )}
