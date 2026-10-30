@@ -7,11 +7,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from controllers.assets.dependencies import get_asset_handler
+from controllers.assets.dependencies import get_asset_handler, get_forecast_handler
 from controllers.assets.requests import AssetCreateRequest, AssetUpdateRequest, CerradoUpdateRequest
 from controllers.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
+    AssetForecastDTO,
     AssetPriceHistoryDTO,
     AssetResponseDTO,
     PriceRange,
@@ -20,6 +21,7 @@ from controllers.shared.dependencies import pagination_query
 from controllers.shared.responses import PaginatedResponse
 from core.helpers.pagination import PaginationParams
 from domain.assets.services.use_cases import AssetHandler
+from domain.forecast.services import ForecastHandler
 from domain.shared.enums import AssetType
 
 assets_router = APIRouter(prefix="/assets", tags=["Assets"])
@@ -104,6 +106,15 @@ def get_asset_analysis(
     handler: AssetHandler = Depends(get_asset_handler),
 ) -> AssetAnalysisResponseDTO:
     return handler.get_analysis(asset_id)
+
+
+@assets_router.get("/{asset_id}/forecast", response_model=AssetForecastDTO)
+def get_asset_forecast(
+    asset_id: int,
+    handler: ForecastHandler = Depends(get_forecast_handler),
+) -> AssetForecastDTO:
+    """Probable price range at 3, 6, 12 and 24 months and the chances that matter (Phase 42)."""
+    return handler.get(asset_id)
 
 
 @assets_router.get("/{asset_id}/prices", response_model=AssetPriceHistoryDTO)

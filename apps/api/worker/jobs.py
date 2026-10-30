@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from core.helpers.calendar import business_days_between, is_business_day
 from core.helpers.units import BCB_SERIES_UNITS
@@ -18,6 +19,7 @@ from domain.assets.services.cerrado import (
 )
 from domain.assets.services.history import STATEMENT_TYPES
 from domain.disclosures.services.sync import sync_documents
+from domain.forecast.runs import refresh_forecasts, run_calibration
 from domain.market.entities import Quote, QuoteFreshness
 from domain.market.services.treasury_prices import (
     RATE_SUFFIX,
@@ -62,7 +64,12 @@ from domain.simulation.data import (
 from domain.simulation.runs import execute_next_run, queue_calibration
 from infra.providers.batch import fetch_distributions, fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
-from infra.providers.stored import refresh_stored_market_data, refresh_stored_usd_brl
+from infra.providers.stored import (
+    refresh_stored_market_data,
+    refresh_stored_usd_brl,
+    stored_macro_rates,
+    stored_usd_brl,
+)
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
 
@@ -418,6 +425,46 @@ def refresh_catalog_fundamentals_job(
         )
         uow.commit()
     return len(fetched.fundamentals)
+
+
+def refresh_asset_forecasts_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    catalog_top: int = 0,
+    now: datetime | None = None,
+) -> dict[str, int]:
+    """Compute and store the price forecast of every registered asset (Phase 42.1)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        cdi, _ipca = stored_macro_rates(uow, gateway, today=at.date())
+        projections = current_policy(uow.policies).valuation.projections
+        if projections.projected_cdi_rate is not None:
+            cdi = projections.projected_cdi_rate
+        counts = refresh_forecasts(
+            uow,
+            cdi_annual=cdi,
+            usd_brl=stored_usd_brl(uow, gateway),
+            catalog_top=catalog_top,
+            today=at.date(),
+        )
+        uow.commit()
+    return counts
+
+
+def calibrate_forecasts_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    catalog_top: int = 0,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Score the past forecasts (rolling origin) and store the calibration (Phase 42.1)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        result = run_calibration(uow, catalog_top=catalog_top, today=at.date())
+        uow.commit()
+    return result or {"windows": 0}
 
 
 def refresh_fundamentals_job(

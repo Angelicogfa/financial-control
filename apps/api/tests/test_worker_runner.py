@@ -239,6 +239,10 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "manual_sync_simulation_history",
         "sync_cvm_documents",
         "manual_sync_cvm_documents",
+        "refresh_asset_forecasts",
+        "manual_refresh_asset_forecasts",
+        "calibrate_forecasts",
+        "manual_calibrate_forecasts",
     }
     assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"

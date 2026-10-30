@@ -19,6 +19,7 @@ from infra.data.repositories.disclosures import (
     SqlAlchemyCvmDocumentRepository,
     SqlAlchemyIssuerTickerRepository,
 )
+from infra.data.repositories.forecast import SqlAlchemyForecastRepository
 from infra.data.repositories.jobs import (
     SqlAlchemyJobRunRepository,
     SqlAlchemyWorkerErrorRepository,
@@ -83,6 +84,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.cvm_documents = SqlAlchemyCvmDocumentRepository(self.session)
         self.market_data = SqlAlchemyMarketDataRepository(self.session)
         self.price_history = SqlAlchemyPriceHistoryRepository(self.session)
+        self.forecasts = SqlAlchemyForecastRepository(self.session)
         return self
 
     def __exit__(

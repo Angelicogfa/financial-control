@@ -55,6 +55,7 @@
 | **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
 | **Fase 40** | Fatos Relevantes, Patrimônio por Conta, Navegação e Exclusão de Simulações | `[x]` Concluída | 100% |
 | **Fase 41** | Simular Carteira: Nova Experiência em Estudos e Capítulos | `[x]` Concluída | 100% |
+| **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 e 42.1 feitas; antes das Fases 34 e 36) | 25% |
 
 > **Roadmap 2026-10-27:** as fases 24–29 seguem as prioridades definidas a partir da [análise de mercado](../research/MARKET_ANALYSIS.md) (seções 6 e 7). Restrição comum: nenhum custo novo (só fontes públicas gratuitas e a infraestrutura atual) e alertas apenas dentro do sistema, sem canal externo.
 
@@ -802,4 +803,17 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **41.6** Comparar estudos capítulo por capítulo, versões com a chance da meta, cartão do último estudo no Início e versão para impressão/PDF.
 - `[x]` **41.7** "Qualidade dos modelos" (`/tools/simulation/quality`) com confiança e Laboratório; as seis abas, os três formulários e as listas de rodadas foram removidos.
 - `[x]` **41.8** Migração das rodadas atuais, testes de unidade, de UI e de integração e `docker compose build`. De quebra: `parseDecimal` passou a ler "1.200.000" como milhar, e os candidatos do screener voltaram a gravar os indicadores (chamada sem Unit of Work desde a 39.5).
+
+## Fase 42 — Previsão Probabilística do Preço dos Ativos (`[~]` Em andamento)
+
+**Objetivo:** a faixa provável do preço de cada ativo em 3, 6, 12 e 24 meses e a chance de passar de valores que importam (preço de hoje, preço médio, preço teto, queda de 20%), com a confiança medida. São três camadas bayesianas, cada uma só entra se melhorar a previsão fora da amostra: A, mercado e classe (reaproveita o modelo dos candidatos da Fase 33); B, fundamentos da CVM com data de entrega (DFP/ITR); C, eventos da CVM (IPE) por estudo de eventos hierárquico. Desenho: [ASSET_PRICE_FORECAST_DESIGN.md](../features/ASSET_PRICE_FORECAST_DESIGN.md). Feita antes das Fases 34 e 36, a pedido; a 42.2 destrava 34.9 e 36.8.
+
+- `[x]` **42.0** Decisões da seção 10 do desenho: horizontes 3/6/12/24 meses; preço com o retorno total ao lado; universo de estimação carteira + watchlist + catálogo mais líquido; CVM desde 2010; só exibe com selo ≥ "Use com cautela"; sem LLM nos PDFs; alerta criado e desligado; antes das Fases 34 e 36.
+- `[x]` **42.1** Camada A por ativo (`domain/forecast`): excesso sobre o CDI = α + β·classe + ε, com α encolhido pela dispersão da classe e β puxado para 1, nos caminhos da mistura calibrada; o preço desconta os proventos (diferença TR − PX). Tabelas `asset_forecasts` e `forecast_calibrations` (migração `script_00030`); jobs `refresh_asset_forecasts` (diário) e `calibrate_forecasts` (semanal, origem móvel: cobertura das faixas de 50% e 90%, PIT, Brier de bater o CDI), também manuais; `GET /assets/{id}/forecast` e `GET /market/forecast-quality`; MCP `assets.forecast` e `market.forecast_quality`; aba "Probabilidades" com resumo, chances (hoje, preço médio, preço justo, queda de 20%), faixa por horizonte, calculadora de preço, "o que pesou" e selo; oculta enquanto o selo estiver abaixo de "Use com cautela".
+- `[ ]` **42.2** DFP/ITR point-in-time (`cvm_statements`) e indicadores com data de entrega.
+- `[ ]` **42.3** Camada B: valuation no prior de α, hierárquica por setor, com portões.
+- `[ ]` **42.4** IPE histórico, taxonomia de eventos e estudo de eventos hierárquico.
+- `[ ]` **42.5** Camada C: efeito dos eventos recentes, com portões e "o que pesou".
+- `[ ]` **42.6** Negociações de administradores (VLMO), se houver o conjunto estruturado.
+- `[ ]` **42.7** Integração com os estudos, alerta opcional, testes de UI e integração, `docker compose build`.
 

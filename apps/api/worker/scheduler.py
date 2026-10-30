@@ -19,10 +19,12 @@ from worker.jobs import (
     UoWFactory,
     backfill_and_record_snapshot_job,
     backfill_snapshots_job,
+    calibrate_forecasts_job,
     ensure_series_coverage_job,
     has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
+    refresh_asset_forecasts_job,
     refresh_catalog_fundamentals_job,
     refresh_distributions_job,
     refresh_fundamentals_job,
@@ -83,6 +85,12 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         ),
         "refresh_catalog_fundamentals": partial(
             refresh_catalog_fundamentals_job, max_workers=cfg.market_fetch_workers
+        ),
+        "refresh_asset_forecasts": partial(
+            refresh_asset_forecasts_job, catalog_top=cfg.simulation_catalog_top
+        ),
+        "calibrate_forecasts": partial(
+            calibrate_forecasts_job, catalog_top=cfg.simulation_catalog_top
         ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
@@ -208,6 +216,32 @@ def create_scheduler(
         hour=(cfg.catalog_sync_cron_hour + 1) % 24,
         minute=0,
         id="refresh_catalog_fundamentals",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "refresh_asset_forecasts",
+            partial(refresh_asset_forecasts_job, catalog_top=cfg.simulation_catalog_top),
+        ),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=(cfg.catalog_sync_cron_hour + 2) % 24,
+        minute=0,
+        id="refresh_asset_forecasts",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "calibrate_forecasts",
+            partial(calibrate_forecasts_job, catalog_top=cfg.simulation_catalog_top),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=(cfg.fundamentals_cron_hour + 1) % 24,
+        minute=0,
+        id="calibrate_forecasts",
         replace_existing=True,
         **defaults,
     )

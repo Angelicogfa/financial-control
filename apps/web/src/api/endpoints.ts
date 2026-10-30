@@ -13,6 +13,7 @@ import type {
   ArcaClass,
   ArcaSuggestionDTO,
   AssetAnalysisResponseDTO,
+  AssetForecastDTO,
   AssetPriceHistoryDTO,
   AssetComparisonDTO,
   AssetCreateRequest,
@@ -41,6 +42,7 @@ import type {
   FixedIncomeCompareRequest,
   FixedIncomeComparisonDTO,
   FixedIncomeIndexer,
+  ForecastQualityDTO,
   GrantOptionsDTO,
   ImportCommitDTO,
   ImportFixedIncomeTermDTO,
@@ -166,6 +168,7 @@ export const api = {
     analysis: (id: number) => request<AssetAnalysisResponseDTO>(`/assets/${id}/analysis`),
     prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>
       request<AssetPriceHistoryDTO>(`/assets/${id}/prices`, { query: { range } }),
+    forecast: (id: number) => request<AssetForecastDTO>(`/assets/${id}/forecast`),
     create: (body: AssetCreateRequest) => request<AssetResponseDTO>("/assets", { method: "POST", body }),
     update: (id: number, body: AssetUpdateRequest) =>
       request<AssetResponseDTO>(`/assets/${id}`, { method: "PUT", body }),
@@ -315,6 +318,7 @@ export const api = {
   },
   market: {
     series: () => request<SeriesStatusDTO[]>("/market/series-status"),
+    forecastQuality: () => request<ForecastQualityDTO>("/market/forecast-quality"),
     jobs: () => request<JobRunDTO[]>("/market/job-runs"),
     quoteStatus: () => request<QuoteStatusDTO>("/market/quotes/status"),
     requestJob: (name: string) =>

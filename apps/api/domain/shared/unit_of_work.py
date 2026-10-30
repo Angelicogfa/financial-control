@@ -9,6 +9,7 @@ from domain.disclosures.repositories import (
     AbstractCvmDocumentRepository,
     AbstractIssuerTickerRepository,
 )
+from domain.forecast.repositories import AbstractForecastRepository
 from domain.market.repositories import (
     AbstractMarketDataRepository,
     AbstractPriceHistoryRepository,
@@ -68,6 +69,7 @@ class AbstractUnitOfWork(ABC):
     cvm_documents: AbstractCvmDocumentRepository
     market_data: AbstractMarketDataRepository
     price_history: AbstractPriceHistoryRepository
+    forecasts: AbstractForecastRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self
