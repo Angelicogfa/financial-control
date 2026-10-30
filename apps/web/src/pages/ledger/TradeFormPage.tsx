@@ -41,6 +41,11 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
       setError("Preencha ativo, quantidade e preço.");
       return;
     }
+    // The API refuses a foreign-currency trade recorded at FX 1 (FX_RATE_REQUIRED).
+    if (currency !== "BRL" && (parseDecimal(fx) === null || values.fx_rate === 1)) {
+      setError(`Informe o câmbio ${currency}/BRL da data da negociação.`);
+      return;
+    }
     const body = {
       kind,
       trade_date: tradeDate,
