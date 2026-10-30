@@ -115,7 +115,7 @@ class ValuationPolicy:
     min_margin_of_safety: float = 0.15
     # Tesouro Direto (Phase 26): weight the quadrant by the redemption price instead of
     # the curve, and the thresholds of the early-sale opportunity.
-    treasury_mark_to_market: bool = False
+    treasury_mark_to_market: bool = True
     early_sale_min_excess_rate: float = 0.01
     early_sale_min_reinvest_spread: float = 0.005
     projections: ProjectionAssumptions = field(default_factory=ProjectionAssumptions)
