@@ -207,3 +207,75 @@ class MiningUniverseDTO(BaseModel):
     members: list[MiningMemberDTO] = Field(default_factory=list)
     with_history: int = 0
     with_statements: int = 0
+
+
+MiningSignalName = Literal["VALUE", "QUALITY", "IMPROVEMENT", "MOMENTUM"]
+
+
+class MiningSignalWeightDTO(BaseModel):
+    signal: MiningSignalName
+    estimate_annual_per_z: float  # extra return a year per unit of z (posterior)
+    weight_annual_per_z: float  # what the ranking uses (0 when the sign is not clear)
+    sign_probability: float
+    used: bool
+
+
+class MiningFindingDTO(BaseModel):
+    rank: int
+    ticker: str
+    company: str = ""
+    sector: str = ""
+    score_annual: float  # return over the universe a year the weights expect
+    signals: dict[str, float] = Field(default_factory=dict)
+    reason: str
+    asset_id: int | None = None  # registered (watchlist or portfolio)
+
+
+class MiningRecordLineDTO(BaseModel):
+    horizon: int
+    trusted: bool
+    runs: int
+    findings: int
+    beat: int
+    beat_share: float
+    beat_low: float
+    beat_high: float
+    mean_excess_annual: float
+
+
+class MiningRecordDTO(BaseModel):
+    lines: list[MiningRecordLineDTO] = Field(default_factory=list)
+
+
+class MiningOverviewDTO(BaseModel):
+    """The Garimpo of the week (Phase 43): the gate, the weights, the findings and the record."""
+
+    status: Literal["OK", "NOT_RUN"]
+    found_on: date | None = None
+    month: date | None = None
+    trusted: bool = False
+    reason: str = ""
+    oos_months: int = 0
+    oos_excess_annual: float = 0.0
+    oos_probability: float = 0.5
+    oos_hit_rate: float = 0.0
+    pbo: float | None = None
+    loss_probability: float | None = None
+    variants: int = 0
+    cost_annual: float = 0.0
+    weights: list[MiningSignalWeightDTO] = Field(default_factory=list)
+    findings: list[MiningFindingDTO] = Field(default_factory=list)
+    record: list[MiningRecordLineDTO] = Field(default_factory=list)
+
+
+class MiningWhyDTO(BaseModel):
+    """Why a ticker is or is not among this week's findings."""
+
+    ticker: str
+    status: Literal["FOUND", "RANKED", "NO_SIGNALS", "NOT_IN_UNIVERSE", "NOT_RUN"]
+    rank: int | None = None
+    ranked: int = 0
+    score_annual: float | None = None
+    cutoff_annual: float | None = None  # the last finding's score
+    signals: dict[str, float] = Field(default_factory=dict)
+    reasons: list[str] = Field(default_factory=list)

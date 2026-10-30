@@ -46,6 +46,8 @@ import type {
   ForecastQualityDTO,
   GrantOptionsDTO,
   ImportCommitDTO,
+  MiningOverviewDTO,
+  MiningWhyDTO,
   ImportFixedIncomeTermDTO,
   ImportPreviewDTO,
   JobRunDTO,
@@ -252,6 +254,8 @@ export const api = {
     treasury: (filters: TreasuryFilters = {}) =>
       request<TreasurySearchResponseDTO>("/research/treasury", { query: { ...filters } }),
     watchlist: () => request<WatchlistItemDTO[]>("/research/watchlist"),
+    mining: () => request<MiningOverviewDTO>("/research/mining"),
+    miningWhy: (ticker: string) => request<MiningWhyDTO>(`/research/mining/why/${encodeURIComponent(ticker)}`),
     compare: (tickers: string[], indicators: string[] = []) =>
       request<AssetComparisonDTO>("/research/compare", {
         query: { tickers: tickers.join(","), indicators: indicators.length ? indicators.join(",") : undefined },

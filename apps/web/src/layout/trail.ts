@@ -42,6 +42,7 @@ const ROUTES: RouteSpec[] = [
   },
   { test: (p) => p.startsWith("/asset/"), label: "Ativo", parent: under("/portfolio"), detail: true },
   { test: (p) => p.startsWith("/portfolio"), label: "Carteira", parent: under(HOME) },
+  { test: (p) => p.startsWith("/research/mining"), label: "Garimpo", parent: under(HOME) },
   { test: (p) => p.startsWith("/research"), label: "Pesquisar", parent: under(HOME) },
   { test: (p) => /^\/contribute\/.+/.test(p), label: "Plano de aporte", parent: under("/contribute"), detail: true },
   { test: (p) => p.startsWith("/contribute"), label: "Aportar", parent: under(HOME) },

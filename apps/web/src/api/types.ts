@@ -1389,6 +1389,17 @@ export interface MethodResultDTO {
   note?: string;
 }
 
+export interface MiningFindingDTO {
+  rank: number;
+  ticker: string;
+  company?: string;
+  sector?: string;
+  score_annual: number;
+  signals?: Record<string, number>;
+  reason: string;
+  asset_id?: number | null;
+}
+
 export interface MiningMemberDTO {
   ticker: string;
   company: string;
@@ -1400,11 +1411,61 @@ export interface MiningMemberDTO {
   has_statements?: boolean;
 }
 
+export interface MiningOverviewDTO {
+  status: "OK" | "NOT_RUN";
+  found_on?: string | null;
+  month?: string | null;
+  trusted?: boolean;
+  reason?: string;
+  oos_months?: number;
+  oos_excess_annual?: number;
+  oos_probability?: number;
+  oos_hit_rate?: number;
+  pbo?: number | null;
+  loss_probability?: number | null;
+  variants?: number;
+  cost_annual?: number;
+  weights?: MiningSignalWeightDTO[];
+  findings?: MiningFindingDTO[];
+  record?: MiningRecordLineDTO[];
+}
+
+export interface MiningRecordLineDTO {
+  horizon: number;
+  trusted: boolean;
+  runs: number;
+  findings: number;
+  beat: number;
+  beat_share: number;
+  beat_low: number;
+  beat_high: number;
+  mean_excess_annual: number;
+}
+
+export interface MiningSignalWeightDTO {
+  signal: "VALUE" | "QUALITY" | "IMPROVEMENT" | "MOMENTUM";
+  estimate_annual_per_z: number;
+  weight_annual_per_z: number;
+  sign_probability: number;
+  used: boolean;
+}
+
 export interface MiningUniverseDTO {
   min_daily_volume: number;
   members?: MiningMemberDTO[];
   with_history?: number;
   with_statements?: number;
+}
+
+export interface MiningWhyDTO {
+  ticker: string;
+  status: "FOUND" | "RANKED" | "NO_SIGNALS" | "NOT_IN_UNIVERSE" | "NOT_RUN";
+  rank?: number | null;
+  ranked?: number;
+  score_annual?: number | null;
+  cutoff_annual?: number | null;
+  signals?: Record<string, number>;
+  reasons?: string[];
 }
 
 export type OfferIndexer = "CDI_PERCENT" | "CDI_SPREAD" | "IPCA_SPREAD" | "PRE";

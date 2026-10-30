@@ -15,7 +15,9 @@ from controllers.research.dependencies import (
 from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
 from controllers.research.responses import (
     AssetComparisonDTO,
+    MiningOverviewDTO,
     MiningUniverseDTO,
+    MiningWhyDTO,
     ScreenerResponseDTO,
     TreasurySearchResponseDTO,
     WatchlistItemDTO,
@@ -63,6 +65,20 @@ def run_screener(
         offset=(page - 1) * limit,
     )
     return handler.screener(criteria, below_band=below_band)
+
+
+@research_router.get("/mining", response_model=MiningOverviewDTO)
+def get_mining(handler: MiningHandler = Depends(get_mining_handler)) -> MiningOverviewDTO:
+    """The Garimpo of the week: gate, weights, findings and record (Phase 43)."""
+    return handler.overview()
+
+
+@research_router.get("/mining/why/{ticker}", response_model=MiningWhyDTO)
+def get_mining_why(
+    ticker: str, handler: MiningHandler = Depends(get_mining_handler)
+) -> MiningWhyDTO:
+    """Why a ticker is or is not among this week's findings."""
+    return handler.why(ticker)
 
 
 @research_router.get("/mining/universe", response_model=MiningUniverseDTO)

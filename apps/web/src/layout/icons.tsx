@@ -84,6 +84,13 @@ export const SearchIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const GemIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6 3h12l3 6-9 12L3 9z" />
+    <path d="M3 9h18M9 3l3 18M15 3l-3 18" />
+  </Icon>
+);
+
 export const PlusCircleIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />

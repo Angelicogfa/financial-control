@@ -49,7 +49,7 @@ Cada sinal vira um z (frente ao setor e ao próprio passado, como na 42.3) e ent
 
 - **Origem móvel anual**, como na 42.3: os pesos de cada ano usam só o que se sabia; a carteira dos achados daquele ano é medida no ano seguinte.
 - **Comparação justa:** o retorno dos achados é medido contra a classe (Ações) e contra uma seleção aleatória do mesmo universo e do mesmo tamanho.
-- **PBO (probabilidade de sobreajuste)** sobre as variantes testadas (quais sinais, quantos achados), como no Laboratório; com PBO alto, o garimpo mostra "sem achados confiáveis".
+- **Sobreajuste pelo CSCV** sobre as variantes testadas (quais sinais, quantos achados), como no Laboratório. A PBO é mostrada, mas o portão usa a chance de a variante escolhida perder do universo na outra metade dos meses (até 25%). Na implementação (43.3) ficou claro que muitas variantes compartilham o mesmo sinal bom e rendem quase igual, então a melhor cai perto da mediana (PBO perto de 50%) mesmo sem sobreajuste. Sem portão aprovado, a lista aparece como "ranking em observação", não como achados.
 - **Custos:** o resultado já desconta uma estimativa de custo de transação e de impacto pela liquidez.
 
 ## 6. O que você vê

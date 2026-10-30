@@ -119,6 +119,29 @@ def company_yields(company: CompanyInput) -> dict[Month, dict[str, float]]:
     return out
 
 
+def sector_z(row: Mapping[str, float], sectors: Mapping[str, str]) -> dict[str, float]:
+    """z of each company against its sector in one cross-section (empty below MIN_COMPANIES).
+
+    The sector centre is pulled to the market by SECTOR_PSEUDO_COUNT companies, so a sector of
+    two does not define "cheap" by itself; the spread is the market's.
+    """
+    if len(row) < MIN_COMPANIES:
+        return {}
+    values = np.array(list(row.values()))
+    market, spread = float(np.mean(values)), float(np.std(values, ddof=1))
+    if spread <= 0:
+        return {}
+    by_sector: dict[str, list[float]] = defaultdict(list)
+    for t, v in row.items():
+        by_sector[sectors.get(t, "")].append(v)
+    out = {}
+    for t, v in row.items():
+        peers = by_sector[sectors.get(t, "")]
+        centre = (sum(peers) + SECTOR_PSEUDO_COUNT * market) / (len(peers) + SECTOR_PSEUDO_COUNT)
+        out[t] = (v - centre) / spread
+    return out
+
+
 def value_scores(
     yields: Mapping[str, Mapping[Month, Mapping[str, float]]],
     sectors: Mapping[str, str],
@@ -147,21 +170,8 @@ def value_scores(
                 for t, by_month in yields.items()
                 if month in by_month and name in by_month[month]
             }
-            if len(row) < MIN_COMPANIES:
-                continue
-            values = np.array(list(row.values()))
-            market, spread = float(np.mean(values)), float(np.std(values, ddof=1))
-            if spread <= 0:
-                continue
-            by_sector: dict[str, list[float]] = defaultdict(list)
-            for t, v in row.items():
-                by_sector[sectors.get(t, "")].append(v)
-            for t, v in row.items():
-                peers = by_sector[sectors.get(t, "")]
-                centre = (sum(peers) + SECTOR_PSEUDO_COUNT * market) / (
-                    len(peers) + SECTOR_PSEUDO_COUNT
-                )
-                parts[t][month].append((v - centre) / spread)
+            for t, z in sector_z(row, sectors).items():
+                parts[t][month].append(z)
 
     return {
         t: {m: float(np.clip(np.mean(zs), -WINSOR, WINSOR)) for m, zs in by_month.items() if zs}

@@ -141,7 +141,7 @@ Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, 
 
 ## 3. Modelo de Dados (ER)
 
-Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00032`):
+Tabelas e colunas em **inglês**, versionadas por migrations Alembic sequenciais (`script_00001` … `script_00034`):
 
 ```mermaid
 erDiagram
@@ -359,4 +359,8 @@ A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, prem
 ### Previsão probabilística do preço (Fase 42)
 
 `domain/forecast` dá a cada ativo a faixa provável do preço em 3, 6, 12 e 24 meses e a chance de passar de preços que importam. A camada A reaproveita o modelo de fatores dos candidatos (excesso sobre o CDI = α + β·classe + ε, α encolhido pela classe) sobre os caminhos da mistura calibrada, e desconta os proventos para chegar ao preço. O worker grava em `asset_forecasts` (`refresh_asset_forecasts`, diário) e mede, por origem móvel, quantas vezes as faixas se confirmaram em `forecast_calibrations` (`calibrate_forecasts`, semanal); a tela só lê. A aba "Probabilidades" do ativo fica oculta enquanto o selo estiver abaixo de "Use com cautela". Os balanços entregues à CVM (DFP/ITR) ficam em `cvm_statements`, uma linha por métrica, balanço e versão, com a data de entrega: `domain/disclosures/statements.py` extrai as métricas e responde "o que se sabia em tal data" (últimos 12 meses e último balanço), sem usar um número antes de ele existir; `sync_cvm_statements` carrega os arquivos anuais da CVM aos poucos. A camada B (42.3, `valuation_model.py`) mede toda semana quanto estar barata ou cara frente ao próprio histórico e ao setor disse sobre os 12 meses seguintes (γ por Fama-MacBeth, prior cético, portão fora da amostra) e guarda o resultado em `forecast_models`; quando o portão passa, o α de cada empresa é encolhido para γ·z em vez de zero. A camada C (eventos da CVM) entra nas 42.4–42.5.
+
+### Garimpo (Fase 43)
+
+`domain/mining` procura achados nas ações líquidas de todo o catálogo. O universo (`universe.py`) são as ações brasileiras com CNPJ no mapa da CVM e volume médio acima de `MINING_MIN_DAILY_VOLUME`, uma classe por empresa; `sync_mining_universe` mantém o histórico longo delas (com desdobramentos). `run_mining` monta toda semana o painel mensal e grava em `mining_signals` quatro sinais point-in-time, cada um um z frente ao setor: valor (o z da 42.3), qualidade, melhora dos resultados e momentum. O mesmo job estima os pesos dos sinais (Fama-MacBeth com prior cético), testa a carteira dos 10 melhores por origem móvel contra o universo, com custos e CSCV, e grava os achados da semana em `mining_findings` (achados se o portão passou; senão, ranking em observação) e o placar no modelo (`forecast_models`, `MINING`). A página "Garimpo" e o MCP só leem essas tabelas.
 

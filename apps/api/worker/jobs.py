@@ -34,6 +34,7 @@ from domain.market.services.treasury_prices import (
     bond_family,
     price_symbol,
 )
+from domain.mining.runs import run_mining
 from domain.mining.universe import mining_universe
 from domain.policy.services.allocation import ArcaTargets
 from domain.policy.services.policy import EligibilityPolicy, current_policy
@@ -966,6 +967,22 @@ def sync_mining_universe_job(
         "without_history": empty[:20],
         "remaining": max(len(stale) - len(loaded) - len(empty), 0),
     }
+
+
+def run_mining_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    min_daily_volume: float = 1_000_000.0,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """The weekly Garimpo: signals, gated model, findings and record (Phases 43.2-43.5)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        result = run_mining(uow, min_daily_volume=min_daily_volume, today=at.date())
+        uow.commit()
+    last = result.get("last_month")
+    return {**result, "last_month": last.isoformat() if last else None}
 
 
 def sync_simulation_history_job(
