@@ -915,11 +915,24 @@ a.app-icon-button {
   text-decoration: underline;
 }
 
+/* The class sits on a <td>, which must stay a table cell: as a flex box it no longer
+   stretches to the row height, so its border and content drift off the rest of the row
+   whenever another cell wraps to two lines. */
 .app-row-actions {
-  display: flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
-  align-items: center;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.app-row-actions > * {
+  vertical-align: middle;
+}
+
+.app-row-actions > * + * {
+  margin-left: var(--space-1);
+}
+
+.app-row-actions > .app-button-row {
+  display: inline-flex;
 }
 
 /* --- badges --- */
