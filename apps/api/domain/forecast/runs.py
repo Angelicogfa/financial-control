@@ -8,6 +8,10 @@ universe is the portfolio, the watchlist and the most traded catalog instruments
 Layer B (42.3): `estimate_valuation_model` measures, weekly, how much the valuation of the
 statements delivered to the CVM said about the next 12 months, with an out-of-sample gate; the
 daily forecast pulls each company's α to γ·z instead of zero when the gate passed.
+
+Layer C (42.5): the event study (`domain.forecast.event_runs`, weekly) keeps the gate of each
+class; the daily forecast adds the effect of the company's events of the last 20 trading days
+whose class passed.
 """
 
 from __future__ import annotations
@@ -19,9 +23,12 @@ from typing import Any
 
 import numpy as np
 
+from domain.disclosures.events import EVENT_LABELS
 from domain.disclosures.services.sync import base_ticker
 from domain.disclosures.statements import delivery_history
 from domain.forecast.calibration import calibrate
+from domain.forecast.event_runs import EVENTS
+from domain.forecast.events import EventStudy, RecentEvent, group_events, recent_events
 from domain.forecast.model import (
     DEFAULT_PATHS,
     HORIZONS,
@@ -77,6 +84,7 @@ MEAN_BLOCK_MONTHS = 12.0
 # An asset the user asked for by itself is forecast from 12 months on, with a warning; the
 # rest need the 36 months of the candidates model (decision 42.0-5).
 REQUESTED_MIN_MONTHS = 12
+RECENT_EVENT_DAYS = 35  # calendar days that hold the last 20 trading days
 
 
 @dataclass(frozen=True)
@@ -210,6 +218,7 @@ def refresh_forecasts(
     model, sectors = _valuation_inputs(uow)
     prior_means, notes = _valuation_priors(model, sectors, universe.classes)
     fits = _fits(universe, requested, prior_means)
+    events, events_note = _recent_events(uow, [a.ticker.upper() for a in targets], as_of)
     weights, _run, _note = mixture_weights(uow, STACKED, universe.sample)
     excess, _labels = draw_mixture(
         universe.sample,
@@ -256,6 +265,8 @@ def refresh_forecasts(
             seed=seed + k,
             class_expected_excess_monthly=float(np.mean(universe.sample.excess[:, k])),
             valuation_note=notes.get(ticker),
+            events=events.get(ticker, []),
+            events_note=events_note,
         )
         uow.forecasts.save(
             ticker,
@@ -290,6 +301,43 @@ def run_calibration(
     payload = result.to_dict()
     uow.forecasts.save_calibration(as_of, payload)
     return payload
+
+
+# --- layer C: recent events (42.5) ---------------------------------------------------------------
+
+
+def _recent_events(
+    uow: AbstractUnitOfWork, tickers: Collection[str], today: date
+) -> tuple[dict[str, list[RecentEvent]], str | None]:
+    """The recent CVM events of each ticker with what they add, and the note when none apply."""
+    stored = uow.forecasts.latest_model(EVENTS)
+    found = EventStudy.from_dict(stored.payload) if stored is not None else None
+    cnpjs = uow.cvm_issuers.cnpjs_for([base_ticker(t) for t in tickers])
+    by_cnpj = {c: t for t in tickers if (c := cnpjs.get(base_ticker(t))) is not None}
+    if not by_cnpj:
+        return {}, None
+    documents = uow.cvm_documents.events(
+        sorted(by_cnpj), since=today - timedelta(days=RECENT_EVENT_DAYS)
+    )
+    rows = [
+        (d.id, by_cnpj[d.cnpj], d.delivery_date, d.event_class or "")
+        for d in documents
+        if d.id is not None and d.cnpj in by_cnpj
+    ]
+    out: dict[str, list[RecentEvent]] = {}
+    grouped: dict[str, list] = {}
+    for event in group_events(rows):
+        grouped.setdefault(event.ticker, []).append(event)
+    cnpj_of = {t: c for c, t in by_cnpj.items()}
+    for ticker, items in grouped.items():
+        results = [d.delivered_on for d in uow.cvm_statements.docs_for(cnpj_of[ticker])]
+        found_events = recent_events(
+            items, found, today=today, results_days=results, labels=EVENT_LABELS
+        )
+        if found_events:
+            out[ticker] = found_events
+    note = None if found is not None else "O estudo de eventos ainda não foi calculado."
+    return out, note
 
 
 # --- layer B: valuation (42.3) ----------------------------------------------------------------

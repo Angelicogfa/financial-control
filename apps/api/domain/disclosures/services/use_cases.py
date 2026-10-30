@@ -143,6 +143,7 @@ class DisclosureHandler:
             as_of=found.as_of,
             events=found.events,
             confounded=found.confounded,
+            sign_threshold=found.sign_threshold,
             classes=[
                 EventClassDTO(
                     event_class=c.event_class,
@@ -160,10 +161,24 @@ class DisclosureHandler:
                         for h in c.horizons
                     ],
                     volatility_ratio=c.volatility_ratio,
+                    **self._gate_fields(found, c.event_class),
                 )
                 for c in sorted(found.classes, key=lambda c: -c.events)
             ],
         )
+
+    @staticmethod
+    def _gate_fields(found: EventStudy, event_class: str) -> dict:
+        verdict = found.gate(event_class)
+        if verdict is None:
+            return {"gate_reason": "O portão fora da amostra ainda não foi calculado."}
+        return {
+            "passed": verdict.passed,
+            "gate_reason": verdict.reason,
+            "oos_origins": verdict.origins,
+            "oos_improvement": verdict.improvement if verdict.origins else None,
+            "oos_win_share": verdict.win_share if verdict.origins else None,
+        }
 
     def mark_read(self, req: MarkReadRequest, *, now: datetime | None = None) -> int:
         """Mark the given documents (or every document in scope) as read."""

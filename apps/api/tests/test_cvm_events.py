@@ -27,10 +27,16 @@ from domain.forecast.event_runs import EVENTS, run_event_study
 from domain.forecast.events import (
     MIXED,
     AlignedReturns,
+    ClassEffect,
+    ClassGate,
     EventInput,
     EventStudy,
+    HorizonEffect,
+    effect_so_far,
+    gate,
     group_events,
     measure,
+    recent_events,
     study,
 )
 from domain.portfolio.services.service import PortfolioApplicationService
@@ -241,6 +247,99 @@ def test_study_shrinks_the_classes_to_zero() -> None:
     assert EventStudy.from_dict(found.to_dict()) == found
 
 
+def _yearly(cls: str, mean: float, years: range, per_year: int, seed: int) -> list[EventEffect]:
+    rng = np.random.default_rng(seed)
+    out = []
+    for year in years:
+        for i, v in enumerate(rng.normal(mean, 0.03, per_year)):
+            n = seed * 100_000 + year * 100 + i
+            day = date(year, 1, 1) + timedelta(days=3 * i)
+            out.append(EventEffect(n, f"T{n}", day, cls, v / 4, v / 2, v, 1.4, False))
+    return out
+
+
+def test_gate_keeps_only_the_classes_that_predict_out_of_sample() -> None:
+    years = range(2012, 2025)
+    effects = (
+        _yearly(BUYBACK, 0.03, years, 40, 1)
+        + _yearly(DIVIDENDS, 0.0, years, 40, 2)
+        + _yearly(ACQUISITION, 0.0, years, 40, 3)
+        + _yearly(MANAGEMENT, 0.02, range(2023, 2025), 5, 4)  # measured, but only two years
+    )
+    found = gate(effects, study(effects, as_of=date(2026, 10, 30)))
+    assert found.sign_threshold == pytest.approx(1 - 0.10 / 4)
+    buyback = found.gate(BUYBACK)
+    assert buyback.passed and buyback.origins == 10 and buyback.improvement > 0
+    assert buyback.win_share >= 0.55 and "Passou fora da amostra" in buyback.reason
+    assert not found.passed(DIVIDENDS) and not found.passed(ACQUISITION)
+    assert found.gate(DIVIDENDS).reason
+    assert not found.passed(MANAGEMENT)
+    assert found.gate(MANAGEMENT).reason.startswith("Só 2 anos fora da amostra")
+    assert EventStudy.from_dict(found.to_dict()) == found
+
+
+def _passed_study() -> EventStudy:
+    def horizons(values: tuple[float, float, float]) -> list[HorizonEffect]:
+        return [
+            HorizonEffect(h, 50, v, 0.004, v, 0.004, 0.99)
+            for h, v in zip((1, 5, 20), values, strict=True)
+        ]
+
+    return EventStudy(
+        as_of=date(2026, 10, 25),
+        events=200,
+        confounded=0,
+        classes=[
+            ClassEffect(BUYBACK, 100, horizons((0.01, 0.02, 0.04)), 1.5),
+            ClassEffect(DIVIDENDS, 100, horizons((0.0, 0.0, 0.001)), 1.0),
+        ],
+        gates=[
+            ClassGate(BUYBACK, 8, 400, 0.001, 0.0012, 0.17, 0.75, 0.99, True, "Passou."),
+            ClassGate(DIVIDENDS, 8, 400, 0.001, 0.001, -0.01, 0.4, 0.6, False, "Não passou."),
+        ],
+        sign_threshold=0.95,
+    )
+
+
+def test_effect_so_far_is_linear_between_the_horizons() -> None:
+    effects = {1: 0.01, 5: 0.02, 20: 0.04}
+    assert effect_so_far(effects, 0) == 0.0
+    assert effect_so_far(effects, 3) == pytest.approx(0.015)
+    assert effect_so_far(effects, 30) == pytest.approx(0.04)
+
+
+def test_recent_events_add_what_is_still_to_come() -> None:
+    today = date(2026, 10, 30)  # a Friday
+    events = [
+        EventInput((1,), "WEGE3", date(2026, 10, 23), BUYBACK),  # 5 trading days ago
+        EventInput((2,), "WEGE3", date(2026, 10, 28), DIVIDENDS),
+        EventInput((3,), "WEGE3", date(2026, 10, 29), MIXED),
+        EventInput((4,), "WEGE3", date(2026, 9, 1), BUYBACK),  # more than 20 trading days
+    ]
+    labels = {BUYBACK: "Recompra de ações", DIVIDENDS: "Proventos"}
+    found = recent_events(events, _passed_study(), today=today, labels=labels)
+    assert [(e.event_class, e.used) for e in found] == [
+        (MIXED, False),
+        (DIVIDENDS, False),
+        (BUYBACK, True),
+    ]
+    buyback = found[2]
+    assert buyback.days_after == 5
+    assert buyback.effect == pytest.approx(0.02)  # 4% in 20 days, 2% already by day 5
+    assert buyback.effect_sd == pytest.approx(0.004 * 0.75)
+    assert buyback.volatility_factor == pytest.approx(np.sqrt(1 + (1.5**2 - 1) * 0.75), abs=1e-4)
+    assert "faltam +2.0%" in buyback.note
+    assert "sem efeito comprovado. Não passou." in found[1].note
+    assert type(buyback).from_dict(buyback.to_dict()) == buyback
+
+    # A results delivery next to the event confounds it; without a study nothing is used.
+    near = recent_events(
+        events[:1], _passed_study(), today=today, results_days=[date(2026, 10, 24)]
+    )
+    assert not near[0].used and "entrega de balanço" in near[0].note
+    assert not recent_events(events[:1], None, today=today)[0].used
+
+
 # --- runner, API and MCP ---------------------------------------------------------------------
 
 
@@ -285,6 +384,7 @@ def test_run_event_study_and_the_feed(api: SimpleNamespace) -> None:
     assert item["typical_20"] is None  # one event is not a class effect
     study_dto = api.client.get("/api/v1/disclosures/event-study").json()
     assert study_dto["status"] == "OK" and study_dto["events"] == 1
+    assert study_dto["sign_threshold"] is not None
 
 
 def test_event_study_not_computed_and_mcp(api: SimpleNamespace) -> None:

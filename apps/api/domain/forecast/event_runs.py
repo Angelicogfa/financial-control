@@ -1,4 +1,5 @@
-"""Worker side of the event study (Phase 42.4): measure every event and store the study.
+"""Worker side of the event study (Phase 42.4): measure every event and store the study, with
+the out-of-sample gate of each class that decides what enters the forecast (Phase 42.5).
 
 The companies are those of the mining universe (liquid stocks with a CNPJ) plus the registered
 Brazilian stocks; each company is measured on one ticker, the mining one when it has it. The
@@ -11,7 +12,7 @@ from datetime import date
 from typing import Any
 
 from domain.disclosures.services.sync import base_ticker
-from domain.forecast.events import align, group_events, measure, study
+from domain.forecast.events import align, gate, group_events, measure, study
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.shared.enums import AssetType
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -74,7 +75,7 @@ def run_event_study(
         for event in events:
             effects.extend(measure(event, returns, results))
     uow.cvm_documents.replace_effects(effects)
-    found = study(effects, as_of=as_of)
+    found = gate(effects, study(effects, as_of=as_of))
     payload = found.to_dict()
     uow.forecasts.save_model(EVENTS, as_of, payload)
     return payload

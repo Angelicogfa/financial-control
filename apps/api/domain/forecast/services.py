@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from controllers.assets.responses import (
     AssetForecastDTO,
     ForecastDriverDTO,
+    ForecastEventDTO,
     ForecastHorizonDTO,
     ForecastProbabilityDTO,
     ForecastQualityDTO,
@@ -24,6 +25,7 @@ from controllers.assets.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError, ValidationError
+from domain.disclosures.events import EVENT_LABELS
 from domain.forecast.calibration import ForecastCalibration
 from domain.forecast.model import FALL_THRESHOLD, PriceForecast, chance_above
 from domain.forecast.repositories import StoredCalibration
@@ -320,6 +322,18 @@ class ForecastHandler:
             drivers=[
                 ForecastDriverDTO(key=d.key, label=d.label, annual=d.annual, note=d.note)  # type: ignore[arg-type]
                 for d in forecast.drivers
+            ],
+            recent_events=[
+                ForecastEventDTO(
+                    event_class=e.event_class,
+                    label=EVENT_LABELS.get(e.event_class, "Vários tipos"),
+                    event_date=e.event_date,
+                    days_after=e.days_after,
+                    effect=e.effect,
+                    used=e.used,
+                    note=e.note,
+                )
+                for e in forecast.events
             ],
             cautions=cautions,
             warnings=forecast.warnings,

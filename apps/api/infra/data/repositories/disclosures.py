@@ -183,10 +183,14 @@ class SqlAlchemyCvmDocumentRepository(AbstractCvmDocumentRepository):
         self.session.flush()
         return len(classes)
 
-    def events(self, cnpjs: Sequence[str] | None = None) -> list[CvmDocument]:
+    def events(
+        self, cnpjs: Sequence[str] | None = None, *, since: date | None = None
+    ) -> list[CvmDocument]:
         base = select(CvmDocumentModel).where(
             CvmDocumentModel.event_class.is_not(None), CvmDocumentModel.event_class != ""
         )
+        if since is not None:
+            base = base.where(CvmDocumentModel.delivery_date >= since)
         if cnpjs is None:
             stmt = base.order_by(CvmDocumentModel.delivery_date, CvmDocumentModel.id)
             return [to_cvm_document(m) for m in self.session.scalars(stmt).all()]

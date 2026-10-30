@@ -11,6 +11,10 @@ dividend yield the asset's own history shows (`dividend_drag`). Each horizon kee
 price quantiles, so any "chance of passing R$ X" is read from it; the stored chances (up, fall
 of 20%) carry a credibility interval for the parameter and sampling uncertainty.
 
+Layer C (42.5): a CVM event of the last 20 trading days whose class passed the out-of-sample
+gate adds what is still to come of its effect to the first month, drawn with its uncertainty,
+and widens that month by the class's volatility ratio (`domain.forecast.events.recent_events`).
+
 Nothing here is a price target: the output is a distribution, with its confidence measured by
 `domain.forecast.calibration`.
 """
@@ -24,11 +28,12 @@ from typing import Any
 
 import numpy as np
 
+from domain.forecast.events import RecentEvent
 from domain.simulation.bayes import credible_interval
 from domain.simulation.candidates import FactorFit
 from domain.simulation.scenarios import stationary_bootstrap_indices
 
-MODEL_VERSION = "42.1.0"
+MODEL_VERSION = "42.5.0"
 HORIZONS: tuple[int, ...] = (3, 6, 12, 24)  # months (decision 42.0-1)
 QUANTILE_LEVELS: tuple[float, ...] = tuple(round(i / 100, 2) for i in range(1, 100))
 FALL_THRESHOLD = 0.20
@@ -82,10 +87,12 @@ class PriceForecast:
     paths: int
     model_version: str = MODEL_VERSION
     warnings: list[str] = field(default_factory=list)
+    events: list[RecentEvent] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["as_of"] = self.as_of.isoformat()
+        data["events"] = [e.to_dict() for e in self.events]
         return data
 
     @classmethod
@@ -115,6 +122,7 @@ class PriceForecast:
             paths=data["paths"],
             model_version=data.get("model_version", MODEL_VERSION),
             warnings=list(data.get("warnings", [])),
+            events=[RecentEvent.from_dict(e) for e in data.get("events", [])],
         )
 
 
@@ -169,6 +177,8 @@ def forecast_asset(
     mean_block: float = MEAN_BLOCK_MONTHS,
     class_expected_excess_monthly: float = 0.0,
     valuation_note: str | None = None,
+    events: Sequence[RecentEvent] = (),
+    events_note: str | None = None,
 ) -> PriceForecast:
     """Price paths of one asset on the class paths `class_excess` (paths, months ≥ max horizon)."""
     rng = np.random.default_rng(seed)
@@ -179,7 +189,15 @@ def forecast_asset(
     alpha = rng.normal(fit.alpha_post, fit.alpha_post_sd, paths)[:, None]
     beta = rng.normal(fit.beta_post, fit.beta_post_sd, paths)[:, None]
     idx = stationary_bootstrap_indices(fit.residuals.size, horizon_max, paths, mean_block, rng)
-    excess = alpha + beta * class_excess[:, :horizon_max] + fit.residuals[idx]
+    residuals = fit.residuals[idx]
+    used = [e for e in events if e.used]
+    shock = np.zeros(paths)
+    if used:  # layer C: only the first month, the 20 trading days of the event study
+        residuals[:, 0] *= float(np.prod([e.volatility_factor for e in used]))
+        for e in used:
+            shock += rng.normal(e.effect, e.effect_sd, paths)
+    excess = alpha + beta * class_excess[:, :horizon_max] + residuals
+    excess[:, 0] += shock
     excess = np.maximum(excess, -0.99)
     total = (1.0 + excess) * (1.0 + cdi_monthly)
     tr_growth = np.cumprod(total, axis=1)  # (paths, months)
@@ -205,7 +223,14 @@ def forecast_asset(
     valuation_monthly = fit.shrinkage * fit.alpha_prior_mean
     own_annual = (1.0 + fit.alpha_post - valuation_monthly) ** 12 - 1.0
     valuation_annual = (1.0 + valuation_monthly) ** 12 - 1.0
-    expected = (1.0 + market_annual) * (1.0 + fit.alpha_post) ** 12 - 1.0
+    events_effect = sum(e.effect for e in used)
+    expected = (1.0 + market_annual) * (1.0 + fit.alpha_post) ** 12 * (1.0 + events_effect) - 1.0
+    if used:
+        note = " ".join(e.note for e in used)
+    elif events:
+        note = " ".join(e.note for e in events)
+    else:
+        note = events_note or "Nenhum evento da CVM nos últimos 20 pregões."
     drivers = [
         Driver(
             "MARKET",
@@ -225,7 +250,12 @@ def forecast_asset(
             round(valuation_annual, 4) if fit.alpha_prior_mean else None,
             valuation_note or "Sem sinal de valuation para este ativo.",
         ),
-        Driver("EVENTS", "Eventos recentes da CVM", None, "Entra na Fase 42.5."),
+        Driver(
+            "EVENTS",
+            "Eventos recentes da CVM",
+            round(events_effect, 4) if used else None,
+            note,
+        ),
     ]
     warnings = []
     if fit.months < 60:
@@ -246,4 +276,5 @@ def forecast_asset(
         drivers=drivers,
         paths=paths,
         warnings=warnings,
+        events=list(events),
     )

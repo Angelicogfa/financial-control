@@ -753,7 +753,9 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "Estudo de eventos da CVM: para cada tipo de fato relevante (recompra, dividendos, "
             "emissão de ações, aquisição, recuperação judicial etc.), o retorno anormal médio em "
             "1, 5 e 20 pregões, encolhido para zero quando há poucos eventos, e a mudança na "
-            "volatilidade. Eventos perto da entrega de balanço ficam de fora."
+            "volatilidade. Eventos perto da entrega de balanço ficam de fora. Cada tipo traz o "
+            "portão fora da amostra (passed, gate_reason): só os que passaram entram na "
+            "previsão de preço."
         ),
         input_model=EmptyInput,
         output_type=EventStudyDTO,
@@ -778,8 +780,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         description=(
             "Previsão probabilística do preço de um ativo (bayesiana): faixa provável em 3, 6, "
             "12 e 24 meses, chance de subir, de cair 20% e de passar do preço médio e do preço "
-            "justo, o que pesou e o selo de confiança. É uma distribuição, não um preço-alvo. "
-            "Para projetar o patrimônio da carteira, use simulation.project."
+            "justo, o que pesou (inclusive os eventos da CVM dos últimos 20 pregões e o efeito "
+            "que ainda falta, só dos tipos que passaram no teste fora da amostra) e o selo de "
+            "confiança. É uma distribuição, não um preço-alvo. Para projetar o patrimônio da "
+            "carteira, use simulation.project."
         ),
         input_model=AssetIdInput,
         output_type=AssetForecastDTO,
