@@ -27,6 +27,7 @@ export function EventStudy() {
                     <th className="app-numeric">5 pregões</th>
                     <th className="app-numeric">20 pregões</th>
                     <th className="app-numeric">Volatilidade depois</th>
+                    <th>Na previsão</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -52,6 +53,10 @@ export function EventStudy() {
                       <td className="app-numeric">
                         {c.volatility_ratio === null || c.volatility_ratio === undefined ? "—" : `${num(c.volatility_ratio, 2)}×`}
                       </td>
+                      <td>
+                        {c.passed ? <Badge tone="success">entra</Badge> : <Badge tone="neutral">não entra</Badge>}
+                        {c.gate_reason && <div className="app-muted">{c.gate_reason}</div>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -59,7 +64,10 @@ export function EventStudy() {
             </div>
             <p className="app-card-hint">
               Os efeitos são puxados para zero quando há poucos eventos ou muita variação; “claro” marca os que têm 90% de
-              confiança no sentido. {data.confounded} eventos perto da entrega de balanço ficaram de fora.
+              confiança no sentido. {data.confounded} eventos perto da entrega de balanço ficaram de fora. Só entra na
+              previsão de preço o tipo cujo efeito em 20 pregões, estimado a cada ano com os anos anteriores, previu melhor que
+              zero no total e na maioria dos anos, e com o sentido claro depois de descontar o número de tipos testados
+              {data.sign_threshold ? ` (${pct(data.sign_threshold, 1)} de confiança)` : ""}.
             </p>
           </Section>
         )

@@ -213,6 +213,7 @@ export interface AssetForecastDTO {
   expected_total_return_annual?: number | null;
   horizons?: ForecastHorizonDTO[];
   drivers?: ForecastDriverDTO[];
+  recent_events?: ForecastEventDTO[];
   seal?: ForecastSealDTO | null;
   requested?: boolean;
   cautions?: string[];
@@ -870,6 +871,11 @@ export interface EventClassDTO {
   events: number;
   horizons?: EventHorizonDTO[];
   volatility_ratio?: number | null;
+  passed?: boolean;
+  gate_reason?: string;
+  oos_origins?: number;
+  oos_improvement?: number | null;
+  oos_win_share?: number | null;
 }
 
 export interface EventHorizonDTO {
@@ -904,6 +910,7 @@ export interface EventStudyDTO {
   as_of?: string | null;
   events?: number;
   confounded?: number;
+  sign_threshold?: number | null;
   classes?: EventClassDTO[];
 }
 
@@ -999,6 +1006,16 @@ export interface ForecastDriverDTO {
   label: string;
   annual?: number | null;
   note?: string;
+}
+
+export interface ForecastEventDTO {
+  event_class: string;
+  label: string;
+  event_date: string;
+  days_after: number;
+  effect: number;
+  used: boolean;
+  note: string;
 }
 
 export interface ForecastHorizonDTO {

@@ -9,7 +9,11 @@ import numpy as np
 import pytest
 
 from domain.agentic.services.catalog import CATALOG_BY_NAME, AgenticRuntimeHandlers
+from domain.disclosures.entities import IssuerTicker
+from domain.disclosures.events import BUYBACK
 from domain.forecast.calibration import ForecastCalibration
+from domain.forecast.event_runs import EVENTS
+from domain.forecast.events import RecentEvent
 from domain.forecast.model import (
     QUANTILE_LEVELS,
     PriceForecast,
@@ -23,6 +27,7 @@ from domain.shared.enums import ArcaClass, SeriesUnit
 from domain.simulation.candidates import FactorFit, ols_fit, shrink
 from domain.simulation.data import index_symbol, px_symbol, tr_symbol
 from tests.conftest import offline_gateway
+from tests.test_cvm_events import WEG, _doc, _passed_study
 from worker.jobs import calibrate_forecasts_job, refresh_asset_forecasts_job
 
 A, CX = ArcaClass.ACOES, ArcaClass.CAIXA
@@ -63,6 +68,31 @@ def test_forecast_follows_the_class_the_cdi_and_the_dividends() -> None:
     keys = [d.key for d in forecast.drivers]
     assert keys == ["MARKET", "OWN", "VALUATION", "EVENTS"]
     assert PriceForecast.from_dict(forecast.to_dict()) == forecast
+
+
+def test_a_recent_event_moves_the_first_month() -> None:
+    args = {
+        "cdi_monthly": 0.01,
+        "price_now": 100.0,
+        "drag_monthly": 0.0,
+        "as_of": TODAY,
+        "seed": 3,
+    }
+    base = forecast_asset(_fit(), np.full((400, 24), 0.0), **args)
+    assert base.drivers[3].annual is None and "Nenhum evento" in base.drivers[3].note
+    used = RecentEvent(BUYBACK, date(2026, 10, 26), 4, 0.05, 0.0, 2.0, True, "Recompra: +5%.")
+    ignored = RecentEvent("DIVIDENDS", date(2026, 10, 27), 3, 0.0, 0.0, 1.0, False, "Sem efeito.")
+    moved = forecast_asset(_fit(), np.full((400, 24), 0.0), **args, events=[used, ignored])
+    first = next(h for h in moved.horizons if h.months == 3)
+    before = next(h for h in base.horizons if h.months == 3)
+    assert first.price_at(0.5) == pytest.approx(before.price_at(0.5) * 1.05, rel=0.01)
+    events = moved.drivers[3]
+    assert events.key == "EVENTS" and events.annual == pytest.approx(0.05)
+    assert events.note == "Recompra: +5%."
+    assert moved.expected_total_return_annual > base.expected_total_return_annual
+    only_ignored = forecast_asset(_fit(), np.full((400, 24), 0.0), **args, events=[ignored])
+    assert only_ignored.drivers[3].annual is None and only_ignored.drivers[3].note == "Sem efeito."
+    assert PriceForecast.from_dict(moved.to_dict()) == moved
 
 
 def test_chance_above_reads_the_quantile_grid() -> None:
@@ -183,6 +213,26 @@ def test_forecast_statuses_through_the_api(api: SimpleNamespace) -> None:
     quality = api.client.get("/api/v1/market/forecast-quality").json()
     assert quality["status"] == "OK" and quality["coverage_90"] == 0.9
     assert api.client.get("/api/v1/assets/999/forecast").status_code == 404
+
+
+def test_recent_events_reach_the_forecast(api: SimpleNamespace) -> None:
+    ids = _seed(api)
+    with api.uow_factory() as uow:
+        uow.cvm_issuers.replace_all([IssuerTicker("WEGE3", WEG, "WEG")])
+        uow.cvm_documents.upsert_many(
+            [_doc("R1", date(2026, 10, 26), "Programa de Recompra de Ações")], seen_at=NOW
+        )
+        uow.forecasts.save_model(EVENTS, TODAY, _passed_study().to_dict())
+        uow.commit()
+    refresh_asset_forecasts_job(api.uow_factory, offline_gateway(), now=NOW)
+    _trusted_calibration(api)
+    data = api.client.get(f"/api/v1/assets/{ids['WEGE3']}/forecast").json()
+    [event] = data["recent_events"]
+    assert event["event_class"] == BUYBACK and event["used"] and event["days_after"] == 4
+    assert event["label"] == "Recompra de ações" and event["effect"] > 0
+    driver = next(d for d in data["drivers"] if d["key"] == "EVENTS")
+    assert driver["annual"] == pytest.approx(event["effect"], abs=1e-4)
+    assert data["model_version"] == "42.5.0"
 
 
 def test_calibration_job_scores_the_past(api: SimpleNamespace) -> None:

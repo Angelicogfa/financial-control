@@ -15,6 +15,13 @@ Care taken:
   of the class effects (it is still measured and shown);
 - the effect of a class is the mean CAR shrunk to zero, empirical Bayes across the classes: most
   kinds of events have no systematic effect, and a class with few events barely moves.
+
+Layer C of the forecast (Phase 42.5) uses a class only if its 20-day effect passed out of sample:
+each year the study is redone with the earlier years and predicts the CAR of that year's events;
+the class enters if it beat "no effect" in total and in most years and if the sign of its effect
+is clear after discounting the number of classes tested (Bonferroni). A recent event of a class
+that passed adds what is still to come of the effect to the first month of the forecast, and
+its volatility ratio to the spread of that month.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ import bisect
 import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from typing import Any
 
@@ -39,6 +46,13 @@ CONFOUND_BEFORE_DAYS = 3  # calendar days around a DFP/ITR delivery
 CONFOUND_AFTER_DAYS = 5
 MIN_CLASS_EVENTS = 5
 MIXED = "MIXED"
+# Gate of layer C (42.5): the 20-day effect, yearly rolling origin.
+GATE_HORIZON = 20
+MIN_TRAIN_YEARS = 3
+MIN_GATE_ORIGINS = 5
+MIN_GATE_WIN_SHARE = 0.55
+GATE_SIGN_ALPHA = 0.10  # split over the classes tested
+VOLATILITY_RATIO_BOUNDS = (0.5, 3.0)
 
 Series = Sequence[tuple[date, float]]
 
@@ -165,18 +179,44 @@ class ClassEffect:
 
 
 @dataclass(frozen=True)
+class ClassGate:
+    """Out-of-sample check of a class's 20-day effect (Phase 42.5)."""
+
+    event_class: str
+    origins: int  # years predicted with the earlier ones
+    test_events: int
+    mse_model: float
+    mse_zero: float
+    improvement: float  # 1 - mse_model / mse_zero
+    win_share: float  # share of the years (where the prediction was not zero) it did better
+    sign_probability: float
+    passed: bool
+    reason: str
+
+
+@dataclass(frozen=True)
 class EventStudy:
     as_of: date
     events: int  # measured, one per company and day
     confounded: int
     classes: list[ClassEffect] = field(default_factory=list)
     tau: dict[str, float] = field(default_factory=dict)  # spread of the true class effects
+    gates: list[ClassGate] = field(default_factory=list)
+    sign_threshold: float | None = None  # sign confidence a class needs, after Bonferroni
 
     def effect(self, event_class: str, horizon: int) -> HorizonEffect | None:
-        for c in self.classes:
-            if c.event_class == event_class:
-                return next((h for h in c.horizons if h.horizon == horizon), None)
-        return None
+        found = self.class_effect(event_class)
+        return next((h for h in found.horizons if h.horizon == horizon), None) if found else None
+
+    def class_effect(self, event_class: str) -> ClassEffect | None:
+        return next((c for c in self.classes if c.event_class == event_class), None)
+
+    def gate(self, event_class: str) -> ClassGate | None:
+        return next((g for g in self.gates if g.event_class == event_class), None)
+
+    def passed(self, event_class: str) -> bool:
+        found = self.gate(event_class)
+        return found is not None and found.passed
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -196,15 +236,20 @@ class EventStudy:
             )
             for c in payload.get("classes", [])
         ]
+        payload["gates"] = [ClassGate(**g) for g in payload.get("gates", [])]
         return cls(**payload)
+
+
+def _one_per_event(effects: Sequence[EventEffect]) -> list[EventEffect]:
+    events: dict[tuple[str, date], EventEffect] = {}
+    for e in effects:
+        events.setdefault((e.ticker, e.event_date), e)  # one per event, not per document
+    return list(events.values())
 
 
 def study(effects: Sequence[EventEffect], *, as_of: date) -> EventStudy:
     """Class effects of the unconfounded events, shrunk to zero across the classes."""
-    events: dict[tuple[str, date], EventEffect] = {}
-    for e in effects:
-        events.setdefault((e.ticker, e.event_date), e)  # one per event, not per document
-    measured = list(events.values())
+    measured = _one_per_event(effects)
     clean = [e for e in measured if not e.confounded and e.event_class != MIXED]
     by_class: dict[str, list[EventEffect]] = defaultdict(list)
     for e in clean:
@@ -264,3 +309,174 @@ def study(effects: Sequence[EventEffect], *, as_of: date) -> EventStudy:
         classes=classes,
         tau={k: round(v, 6) for k, v in taus.items()},
     )
+
+
+# --- layer C: the gate and the recent events (42.5) --------------------------------------------
+
+
+def _gate_verdict(
+    origins: int, improvement: float, win_share: float, sign: float, threshold: float, tested: int
+) -> tuple[bool, str]:
+    if origins < MIN_GATE_ORIGINS:
+        return False, f"Só {origins} anos fora da amostra; são precisos {MIN_GATE_ORIGINS}."
+    if improvement <= 0:
+        return False, "Fora da amostra, o efeito não previu melhor do que zero."
+    if win_share < MIN_GATE_WIN_SHARE:
+        return False, f"Melhorou a previsão em só {win_share:.0%} dos anos."
+    if sign < threshold:
+        return False, (
+            f"O sentido do efeito tem {sign:.1%} de confiança; com {tested} tipos testados, "
+            f"são precisos {threshold:.1%}."
+        )
+    return True, (
+        f"Passou fora da amostra: erro {improvement:.1%} menor que prever zero, melhor em "
+        f"{win_share:.0%} dos anos."
+    )
+
+
+def gate(effects: Sequence[EventEffect], found: EventStudy) -> EventStudy:
+    """The study with each class's out-of-sample gate on the 20-day effect (yearly origins)."""
+    clean = [
+        e
+        for e in _one_per_event(effects)
+        if not e.confounded and e.event_class != MIXED and e.car_20 is not None
+    ]
+    # class -> year -> [squared error of the model, of zero, events]
+    stats: dict[str, dict[int, list[float]]] = defaultdict(dict)
+    for year in sorted({e.event_date.year for e in clean}):
+        train = [e for e in clean if e.event_date.year < year]
+        if len({e.event_date.year for e in train}) < MIN_TRAIN_YEARS:
+            continue
+        past = study(train, as_of=date(year, 1, 1))
+        for e in clean:
+            if e.event_date.year != year or e.car_20 is None:
+                continue
+            h = past.effect(e.event_class, GATE_HORIZON)
+            prediction = h.effect if h is not None else 0.0
+            row = stats[e.event_class].setdefault(year, [0.0, 0.0, 0.0])
+            row[0] += (e.car_20 - prediction) ** 2
+            row[1] += e.car_20 * e.car_20
+            row[2] += 1
+
+    tested = [c for c in found.classes if found.effect(c.event_class, GATE_HORIZON) is not None]
+    threshold = 1.0 - GATE_SIGN_ALPHA / max(len(tested), 1)
+    gates = []
+    for c in found.classes:
+        h20 = found.effect(c.event_class, GATE_HORIZON)
+        by_year = stats.get(c.event_class, {})
+        sse_model = sum(r[0] for r in by_year.values())
+        sse_zero = sum(r[1] for r in by_year.values())
+        n = int(sum(r[2] for r in by_year.values()))
+        decided = [r for r in by_year.values() if not math.isclose(r[0], r[1])]
+        win_share = sum(r[0] < r[1] for r in decided) / len(decided) if decided else 0.0
+        improvement = 1.0 - sse_model / sse_zero if sse_zero > 0 else 0.0
+        sign = h20.sign_probability if h20 is not None else 0.5
+        if h20 is None:
+            passed, reason = False, "Poucos eventos para medir o efeito em 20 pregões."
+        else:
+            passed, reason = _gate_verdict(
+                len(by_year), improvement, win_share, sign, threshold, len(tested)
+            )
+        gates.append(
+            ClassGate(
+                event_class=c.event_class,
+                origins=len(by_year),
+                test_events=n,
+                mse_model=round(float(sse_model) / n, 8) if n else 0.0,
+                mse_zero=round(float(sse_zero) / n, 8) if n else 0.0,
+                improvement=round(float(improvement), 4),
+                win_share=round(float(win_share), 4),
+                sign_probability=sign,
+                passed=passed,
+                reason=reason,
+            )
+        )
+    return replace(found, gates=gates, sign_threshold=round(threshold, 4))
+
+
+@dataclass(frozen=True)
+class RecentEvent:
+    """A CVM event of the last 20 trading days and what it adds to the forecast (42.5)."""
+
+    event_class: str
+    event_date: date  # delivery
+    days_after: int  # trading days since the delivery
+    effect: float  # what is still to come of the class effect (abnormal return, first month)
+    effect_sd: float
+    volatility_factor: float  # multiplies the spread of the first month
+    used: bool
+    note: str
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["event_date"] = self.event_date.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> RecentEvent:
+        return cls(**{**data, "event_date": date.fromisoformat(data["event_date"])})
+
+
+def effect_so_far(effects: Mapping[int, float], days: int) -> float:
+    """The class CAR expected after `days` trading days, linear between the measured horizons."""
+    points = [(0, 0.0), *sorted(effects.items())]
+    return float(np.interp(days, [p[0] for p in points], [p[1] for p in points]))
+
+
+def _results_near(day: date, results_days: Sequence[date]) -> bool:
+    return any(
+        day - timedelta(days=CONFOUND_BEFORE_DAYS) <= r <= day + timedelta(days=CONFOUND_AFTER_DAYS)
+        for r in results_days
+    )
+
+
+def recent_events(
+    events: Sequence[EventInput],
+    found: EventStudy | None,
+    *,
+    today: date,
+    results_days: Sequence[date] = (),
+    labels: Mapping[str, str] | None = None,
+) -> list[RecentEvent]:
+    """The events of the last 20 trading days, newest first, with the effect still to come."""
+    names = labels or {}
+    out = []
+    for event in sorted(events, key=lambda e: e.delivery, reverse=True):
+        days = int(np.busday_count(event.delivery, today))
+        if event.delivery > today or days >= GATE_HORIZON:
+            continue
+        label = names.get(event.event_class, event.event_class)
+        base = RecentEvent(event.event_class, event.delivery, days, 0.0, 0.0, 1.0, False, "")
+        effect = found.class_effect(event.event_class) if found is not None else None
+        h20 = found.effect(event.event_class, GATE_HORIZON) if found is not None else None
+        if event.event_class == MIXED:
+            note = "Comunicados de tipos diferentes no mesmo dia: sem efeito isolado."
+        elif _results_near(event.delivery, results_days):
+            note = f"{label}: perto da entrega de balanço, o efeito se confunde com o resultado."
+        elif found is None:
+            note = f"{label}: o estudo de eventos ainda não foi calculado."
+        elif effect is None or h20 is None or not found.passed(event.event_class):
+            verdict = found.gate(event.event_class)
+            note = f"{label}: sem efeito comprovado." + (f" {verdict.reason}" if verdict else "")
+        else:
+            left = 1.0 - days / GATE_HORIZON
+            so_far = effect_so_far({h.horizon: h.effect for h in effect.horizons}, days)
+            remaining = h20.effect - so_far
+            low, high = VOLATILITY_RATIO_BOUNDS
+            ratio = min(max(effect.volatility_ratio or 1.0, low), high)
+            out.append(
+                replace(
+                    base,
+                    effect=round(remaining, 6),
+                    effect_sd=round(h20.effect_sd * left, 6),
+                    volatility_factor=round(math.sqrt(1.0 + (ratio * ratio - 1.0) * left), 4),
+                    used=True,
+                    note=(
+                        f"{label} em {event.delivery:%d/%m}: efeito típico de "
+                        f"{h20.effect:+.1%} em 20 pregões; faltam {remaining:+.1%}."
+                    ),
+                )
+            )
+            continue
+        out.append(replace(base, note=note))
+    return out

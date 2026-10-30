@@ -43,8 +43,20 @@ const study = {
         { horizon: 20, events: 410, mean: 0.014, effect: 0.012, effect_sd: 0.006, sign_probability: 0.95 },
       ],
       volatility_ratio: 1.08,
+      passed: true,
+      gate_reason: "Passou fora da amostra: erro 2,0% menor que prever zero, melhor em 70% dos anos.",
+    },
+    {
+      event_class: "DIVIDENDS",
+      label: "Proventos",
+      events: 300,
+      horizons: [],
+      volatility_ratio: null,
+      passed: false,
+      gate_reason: "Fora da amostra, o efeito não previu melhor do que zero.",
     },
   ],
+  sign_threshold: 0.995,
 };
 
 describe("Event study on the relevant-facts page (Phase 42.4)", () => {
@@ -60,6 +72,10 @@ describe("Event study on the relevant-facts page (Phase 42.4)", () => {
     expect(within(table).getByText("Recompra de ações")).toBeInTheDocument();
     expect(within(table).getByText("1,08×")).toBeInTheDocument();
     expect(within(table).getAllByText("claro")).toHaveLength(3);
+    expect(within(table).getByText("entra")).toBeInTheDocument();
+    expect(within(table).getByText("não entra")).toBeInTheDocument();
+    expect(within(table).getByText(/não previu melhor do que zero/)).toBeInTheDocument();
+    expect(screen.getByText(/99,5% de confiança/)).toBeInTheDocument();
   });
 
   it("leaves the study out until it is computed", async () => {

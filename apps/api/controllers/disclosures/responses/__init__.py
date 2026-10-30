@@ -115,6 +115,13 @@ class EventClassDTO(BaseModel):
     events: int
     horizons: list[EventHorizonDTO] = Field(default_factory=list)
     volatility_ratio: float | None = None
+    # Out-of-sample gate of the 20-day effect (Phase 42.5): only a class that passed enters
+    # the price forecast.
+    passed: bool = False
+    gate_reason: str = ""
+    oos_origins: int = 0
+    oos_improvement: float | None = None
+    oos_win_share: float | None = None
 
 
 class EventStudyDTO(BaseModel):
@@ -124,4 +131,5 @@ class EventStudyDTO(BaseModel):
     as_of: date | None = None
     events: int = 0
     confounded: int = 0
+    sign_threshold: float | None = None  # sign confidence a class needs, after Bonferroni
     classes: list[EventClassDTO] = Field(default_factory=list)

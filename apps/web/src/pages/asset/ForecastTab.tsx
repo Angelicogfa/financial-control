@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { api } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
-import type { AssetForecastDTO, ForecastHorizonDTO } from "../../api/types";
+import type { AssetForecastDTO, ForecastEventDTO, ForecastHorizonDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { KpiGrid, Lead, Notes, Section, Segmented, type KpiSpec } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
@@ -231,12 +231,44 @@ function Forecast({ forecast, onRefreshed }: Readonly<{ forecast: AssetForecastD
             </div>
           ))}
         </dl>
+        <RecentEvents events={forecast.recent_events ?? []} />
       </Section>
       <SealBox title="Quanto confiar" seal={forecast.seal} />
       <Notes items={notes} />
       <div className="app-button-row">
         <RefreshButton assetId={forecast.asset_id} onDone={onRefreshed} label="Recalcular agora" />
       </div>
+    </div>
+  );
+}
+
+/** CVM events of the last 20 trading days (Phase 42.5): only the kinds that passed the
+ *  out-of-sample test move the forecast; the others are listed as "sem efeito comprovado". */
+function RecentEvents({ events }: Readonly<{ events: ForecastEventDTO[] }>) {
+  if (events.length === 0) return null;
+  return (
+    <div className="app-table-wrap">
+      <table className="app-table" aria-label="Eventos recentes da CVM">
+        <thead>
+          <tr>
+            <th>Evento recente</th>
+            <th className="app-numeric">Entrega</th>
+            <th className="app-numeric">Efeito que falta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((e) => (
+            <tr key={`${e.event_date}-${e.event_class}`}>
+              <td>
+                {e.label}
+                <div className="app-muted">{e.note}</div>
+              </td>
+              <td className="app-numeric">{day(e.event_date)}</td>
+              <td className="app-numeric">{e.used ? pct(e.effect, 1, true) : "sem efeito comprovado"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

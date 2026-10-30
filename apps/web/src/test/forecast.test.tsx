@@ -47,6 +47,27 @@ function forecast(overrides: Partial<AssetForecastDTO> = {}): AssetForecastDTO {
     drivers: [
       { key: "MARKET", label: "Mercado (classe)", annual: 0.08, note: "" },
       { key: "VALUATION", label: "Valuation", annual: null, note: "Entra na Fase 42.3" },
+      { key: "EVENTS", label: "Eventos recentes da CVM", annual: 0.012, note: "Recompra em 26/10." },
+    ],
+    recent_events: [
+      {
+        event_class: "BUYBACK",
+        label: "Recompra de ações",
+        event_date: "2026-10-26",
+        days_after: 4,
+        effect: 0.012,
+        used: true,
+        note: "Recompra em 26/10: efeito típico de +1,6% em 20 pregões; faltam +1,2%.",
+      },
+      {
+        event_class: "DIVIDENDS",
+        label: "Proventos",
+        event_date: "2026-10-27",
+        days_after: 3,
+        effect: 0,
+        used: false,
+        note: "Proventos: sem efeito comprovado.",
+      },
     ],
     seal: { level: 3, label: "Confiável", text: "Quando o modelo disse 90%, aconteceu em 88% das vezes." },
     warnings: [],
@@ -75,6 +96,10 @@ describe("Probabilidades tab (Phase 42.1)", () => {
     const table = screen.getByRole("table", { name: "Chances em 12 meses" });
     expect(within(table).getByText("Acima do preço justo (valuation)")).toBeInTheDocument();
     expect(screen.getByText("Entra na Fase 42.3")).toBeInTheDocument();
+    const events = screen.getByRole("table", { name: "Eventos recentes da CVM" });
+    expect(within(events).getByText("Recompra de ações")).toBeInTheDocument();
+    expect(within(events).getByText("+1,2%")).toBeInTheDocument();
+    expect(within(events).getByText("sem efeito comprovado")).toBeInTheDocument();
     expect(screen.getByText("Confiável")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "24 meses" }));

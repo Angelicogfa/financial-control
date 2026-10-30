@@ -73,8 +73,10 @@ class AbstractCvmDocumentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def events(self, cnpjs: Sequence[str] | None = None) -> list[CvmDocument]:
-        """Documents that are events (a non-empty class), oldest first."""
+    def events(
+        self, cnpjs: Sequence[str] | None = None, *, since: date | None = None
+    ) -> list[CvmDocument]:
+        """Documents that are events (a non-empty class), oldest first; `since` on delivery."""
         raise NotImplementedError
 
     @abstractmethod

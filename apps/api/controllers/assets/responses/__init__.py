@@ -276,6 +276,18 @@ class ForecastDriverDTO(BaseModel):
     note: str = ""
 
 
+class ForecastEventDTO(BaseModel):
+    """A CVM event of the last 20 trading days and what it adds to the forecast (Phase 42.5)."""
+
+    event_class: str
+    label: str
+    event_date: date
+    days_after: int  # trading days since the delivery
+    effect: float  # abnormal return still to come in the first month (0 when not used)
+    used: bool  # its class passed the out-of-sample gate
+    note: str
+
+
 class ForecastSealDTO(BaseModel):
     level: int
     label: str
@@ -299,6 +311,7 @@ class AssetForecastDTO(BaseModel):
     expected_total_return_annual: float | None = None
     horizons: list[ForecastHorizonDTO] = Field(default_factory=list)
     drivers: list[ForecastDriverDTO] = Field(default_factory=list)
+    recent_events: list[ForecastEventDTO] = Field(default_factory=list)
     seal: ForecastSealDTO | None = None
     requested: bool = False  # asked for by the user: shown with a warning, from 12 months
     cautions: list[str] = Field(default_factory=list)  # why to read it with care
