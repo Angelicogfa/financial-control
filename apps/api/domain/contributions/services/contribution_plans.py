@@ -10,15 +10,22 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 from core.errors import ConflictError, ValidationError
 from domain.assets.services.cerrado import Recommendation
 from domain.policy.services.allocation import ClassAllocation
-from domain.portfolio.services.consolidation import AssetContributionOrder, ContributionPlan
+from domain.portfolio.services.consolidation import (
+    AssetContributionOrder,
+    ClassContributionRationale,
+    ContributionPlan,
+)
 from domain.shared.enums import (
     ArcaClass,
     AssetType,
+    ContributionClassReason,
+    ContributionOrderReason,
     ContributionPlanStatus,
     IntraClassStrategy,
 )
@@ -70,7 +77,12 @@ def plan_to_payload(plan: ContributionPlan) -> dict[str, Any]:
     return _jsonable(asdict(plan))
 
 
+def _optional[E: StrEnum](enum: type[E], value: str | None) -> E | None:
+    return enum(value) if value is not None else None
+
+
 def plan_from_payload(data: Mapping[str, Any]) -> ContributionPlan:
+    """Plans saved before the rationale existed load with empty reasons."""
     orders = [
         AssetContributionOrder(
             **{
@@ -78,6 +90,7 @@ def plan_from_payload(data: Mapping[str, Any]) -> ContributionPlan:
                 "asset_type": AssetType(o["asset_type"]),
                 "arca_class": ArcaClass(o["arca_class"]),
                 "cerrado_recommendation": Recommendation(o["cerrado_recommendation"]),
+                "reason": _optional(ContributionOrderReason, o.get("reason")),
             }
         )
         for o in data.get("orders", [])
@@ -85,6 +98,17 @@ def plan_from_payload(data: Mapping[str, Any]) -> ContributionPlan:
     allocations = [
         ClassAllocation(**{**a, "arca_class": ArcaClass(a["arca_class"])})
         for a in data.get("projected_allocations", [])
+    ]
+    rationale = [
+        ClassContributionRationale(
+            **{
+                **r,
+                "arca_class": ArcaClass(r["arca_class"]),
+                "reason": ContributionClassReason(r["reason"]),
+                "strategy": _optional(IntraClassStrategy, r.get("strategy")),
+            }
+        )
+        for r in data.get("class_rationale", [])
     ]
     return ContributionPlan(
         contribution_amount_brl=float(data["contribution_amount_brl"]),
@@ -95,6 +119,7 @@ def plan_from_payload(data: Mapping[str, Any]) -> ContributionPlan:
         },
         orders=orders,
         projected_allocations=allocations,
+        class_rationale=rationale,
     )
 
 

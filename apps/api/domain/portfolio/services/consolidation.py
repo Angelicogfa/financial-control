@@ -55,6 +55,8 @@ from domain.shared.enums import (
     AssetLifecycle,
     AssetPurpose,
     AssetType,
+    ContributionClassReason,
+    ContributionOrderReason,
     IntraClassStrategy,
     TransactionKind,
 )
@@ -155,6 +157,28 @@ class AssetContributionOrder:
     recommended_quantity: float
     executed_amount_brl: float
     projected_value_brl: float
+    # Rationale (plans saved before it existed keep the defaults).
+    class_current_weight_pct: float = 0.0
+    leftover_amount_brl: float = 0.0
+    reason: ContributionOrderReason | None = None
+
+
+@dataclass(frozen=True)
+class ClassContributionRationale:
+    """Why an ARCA class received what it did: the first-level rule and the numbers behind it."""
+
+    arca_class: ArcaClass
+    reason: ContributionClassReason
+    band_status: str
+    current_pct: float
+    target_pct: float
+    band_pct: float
+    deficit_brl: float
+    first_level_brl: float
+    received_brl: float
+    eligible_assets: int
+    strategy: IntraClassStrategy | None = None
+    strategy_overridden: bool = False
 
 
 @dataclass(frozen=True)
@@ -167,6 +191,7 @@ class ContributionPlan:
     by_class_allocated_brl: dict[ArcaClass, float]
     orders: list[AssetContributionOrder]
     projected_allocations: list[ClassAllocation]
+    class_rationale: list[ClassContributionRationale] = field(default_factory=list)
 
 
 @dataclass
@@ -665,6 +690,7 @@ class _DraftOrder:
     unit_brl: float
     qty: float = 0.0
     executed: float = 0.0
+    first_pass: float = 0.0  # spent from its own share, before the leftover redistribution
 
     @property
     def is_integer(self) -> bool:
@@ -742,14 +768,55 @@ def _redistribute_leftover(
     return leftover
 
 
+def _order_reason(order: _DraftOrder) -> ContributionOrderReason:
+    if order.unit_brl <= 0:
+        return ContributionOrderReason.NO_PRICE
+    if order.weight <= 0:
+        return ContributionOrderReason.ZERO_WEIGHT
+    if order.qty > 0:
+        return (
+            ContributionOrderReason.BOUGHT
+            if order.first_pass > 0
+            else ContributionOrderReason.LEFTOVER_FILL
+        )
+    if order.budget > 0.005:
+        return ContributionOrderReason.PRICE_ABOVE_BUDGET
+    return ContributionOrderReason.ABOVE_TARGET
+
+
+def _class_reason(
+    *,
+    below_band: bool,
+    first_level: float,
+    eligible_assets: int,
+    band_priority: bool,
+) -> ContributionClassReason:
+    """Mirror of `distribute_with_bands`: which of its branches decided this class's share."""
+    if first_level > 0.005 and eligible_assets == 0:
+        return ContributionClassReason.NO_ELIGIBLE_ASSETS
+    if below_band:
+        return ContributionClassReason.REFILL_BELOW_BAND
+    if first_level > 0.005:
+        # `distribute_by_targets` only pays deficits: their sum is never below the amount.
+        return ContributionClassReason.BELOW_TARGET
+    if band_priority:
+        return ContributionClassReason.BELOW_BAND_PRIORITY
+    return ContributionClassReason.ABOVE_TARGET
+
+
 def plan_contribution(
     report: ConsolidatedPortfolioReport,
     targets: ArcaTargets,
     amount_brl: float,
     *,
     strategy_override: IntraClassStrategy | None = None,
+    class_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
 ) -> ContributionPlan:
-    """Build a 2-level contribution plan (Level 1: ARCA classes; Level 2: intra-class assets)."""
+    """Build a 2-level contribution plan (Level 1: ARCA classes; Level 2: intra-class assets).
+
+    `class_strategies` is the policy's intra-class strategy per class; it only labels the
+    rationale (the report's target weights already follow it).
+    """
     if amount_brl < 0:
         raise ValidationError("Contribution amount cannot be negative")
 
@@ -757,8 +824,15 @@ def plan_contribution(
     below_band = {a.arca_class for a in report.allocations if a.band_status == BAND_BELOW}
     class_alloc_brl = distribute_with_bands(current_by_class, targets, below_band, amount_brl)
     bands = {a.arca_class: a.band_pct for a in report.allocations}
+    total_after = sum(max(v, 0.0) for v in current_by_class.values()) + amount_brl
+    deficits = {
+        c: max(targets.fraction(c) * total_after - max(current_by_class.get(c, 0.0), 0.0), 0.0)
+        for c in ArcaClass
+    }
+    band_priority = bool(below_band) and sum(deficits[c] for c in below_band) >= amount_brl
 
     drafts: dict[ArcaClass, list[_DraftOrder]] = {}
+    eligible_count: dict[ArcaClass, int] = {}
     projected = dict(current_by_class)
     leftover = 0.0
     for arca_class in ArcaClass:
@@ -771,6 +845,7 @@ def plan_contribution(
             and p.purpose == AssetPurpose.ARCA
             and p.lifecycle_status in CONTRIBUTION_STATUSES
         ]
+        eligible_count[arca_class] = len(class_positions)
         if class_budget <= 0 or not class_positions:
             leftover += max(class_budget, 0.0)
             continue
@@ -790,6 +865,7 @@ def plan_contribution(
         ]
         for order in drafts[arca_class]:
             spent = _fill(order, order.budget)
+            order.first_pass = spent
             leftover += order.budget - spent
             projected[arca_class] = projected.get(arca_class, 0.0) + spent
 
@@ -810,6 +886,9 @@ def plan_contribution(
             recommended_quantity=o.qty if o.is_integer else round(o.qty, 6),
             executed_amount_brl=round(o.executed, 2),
             projected_value_brl=round(o.pos.current_value_brl + o.executed, 2),
+            class_current_weight_pct=round(o.pos.class_current_weight_pct, 2),
+            leftover_amount_brl=round(o.executed - o.first_pass, 2),
+            reason=_order_reason(o),
         )
         for arca_class in ArcaClass
         for o in drafts.get(arca_class, [])
@@ -820,6 +899,29 @@ def plan_contribution(
     received: dict[ArcaClass, float] = {}
     for order in orders:
         received[order.arca_class] = received.get(order.arca_class, 0.0) + order.executed_amount_brl
+    policy_strategies = class_strategies or {}
+    rationale = [
+        ClassContributionRationale(
+            arca_class=a.arca_class,
+            reason=_class_reason(
+                below_band=a.arca_class in below_band,
+                first_level=class_alloc_brl.get(a.arca_class, 0.0),
+                eligible_assets=eligible_count[a.arca_class],
+                band_priority=band_priority,
+            ),
+            band_status=a.band_status,
+            current_pct=a.current_pct,
+            target_pct=a.target_pct,
+            band_pct=a.band_pct,
+            deficit_brl=round(deficits[a.arca_class], 2),
+            first_level_brl=round(class_alloc_brl.get(a.arca_class, 0.0), 2),
+            received_brl=round(received.get(a.arca_class, 0.0), 2),
+            eligible_assets=eligible_count[a.arca_class],
+            strategy=strategy_override or policy_strategies.get(a.arca_class),
+            strategy_overridden=strategy_override is not None,
+        )
+        for a in report.allocations
+    ]
     return ContributionPlan(
         contribution_amount_brl=round(amount_brl, 2),
         executed_total_brl=executed_total,
@@ -829,4 +931,5 @@ def plan_contribution(
         projected_allocations=compute_allocation(
             {c: round(v, 2) for c, v in projected.items()}, targets, bands=bands
         ),
+        class_rationale=rationale,
     )

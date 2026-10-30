@@ -57,9 +57,10 @@ Ou seja, "A é melhor que B" significa hoje apenas que A tem mais respostas SIM 
 3. **Escalas incompatíveis.** Contagem inteira, enum (DESCONTADO/CARO), BOM/RUIM, z-score, probabilidade, R$. Sem uma escala comum, não há como combinar.
 4. **O mesmo sinal calculado duas vezes.** O z de valuation aparece na camada B da previsão e no sinal VALOR do Garimpo; o veredito de valuation filtra candidatos, mas não o aporte. Combinar sem um registro único conta duas vezes a mesma evidência.
 5. **Sem validação do todo.** Mecanismos isolados têm portões fora da amostra (B, C, Garimpo), mas a regra que de fato gasta o seu dinheiro nunca foi comparada com referências simples: pesos iguais, só o Cerrado, o índice.
-6. **Sem trilha de auditoria da decisão.**
-   - O plano de aporte guarda os valores, não o porquê.
-   - Não dá para responder, meses depois, "por que comprei A e não B em março" com os dados que existiam em março.
+6. **Trilha de auditoria só da regra, não das evidências.**
+   - Desde a Fase 44 (justificativa do aporte), o plano guarda a regra que decidiu cada valor: banda, déficit, divisão interna e o motivo de cada ativo.
+   - Não guarda as evidências, porque o aporte não usa nenhuma. Não dá para responder, meses depois, "por que A e não B em março" com os dados que existiam em março.
+   - O registro de decisão da Fase 45 estende essa justificativa com as lentes, os portões e a nota.
 7. **Sem retorno.** Só o Garimpo tem placar. As recomendações do aporte não são medidas depois.
 8. **Universo estreito.** O aporte só olha os ativos já cadastrados e elegíveis. Os melhores candidatos (M13, M15) ficam em outras telas.
 

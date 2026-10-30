@@ -11,6 +11,7 @@ from controllers.portfolio.responses import (
     AssetContributionOrderDTO,
     BenchmarkComparisonDTO,
     ClassAllocationDTO,
+    ClassContributionRationaleDTO,
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
     FixedIncomeValuationDTO,
@@ -128,10 +129,14 @@ def to_contribution_plan_dto(plan: ContributionPlan) -> ContributionPlanResponse
                 recommended_quantity=o.recommended_quantity,
                 executed_amount_brl=o.executed_amount_brl,
                 projected_value_brl=o.projected_value_brl,
+                class_current_weight_pct=o.class_current_weight_pct,
+                leftover_amount_brl=o.leftover_amount_brl,
+                reason=o.reason,
             )
             for o in plan.orders
         ],
         projected_allocations=[ClassAllocationDTO(**asdict(a)) for a in plan.projected_allocations],
+        class_rationale=[ClassContributionRationaleDTO(**asdict(r)) for r in plan.class_rationale],
     )
 
 

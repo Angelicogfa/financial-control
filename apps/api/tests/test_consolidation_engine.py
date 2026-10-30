@@ -200,3 +200,168 @@ def test_emergency_reserve_is_valued_but_kept_out_of_arca() -> None:
 
     plan = plan_contribution(report, ArcaTargets.default(), 1000.0)
     assert "RESERVA" not in {o.ticker for o in plan.orders}
+
+
+def _single_class_plan(*assets: AssetEntity, prices: dict[str, float], **kwargs):
+    """Everything goes to Ações (target 100%), so only the intra-class rules decide."""
+    targets = ArcaTargets(
+        {ArcaClass.ACOES: 100.0, ArcaClass.REAL_ESTATE: 0.0, ArcaClass.CAIXA: 0.0}
+        | {ArcaClass.ATIVOS_INTERNACIONAIS: 0.0}
+    )
+    report = consolidate_portfolio(
+        list(assets),
+        targets,
+        quotes={t: Quote(t, p) for t, p in prices.items()},
+        as_of_date=AS_OF,
+    )
+    plan = plan_contribution(report, targets, 1000.0, **kwargs)
+    return {o.ticker: o for o in plan.orders}
+
+
+def test_order_reasons_explain_each_asset_of_the_class() -> None:
+    from domain.shared.enums import ContributionOrderReason, IntraClassStrategy
+
+    held = _stock(1, "WEGE3", _tx(1, TransactionKind.BUY, date(2025, 1, 2), "100", "40"))
+    orders = _single_class_plan(
+        held,
+        _stock(2, "ITUB4"),
+        _stock(3, "BIGG3"),
+        prices={"WEGE3": 50.0, "ITUB4": 30.0, "BIGG3": 3000.0},
+        strategy_override=IntraClassStrategy.EQUAL_WEIGHT,
+    )
+
+    # Above its 1/3 weight already; ITUB4 and BIGG3 split the R$ 1.000 by what they lack.
+    assert orders["WEGE3"].reason == ContributionOrderReason.ABOVE_TARGET
+    assert orders["WEGE3"].class_current_weight_pct == 100.0
+    assert orders["BIGG3"].reason == ContributionOrderReason.PRICE_ABOVE_BUDGET
+    assert orders["BIGG3"].allocated_amount_brl == pytest.approx(500.0)
+    # ITUB4 buys its own share and then the leftovers BIGG3 could not spend.
+    assert orders["ITUB4"].reason == ContributionOrderReason.BOUGHT
+    assert orders["ITUB4"].executed_amount_brl == pytest.approx(990.0)
+    assert orders["ITUB4"].leftover_amount_brl == pytest.approx(510.0)
+
+
+def test_asset_bought_only_with_leftovers_is_marked() -> None:
+    from domain.shared.enums import ContributionOrderReason, IntraClassStrategy
+
+    held = _stock(1, "WEGE3", _tx(1, TransactionKind.BUY, date(2025, 1, 2), "100", "40"))
+    orders = _single_class_plan(
+        held,
+        _stock(3, "BIGG3"),
+        prices={"WEGE3": 50.0, "BIGG3": 3000.0},
+        strategy_override=IntraClassStrategy.EQUAL_WEIGHT,
+    )
+
+    assert orders["BIGG3"].reason == ContributionOrderReason.PRICE_ABOVE_BUDGET
+    assert orders["WEGE3"].reason == ContributionOrderReason.LEFTOVER_FILL
+    assert orders["WEGE3"].leftover_amount_brl == orders["WEGE3"].executed_amount_brl == 1000.0
+
+
+def test_asset_without_manual_weight_is_marked_zero_weight() -> None:
+    from domain.shared.enums import ContributionOrderReason, IntraClassStrategy
+
+    orders = _single_class_plan(
+        _stock(1, "WEGE3", custom_class_weight=Decimal("0")),
+        _stock(2, "ITUB4", custom_class_weight=Decimal("1")),
+        prices={"WEGE3": 50.0, "ITUB4": 30.0},
+        strategy_override=IntraClassStrategy.MANUAL_WEIGHT,
+    )
+
+    assert orders["WEGE3"].reason == ContributionOrderReason.ZERO_WEIGHT
+    assert orders["ITUB4"].reason == ContributionOrderReason.BOUGHT
+
+
+def test_class_rationale_names_the_first_level_rule() -> None:
+    from domain.shared.enums import ContributionClassReason, IntraClassStrategy
+
+    assets = [
+        _stock(1, "WEGE3", _tx(1, TransactionKind.BUY, date(2025, 1, 2), "100", "40")),
+        _stock(
+            2,
+            "HGLG11",
+            _tx(2, TransactionKind.BUY, date(2025, 1, 2), "5", "150"),
+            asset_type=AssetType.FII,
+            arca_class=ArcaClass.REAL_ESTATE,
+        ),
+        AssetEntity(
+            id=3,
+            ticker="CAIXA",
+            name="Caixa",
+            asset_type=AssetType.CASH,
+            arca_class=ArcaClass.CAIXA,
+            manual_price=Decimal("1"),
+            transactions=(_tx(3, TransactionKind.BUY, date(2025, 1, 2), "1000", "1"),),
+        ),
+    ]
+    report = consolidate_portfolio(
+        assets,
+        ArcaTargets.default(),
+        quotes={"WEGE3": Quote("WEGE3", 50.0), "HGLG11": Quote("HGLG11", 160.0)},
+        bands=dict.fromkeys(ArcaClass, 5.0),
+        as_of_date=AS_OF,
+    )
+    plan = plan_contribution(
+        report,
+        ArcaTargets.default(),
+        1000.0,
+        class_strategies=dict.fromkeys(ArcaClass, IntraClassStrategy.CERRADO),
+    )
+    by_class = {r.arca_class: r for r in plan.class_rationale}
+
+    # R$ 6.800 + 1.000: the three classes below the band lack R$ 4.050, more than the aporte.
+    assert by_class[ArcaClass.ACOES].reason == ContributionClassReason.BELOW_BAND_PRIORITY
+    assert by_class[ArcaClass.ACOES].band_status == "ABOVE"
+    assert by_class[ArcaClass.REAL_ESTATE].reason == ContributionClassReason.REFILL_BELOW_BAND
+    assert by_class[ArcaClass.REAL_ESTATE].deficit_brl == pytest.approx(1150.0)
+    assert by_class[ArcaClass.REAL_ESTATE].first_level_brl == pytest.approx(
+        1000 * 1150 / 4050, 0.01
+    )
+    assert by_class[ArcaClass.CAIXA].reason == ContributionClassReason.REFILL_BELOW_BAND
+    intl = by_class[ArcaClass.ATIVOS_INTERNACIONAIS]
+    assert intl.reason == ContributionClassReason.NO_ELIGIBLE_ASSETS
+    assert intl.eligible_assets == 0 and intl.received_brl == 0.0
+    assert all(r.strategy == IntraClassStrategy.CERRADO for r in plan.class_rationale)
+    assert not any(r.strategy_overridden for r in plan.class_rationale)
+    assert sum(r.received_brl for r in plan.class_rationale) == pytest.approx(
+        plan.executed_total_brl
+    )
+
+
+def test_class_rationale_inside_the_bands_follows_the_deficit() -> None:
+    from domain.shared.enums import ContributionClassReason, IntraClassStrategy
+
+    assets = [
+        _stock(1, "WEGE3", _tx(1, TransactionKind.BUY, date(2025, 1, 2), "60", "40")),
+        _stock(
+            2,
+            "AAPL",
+            _tx(2, TransactionKind.BUY, date(2025, 1, 2), "10", "100"),
+            asset_type=AssetType.STOCK_INTL,
+            arca_class=ArcaClass.ATIVOS_INTERNACIONAIS,
+        ),
+    ]
+    targets = ArcaTargets(
+        {ArcaClass.ACOES: 50.0, ArcaClass.ATIVOS_INTERNACIONAIS: 50.0}
+        | {ArcaClass.REAL_ESTATE: 0.0, ArcaClass.CAIXA: 0.0}
+    )
+    report = consolidate_portfolio(
+        assets,
+        targets,
+        quotes={"WEGE3": Quote("WEGE3", 50.0), "AAPL": Quote("AAPL", 100.0)},
+        usd_brl_rate=1.0,
+        bands=dict.fromkeys(ArcaClass, 30.0),
+        as_of_date=AS_OF,
+    )
+    plan = plan_contribution(
+        report, targets, 1000.0, strategy_override=IntraClassStrategy.EQUAL_WEIGHT
+    )
+    by_class = {r.arca_class: r for r in plan.class_rationale}
+
+    # Ações 3.000 x Internacional 1.000, both inside a 30-point band: only the deficit counts.
+    intl = by_class[ArcaClass.ATIVOS_INTERNACIONAIS]
+    assert intl.reason == ContributionClassReason.BELOW_TARGET
+    assert intl.band_status == "WITHIN" and intl.first_level_brl == pytest.approx(1000.0)
+    assert by_class[ArcaClass.ACOES].reason == ContributionClassReason.ABOVE_TARGET
+    assert by_class[ArcaClass.REAL_ESTATE].reason == ContributionClassReason.ABOVE_TARGET
+    assert all(r.strategy == IntraClassStrategy.EQUAL_WEIGHT for r in plan.class_rationale)
+    assert all(r.strategy_overridden for r in plan.class_rationale)

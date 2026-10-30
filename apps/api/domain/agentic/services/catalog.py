@@ -888,8 +888,10 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         name="contributions.simulate",
         kind="query",
         description=(
-            "Simula a distribuição ótima de um novo aporte em R$ entre os quadrantes ARCA e "
-            "ativos elegíveis, sem persistir rascunho."
+            "Simula a distribuição de um novo aporte em R$ entre os quadrantes ARCA e os "
+            "ativos elegíveis, sem persistir rascunho. Regras fixas, não otimização: "
+            "`class_rationale` diz a regra de cada classe (banda, déficit, estratégia) e "
+            "`orders[].reason` por que cada ativo comprou ou não."
         ),
         input_model=ContributionSimulationRequest,
         output_type=ContributionPlanResponseDTO,

@@ -20,6 +20,8 @@ from domain.shared.enums import (
     AssetLifecycle,
     AssetPurpose,
     AssetType,
+    ContributionClassReason,
+    ContributionOrderReason,
     EarningKind,
     IntraClassStrategy,
 )
@@ -176,6 +178,30 @@ class AssetContributionOrderDTO(BaseModel):
     recommended_quantity: float
     executed_amount_brl: float
     projected_value_brl: float
+    class_current_weight_pct: float = Field(0.0, description="Weight inside the class before.")
+    leftover_amount_brl: float = Field(
+        0.0, description="Part of the purchase paid with other assets' rounding leftovers."
+    )
+    reason: ContributionOrderReason | None = Field(
+        None, description="Why the asset got this purchase; null on plans saved before it."
+    )
+
+
+class ClassContributionRationaleDTO(BaseModel):
+    """First-level rule that decided what one ARCA class receives, with its numbers."""
+
+    arca_class: ArcaClass
+    reason: ContributionClassReason
+    band_status: str
+    current_pct: float
+    target_pct: float
+    band_pct: float
+    deficit_brl: float = Field(description="What the class lacks to reach its target after.")
+    first_level_brl: float = Field(description="Share given by the class split.")
+    received_brl: float = Field(description="What its assets actually bought.")
+    eligible_assets: int
+    strategy: IntraClassStrategy | None = None
+    strategy_overridden: bool = False
 
 
 class ContributionPlanResponseDTO(BaseModel):
@@ -185,6 +211,7 @@ class ContributionPlanResponseDTO(BaseModel):
     by_class_allocated_brl: dict[ArcaClass, float]
     orders: list[AssetContributionOrderDTO]
     projected_allocations: list[ClassAllocationDTO]
+    class_rationale: list[ClassContributionRationaleDTO] = Field(default_factory=list)
 
 
 class BenchmarkComparisonDTO(BaseModel):
