@@ -77,8 +77,13 @@ services:
       dockerfile: apps/api/Dockerfile
     working_dir: /app/apps/api
     command: ["python", "-m", "worker.scheduler"]
+    # Healthy while the scheduler is the container's main process (`up --wait` needs a check).
     healthcheck:
-      disable: true
+      test: ["CMD-SHELL", "grep -q worker.scheduler /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     depends_on:
       postgres:

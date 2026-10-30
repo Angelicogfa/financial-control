@@ -40,9 +40,11 @@ if [[ "$MODE" == "--fast" ]]; then
 fi
 
 step "Docker: compose config (production and development) and image build"
-docker compose -p fincontrol-check --env-file .env.example -f docker-compose.prod.yml config -q
-docker compose -p fincontrol-check --env-file .env.example -f docker-compose.yml config -q
-docker compose -p fincontrol-check --env-file .env.example -f docker-compose.prod.yml build
+# The services read APP_ENV_FILE (.env by default), absent on a clean checkout such as CI;
+# set per command so the smoke and E2E stacks keep their own env files.
+APP_ENV_FILE=.env.example docker compose -p fincontrol-check --env-file .env.example -f docker-compose.prod.yml config -q
+APP_ENV_FILE=.env.example docker compose -p fincontrol-check --env-file .env.example -f docker-compose.yml config -q
+APP_ENV_FILE=.env.example docker compose -p fincontrol-check --env-file .env.example -f docker-compose.prod.yml build
 
 if [[ "$MODE" == "--smoke" || "$MODE" == "--e2e" ]]; then
   step "Docker: isolated end-to-end smoke test"
