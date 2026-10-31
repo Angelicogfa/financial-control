@@ -52,6 +52,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: "/portfolio", label: "Carteira", icon: BriefcaseIcon },
       { to: "/research", label: "Pesquisar", icon: SearchIcon },
       { to: "/research/mining", label: "Garimpo", icon: GemIcon },
+      { to: "/recommendation", label: "Recomendação", icon: SlidersIcon },
       { to: "/contribute", label: "Aportar", icon: PlusCircleIcon },
       { to: "/ledger", label: "Lançamentos", icon: ListIcon },
     ],

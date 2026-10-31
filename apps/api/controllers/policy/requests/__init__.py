@@ -6,6 +6,7 @@ Scope: versioned investment policy and ARCA targets.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -104,13 +105,42 @@ class HealthPolicyDTO(BaseModel):
     min_observations: int = Field(default=60, ge=2, le=2520)
 
 
+Objective = Literal["GROWTH", "DIVIDENDS", "MIXED"]
+
+
+class RecommendationPolicyDTO(BaseModel):
+    """Premises of the recommendation (Phase 45.3): objective per class and AHP matrices.
+
+    Each matrix is 8x8 in the lens order CERRADO, QUALITY, VALUATION, IMPROVEMENT, MOMENTUM,
+    INCOME, RISK, PROJECTION, on Saaty's scale (1/9 to 9) and reciprocal; a matrix whose
+    judgements contradict each other (consistency ratio above 0.10) is refused.
+    """
+
+    objectives: dict[ArcaClass, Objective]
+    matrices: dict[Objective, list[list[float]]]
+    score_scale_annual: float = Field(default=0.06, gt=0.0, le=0.5)
+    # Construction of the weights (45.4): dynamic K, caps and the smallest purchase.
+    risk_aversion: float = Field(default=0.2, ge=0.0, le=5.0)
+    k_min: int = Field(default=3, ge=1, le=50)
+    k_max: int = Field(default=12, ge=1, le=50)
+    sector_cap: float = Field(default=0.25, gt=0.0, le=1.0)
+    group_cap: float = Field(default=0.25, gt=0.0, le=1.0)
+    max_per_sector: int = Field(default=2, ge=1, le=50)
+    sector_margin_sd: float = Field(default=0.5, ge=0.0, le=5.0)
+    min_lot_brl: float = Field(default=500.0, ge=0.0)
+
+
 class PolicyUpdateRequest(BaseModel):
-    """Full policy; saving it creates a new version (ADR 0005)."""
+    """Full policy; saving it creates a new version (ADR 0005).
+
+    `recommendation` left out keeps the current premises of the recommendation.
+    """
 
     arca: list[ClassPolicyDTO]
     eligibility: EligibilityPolicyDTO = Field(default_factory=EligibilityPolicyDTO)
     valuation: ValuationPolicyDTO = Field(default_factory=ValuationPolicyDTO)
     health: HealthPolicyDTO = Field(default_factory=HealthPolicyDTO)
+    recommendation: RecommendationPolicyDTO | None = None
 
 
 class PolicyDTO(PolicyUpdateRequest):

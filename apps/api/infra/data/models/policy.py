@@ -31,3 +31,4 @@ class InvestmentPolicyModel(Base):
     eligibility: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     valuation: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     health: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    recommendation: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

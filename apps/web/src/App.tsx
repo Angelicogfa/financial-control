@@ -26,6 +26,7 @@ import { DisclosuresPage } from "./pages/disclosures/DisclosuresPage";
 import { MarketDataPage } from "./pages/settings/MarketDataPage";
 import { AssetComparePage } from "./pages/tools/AssetComparePage";
 import { MiningPage } from "./pages/research/MiningPage";
+import { RecommendationPage } from "./pages/recommendation/RecommendationPage";
 import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
 import { CompareStudiesPage } from "./pages/simulation/CompareStudiesPage";
 import { NewStudyPage } from "./pages/simulation/NewStudyPage";
@@ -48,6 +49,7 @@ export function AppRoutes() {
       <Route path="/asset/:id/edit" element={<AssetFormPage />} />
       <Route path="/research" element={<ResearchPage />} />
       <Route path="/research/mining" element={<MiningPage />} />
+      <Route path="/recommendation" element={<RecommendationPage />} />
       <Route path="/contribute" element={<ContributePage />} />
       <Route path="/contribute/:planId" element={<ContributePage />} />
       <Route path="/ledger" element={<LedgerPage />} />

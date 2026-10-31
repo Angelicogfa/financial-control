@@ -56,6 +56,12 @@ class SqlAlchemyMiningRepository(AbstractMiningRepository):
         )
         return [_signal(m) for m in self.session.scalars(stmt).all()]
 
+    def all_signals(self) -> list[MiningSignal]:
+        stmt = select(MiningSignalModel).order_by(
+            MiningSignalModel.month, MiningSignalModel.ticker, MiningSignalModel.signal
+        )
+        return [_signal(m) for m in self.session.scalars(stmt).all()]
+
     def signals_of_month(self, month: date) -> list[MiningSignal]:
         stmt = (
             select(MiningSignalModel)

@@ -255,6 +255,8 @@ def test_build_job_lock_and_scheduler_use_settings() -> None:
         "manual_run_mining",
         "refresh_asset_lenses",
         "manual_refresh_asset_lenses",
+        "backtest_recommendation",
+        "manual_backtest_recommendation",
     }
     assert "sun" in str(jobs["refresh_fundamentals"].trigger)
     assert str(jobs["warm_portfolio_quotes"].trigger) == "interval[0:07:00]"

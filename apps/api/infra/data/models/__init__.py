@@ -41,7 +41,12 @@ from infra.data.models.market import (
 from infra.data.models.mining import MiningFindingModel, MiningSignalModel
 from infra.data.models.policy import InvestmentPolicyModel
 from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshotModel
-from infra.data.models.recommendation import AssetGateModel, AssetLensModel
+from infra.data.models.recommendation import (
+    AssetGateModel,
+    AssetLensModel,
+    RecommendationMatrixModel,
+    RecommendationRunModel,
+)
 from infra.data.models.simulation import (
     SimulationResultModel,
     SimulationRunModel,
@@ -81,6 +86,8 @@ __all__ = [
     "MarketQuoteHistoryModel",
     "MarketSeriesModel",
     "PortfolioSnapshotModel",
+    "RecommendationMatrixModel",
+    "RecommendationRunModel",
     "SimulationResultModel",
     "SimulationRunModel",
     "SimulationStudyModel",

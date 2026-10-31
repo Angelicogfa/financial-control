@@ -280,7 +280,7 @@ A nota final é convertida em **retorno esperado acima da classe**, em % ao ano,
 Entre os aprovados em N3, ordenados por N5, os pesos-alvo da classe saem de:
 
 - **forma simples, para começar:** os K melhores, peso proporcional ao retorno esperado positivo e limitado pelos tetos de ativo, setor e emissor da política. O **K é dinâmico** (decisão 10.6):
-  - os ativos entram um a um, na ordem da seleção que alterna setores;
+  - os ativos entram um a um; a regra de setores diz quem pode entrar em cada passo e, entre esses, entra o que mais aumenta a utilidade (assim um ativo que diversifica pode passar à frente de uma nota um pouco maior que anda junto com os já escolhidos);
   - cada novo ativo só entra se o **ganho de diversificação** compensar a **perda de nota**;
   - a conta usa a utilidade da classe U = retorno esperado − λ × risco. O risco é a volatilidade (ou o CVaR) da classe, calculada com as correlações dos retornos. λ é a aversão a risco declarada na política;
   - um ativo pouco correlacionado com os já escolhidos reduz o risco o bastante para valer a nota um pouco menor. Um ativo que anda junto com os outros não reduz, e a seleção para;

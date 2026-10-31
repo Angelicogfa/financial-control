@@ -338,6 +338,27 @@ export interface AssetValuationDTO {
   extraordinary_dividends?: boolean;
 }
 
+export interface BacktestDTO {
+  status: "OK" | "INSUFFICIENT" | "NOT_COMPUTED";
+  as_of?: string | null;
+  passed?: boolean;
+  reason?: string;
+  first_month?: string | null;
+  last_month?: string | null;
+  months?: number;
+  rebalances?: number;
+  average_k?: number;
+  strategy_annual?: number;
+  equal_annual?: number;
+  difference_annual?: number;
+  hit_rate?: number;
+  probability?: number;
+  years?: BacktestYearDTO[];
+  weights?: Record<string, number>;
+  notes?: string[];
+  scoreboard?: ScoreLineDTO[];
+}
+
 export interface BacktestPointDTO {
   day: string;
   contribution: number;
@@ -379,6 +400,13 @@ export interface BacktestSummaryDTO {
   fees: number;
   taxes?: number;
   sales?: number;
+}
+
+export interface BacktestYearDTO {
+  year: number;
+  months: number;
+  strategy: number;
+  equal: number;
 }
 
 export interface BenchmarkComparisonDTO {
@@ -597,6 +625,17 @@ export interface ClassAllocationDTO {
   band_status?: string;
 }
 
+export interface ClassComparisonDTO {
+  arca_class: string;
+  budget: number;
+  covered: boolean;
+  note?: string;
+  confidence?: number | null;
+  current_orders?: OrderLineDTO[];
+  recommended_orders?: OrderLineDTO[];
+  recommended_leftover?: number;
+}
+
 export interface ClassContributionRationaleDTO {
   arca_class: ArcaClass;
   reason: ContributionClassReason;
@@ -610,6 +649,18 @@ export interface ClassContributionRationaleDTO {
   eligible_assets: number;
   strategy?: IntraClassStrategy | null;
   strategy_overridden?: boolean;
+}
+
+export interface ClassMatrixDTO {
+  arca_class: string;
+  objective: "GROWTH" | "DIVIDENDS" | "MIXED";
+  objective_label: string;
+  consistency_ratio: number;
+  scale_annual: number;
+  weights?: LensWeightDTO[];
+  rows?: MatrixRowDTO[];
+  excluded?: ExcludedAssetDTO[];
+  construction?: ConstructionDTO | null;
 }
 
 export interface ClassPolicyDTO {
@@ -685,7 +736,24 @@ export interface ConfidenceIntervalDTO {
   confidence?: number;
 }
 
+export interface ConstructionDTO {
+  k: number;
+  stop_reason: string;
+  confidence: number;
+  selected?: SelectedAssetDTO[];
+  skipped?: SkippedAssetDTO[];
+  curve?: CurvePointDTO[];
+  notes?: string[];
+}
+
 export type ContributionClassReason = "REFILL_BELOW_BAND" | "BELOW_BAND_PRIORITY" | "BELOW_TARGET" | "ABOVE_TARGET" | "NO_ELIGIBLE_ASSETS";
+
+export interface ContributionComparisonDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  amount: number;
+  classes?: ClassComparisonDTO[];
+}
 
 export interface ContributionConfirmRequest {
   trade_date: string;
@@ -761,6 +829,14 @@ export interface CrisisDTO {
 export interface CurrentUserDTO {
   username: string;
   expires_at?: string | null;
+}
+
+export interface CurvePointDTO {
+  k: number;
+  added: string;
+  expected: number;
+  risk: number;
+  utility: number;
 }
 
 export interface CvmDocumentDTO {
@@ -946,6 +1022,12 @@ export interface EventStudyDTO {
   confounded?: number;
   sign_threshold?: number | null;
   classes?: EventClassDTO[];
+}
+
+export interface ExcludedAssetDTO {
+  ticker: string;
+  source: "PORTFOLIO" | "WATCHLIST" | "CATALOG";
+  reasons?: string[];
 }
 
 export interface ExcludedCandidateDTO {
@@ -1407,6 +1489,22 @@ export interface LensDTO {
   flags?: string[];
 }
 
+export interface LensDifferenceDTO {
+  lens: "CERRADO" | "QUALITY" | "VALUATION" | "IMPROVEMENT" | "MOMENTUM" | "INCOME" | "RISK" | "PROJECTION";
+  label: string;
+  a: number;
+  b: number;
+  weight: number;
+  difference: number;
+}
+
+export interface LensWeightDTO {
+  lens: "CERRADO" | "QUALITY" | "VALUATION" | "IMPROVEMENT" | "MOMENTUM" | "INCOME" | "RISK" | "PROJECTION";
+  label: string;
+  weight: number;
+  gaussian_weight: number;
+}
+
 export interface LiquidityDetailDTO {
   reserve_brl?: number;
   reserve_months?: number | null;
@@ -1490,6 +1588,35 @@ export interface MarketHistoryPointDTO {
 }
 
 export type MarketStatus = "NO_MARKET_DATA" | "BELOW_CURVE" | "NEUTRAL" | "OPPORTUNITY";
+
+export interface MatrixBoardDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  classes?: ClassMatrixDTO[];
+}
+
+export interface MatrixCellDTO {
+  lens: "CERRADO" | "QUALITY" | "VALUATION" | "IMPROVEMENT" | "MOMENTUM" | "INCOME" | "RISK" | "PROJECTION";
+  value: number;
+  weight: number;
+  contribution: number;
+}
+
+export interface MatrixRowDTO {
+  ticker: string;
+  source: "PORTFOLIO" | "WATCHLIST" | "CATALOG";
+  sector?: string;
+  rank: number;
+  score: number;
+  expected: number;
+  expected_low: number;
+  expected_high: number;
+  confidence: number;
+  cells?: MatrixCellDTO[];
+  gaussian_score: number;
+  gaussian_rank: number;
+  flags?: string[];
+}
 
 export interface MaturityDTO {
   ticker: string;
@@ -1614,6 +1741,17 @@ export interface OfferProjectionDTO {
   equivalent_rates: EquivalentRateDTO[];
 }
 
+export interface OrderLineDTO {
+  ticker: string;
+  amount: number;
+  quantity: number;
+  unit_price?: number | null;
+  target_weight?: number | null;
+  current_weight?: number | null;
+  new?: boolean;
+  reason?: string;
+}
+
 export interface OriginForecastDTO {
   origin: string;
   realized: number;
@@ -1676,6 +1814,7 @@ export interface PolicyDTO {
   eligibility?: EligibilityPolicyDTO;
   valuation?: ValuationPolicyDTO;
   health?: HealthPolicyDTO;
+  recommendation?: RecommendationPolicyDTO | null;
   version?: number | null;
   created_at?: string | null;
 }
@@ -1685,6 +1824,7 @@ export interface PolicyUpdateRequest {
   eligibility?: EligibilityPolicyDTO;
   valuation?: ValuationPolicyDTO;
   health?: HealthPolicyDTO;
+  recommendation?: RecommendationPolicyDTO | null;
 }
 
 export interface PortfolioAnalyticsResponseDTO {
@@ -1853,6 +1993,29 @@ export interface ReadinessDTO {
   checks: Record<string, ReadinessCheckDTO>;
 }
 
+export interface RecommendationPolicyDTO {
+  objectives: Record<string, "GROWTH" | "DIVIDENDS" | "MIXED">;
+  matrices: Partial<Record<"GROWTH" | "DIVIDENDS" | "MIXED", number[][]>>;
+  score_scale_annual?: number;
+  risk_aversion?: number;
+  k_min?: number;
+  k_max?: number;
+  sector_cap?: number;
+  group_cap?: number;
+  max_per_sector?: number;
+  sector_margin_sd?: number;
+  min_lot_brl?: number;
+}
+
+export interface RecommendationRunDTO {
+  as_of: string;
+  policy_version?: number | null;
+  signal_month?: string | null;
+  assets: number;
+  eligible: number;
+  selected?: Record<string, string[]>;
+}
+
 export interface RegimePointDTO {
   month: string;
   stress_probability: number;
@@ -1926,6 +2089,14 @@ export interface RollingPointDTO {
   sharpe: number;
 }
 
+export interface RowComparisonDTO {
+  status: "OK" | "NOT_COMPUTED" | "NOT_COMPARABLE";
+  reason?: string;
+  a?: MatrixRowDTO | null;
+  b?: MatrixRowDTO | null;
+  differences?: LensDifferenceDTO[];
+}
+
 export type SaleSignal = "EXCESS_RETURN" | "REINVESTMENT";
 
 export interface SavedContributionPlanDTO {
@@ -1939,6 +2110,18 @@ export interface SavedContributionPlanDTO {
   account_id?: number | null;
   transaction_ids?: number[];
   plan: ContributionPlanResponseDTO;
+}
+
+export interface ScoreLineDTO {
+  horizon: number;
+  runs: number;
+  vs_equal: number;
+  beat_equal: number;
+  beat_equal_low: number;
+  beat_equal_high: number;
+  vs_cerrado?: number | null;
+  beat_cerrado?: number | null;
+  cerrado_runs?: number;
 }
 
 export interface ScreenerItemDTO {
@@ -1974,6 +2157,17 @@ export interface ScreenerResponseDTO {
   arca_classes?: ArcaClass[];
   catalog_size: number;
   catalog_updated_at?: string | null;
+}
+
+export interface SelectedAssetDTO {
+  ticker: string;
+  sector: string;
+  group: string;
+  weight: number;
+  score: number;
+  expected: number;
+  confidence: number;
+  reason: string;
 }
 
 export interface SeriesCoverageDTO {
@@ -2065,6 +2259,11 @@ export interface SimulationRunDetailDTO {
 }
 
 export type SimulationStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED" | "TIMEOUT";
+
+export interface SkippedAssetDTO {
+  ticker: string;
+  reason: string;
+}
 
 export interface SnapshotPointDTO {
   snapshot_date: string;

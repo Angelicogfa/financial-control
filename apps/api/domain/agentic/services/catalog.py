@@ -80,7 +80,14 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from controllers.recommendation.responses import LensBoardDTO
+from controllers.recommendation.responses import (
+    BacktestDTO,
+    ContributionComparisonDTO,
+    LensBoardDTO,
+    MatrixBoardDTO,
+    RecommendationRunDTO,
+    RowComparisonDTO,
+)
 from controllers.research.requests import WatchlistAddRequest
 from controllers.research.responses import (
     AssetComparisonDTO,
@@ -180,6 +187,26 @@ class LensBoardInput(BaseModel):
     eligible: bool | None = None  # True: only who passed every gate; False: only who failed
 
 
+class MatrixInput(BaseModel):
+    """One ARCA class (every class when left out) of the latest run, or of the run of `as_of`."""
+
+    arca_class: Literal["ACOES", "REAL_ESTATE", "ATIVOS_INTERNACIONAIS"] | None = None
+    as_of: date | None = None
+
+
+class AmountInput(BaseModel):
+    """A contribution amount in reais."""
+
+    amount_brl: float = Field(gt=0)
+
+
+class PairInput(BaseModel):
+    """Two B3 trading codes of the same ARCA class."""
+
+    a: str = Field(min_length=1, max_length=16)
+    b: str = Field(min_length=1, max_length=16)
+
+
 class TickerInput(BaseModel):
     """A B3 trading code."""
 
@@ -230,6 +257,7 @@ class JobRequestInput(BaseModel):
         "sync_mining_universe",
         "run_mining",
         "refresh_asset_lenses",
+        "backtest_recommendation",
     ]
 
 
@@ -548,7 +576,9 @@ class AgenticRuntimeHandlers:
 
     @property
     def recommendation(self) -> RecommendationHandler:
-        return RecommendationHandler(uow_factory=self.uow_factory)
+        return RecommendationHandler(
+            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
+        )
 
     @property
     def statements(self) -> StatementsHandler:
@@ -770,6 +800,74 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         invoke=lambda h, p: h.recommendation.lenses(
             arca_class=p.arca_class, source=p.source, ticker=p.ticker, eligible=p.eligible
         ),
+    ),
+    OperationSpec(
+        name="recommendation.matrix",
+        kind="query",
+        description=(
+            "Matriz de decisão da recomendação (Fase 45.3) de cada classe ARCA: o objetivo da "
+            "classe, os pesos das lentes pelo AHP (com a razão de consistência), os ativos aptos "
+            "ordenados pela nota (0 a 1) com a contribuição de cada lente, o retorno esperado "
+            "acima da classe na escala declarada da política (ainda não calibrada), o ranking "
+            "de referência pelo AHP Gaussiano, os ativos que os portões tiraram, com o motivo, "
+            "e a construção dos pesos (Fase 45.4: K dinâmico com a curva, setores e grupos)."
+        ),
+        input_model=MatrixInput,
+        output_type=MatrixBoardDTO,
+        invoke=lambda h, p: h.recommendation.matrix(arca_class=p.arca_class, as_of=p.as_of),
+    ),
+    OperationSpec(
+        name="recommendation.backtest",
+        kind="query",
+        description=(
+            "Teste no passado da hierarquia de recomendação (Fase 45.6) na classe Ações: a cada "
+            "trimestre, só com o que se sabia, os portões, as lentes com histórico (sem o Cerrado "
+            "manual e sem a projeção), o AHP e a construção; comparado com pesos iguais entre os "
+            "aptos pelo portão bayesiano (passa com 90% de confiança em 5 anos ou mais). Traz "
+            "também o placar das rodadas guardadas, 1, 3, 6 e 12 meses depois, contra pesos "
+            "iguais e contra uma aproximação da regra do Cerrado."
+        ),
+        input_model=EmptyInput,
+        output_type=BacktestDTO,
+        invoke=lambda h, _p: h.recommendation.backtest(),
+    ),
+    OperationSpec(
+        name="recommendation.runs",
+        kind="query",
+        description=(
+            "Histórico das rodadas semanais da recomendação (Fase 45.5): data, versão da "
+            "política aplicada, mês dos sinais, ativos avaliados, aptos e os escolhidos de cada "
+            "classe. Use a data em recommendation.matrix para ver a matriz de uma rodada passada."
+        ),
+        input_model=EmptyInput,
+        output_type=list[RecommendationRunDTO],
+        invoke=lambda h, _p: h.recommendation.runs(),
+    ),
+    OperationSpec(
+        name="recommendation.contribution",
+        kind="query",
+        description=(
+            "Aporte que a recomendação faria (Fase 45.4), ao lado do aporte da regra atual, para "
+            "um valor em R$: a divisão entre classes é a mesma (bandas ARCA); dentro de cada "
+            "classe, os pesos-alvo da construção (K dinâmico, tetos por setor e grupo) puxados "
+            "para os pesos atuais pela confiança. Nada é gravado e o aporte de verdade continua "
+            "na regra atual até a troca (Fase 45.6)."
+        ),
+        input_model=AmountInput,
+        output_type=ContributionComparisonDTO,
+        invoke=lambda h, p: h.recommendation.contribution(p.amount_brl),
+    ),
+    OperationSpec(
+        name="recommendation.compare",
+        kind="query",
+        description=(
+            '"Por que A e não B": duas linhas da matriz de decisão da mesma classe, lente por '
+            "lente, das maiores diferenças para as menores (quanto cada lente somou à vantagem "
+            "de A; negativo favoreceu B)."
+        ),
+        input_model=PairInput,
+        output_type=RowComparisonDTO,
+        invoke=lambda h, p: h.recommendation.compare(p.a, p.b),
     ),
     OperationSpec(
         name="research.mining_universe",
@@ -1371,7 +1469,7 @@ OPERATIONS: tuple[OperationSpec, ...] = (
             "screener), `refresh_asset_forecasts`, `calibrate_forecasts`, "
             "`estimate_forecast_models` (previsão de preço) e `sync_mining_universe` "
             "(histórico do garimpo), `run_mining` (sinais do garimpo), `refresh_asset_lenses` "
-            "(lentes da recomendação). O "
+            "(lentes da recomendação), `backtest_recommendation` (teste no passado e placar). O "
             "worker atende em até 15 s; acompanhe "
             "com market.job_runs. Um pedido que ainda espera é devolvido, sem duplicar."
         ),

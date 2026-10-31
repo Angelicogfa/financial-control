@@ -24,10 +24,20 @@ from domain.disclosures.events import RESTRUCTURING
 from domain.disclosures.services.sync import base_ticker
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.policy.services.lifecycle import has_position
-from domain.policy.services.policy import current_policy
+from domain.policy.services.policy import RecommendationPolicy, current_policy
 from domain.portfolio.services.positions import InsufficientQuantityError, build_position
+from domain.recommendation.ahp import priority
+from domain.recommendation.combination import ClassMatrix, combine_class
+from domain.recommendation.construction import build_class
 from domain.recommendation.gates import RESTRUCTURING_LOOKBACK_DAYS, AssetGates, asset_gates
-from domain.recommendation.lenses import CATALOG, PORTFOLIO, WATCHLIST, asset_lenses
+from domain.recommendation.lenses import (
+    CATALOG,
+    PORTFOLIO,
+    WATCHLIST,
+    AssetLenses,
+    asset_lenses,
+)
+from domain.recommendation.repositories import RecommendationRun
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, AssetPurpose, ChecklistProfile, default_arca_class
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -160,6 +170,62 @@ def _gates(
     return out
 
 
+def _matrices(
+    premises: RecommendationPolicy,
+    items: list[AssetLenses],
+    gates: list[AssetGates],
+    as_of: date,
+) -> list[ClassMatrix]:
+    """The AHP decision matrix of each class that has assets (Phase 45.3)."""
+    by_ticker = {g.ticker: g for g in gates}
+    out = []
+    for arca_class, objective in premises.objectives.items():
+        members = [i for i in items if i.arca_class == arca_class.value]
+        if not members:
+            continue
+        found = priority(premises.matrices[objective])
+        out.append(
+            combine_class(
+                arca_class=arca_class.value,
+                objective=objective,
+                as_of=as_of,
+                weights=found.weights,
+                consistency_ratio=found.consistency_ratio,
+                scale_annual=premises.score_scale_annual,
+                items=members,
+                gates=by_ticker,
+            )
+        )
+    return out
+
+
+RETURN_MONTHS = 40  # the 36 of the correlations and a margin
+
+
+def monthly_returns(
+    uow: AbstractUnitOfWork, tickers: list[str], as_of: date
+) -> dict[str, dict[tuple[int, int], float]]:
+    """Monthly total returns of each ticker from the stored series (price when no total return)."""
+    start = as_of - timedelta(days=31 * RETURN_MONTHS)
+    out: dict[str, dict[tuple[int, int], float]] = {}
+    for ticker in tickers:
+        points = uow.market_series.list_series(tr_symbol(ticker), date_from=start, date_to=as_of)
+        if not points:
+            points = uow.market_series.list_series(
+                px_symbol(ticker), date_from=start, date_to=as_of
+            )
+        last: dict[tuple[int, int], float] = {}
+        for p in points:
+            last[(p.reference_date.year, p.reference_date.month)] = p.value
+        months = sorted(last)
+        out[ticker] = {
+            m: last[m] / last[prev] - 1.0
+            for prev, m in zip(months, months[1:], strict=False)
+            if last[prev] > 0
+        }
+    return out
+
+
 def refresh_lenses(
     uow: AbstractUnitOfWork,
     evaluate: Evaluate,
@@ -167,9 +233,10 @@ def refresh_lenses(
     min_daily_volume: float = MIN_DAILY_VOLUME,
     today: date | None = None,
 ) -> dict[str, Any]:
-    """Compute and store the lenses and the gates of every asset of the universe."""
+    """Compute and store the lenses, the gates and each class's decision matrix."""
     as_of = today or date.today()
-    validity = current_policy(uow.policies).eligibility.answer_validity_months
+    policy = current_policy(uow.policies)
+    validity = policy.eligibility.answer_validity_months
     month = uow.mining.latest_signal_month()
     panel: dict[str, dict[str, float]] = {}
     for s in uow.mining.signals_of_month(month) if month else []:
@@ -194,13 +261,30 @@ def refresh_lenses(
             )
         )
     gates = _gates(uow, universe, min_daily_volume, as_of)
+    matrices = _matrices(policy.recommendation, items, gates, as_of)
+    returns = monthly_returns(uow, [r.ticker for m in matrices for r in m.rows], as_of)
+    params = policy.recommendation.construction()
+    constructions = {m.arca_class: build_class(m, returns, params) for m in matrices}
     stored_count = uow.recommendation.replace_lenses(as_of, items)
     uow.recommendation.replace_gates(as_of, gates)
+    uow.recommendation.replace_matrices(as_of, matrices, constructions)
+    uow.recommendation.save_run(
+        RecommendationRun(
+            as_of=as_of,
+            policy_version=policy.version,
+            signal_month=month,
+            assets=len(items),
+            eligible=sum(1 for g in gates if g.eligible),
+            selected={c: [s.ticker for s in b.selected] for c, b in constructions.items()},
+        )
+    )
     registered = sum(1 for m in universe if m.asset is not None)
     return {
         "assets": stored_count,
         "registered": registered,
         "catalog": stored_count - registered,
         "eligible": sum(1 for g in gates if g.eligible),
+        "classes": len(matrices),
+        "selected": {c: b.k for c, b in constructions.items()},
         "signal_month": month.isoformat() if month else None,
     }

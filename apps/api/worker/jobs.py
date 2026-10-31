@@ -54,6 +54,7 @@ from domain.portfolio.services.snapshots import (
     snapshot_from_report,
 )
 from domain.portfolio.services.treasury_rates import IPCA_HISTORY_START
+from domain.recommendation.backtest_runs import run_recommendation_backtest
 from domain.recommendation.runs import refresh_lenses
 from domain.shared.entities import AssetEntity, PortfolioSnapshotEntity
 from domain.shared.enums import (
@@ -1008,6 +1009,23 @@ def refresh_asset_lenses_job(
     with uow_factory() as uow:
         result = refresh_lenses(
             uow, service.evaluate_checklist, min_daily_volume=min_daily_volume, today=at.date()
+        )
+        uow.commit()
+    return result
+
+
+def backtest_recommendation_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    min_daily_volume: float = 1_000_000.0,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Walk-forward backtest of the recommendation and the scoreboard of its runs (45.6)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        result = run_recommendation_backtest(
+            uow, min_daily_volume=min_daily_volume, today=at.date()
         )
         uow.commit()
     return result
