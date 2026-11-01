@@ -40,7 +40,7 @@ describe("job buttons on the screen of each subject", () => {
       { path: "/recommendation/backtest", reply: { status: "NOT_COMPUTED" } },
       { path: "/market/job-runs", reply: [] },
     ]);
-    renderAt("/recommendation");
+    renderAt("/recommendation?tab=runs");
     expect(await screen.findByRole("button", { name: "Rodar as lentes e os portões da recomendação" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rodar o teste no passado da recomendação" })).toBeInTheDocument();
   });
