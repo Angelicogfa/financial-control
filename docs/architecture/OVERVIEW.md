@@ -135,6 +135,13 @@ apps/packages/
 
 A API e o worker usam os mesmos pacotes de `apps/packages/`; o worker nunca importa a API.
 
+**Guarda-corpos da Fase 48.R0** (a correção desta seção para a estrutura atual é da R1):
+
+- `tests/test_architecture_contracts.py` verifica o contrato de imports entre camadas (`core` não importa nenhuma; `domain` não importa `controllers`, `infra` nem `worker`; `controllers` não importa `infra.data` nem `worker`; `infra` e `worker` não importam `controllers`). As violações anteriores ao contrato estão em `tests/architecture_allowlist.py`, que só pode diminuir: 29 módulos e 118 imports, sendo 25 módulos de `domain` que importam `controllers` e 10 que importam `infra`.
+- `tests/test_openapi_snapshot.py` congela o contrato da API em `tests/snapshots/openapi.json`. Uma mudança intencional regenera o snapshot com `scripts/update_openapi_snapshot.py`.
+- `scripts/migration_rehearsal.sh` restaura um dump da base real num Postgres descartável e roda `infra/data/migration_rehearsal.py`, que confere se as migrations são só aditivas (nenhuma tabela, coluna ou linha perdida) e faz a ida e volta `downgrade`/`upgrade`.
+- `apps/web/e2e/navigation.spec.ts` abre cada tela listada em `e2e/routes.ts`; essas URLs precisam continuar funcionando, ou redirecionar, durante a reconstrução.
+
 Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, taxas padrão) e são lembradas por `MARKET_MISS_CACHE_TTL` para as telas responderem na hora; os alertas avisam o usuário.
 
 ---

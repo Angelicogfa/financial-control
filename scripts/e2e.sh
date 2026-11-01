@@ -18,7 +18,9 @@ BASE="http://localhost:${WEB_PORT}"
 
 native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
 
-PASSWORD="$(uv run --quiet python -I -c "import secrets; print(secrets.token_urlsafe(16))")"
+# E2E_PASSWORD fixes the password, so a kept stack (KEEP_STACK=1) can be reused by
+# `npx playwright test` while fixing a spec.
+PASSWORD="${E2E_PASSWORD:-$(uv run --quiet python -I -c "import secrets; print(secrets.token_urlsafe(16))")}"
 HASH="$(uv run --quiet python -I -c "import sys; from core.security import hash_password; print(hash_password(sys.argv[1]))" "$PASSWORD")"
 SECRET="$(uv run --quiet python -I -c "import secrets; print(secrets.token_hex(32))")"
 sed -e "s|^PGDATA_VOLUME=.*|PGDATA_VOLUME=fincontrol_e2e_pgdata|" \
@@ -64,6 +66,9 @@ wait_ready
 export E2E_BASE_URL="$BASE" E2E_USERNAME="e2e" E2E_PASSWORD="$PASSWORD"
 echo "==> journey"
 (cd apps/web && npx playwright test e2e/journey.spec.ts) || fail "journey"
+
+echo "==> every current screen (Phase 48.R0 smoke)"
+(cd apps/web && npx playwright test e2e/navigation.spec.ts) || fail "navigation"
 
 echo "==> restarting containers"
 "${COMPOSE[@]}" restart >/dev/null

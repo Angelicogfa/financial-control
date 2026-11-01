@@ -59,7 +59,7 @@
 | **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 a 43.5 feitas; 43.6 depois de 42.4–42.6) | 85% |
 | **Fase 45** | Hierarquia de Recomendação (motor analítico do aporte) | `[x]` Concluída (45.0 a 45.8) | 100% |
 | **Fase 47** | Recomendações Externas: Engenharia Reversa | `[ ]` Proposta — incorporada à Fase 48.R8 (decisão 2026-11-01) | 0% |
-| **Fase 48** | Reconstrução da Experiência e Unificação das Camadas | `[ ]` Aprovada (48.0 decidida; próxima: R0) | 0% |
+| **Fase 48** | Reconstrução da Experiência e Unificação das Camadas | `[~]` Em andamento (48.0 e R0 feitas; próxima: R1) | 10% |
 
 > **Pausa 2026-10-30:** a pedido, nenhuma fase nova avança (42.6, 42.7, 43.6, 34 e 36 incluídas) até a revisão da hierarquia de recomendação ser aprovada. Inventário dos mecanismos e proposta em [RECOMMENDATION_HIERARCHY_DESIGN.md](../features/RECOMMENDATION_HIERARCHY_DESIGN.md) (Fase 45).
 
@@ -903,12 +903,12 @@ Desenho: [EXTERNAL_RECOMMENDATIONS_DESIGN.md](../features/EXTERNAL_RECOMMENDATIO
 - `[ ]` **47.4** A fonte no placar ao vivo, estabilidade e rotatividade.
 - `[ ]` **47.5** Tela, MCP, testes de UI e integração, `docker compose build`.
 
-## Fase 48 — Reconstrução da Experiência e Unificação das Camadas (`[ ]` Aprovada)
+## Fase 48 — Reconstrução da Experiência e Unificação das Camadas (`[~]` Em andamento)
 
 Análise: [REBUILD_ANALYSIS.md](../architecture/REBUILD_ANALYSIS.md). Plano: [REFACTORING_PLAN.md](../architecture/REFACTORING_PLAN.md). Pedida em 2026-11-01: aproximar a ferramenta das referências do mercado (Status Invest, Investidor10, Kinvo, Sharesight, Simply Wall St, Morningstar X-Ray) com uma história fluida, busca e página para qualquer ativo, e conferência da posição — mantendo a base de dados e o código que já operam sobre ela (migrations só aditivas).
 
 - `[x]` **48.0** Decisões da seção 7 do plano (2026-11-01): rotas do SPA em pt-BR e da API em inglês; TanStack Query no lugar do `useApi`; R4 (ativo) antes de R5 (carteira); propostas 34, 36 e 47 entram na R8.
-- `[ ]` **48.R0** Guarda-corpos: contrato de imports com allowlist, snapshot do OpenAPI, teste de migração sobre cópia da base, smoke E2E.
+- `[x]` **48.R0** Guarda-corpos: `test_architecture_contracts.py` com allowlist que só diminui (`architecture_allowlist.py`: 29 módulos, 118 imports); `test_openapi_snapshot.py` + `scripts/update_openapi_snapshot.py`; `scripts/migration_rehearsal.sh` + `infra/data/migration_rehearsal.py` (ensaio aditivo e ida e volta sobre cópia da base real: OK em `script_00039`); smoke E2E `navigation.spec.ts` das 26 telas em `e2e/routes.ts` + página do ativo; helpers de E2E corrigidos (rótulo exato). `check.sh` ok (cobertura 97,31%), `docker compose build`, smoke e `e2e.sh` verdes.
 - `[ ]` **48.R1** Unificação das camadas: use cases devolvem read models, DTOs só nos controllers, portas no lugar de `infra` no domínio, `health.py` dividido; diff de OpenAPI igual a zero.
 - `[ ]` **48.R2** Instrumento por ticker (`InstrumentView`) e busca global na API e no MCP.
 - `[ ]` **48.R3** Novo shell e arquitetura de informação (7 destinos + busca `Ctrl+K`), com redirecionamento das rotas antigas.
