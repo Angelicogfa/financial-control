@@ -67,6 +67,7 @@ def to_policy_dto(policy: InvestmentPolicy) -> PolicyDTO:
             max_per_sector=policy.recommendation.max_per_sector,
             sector_margin_sd=policy.recommendation.sector_margin_sd,
             min_lot_brl=policy.recommendation.min_lot_brl,
+            use_cerrado=policy.recommendation.use_cerrado,
         ),
     )
 
@@ -84,6 +85,7 @@ def _recommendation_policy(dto: RecommendationPolicyDTO) -> RecommendationPolicy
         max_per_sector=dto.max_per_sector,
         sector_margin_sd=dto.sector_margin_sd,
         min_lot_brl=dto.min_lot_brl,
+        use_cerrado=dto.use_cerrado,
     )
 
 

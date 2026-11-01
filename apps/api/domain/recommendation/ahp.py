@@ -116,6 +116,16 @@ def priority(matrix: Sequence[Sequence[float]], *, labels: Sequence[str] = LENSE
     )
 
 
+def priority_without(
+    matrix: Sequence[Sequence[float]], lens: str, *, labels: Sequence[str] = LENSES
+) -> Priority:
+    """The priority of the matrix without one lens's row and column: the proportions you declared
+    among the other lenses stay, and the consistency ratio is that of the smaller matrix."""
+    keep = [i for i, label in enumerate(labels) if label != lens]
+    sub = [[matrix[i][j] for j in keep] for i in keep]
+    return priority(sub, labels=[labels[i] for i in keep])
+
+
 def worst_pairs(
     matrix: Sequence[Sequence[float]], *, labels: Sequence[str] = LENSES, count: int = 3
 ) -> list[tuple[str, str]]:

@@ -24,6 +24,8 @@ Holdings = dict[ArcaClass, dict[str, float]]  # class -> symbol -> weight inside
 
 RECOMMENDATION = "RECOMMENDATION"
 OPTIMIZED = "OPTIMIZED"
+WITH_CERRADO = "WITH_CERRADO"
+WITHOUT_CERRADO = "WITHOUT_CERRADO"
 CERRADO_RULE = "CERRADO_RULE"
 EQUAL = "EQUAL"
 INDEX_ARCA = "INDEX_ARCA"
@@ -35,6 +37,8 @@ LABELS = {
     YOURS: "Sua carteira",
     RECOMMENDATION: "Recomendação",
     OPTIMIZED: "Otimizador",
+    WITH_CERRADO: "Recomendação com o Cerrado",
+    WITHOUT_CERRADO: "Recomendação sem o Cerrado",
     CERRADO_RULE: "Regra antiga (Cerrado)",
     EQUAL: "Pesos iguais",
     INDEX_ARCA: "Índices por classe",

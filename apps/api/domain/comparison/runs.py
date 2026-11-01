@@ -25,6 +25,8 @@ from domain.comparison.strategies import (
     LABELS,
     OPTIMIZED,
     RANDOM_PORTFOLIOS,
+    WITH_CERRADO,
+    WITHOUT_CERRADO,
     YOURS,
     AllCdi,
     Candidate,
@@ -111,6 +113,20 @@ def recommendation_runs(uow: AbstractUnitOfWork) -> list[tuple[date, Holdings]]:
     return sorted(out, key=lambda r: r[0])
 
 
+def variant_runs(uow: AbstractUnitOfWork, variant: str) -> list[tuple[date, Holdings]]:
+    """The construction's weights with or without the Cerrado lens of every stored run."""
+    out = []
+    for run in uow.recommendation.runs(limit=520):
+        holdings: Holdings = {}
+        for built in uow.recommendation.constructions(run.as_of):
+            weights = (built.cerrado_variants or {}).get(variant)
+            if weights:
+                holdings[ArcaClass(built.arca_class)] = dict(weights)
+        if holdings:
+            out.append((run.as_of, holdings))
+    return sorted(out, key=lambda r: r[0])
+
+
 def optimized_runs(uow: AbstractUnitOfWork) -> list[tuple[date, Holdings]]:
     """The optimizer's weights of every stored weekly run that has them (Phase 45.8b)."""
     out = []
@@ -167,6 +183,7 @@ def _strategies(
     assets: Sequence[AssetEntity],
     runs: Sequence[tuple[date, Holdings]],
     optimized: Sequence[tuple[date, Holdings]],
+    variants: Mapping[str, Sequence[tuple[date, Holdings]]],
     members: Sequence[Candidate],
     uow: AbstractUnitOfWork,
 ) -> list[tuple[int, Strategy]]:
@@ -179,6 +196,10 @@ def _strategies(
     fixed: list[tuple[int, Strategy]] = [
         (0, RecommendationRuns(runs)),
         (0, RecommendationRuns(optimized, key=OPTIMIZED, label=LABELS[OPTIMIZED])),
+        *(
+            (0, RecommendationRuns(runs_of, key=key, label=LABELS[key]))
+            for key, runs_of in variants.items()
+        ),
         (0, CerradoRule(registered, _scores(histories))),
         (0, EqualWeights(members)),
         (0, IndexArca()),
@@ -214,7 +235,8 @@ def update_comparison_portfolios(
     first = min(flows)
     runs = recommendation_runs(uow)
     optimized = optimized_runs(uow)
-    members = universe(assets, [*runs, *optimized])
+    variants = {key: variant_runs(uow, key) for key in (WITH_CERRADO, WITHOUT_CERRADO)}
+    members = universe(assets, [*runs, *optimized, *(r for v in variants.values() for r in v)])
     types = {c.symbol: c.asset_type for c in members} | {t.ticker: t.asset_type for t in trades}
     tickers = sorted(types)
     market = _market(
@@ -231,7 +253,7 @@ def update_comparison_portfolios(
     uow.comparison.save(yours)
 
     created = updated = 0
-    for variant, strategy in _strategies(assets, runs, optimized, members, uow):
+    for variant, strategy in _strategies(assets, runs, optimized, variants, members, uow):
         start = getattr(strategy, "first_day", None)
         if isinstance(strategy, RecommendationRuns) and start is None:
             continue  # the recommendation has not run yet: it starts with its first run

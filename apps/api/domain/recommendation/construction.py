@@ -38,6 +38,9 @@ from domain.recommendation.params import ConstructionParams
 
 Month = tuple[int, int]
 
+WITH_CERRADO = "WITH_CERRADO"
+WITHOUT_CERRADO = "WITHOUT_CERRADO"
+
 GROUP_CORRELATION = 0.7
 GROUP_MONTHS = 36
 MIN_OVERLAP_MONTHS = 12
@@ -83,6 +86,8 @@ class ClassConstruction:
     notes: list[str] = field(default_factory=list)
     # The full optimizer's result for the same class (Phase 45.8b), as stored.
     optimized: dict[str, Any] | None = None
+    # The construction's weights with and without the Cerrado lens, for the scoreboard.
+    cerrado_variants: dict[str, dict[str, float]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

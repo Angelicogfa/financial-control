@@ -30,10 +30,15 @@ from domain.portfolio.services.positions import (
     build_position,
     quantity_on,
 )
-from domain.recommendation.ahp import priority
+from domain.recommendation.ahp import priority, priority_without
 from domain.recommendation.combination import ClassMatrix, combine_class
-from domain.recommendation.construction import build_class
+from domain.recommendation.construction import (
+    WITH_CERRADO,
+    WITHOUT_CERRADO,
+    build_class,
+)
 from domain.recommendation.gates import RESTRUCTURING_LOOKBACK_DAYS, AssetGates, asset_gates
+from domain.recommendation.keys import CERRADO
 from domain.recommendation.lenses import (
     CATALOG,
     PORTFOLIO,
@@ -177,22 +182,35 @@ def _gates(
     return out
 
 
+def without(weights: dict[str, float], use_cerrado: bool) -> dict[str, float]:
+    """The weights without the Cerrado lens, renormalized (unchanged when it is used)."""
+    if use_cerrado:
+        return weights
+    rest = {k: v for k, v in weights.items() if k != CERRADO}
+    total = sum(rest.values()) or 1.0
+    return {k: v / total for k, v in rest.items()}
+
+
 def _matrices(
     premises: RecommendationPolicy,
     items: list[AssetLenses],
     gates: list[AssetGates],
     as_of: date,
     validated: LensWeights | None = None,
+    *,
+    use_cerrado: bool = True,
 ) -> list[ClassMatrix]:
     """The AHP decision matrix of each class that has assets (Phase 45.3); the Ações class uses
-    the weights the data validated (45.7) when they passed for its objective."""
+    the weights the data validated (45.7) when they passed for its objective. Without the
+    Cerrado, the weights come from the matrix without its row and column."""
     by_ticker = {g.ticker: g for g in gates}
     out = []
     for arca_class, objective in premises.objectives.items():
         members = [i for i in items if i.arca_class == arca_class.value]
         if not members:
             continue
-        found = priority(premises.matrices[objective])
+        matrix = premises.matrices[objective]
+        found = priority(matrix) if use_cerrado else priority_without(matrix, CERRADO)
         weights, source = found.weights, "AHP"
         if (
             validated is not None
@@ -200,7 +218,7 @@ def _matrices(
             and arca_class == ArcaClass.ACOES
             and validated.objective == objective
         ):
-            weights, source = validated.used, "VALIDATED"
+            weights, source = without(validated.used, use_cerrado), "VALIDATED"
         out.append(
             combine_class(
                 arca_class=arca_class.value,
@@ -296,7 +314,15 @@ def refresh_lenses(
     gates = _gates(uow, universe, min_daily_volume, as_of)
     stored = uow.forecasts.latest_model(LENS_WEIGHTS)
     validated = LensWeights.from_dict(stored.payload) if stored is not None else None
-    matrices = _matrices(policy.recommendation, items, gates, as_of, validated)
+    premises = policy.recommendation
+    matrices = _matrices(premises, items, gates, as_of, validated, use_cerrado=premises.use_cerrado)
+    # The other variant (with or without the Cerrado), built to be compared on the scoreboard.
+    other = {
+        m.arca_class: m
+        for m in _matrices(
+            premises, items, gates, as_of, validated, use_cerrado=not premises.use_cerrado
+        )
+    }
     held = _held_values(uow, universe, as_of)
     tickers = {r.ticker for m in matrices for r in m.rows} | {t for c in held.values() for t in c}
     returns = monthly_returns(uow, sorted(tickers), as_of)
@@ -307,7 +333,18 @@ def refresh_lenses(
         optimized = optimize_class(
             m, returns, params, current=held.get(m.arca_class), construction=built
         )
-        constructions[m.arca_class] = replace(built, optimized=optimized.to_dict())
+        twin = other.get(m.arca_class)
+        twin_built = build_class(twin, returns, params) if twin is not None else None
+        twin_weights = {s.ticker: s.weight for s in twin_built.selected} if twin_built else {}
+        mine = {s.ticker: s.weight for s in built.selected}
+        variants = (
+            {WITH_CERRADO: mine, WITHOUT_CERRADO: twin_weights}
+            if premises.use_cerrado
+            else {WITH_CERRADO: twin_weights, WITHOUT_CERRADO: mine}
+        )
+        constructions[m.arca_class] = replace(
+            built, optimized=optimized.to_dict(), cerrado_variants=variants
+        )
     stored_count = uow.recommendation.replace_lenses(as_of, items)
     uow.recommendation.replace_gates(as_of, gates)
     uow.recommendation.replace_matrices(as_of, matrices, constructions)

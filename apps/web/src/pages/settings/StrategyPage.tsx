@@ -134,6 +134,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
   const [validityMonths, setValidityMonths] = useState(String(eligibility.answer_validity_months ?? 12));
   const [reviewExpired, setReviewExpired] = useState(eligibility.review_on_expired_answers ?? true);
   const [dropExpired, setDropExpired] = useState(eligibility.drop_expired_answers ?? false);
+  const [useCerrado, setUseCerrado] = useState(policy.recommendation?.use_cerrado ?? true);
   const valuation = (policy.valuation ?? {}) as Record<string, number | undefined>;
   const projections = (policy.valuation?.projections ?? {}) as Record<string, number | undefined>;
   const [valuationText, setValuationText] = useState<Record<string, string>>(() =>
@@ -192,6 +193,8 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
           projections: read(PROJECTION_FIELDS, projectionText),
         },
         health: read(HEALTH_FIELDS, healthText),
+        // The other premises of the recommendation are kept as they are; only the switch changes.
+        ...(policy.recommendation ? { recommendation: { ...policy.recommendation, use_cerrado: useCerrado } } : {}),
       });
       onSaved();
     } catch (err) {
@@ -310,6 +313,12 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
             <input type="checkbox" checked={dropExpired} disabled={saving} onChange={(e) => setDropExpired(e.target.checked)} />
             Tirar respostas vencidas da nota
           </label>
+          {policy.recommendation && (
+            <label className="app-check">
+              <input type="checkbox" checked={useCerrado} disabled={saving} onChange={(e) => setUseCerrado(e.target.checked)} />
+              Usar o Cerrado na recomendação (desligado: a lente sai dos pesos e quem não foi analisado deixa de ter nota 0)
+            </label>
+          )}
         </div>
       </section>
 

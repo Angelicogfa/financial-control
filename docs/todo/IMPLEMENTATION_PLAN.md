@@ -58,6 +58,7 @@
 | **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.5 feitas; antes das Fases 34 e 36) | 75% |
 | **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 a 43.5 feitas; 43.6 depois de 42.4–42.6) | 85% |
 | **Fase 45** | Hierarquia de Recomendação (motor analítico do aporte) | `[x]` Concluída (45.0 a 45.8) | 100% |
+| **Fase 47** | Recomendações Externas: Engenharia Reversa | `[ ]` Proposta (aguarda decisões da seção 10 do desenho) | 0% |
 
 > **Pausa 2026-10-30:** a pedido, nenhuma fase nova avança (42.6, 42.7, 43.6, 34 e 36 incluídas) até a revisão da hierarquia de recomendação ser aprovada. Inventário dos mecanismos e proposta em [RECOMMENDATION_HIERARCHY_DESIGN.md](../features/RECOMMENDATION_HIERARCHY_DESIGN.md) (Fase 45).
 
@@ -879,3 +880,20 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 
 - `[x]` **46.1** Dados de mercado fica só com as rotinas que buscam dados fora (histórico da simulação, comunicados, balanços e histórico da CVM, histórico do garimpo). As de cálculo foram para a tela do assunto: o garimpo no Garimpo, as lentes e o teste no passado em Recomendação, e a previsão de preço (recalcular, valuation, calibração) em Qualidade dos modelos, numa seção nova que também mostra a qualidade medida da previsão (antes sem tela). Uma lista única das rotinas manuais (`src/api/jobs.ts`) e um componente (`JobRunList`) pedem, acompanham e recarregam a tela; o teste da API compara as rotinas manuais com essa lista.
 - `[x]` **46.2** Dois workers da mesma imagem pelo `WORKER_ROLE` (`worker/roles.py`): `worker-ingest` (busca fora) e `worker-process` (calcula com o banco), cada um com as suas rotinas agendadas, os seus pedidos manuais e a sua parte da inicialização; a trava por rotina no Redis continua a mesma. Em processos separados, uma carga longa não segura um cálculo e os cálculos usam outro núcleo (um processo Python divide uma trava do interpretador entre as threads). `WORKER_ROLE=all` mantém um processo só. Compose, smoke, README e visão da arquitetura atualizados.
+
+## Ajustes depois da Fase 45 (2026-11-01)
+
+- `[x]` **Chave do Cerrado na política** (`use_cerrado`, versionada; ligada por padrão). Desligada, os pesos do AHP vêm da matriz sem a linha e a coluna do Cerrado (`priority_without`), os pesos validados pelos dados perdem o Cerrado e quem não foi analisado deixa de ter nota 0; vale para a matriz, a construção, o otimizador e o aporte. A rodada guarda os pesos da construção com e sem o Cerrado, e o placar ao vivo compara "Recomendação com o Cerrado" e "sem o Cerrado". A tela Estratégia tem a chave; a Recomendação mostra "Sem o Cerrado".
+- `[x]` **Aporte com todas as posições.** O plano lista também as posições que não receberam sugestão, com o motivo (fora do ARCA, pendência no livro, classe sem aporte, fora pela elegibilidade ou pelos portões); a caixa "Só os sugeridos para comprar", desmarcada, mostra todas, e qualquer uma pode ser comprada à mão.
+- Liberação da rodada: mantida automática (o controle é a confirmação de cada aporte).
+
+## Fase 47 — Recomendações Externas: Engenharia Reversa (`[ ]` Proposta)
+
+Desenho: [EXTERNAL_RECOMMENDATIONS_DESIGN.md](../features/EXTERNAL_RECOMMENDATIONS_DESIGN.md). Pedida em 2026-11-01: informar os ativos sugeridos por outra fonte e entender, pelas lentes da hierarquia, por que eles foram escolhidos e que padrão a fonte segue.
+
+- `[ ]` **47.0** Decisões da seção 10 do desenho.
+- `[ ]` **47.1** Entrada, persistência, lentes da data (rodada guardada ou painel refeito), cobertura e portões.
+- `[ ]` **47.2** Perfil por lente com permutação, setores e estilo (AUC).
+- `[ ]` **47.3** Pesos implícitos (por lista e por fonte) e concordância com a recomendação.
+- `[ ]` **47.4** A fonte no placar ao vivo, estabilidade e rotatividade.
+- `[ ]` **47.5** Tela, MCP, testes de UI e integração, `docker compose build`.

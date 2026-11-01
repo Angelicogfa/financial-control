@@ -173,6 +173,11 @@ class ContributionOrderReason(StrEnum):
     ZERO_WEIGHT = "ZERO_WEIGHT"  # the class strategy gives it no weight
     NO_PRICE = "NO_PRICE"
     BELOW_MIN_LOT = "BELOW_MIN_LOT"  # the recommendation's share is below the minimum purchase
+    # Held positions outside the plan, listed so a purchase can still be chosen by hand.
+    NOT_ARCA = "NOT_ARCA"  # emergency reserve or another purpose
+    LEDGER_PENDING = "LEDGER_PENDING"  # the ledger of the asset needs fixing
+    CLASS_NOT_RECEIVING = "CLASS_NOT_RECEIVING"  # its class gets nothing from this contribution
+    NOT_ELIGIBLE = "NOT_ELIGIBLE"  # out by the lifecycle or the gates
 
 
 class CorporateEventKind(StrEnum):

@@ -350,7 +350,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
             <label className="app-check" style={{ marginBottom: "var(--space-3)" }}>
               <input type="checkbox" checked={onlyRecommended} onChange={(ev) => setOnlyRecommended(ev.target.checked)} />
               <span>
-                Só os recomendados para comprar ({visible.length} de {orders.length})
+                Só os sugeridos para comprar ({visible.length} de {orders.length}); desmarque para ver todas as suas posições
               </span>
             </label>
             {visible.length === 0 ? (
