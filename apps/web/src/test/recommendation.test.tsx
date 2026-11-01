@@ -104,6 +104,30 @@ const BACKTEST = {
   ],
 };
 
+const WEIGHTS = {
+  status: "OK",
+  as_of: "2026-11-01",
+  objective: "MIXED",
+  passed: false,
+  reason: "Os dados não justificaram mudar os seus pesos: os pesos ajustados renderam +0.8% ao ano a mais nas 10 melhores notas, com 64% de confiança (são precisos 90%).",
+  origins: 9,
+  oos_months: 108,
+  improvement_annual: 0.008,
+  probability: 0.64,
+  lines: [
+    {
+      lens: "QUALITY",
+      label: "Qualidade",
+      declared: 0.236,
+      estimate_annual_per_z: 0.012,
+      sign_probability: 0.97,
+      data: 0.4,
+      candidate: 0.318,
+      used: 0.236,
+    },
+  ],
+};
+
 describe("Recomendação (Phase 45.5)", () => {
   it("explains the choice of the class: lead, chosen assets, curve, matrix, gates and runs", async () => {
     mockApi([
@@ -224,5 +248,20 @@ describe("Recomendação (Phase 45.5)", () => {
     expect(within(years).getByText("2025")).toBeInTheDocument();
     const score = screen.getByRole("table", { name: "Placar das rodadas" });
     expect(within(score).getByText("-0,2% (4)")).toBeInTheDocument();
+  });
+
+  it("shows the lens weights validated by the data (Phase 45.7)", async () => {
+    mockApi([
+      { path: "/recommendation/matrix", reply: board() },
+      { path: "/recommendation/runs", reply: RUNS },
+      { path: "/recommendation/backtest", reply: BACKTEST },
+      { path: "/recommendation/weights", reply: WEIGHTS },
+    ]);
+    renderAt("/recommendation");
+    expect(await screen.findByText("Ficam os seus pesos")).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: "Pesos validados pelos dados" });
+    expect(within(table).getByText("Qualidade")).toBeInTheDocument();
+    expect(within(table).getByText("31,8%")).toBeInTheDocument();
+    expect(within(table).getByText("97% de confiança no sentido")).toBeInTheDocument();
   });
 });

@@ -20,6 +20,8 @@ from controllers.recommendation.responses import (
     LensDifferenceDTO,
     LensDTO,
     LensWeightDTO,
+    LensWeightLineDTO,
+    LensWeightsDTO,
     MatrixBoardDTO,
     MatrixCellDTO,
     MatrixRowDTO,
@@ -42,6 +44,7 @@ from domain.recommendation.gates import GATE_LABELS, AssetGates
 from domain.recommendation.keys import LENS_LABELS, OBJECTIVE_LABELS
 from domain.recommendation.lenses import AssetLenses
 from domain.recommendation.switch import recommended_classes
+from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
 
 
 def _asset_dto(item: AssetLenses, gates: AssetGates | None) -> AssetLensesDTO:
@@ -151,6 +154,7 @@ def _matrix_dto(m: ClassMatrix, construction: ClassConstruction | None = None) -
             for e in m.excluded
         ],
         construction=_construction_dto(construction) if construction is not None else None,
+        weights_source=m.weights_source,  # type: ignore[arg-type]
     )
 
 
@@ -278,6 +282,38 @@ class RecommendationHandler:
             weights=found.weights,
             notes=found.notes,
             scoreboard=[ScoreLineDTO(**line) for line in stored.payload.get("scoreboard", [])],
+        )
+
+    def weights(self) -> LensWeightsDTO:
+        """The latest validation of the lens weights by the data (Phase 45.7)."""
+        with self.uow_factory() as uow:
+            stored = uow.forecasts.latest_model(LENS_WEIGHTS)
+        if stored is None:
+            return LensWeightsDTO(status="NOT_COMPUTED")
+        found = LensWeights.from_dict(stored.payload)
+        return LensWeightsDTO(
+            status="OK",
+            as_of=found.as_of,
+            objective=found.objective,
+            passed=found.passed,
+            reason=found.reason,
+            origins=found.origins,
+            oos_months=found.oos_months,
+            improvement_annual=found.improvement_annual,
+            probability=found.probability,
+            lines=[
+                LensWeightLineDTO(
+                    lens=line.lens,  # type: ignore[arg-type]
+                    label=LENS_LABELS.get(line.lens, line.lens),
+                    declared=line.declared,
+                    estimate_annual_per_z=line.estimate_annual_per_z,
+                    sign_probability=line.sign_probability,
+                    data=line.data,
+                    candidate=line.candidate,
+                    used=line.used,
+                )
+                for line in found.lines
+            ],
         )
 
     def runs(self, limit: int = 52) -> list[RecommendationRunDTO]:

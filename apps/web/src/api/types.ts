@@ -663,6 +663,7 @@ export interface ClassMatrixDTO {
   rows?: MatrixRowDTO[];
   excluded?: ExcludedAssetDTO[];
   construction?: ConstructionDTO | null;
+  weights_source?: "AHP" | "VALIDATED";
 }
 
 export interface ClassPolicyDTO {
@@ -1506,6 +1507,30 @@ export interface LensWeightDTO {
   label: string;
   weight: number;
   gaussian_weight: number;
+}
+
+export interface LensWeightLineDTO {
+  lens: "CERRADO" | "QUALITY" | "VALUATION" | "IMPROVEMENT" | "MOMENTUM" | "INCOME" | "RISK" | "PROJECTION";
+  label: string;
+  declared: number;
+  estimate_annual_per_z: number;
+  sign_probability: number;
+  data: number;
+  candidate: number;
+  used: number;
+}
+
+export interface LensWeightsDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  objective?: string | null;
+  passed?: boolean;
+  reason?: string;
+  origins?: number;
+  oos_months?: number;
+  improvement_annual?: number;
+  probability?: number;
+  lines?: LensWeightLineDTO[];
 }
 
 export interface LiquidityDetailDTO {

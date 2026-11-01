@@ -38,6 +38,7 @@ from domain.recommendation.lenses import (
     asset_lenses,
 )
 from domain.recommendation.repositories import RecommendationRun
+from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, AssetPurpose, ChecklistProfile, default_arca_class
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -175,8 +176,10 @@ def _matrices(
     items: list[AssetLenses],
     gates: list[AssetGates],
     as_of: date,
+    validated: LensWeights | None = None,
 ) -> list[ClassMatrix]:
-    """The AHP decision matrix of each class that has assets (Phase 45.3)."""
+    """The AHP decision matrix of each class that has assets (Phase 45.3); the Ações class uses
+    the weights the data validated (45.7) when they passed for its objective."""
     by_ticker = {g.ticker: g for g in gates}
     out = []
     for arca_class, objective in premises.objectives.items():
@@ -184,12 +187,21 @@ def _matrices(
         if not members:
             continue
         found = priority(premises.matrices[objective])
+        weights, source = found.weights, "AHP"
+        if (
+            validated is not None
+            and validated.passed
+            and arca_class == ArcaClass.ACOES
+            and validated.objective == objective
+        ):
+            weights, source = validated.used, "VALIDATED"
         out.append(
             combine_class(
                 arca_class=arca_class.value,
                 objective=objective,
                 as_of=as_of,
-                weights=found.weights,
+                weights=weights,
+                weights_source=source,
                 consistency_ratio=found.consistency_ratio,
                 scale_annual=premises.score_scale_annual,
                 items=members,
@@ -261,7 +273,9 @@ def refresh_lenses(
             )
         )
     gates = _gates(uow, universe, min_daily_volume, as_of)
-    matrices = _matrices(policy.recommendation, items, gates, as_of)
+    stored = uow.forecasts.latest_model(LENS_WEIGHTS)
+    validated = LensWeights.from_dict(stored.payload) if stored is not None else None
+    matrices = _matrices(policy.recommendation, items, gates, as_of, validated)
     returns = monthly_returns(uow, [r.ticker for m in matrices for r in m.rows], as_of)
     params = policy.recommendation.construction()
     constructions = {m.arca_class: build_class(m, returns, params) for m in matrices}

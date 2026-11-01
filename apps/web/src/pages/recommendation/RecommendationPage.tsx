@@ -555,6 +555,61 @@ function PastTest() {
   );
 }
 
+/** Phase 45.7: what the data say about each lens and whether the adjusted weights passed. */
+function ValidatedWeights() {
+  const state = useApi("recommendation-weights", () => api.recommendation.weights());
+  return (
+    <Async state={state}>
+      {(data) =>
+        data.status !== "OK" ? (
+          <p className="app-muted">A validação roda junto com o teste no passado.</p>
+        ) : (
+          <div className="app-page-stack">
+            <Lead tone={data.passed ? "positive" : "neutral"}>
+              <p>
+                {data.passed ? <Badge tone="success">Em uso</Badge> : <Badge>Ficam os seus pesos</Badge>} {data.reason}
+              </p>
+            </Lead>
+            <div className="app-table-wrap">
+              <table className="app-table" aria-label="Pesos validados pelos dados">
+                <thead>
+                  <tr>
+                    <th>Lente</th>
+                    <th className="app-numeric">Seu peso (AHP)</th>
+                    <th className="app-numeric">O que os dados dizem</th>
+                    <th className="app-numeric">Peso pelos dados</th>
+                    <th className="app-numeric">Candidato</th>
+                    <th className="app-numeric">Em uso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.lines ?? []).map((line) => (
+                    <tr key={line.lens}>
+                      <td>{line.label}</td>
+                      <td className="app-numeric">{pct(line.declared, 1)}</td>
+                      <td className="app-numeric">
+                        {pct(line.estimate_annual_per_z, 1, true)} ao ano por desvio
+                        <div className="app-muted">{pct(line.sign_probability, 0)} de confiança no sentido</div>
+                      </td>
+                      <td className="app-numeric">{pct(line.data, 1)}</td>
+                      <td className="app-numeric">{pct(line.candidate, 1)}</td>
+                      <td className="app-numeric">{pct(line.used, 1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="app-muted">
+              Só as lentes com passado são testadas; o Cerrado e a projeção mantêm o seu peso. Os pesos validados valem só
+              na classe Ações, nos objetivos Valorização e Misto, a partir da rodada seguinte das lentes.
+            </p>
+          </div>
+        )
+      }
+    </Async>
+  );
+}
+
 function Runs() {
   const state = useApi("recommendation-runs", () => api.recommendation.runs());
   return (
@@ -627,7 +682,14 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
       <Section title="Matriz de decisão" subtitle="Cada lente de 0 a 1 (maior é melhor), já puxada para 0,5 pela confiança.">
         <DecisionMatrix matrix={matrix} />
       </Section>
-      <Section title="Pesos das lentes" subtitle={`Objetivo ${matrix.objective_label}, pela matriz AHP da política.`}>
+      <Section
+        title="Pesos das lentes"
+        subtitle={
+          matrix.weights_source === "VALIDATED"
+            ? `Objetivo ${matrix.objective_label}: pesos validados pelos dados (metade AHP, metade dados).`
+            : `Objetivo ${matrix.objective_label}, pela matriz AHP da política.`
+        }
+      >
         <Weights matrix={matrix} />
       </Section>
       <Section title="Fora pelos portões">
@@ -691,6 +753,12 @@ export function RecommendationPage() {
         subtitle="A hierarquia refeita a cada trimestre do passado, só com o que se sabia, contra pesos iguais; e como foram as rodadas guardadas."
       >
         <PastTest />
+      </Section>
+      <Section
+        title="Pesos validados pelos dados"
+        subtitle="Os dados podem ajustar os seus pesos só se o ajuste ganhar dos seus pesos fora da amostra."
+      >
+        <ValidatedWeights />
       </Section>
       <Section title="Rodadas" subtitle="Histórico das rodadas semanais e a versão da política que cada uma aplicou.">
         <Runs />

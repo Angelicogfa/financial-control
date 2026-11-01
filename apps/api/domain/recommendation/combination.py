@@ -72,6 +72,7 @@ class ClassMatrix:
     gaussian_weights: dict[str, float]
     rows: list[MatrixRow]
     excluded: list[ExcludedAsset]
+    weights_source: str = "AHP"  # AHP (declared) or VALIDATED (by the data, Phase 45.7)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -128,6 +129,7 @@ def combine_class(
     scale_annual: float,
     items: Sequence[AssetLenses],
     gates: Mapping[str, AssetGates],
+    weights_source: str = "AHP",
 ) -> ClassMatrix:
     """The decision matrix of one class: the eligible assets ranked, the others with the reason."""
     rows_in: list[tuple[AssetLenses, list[MatrixCell], float]] = []
@@ -192,6 +194,7 @@ def combine_class(
         gaussian_weights=g_weights,
         rows=rows,
         excluded=sorted(excluded, key=lambda e: e.ticker),
+        weights_source=weights_source,
     )
 
 
