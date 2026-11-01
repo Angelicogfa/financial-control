@@ -44,6 +44,7 @@ from worker.jobs import (
     sync_simulation_history_job,
     sync_treasury_catalog_job,
     sync_treasury_prices_job,
+    update_comparison_portfolios_job,
     warm_portfolio_quotes_job,
 )
 from worker.roles import runs_here
@@ -119,6 +120,7 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         "backtest_recommendation": partial(
             backtest_recommendation_job, min_daily_volume=cfg.mining_min_daily_volume
         ),
+        "update_comparison_portfolios": update_comparison_portfolios_job,
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
 
@@ -207,6 +209,16 @@ def create_scheduler(
         hour=cfg.snapshot_cron_hour,
         minute=cfg.snapshot_cron_minute,
         id="record_daily_snapshot",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("update_comparison_portfolios", update_comparison_portfolios_job),
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=(cfg.snapshot_cron_hour + 1) % 24,
+        minute=cfg.snapshot_cron_minute,
+        id="update_comparison_portfolios",
         replace_existing=True,
         **defaults,
     )

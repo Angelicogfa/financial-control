@@ -304,4 +304,74 @@ describe("Recomendação (Phase 45.5)", () => {
     await screen.findByRole("table", { name: "Matriz de decisão" });
     expect(calls.filter((c) => c.path === "/recommendation/matrix").length).toBeGreaterThan(before);
   });
+
+  it("shows the live scoreboard with your place among the random portfolios (Phase 45.8a)", async () => {
+    const summary = (final: number, irr: number) => ({
+      start: "2024-01-10",
+      end: "2026-10-30",
+      final_value: final,
+      contributed: 1800,
+      gain: final - 1800,
+      irr,
+      twr: 0.2,
+      annual_twr: 0.07,
+      volatility: 0.12,
+      max_drawdown: -0.08,
+      fees: 1.5,
+      taxes: 0,
+    });
+    mockApi([
+      { path: "/recommendation/matrix", reply: board() },
+      {
+        path: "/recommendation/live",
+        reply: {
+          status: "OK",
+          as_of: "2026-11-01",
+          prospective_since: "2026-11-01",
+          prospective_months: 0,
+          verdict_ready: false,
+          yours: summary(2100, 0.09),
+          lines: [
+            {
+              key: "EQUAL",
+              label: "Pesos iguais",
+              started: "2024-01-10",
+              retroactive: true,
+              whole: summary(2250, 0.11),
+              yours: summary(2100, 0.09),
+              difference: 150,
+            },
+          ],
+          randoms: {
+            portfolios: 200,
+            rank: { portfolios: 200, beaten: 124, share: 0.62, low: 0.55, high: 0.68 },
+            irr_low: 0.03,
+            irr_mid: 0.08,
+            irr_high: 0.13,
+          },
+          curve: [
+            { day: "2024-01-31", yours: 1000, values: { EQUAL: 1010 }, random_low: 980, random_high: 1030 },
+            { day: "2024-02-29", yours: 1020, values: { EQUAL: 1040 }, random_low: 990, random_high: 1050 },
+          ],
+        },
+      },
+    ]);
+    renderAt("/recommendation?tab=live");
+    expect(await screen.findByText(/0 de 12 meses/)).toBeInTheDocument();
+    expect(screen.getByText(/bateu 62% das 200 carteiras aleatórias/)).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Placar ao vivo" });
+    expect(within(table).getByText("Pesos iguais")).toBeInTheDocument();
+    expect(within(table).getByText("retroativo")).toBeInTheDocument();
+    expect(within(table).getByText(/150,00/)).toBeInTheDocument();
+    expect(screen.queryByText("Decide o aporte")).not.toBeInTheDocument();
+  });
+
+  it("says when the live scoreboard has not run", async () => {
+    mockApi([
+      { path: "/recommendation/matrix", reply: board() },
+      { path: "/recommendation/live", reply: { status: "NOT_COMPUTED" } },
+    ]);
+    renderAt("/recommendation?tab=live");
+    expect(await screen.findByText("O placar ao vivo ainda não rodou")).toBeInTheDocument();
+  });
 });

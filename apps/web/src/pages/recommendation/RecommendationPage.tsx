@@ -22,6 +22,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { Pagination } from "../../components/Pagination";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../../components/Section";
+import { LiveScoreboard } from "./LiveScoreboard";
 import { Async, Empty, Spinner } from "../../components/States";
 import { brl, day, num, parseDecimal, pct, quantity } from "../../utils/format";
 import { usePagedRows } from "../../utils/pagination";
@@ -664,7 +665,7 @@ function Runs() {
   );
 }
 
-type TabKey = "chosen" | "matrix" | "compare" | "past" | "runs";
+type TabKey = "chosen" | "matrix" | "compare" | "past" | "live" | "runs";
 
 /** One tab per area, so the page does not read as one long scroll (the tab lives in `?tab=`).
  *  The first three follow the ARCA class chosen above them; the last two are of the whole run. */
@@ -673,6 +674,7 @@ const TABS: TabSpec<TabKey>[] = [
   { key: "matrix", label: "Matriz de decisão" },
   { key: "compare", label: "Comparar" },
   { key: "past", label: "Teste no passado" },
+  { key: "live", label: "Placar ao vivo" },
   { key: "runs", label: "Rodadas" },
 ];
 const CLASS_TABS: TabKey[] = ["chosen", "matrix", "compare"];
@@ -773,7 +775,7 @@ function RunsTab({ onChange }: Readonly<{ onChange: () => void }>) {
         title="Rodar agora"
         subtitle="Rodam sozinhas toda semana, nesta ordem, depois do garimpo; o garimpo fica na tela Garimpo."
       >
-        <JobRunList jobs={manualJobs(["refresh_asset_lenses", "backtest_recommendation"])} onChange={onChange} />
+        <JobRunList jobs={manualJobs(["refresh_asset_lenses", "backtest_recommendation", "update_comparison_portfolios"])} onChange={onChange} />
       </Section>
     </div>
   );
@@ -835,6 +837,7 @@ export function RecommendationPage() {
           </Async>
         )}
         {tab === "past" && <PastTab />}
+        {tab === "live" && <LiveScoreboard />}
         {tab === "runs" && <RunsTab onChange={state.reload} />}
         <Notes
           items={[

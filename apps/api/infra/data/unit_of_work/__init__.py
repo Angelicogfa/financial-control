@@ -15,6 +15,7 @@ from infra.data.repositories.assets import (
     SqlAlchemyAssetRepository,
     SqlAlchemyChecklistRepository,
 )
+from infra.data.repositories.comparison import SqlAlchemyComparisonRepository
 from infra.data.repositories.disclosures import (
     SqlAlchemyCvmDocumentRepository,
     SqlAlchemyCvmStatementRepository,
@@ -91,6 +92,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.forecasts = SqlAlchemyForecastRepository(self.session)
         self.mining = SqlAlchemyMiningRepository(self.session)
         self.recommendation = SqlAlchemyRecommendationRepository(self.session)
+        self.comparison = SqlAlchemyComparisonRepository(self.session)
         return self
 
     def __exit__(

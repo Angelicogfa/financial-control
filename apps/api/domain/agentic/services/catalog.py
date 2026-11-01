@@ -85,6 +85,7 @@ from controllers.recommendation.responses import (
     ContributionComparisonDTO,
     LensBoardDTO,
     LensWeightsDTO,
+    LiveBoardDTO,
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
@@ -259,6 +260,7 @@ class JobRequestInput(BaseModel):
         "run_mining",
         "refresh_asset_lenses",
         "backtest_recommendation",
+        "update_comparison_portfolios",
     ]
 
 
@@ -845,6 +847,21 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=LensWeightsDTO,
         invoke=lambda h, _p: h.recommendation.weights(),
+    ),
+    OperationSpec(
+        name="recommendation.live",
+        kind="query",
+        description=(
+            "Placar ao vivo (Fase 45.8a): o mesmo fluxo ARCA da sua carteira, nas mesmas datas, "
+            "aplicado pela Recomendação, pela regra antiga do Cerrado, por pesos iguais, pelos "
+            "índices de cada classe, pelo CDI e por 200 carteiras aleatórias. Para cada "
+            "estratégia: TIR, TWR, volatilidade, queda máxima e a diferença para a sua carteira "
+            "no mesmo período; a sua posição entre as aleatórias, com intervalo. A parte "
+            "retroativa vem marcada; o veredito só vale depois de 12 meses de registro."
+        ),
+        input_model=EmptyInput,
+        output_type=LiveBoardDTO,
+        invoke=lambda h, _p: h.recommendation.live(),
     ),
     OperationSpec(
         name="recommendation.runs",

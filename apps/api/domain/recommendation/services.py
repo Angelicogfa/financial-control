@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import asdict
 from datetime import date
 
 from controllers.recommendation.responses import (
@@ -22,6 +23,7 @@ from controllers.recommendation.responses import (
     LensWeightDTO,
     LensWeightLineDTO,
     LensWeightsDTO,
+    LiveBoardDTO,
     MatrixBoardDTO,
     MatrixCellDTO,
     MatrixRowDTO,
@@ -33,6 +35,7 @@ from controllers.recommendation.responses import (
     SkippedAssetDTO,
 )
 from controllers.shared.dependencies import UoWFactory
+from domain.comparison.board import build_board
 from domain.policy.services.policy import current_policy
 from domain.portfolio.services.consolidation import AssetContributionOrder, plan_contribution
 from domain.portfolio.services.service import PortfolioApplicationService
@@ -315,6 +318,15 @@ class RecommendationHandler:
                 for line in found.lines
             ],
         )
+
+    def live(self, today: date | None = None) -> LiveBoardDTO:
+        """The live scoreboard: your ARCA flow under each strategy (Phase 45.8a)."""
+        with self.uow_factory() as uow:
+            rows = uow.comparison.list_all()
+        board = build_board(rows, today or date.today())
+        if board is None:
+            return LiveBoardDTO(status="NOT_COMPUTED")
+        return LiveBoardDTO.model_validate({"status": "OK", **asdict(board)})
 
     def runs(self, limit: int = 52) -> list[RecommendationRunDTO]:
         """The history of the weekly runs, newest first."""

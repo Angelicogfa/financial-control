@@ -15,6 +15,7 @@ from infra.data.models.assets import (
     ChecklistEvaluationModel,
     FixedIncomeTermModel,
 )
+from infra.data.models.comparison import ComparisonPortfolioModel
 from infra.data.models.disclosures import (
     CvmDocumentModel,
     CvmEventEffectModel,
@@ -58,6 +59,7 @@ __all__ = [
     "AccountModel",
     "AssetGateModel",
     "AssetLensModel",
+    "ComparisonPortfolioModel",
     "AgentApiKeyModel",
     "AlertDismissalModel",
     "AssetForecastModel",

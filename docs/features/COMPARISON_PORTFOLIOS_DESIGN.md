@@ -129,6 +129,8 @@ Nova tela **Comparar carteiras** (Visão geral ou Ferramentas, decisão 9):
 
 ## 11. Decisões que precisam ser tomadas antes de implementar
 
+> **2026-11-01:** respondidas dentro da Fase 45 (etapa 45.8a, o placar ao vivo). Ver a seção 10.1 de [RECOMMENDATION_HIERARCHY_DESIGN.md](RECOMMENDATION_HIERARCHY_DESIGN.md).
+
 1. **Estratégias iniciais:** o catálogo da seção 4 inteiro ou um subconjunto (recomendado começar com `POLICY_EQUAL`, `INDEX_ARCA`, `DIVIDENDS`, `VALUE`, `RANDOM` e `CDI`)? Quantas aleatórias (proposta: 200)?
 2. **Universo:** carteira + watchlist, o catálogo filtrado pelo screener ou os dois, conforme a estratégia (recomendado)? Qual teto?
 3. **Alcance do fluxo:** só a parte ARCA (recomendado) ou a carteira toda?

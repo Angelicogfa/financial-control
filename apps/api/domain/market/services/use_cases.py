@@ -42,6 +42,7 @@ MANUAL_JOBS: dict[str, str] = {
     "run_mining": "Garimpo e painel de sinais: valor, qualidade, melhora, momentum, renda e risco",
     "refresh_asset_lenses": "Lentes e portões da recomendação de cada ativo",
     "backtest_recommendation": "Teste no passado e placar da recomendação",
+    "update_comparison_portfolios": "Placar ao vivo: o seu fluxo ARCA em cada estratégia",
 }
 
 

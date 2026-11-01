@@ -13,6 +13,7 @@ from controllers.recommendation.responses import (
     ContributionComparisonDTO,
     LensBoardDTO,
     LensWeightsDTO,
+    LiveBoardDTO,
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
@@ -89,3 +90,11 @@ def get_weights(
 ) -> LensWeightsDTO:
     """The lens weights validated by the data (Phase 45.7) and whether they are used."""
     return handler.weights()
+
+
+@recommendation_router.get("/live", response_model=LiveBoardDTO)
+def get_live(
+    handler: RecommendationHandler = Depends(get_recommendation_handler),
+) -> LiveBoardDTO:
+    """The live scoreboard: your ARCA flow under each strategy (Phase 45.8a)."""
+    return handler.live()
