@@ -74,7 +74,7 @@ describe("Garimpo (Phase 43)", () => {
     expect(within(table).queryByRole("link", { name: "ABCD3" })).not.toBeInTheDocument();
     expect(within(table).queryByRole("link", { name: "Ver ativo" })).not.toBeInTheDocument();
     expect(screen.getByText("Chance de perder do universo")).toBeInTheDocument();
-    expect(screen.getByText(/não usado \(60% de confiança no sentido\)/)).toBeInTheDocument();
+    expect(screen.getByText(/não usado \(60% de chance de ajudar\)/)).toBeInTheDocument();
     const record = screen.getByRole("table", { name: "Placar dos achados" });
     expect(within(record).getByText("58%")).toBeInTheDocument();
   });

@@ -447,11 +447,18 @@ def refresh_asset_forecasts_job(
     gateway: CachedMarketGateway,
     *,
     catalog_top: int = 0,
+    min_daily_volume: float | None = None,
     now: datetime | None = None,
 ) -> dict[str, int]:
-    """Compute and store the price forecast of every registered asset (Phase 42.1)."""
+    """Compute and store the price forecast of every registered asset (Phase 42.1) and, with
+    `min_daily_volume`, of the liquid stocks the recommendation scores (its projection lens)."""
     at = now or datetime.now(UTC)
     with uow_factory() as uow:
+        liquid = (
+            [m.ticker for m in mining_universe(uow, min_daily_volume)]
+            if min_daily_volume is not None
+            else []
+        )
         cdi, _ipca = stored_macro_rates(uow, gateway, today=at.date())
         projections = current_policy(uow.policies).valuation.projections
         if projections.projected_cdi_rate is not None:
@@ -462,6 +469,7 @@ def refresh_asset_forecasts_job(
             usd_brl=stored_usd_brl(uow, gateway),
             catalog_top=catalog_top,
             today=at.date(),
+            also=liquid,
         )
         uow.commit()
     return counts

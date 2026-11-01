@@ -72,3 +72,19 @@ def price_spikes(
             last_good = price
         i += 1
     return keep, spikes
+
+
+# A month the price went up more than 4x or down more than 85% is a level jump in the series (a
+# reverse split or a split the provider did not apply), not a return: a real crash of 77% in a
+# month (Americanas, January 2023) stays. Those months are left out of every monthly return
+# (Garimpo, backtest, validation of the lens weights, construction), so a single jump cannot
+# make a year of +2,000,000%.
+MAX_MONTHLY_RATIO = 4.0
+MIN_MONTHLY_RATIO = 0.15
+
+
+def plausible_month(before: float | None, after: float | None) -> bool:
+    """Whether the move from one month's close to the next can be a return."""
+    if not before or not after or before <= 0 or after <= 0:
+        return False
+    return MIN_MONTHLY_RATIO <= after / before <= MAX_MONTHLY_RATIO

@@ -22,6 +22,7 @@ from domain.assets.services.cerrado import CerradoEvaluation
 from domain.assets.services.scores import accounting_scores
 from domain.disclosures.events import RESTRUCTURING
 from domain.disclosures.services.sync import base_ticker
+from domain.market.services.price_sanity import plausible_month, price_spikes
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.policy.services.lifecycle import has_position
 from domain.policy.services.policy import RecommendationPolicy, current_policy
@@ -241,7 +242,10 @@ RETURN_MONTHS = 40  # the 36 of the correlations and a margin
 def monthly_returns(
     uow: AbstractUnitOfWork, tickers: list[str], as_of: date
 ) -> dict[str, dict[tuple[int, int], float]]:
-    """Monthly total returns of each ticker from the stored series (price when no total return)."""
+    """Monthly total returns of each ticker from the stored series (price when no total return).
+
+    Isolated bad prints are dropped first, and a month whose move is a level jump (an unapplied
+    split) is left out: it is not a return."""
     start = as_of - timedelta(days=31 * RETURN_MONTHS)
     out: dict[str, dict[tuple[int, int], float]] = {}
     for ticker in tickers:
@@ -250,14 +254,17 @@ def monthly_returns(
             points = uow.market_series.list_series(
                 px_symbol(ticker), date_from=start, date_to=as_of
             )
+        ordered = sorted(points, key=lambda p: p.reference_date)
+        keep, _ = price_spikes([p.reference_date for p in ordered], [p.value for p in ordered])
         last: dict[tuple[int, int], float] = {}
-        for p in points:
-            last[(p.reference_date.year, p.reference_date.month)] = p.value
+        for p, kept in zip(ordered, keep, strict=True):
+            if kept:
+                last[(p.reference_date.year, p.reference_date.month)] = p.value
         months = sorted(last)
         out[ticker] = {
             m: last[m] / last[prev] - 1.0
             for prev, m in zip(months, months[1:], strict=False)
-            if last[prev] > 0
+            if plausible_month(last[prev], last[m])
         }
     return out
 
@@ -295,7 +302,8 @@ def refresh_lenses(
     universe = _universe(uow, min_daily_volume, set(panel))
     items = []
     for m in universe:
-        stored = uow.forecasts.latest(m.ticker) if m.asset is not None else None
+        # Catalog stocks have a forecast too (the forecast job covers the liquid ones).
+        stored = uow.forecasts.latest(m.ticker)
         items.append(
             asset_lenses(
                 ticker=m.ticker,

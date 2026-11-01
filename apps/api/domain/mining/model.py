@@ -3,8 +3,9 @@
 Weights: every month, the return over the class in the next 12 months is regressed on the four
 signals across the companies (missing signals count as 0, the sector average); the monthly
 coefficients are averaged (Fama-MacBeth), their error widened for the overlap of the 12-month
-windows, and each is shrunk by a sceptical prior N(0, 0.2% a month). A signal whose sign is not
-clear (< 90%) gets weight 0.
+windows, and each is shrunk by a sceptical prior N(0, 0.2% a month). Every signal is built so
+that a higher z is better; one gets weight only when the chance that it helps (a positive
+premium) is at least 90%. A signal that hurt keeps weight 0: it is never flipped.
 
 Out of sample, by rolling origin: each December the weights are estimated with the windows that
 had closed, and every month of the next year the 10 best scores are the findings. Their return
@@ -104,7 +105,8 @@ def coefficient_table(
 def weights_from(
     table: CoefficientTable, months: Sequence[Month], names: Sequence[str]
 ) -> dict[str, SignalWeight]:
-    """Fama-MacBeth means of the months given, shrunk by the prior; unclear signs get 0."""
+    """Fama-MacBeth means of the months given, shrunk by the prior; a signal gets its weight
+    only when P(premium > 0) is at least 90% (a negative premium is never used, flipped)."""
     rows = [table[m] for m in months if m in table]
     weights: dict[str, SignalWeight] = {}
     for name in names:
@@ -113,7 +115,7 @@ def weights_from(
             weights[name] = SignalWeight(name, 0.0, PRIOR_SD, 0.5, 0.0, 0)
             continue
         mean, sd = posterior(slope, 0.0, PRIOR_SD)
-        sign = _phi(abs(mean) / sd)
+        sign = _phi(mean / sd)  # one-sided: the chance that the signal helps
         weights[name] = SignalWeight(
             name,
             mean,
