@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -107,6 +108,9 @@ class Settings(BaseSettings):
     # Phase 33.3: time limit of one run and how often the worker looks for queued runs.
     simulation_timeout_seconds: int = Field(default=120, ge=5, le=3600)
     simulation_poll_seconds: int = Field(default=15, ge=1, le=3600)
+    # Which jobs this worker process runs (worker/roles.py): "ingest" fetches from outside,
+    # "process" computes from the database, "all" runs both in one process.
+    worker_role: Literal["all", "ingest", "process"] = "all"
     job_max_retries: int = Field(default=3, ge=0)
     job_retry_backoff_seconds: float = Field(default=30.0, ge=0)
     job_lock_ttl_seconds: int = Field(default=3600, ge=60)

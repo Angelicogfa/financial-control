@@ -16,6 +16,8 @@ import type {
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
 import { Combobox } from "../../components/Combobox";
+import { manualJobs } from "../../api/jobs";
+import { JobRunList } from "../../components/JobRunList";
 import { PageHeader } from "../../components/PageHeader";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
@@ -446,7 +448,7 @@ function PastTest() {
           return (
             <Empty
               title="O teste no passado ainda não rodou"
-              hint="Ele roda toda semana depois das lentes; dá para rodar agora em Dados de mercado (teste no passado e placar da recomendação)."
+              hint="Ele roda toda semana depois das lentes; dá para pedir agora em Rodar agora, no fim desta tela."
             />
           );
         const scoreboard = data.scoreboard ?? [];
@@ -677,7 +679,7 @@ export function RecommendationPage() {
           data.status !== "OK" ? (
             <Empty
               title="A recomendação ainda não rodou"
-              hint="Ela roda toda semana depois do garimpo; dá para rodar agora em Dados de mercado (lentes e portões da recomendação)."
+              hint="Ela roda toda semana depois do garimpo; dá para pedir agora em Rodar agora, no fim desta tela."
             />
           ) : (
             <Board data={data} />
@@ -692,6 +694,12 @@ export function RecommendationPage() {
       </Section>
       <Section title="Rodadas" subtitle="Histórico das rodadas semanais e a versão da política que cada uma aplicou.">
         <Runs />
+      </Section>
+      <Section
+        title="Rodar agora"
+        subtitle="Rodam sozinhas toda semana, nesta ordem, depois do garimpo; o garimpo fica na tela Garimpo."
+      >
+        <JobRunList jobs={manualJobs(["refresh_asset_lenses", "backtest_recommendation"])} onChange={state.reload} />
       </Section>
       <Notes
         items={[

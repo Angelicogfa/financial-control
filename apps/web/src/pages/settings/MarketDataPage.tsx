@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../../api/endpoints";
-import { errorMessage } from "../../api/http";
+import { JOB_LABELS, JOB_STATUS_LABELS, JOB_TONES, MARKET_DATA_JOBS, manualJobs } from "../../api/jobs";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { JobRunList } from "../../components/JobRunList";
 import { PageHeader } from "../../components/PageHeader";
 import { Async, Empty, Spinner } from "../../components/States";
 import { dateTime, day, num } from "../../utils/format";
@@ -16,118 +17,6 @@ const UNIT_LABELS: Record<string, string> = {
   RATIO: "Razão",
 };
 
-const JOB_LABELS: Record<string, string> = {
-  sync_bcb_and_benchmarks: "Séries BCB e índices",
-  ensure_series_coverage: "Cobertura das séries",
-  warm_portfolio_quotes: "Cotações da carteira",
-  record_daily_snapshot: "Retrato diário",
-  backfill_snapshots: "Histórico de retratos",
-  refresh_fundamentals: "Demonstrativos anuais",
-  record_checklist_evaluations: "Reavaliação dos checklists",
-  sync_instrument_catalog: "Catálogo de ativos B3",
-  sync_simulation_history: "Histórico longo da simulação",
-  sync_cvm_documents: "Comunicados da CVM",
-  sync_cvm_statements: "Balanços da CVM (DFP e ITR)",
-  sync_cvm_event_history: "Histórico de comunicados da CVM",
-  run_pending_simulations: "Simulações na fila",
-  refresh_asset_forecasts: "Previsão de preço dos ativos",
-  calibrate_forecasts: "Calibração da previsão de preço",
-  estimate_forecast_models: "Valuation na previsão de preço",
-  sync_mining_universe: "Histórico do garimpo",
-  run_mining: "Garimpo",
-  refresh_asset_lenses: "Lentes e portões da recomendação",
-  backtest_recommendation: "Teste no passado da recomendação",
-};
-
-const JOB_STATUS_LABELS: Record<string, string> = {
-  REQUESTED: "Pedida",
-  RUNNING: "Rodando",
-  SUCCESS: "Concluída",
-  FAILED: "Falhou",
-  SKIPPED: "Pulada",
-};
-
-/** Jobs that can be run by hand (the API accepts only these). */
-export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> = [
-  {
-    name: "sync_simulation_history",
-    action: "Carregar o histórico da simulação",
-    hint:
-      "Baixa do Yahoo o histórico longo dos ativos, do Ibovespa, do S&P 500 e do dólar que a simulação de carteira usa. " +
-      "Roda sozinha uma vez por semana; use aqui para não esperar. Pode levar alguns minutos.",
-  },
-  {
-    name: "sync_cvm_documents",
-    action: "Carregar os comunicados da CVM",
-    hint:
-      "Baixa da CVM os fatos relevantes, comunicados e avisos das ações da carteira e da watchlist. " +
-      "Roda sozinha todo dia; use aqui para ver já os documentos de hoje.",
-  },
-  {
-    name: "sync_cvm_statements",
-    action: "Carregar os balanços da CVM",
-    hint:
-      "Baixa da CVM os balanços anuais e trimestrais (DFP e ITR) das empresas listadas, com a data em que cada um foi entregue. " +
-      "Roda sozinha todo dia: confere os dois últimos anos e traz o histórico desde 2010 aos poucos (alguns arquivos por vez).",
-  },
-  {
-    name: "sync_cvm_event_history",
-    action: "Carregar o histórico de comunicados",
-    hint:
-      "Baixa os comunicados da CVM de todas as empresas listadas desde 2010 e classifica cada fato relevante por tipo de evento, para medir o que costuma acontecer com o preço depois. " +
-      "Roda sozinha todo dia, alguns anos por vez; os antigos entram como lidos.",
-  },
-  {
-    name: "sync_mining_universe",
-    action: "Carregar o histórico do garimpo",
-    hint:
-      "Baixa o histórico longo de preço (com desdobramentos) das ações líquidas de todo o catálogo, que o garimpo usa para medir os sinais. " +
-      "Roda sozinha todo dia útil, alguns papéis por vez, até cobrir o universo; depois mantém cada um com até uma semana.",
-  },
-  {
-    name: "run_mining",
-    action: "Rodar o garimpo",
-    hint:
-      "Recalcula, mês a mês e só com o que se sabia em cada mês, os sinais de valor, qualidade, melhora dos resultados, momentum, renda e risco de todas as ações líquidas. " +
-      "Roda sozinho uma vez por semana, depois dos balanços e do histórico.",
-  },
-  {
-    name: "refresh_asset_lenses",
-    action: "Rodar as lentes e os portões da recomendação",
-    hint:
-      "Calcula as lentes de cada ativo (Cerrado, qualidade, valuation, melhora, momentum, renda, risco e projeção), os portões, a matriz de decisão pelo AHP e os pesos-alvo de cada classe. " +
-      "Roda sozinha uma vez por semana, uma hora depois do garimpo; rode o garimpo antes.",
-  },
-  {
-    name: "backtest_recommendation",
-    action: "Rodar o teste no passado da recomendação",
-    hint:
-      "Refaz a recomendação a cada trimestre do passado, só com o que se sabia, e a compara com pesos iguais; mede também as rodadas guardadas. " +
-      "Roda sozinho uma vez por semana, depois das lentes; rode as lentes antes.",
-  },
-  {
-    name: "refresh_asset_forecasts",
-    action: "Recalcular a previsão de preço",
-    hint:
-      "Recalcula a faixa provável de preço de cada ativo em 3, 6, 12 e 24 meses a partir do histórico guardado. " +
-      "Roda sozinha todo dia útil; para um ativo só, use a aba Probabilidades do ativo.",
-  },
-  {
-    name: "estimate_forecast_models",
-    action: "Medir o valuation na previsão",
-    hint:
-      "Mede, com os balanços entregues à CVM, quanto estar barata ou cara frente ao histórico e ao setor disse sobre os 12 meses seguintes, " +
-      "e só usa na previsão se isso melhorou as previsões do passado. Roda sozinha uma vez por semana; depois, recalcule a previsão.",
-  },
-  {
-    name: "calibrate_forecasts",
-    action: "Calibrar a previsão de preço",
-    hint:
-      "Refaz as previsões do passado e mede quantas vezes as faixas se confirmaram; é isso que decide o selo de confiança. " +
-      "Roda sozinha uma vez por semana. Pode levar alguns minutos.",
-  },
-];
-const JOB_POLL_MS = 5000;
 
 const OPERATION_LABELS: Record<string, string> = {
   quote: "Cotação",
@@ -138,13 +27,6 @@ const OPERATION_LABELS: Record<string, string> = {
   catalog: "Catálogo B3",
 };
 
-const JOB_TONES: Record<string, string> = {
-  SUCCESS: "success",
-  FAILED: "danger",
-  REQUESTED: "info",
-  RUNNING: "info",
-  SKIPPED: "neutral",
-};
 
 function notifyWorkerErrorsChanged() {
   window.dispatchEvent(new CustomEvent("fincontrol:worker-errors-changed"));
@@ -161,31 +43,6 @@ export function MarketDataPage() {
   );
 
   const reloading = series.loading || jobs.loading || workerErrors.loading;
-  const [requesting, setRequesting] = useState<string | null>(null);
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const lastRun = (name: string) => jobs.data?.find((j) => j.job_name === name);
-  const statusOf = (name: string) => lastRun(name)?.status;
-  const anyActive = MANUAL_JOBS.some((j) => ["REQUESTED", "RUNNING"].includes(statusOf(j.name) ?? ""));
-
-  // Follow a manual run until the worker finishes it.
-  useEffect(() => {
-    if (!anyActive) return undefined;
-    const timer = setTimeout(() => jobs.reload(), JOB_POLL_MS);
-    return () => clearTimeout(timer);
-  }, [anyActive, jobs]);
-
-  const handleRequest = async (name: string) => {
-    setRequesting(name);
-    setRequestError(null);
-    try {
-      await api.market.requestJob(name);
-      jobs.reload();
-    } catch (err) {
-      setRequestError(errorMessage(err));
-    } finally {
-      setRequesting(null);
-    }
-  };
 
   const handleResolveOne = async (errorId: number) => {
     setResolvingId(errorId);
@@ -371,49 +228,14 @@ export function MarketDataPage() {
             )}
           </Async>
         </section>
-        <section className="app-card app-card-padded" aria-label="Rodar agora">
-          <h2 className="app-card-heading">Rodar agora</h2>
-          {requestError && (
-            <p className="app-error-banner" role="alert">
-              {requestError}
-            </p>
-          )}
-          <ul className="app-run-list">
-            {MANUAL_JOBS.map((job) => {
-              const run = lastRun(job.name);
-              const status = run?.status;
-              const active = status === "REQUESTED" || status === "RUNNING";
-              return (
-                <li key={job.name} className="app-run-item">
-                  <div className="app-run-text">
-                    <strong>{JOB_LABELS[job.name] ?? job.name}</strong>
-                    <p className="app-card-hint">{job.hint}</p>
-                    {active ? (
-                      <span className="app-run-status" role="status">
-                        {status === "REQUESTED" ? "Pedido registrado; o worker começa em até 15 segundos." : "Rodando…"}
-                      </span>
-                    ) : (
-                      run && (
-                        <span className="app-run-status">
-                          Última vez: {dateTime(run.finished_at ?? run.started_at)}{" "}
-                          <Badge tone={JOB_TONES[run.status] ?? "neutral"}>{JOB_STATUS_LABELS[run.status] ?? run.status}</Badge>
-                        </span>
-                      )
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="app-secondary-button"
-                    disabled={active || requesting !== null}
-                    onClick={() => handleRequest(job.name)}
-                  >
-                    {(active || requesting === job.name) && <Spinner size="sm" />}
-                    <span>{job.action}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        <section className="app-card app-card-padded" aria-label="Buscar dados agora">
+          <h2 className="app-card-heading">Buscar dados agora</h2>
+          <p className="app-card-hint">
+            Aqui ficam só as rotinas que buscam dados fora (Yahoo, CVM). As que processam esses dados rodam na tela de
+            cada assunto: o garimpo no Garimpo, as lentes e o teste no passado em Recomendação, a previsão de preço em
+            Qualidade dos modelos.
+          </p>
+          <JobRunList jobs={manualJobs(MARKET_DATA_JOBS)} onChange={jobs.reload} />
         </section>
         <section>
           <h2 className="app-card-heading">Rotinas do worker</h2>

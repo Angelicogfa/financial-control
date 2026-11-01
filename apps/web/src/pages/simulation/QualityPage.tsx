@@ -2,6 +2,7 @@
 
 import { PageHeader } from "../../components/PageHeader";
 import { Lead } from "../../components/Section";
+import { ForecastQualityPanel } from "./ForecastQualityPanel";
 import { ConfidencePanel, LabPanel } from "./views";
 
 export function QualityPage() {
@@ -20,6 +21,7 @@ export function QualityPage() {
         </Lead>
         <ConfidencePanel />
         <LabPanel />
+        <ForecastQualityPanel />
       </div>
     </div>
   );

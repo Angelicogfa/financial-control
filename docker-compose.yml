@@ -36,10 +36,15 @@ services:
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
 
-  worker:
+  worker-ingest:
     extends:
       <<: *prod
-      service: worker
+      service: worker-ingest
+
+  worker-process:
+    extends:
+      <<: *prod
+      service: worker-process
 
   web:
     extends:

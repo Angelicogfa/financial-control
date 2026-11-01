@@ -134,19 +134,13 @@ def test_mcp_request_job(api: SimpleNamespace) -> None:
         spec.input_model(job_name="refresh_fundamentals")
 
 
-def test_every_manual_job_has_a_button_on_the_market_data_page() -> None:
-    """The web page keeps its own list of buttons: a job the API accepts must be on it."""
+def test_every_manual_job_has_a_button_in_the_web() -> None:
+    """The web keeps its own list of the jobs run by hand (each screen shows its own): a job the
+    API accepts must be on it."""
     import re
     from pathlib import Path
 
-    page = (
-        Path(__file__).resolve().parents[2]
-        / "web"
-        / "src"
-        / "pages"
-        / "settings"
-        / "MarketDataPage.tsx"
-    )
+    page = Path(__file__).resolve().parents[2] / "web" / "src" / "api" / "jobs.ts"
     if not page.exists():
         pytest.skip("the web sources are not in this checkout")
     names = set(re.findall(r'name: "([a-z_]+)"', page.read_text(encoding="utf-8")))
