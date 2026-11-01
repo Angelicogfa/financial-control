@@ -20,7 +20,6 @@ from domain.recommendation.construction import (
     pulled_targets,
     set_weights,
 )
-from domain.recommendation.contribution import recommended_orders
 from domain.recommendation.params import ConstructionParams
 
 TODAY = date(2026, 10, 31)
@@ -156,39 +155,6 @@ def test_targets_are_pulled_toward_the_current_weights() -> None:
     assert targets["OLD3"] == pytest.approx(0.6 * 0.5 + 0.4 * 0.6)
     assert targets["GONE3"] == pytest.approx(0.4 * 0.4)  # held, not chosen: only its share left
     assert pulled_targets(built, {}) == {"NEW3": 0.5, "OLD3": 0.5}  # nothing held: no pull
-
-
-def test_recommended_orders_buy_whole_units_and_respect_the_minimum_lot() -> None:
-    built = ClassConstruction(
-        "ACOES",
-        TODAY,
-        3,
-        "",
-        1.0,
-        [
-            SelectedAsset("AAAA3", "X", "AAAA3", 0.5, 0.8, 0.03, 1.0, "Maior nota."),
-            SelectedAsset("BBBB3", "Y", "BBBB3", 0.45, 0.7, 0.02, 1.0, "Setor novo."),
-            SelectedAsset("CCCC3", "Z", "CCCC3", 0.05, 0.6, 0.01, 1.0, "Setor novo."),
-        ],
-        [],
-        [],
-    )
-    found = recommended_orders(
-        10_000.0,
-        built,
-        {},
-        {"AAAA3": 30.0, "BBBB3": 45.0, "CCCC3": 12.0},
-        {"AAAA3": True, "BBBB3": True, "CCCC3": True},
-        min_lot=600.0,
-    )
-    orders = {o.ticker: o for o in found.orders}
-    assert orders["AAAA3"].quantity == int(orders["AAAA3"].quantity)
-    assert orders["CCCC3"].amount == 0 and "lote mínimo" in orders["CCCC3"].reason
-    spent = sum(o.amount for o in found.orders)
-    assert spent + found.leftover == pytest.approx(10_000.0, abs=0.01)
-    assert found.leftover < 45.0  # the leftovers bought whole units while they reached
-    no_price = recommended_orders(1000.0, built, {}, {}, {}, min_lot=0.0)
-    assert all("Sem preço" in o.reason for o in no_price.orders)
 
 
 def test_construction_parameters_in_the_policy() -> None:

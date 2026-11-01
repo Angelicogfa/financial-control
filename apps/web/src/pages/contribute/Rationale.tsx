@@ -5,19 +5,21 @@ import type {
   SavedContributionPlanDTO,
 } from "../../api/types";
 import { Notes, Section } from "../../components/Section";
-import { brl, num, points } from "../../utils/format";
+import { brl, day, num, points } from "../../utils/format";
 import { ARCA_LABELS, STRATEGY_LABELS } from "../../utils/labels";
 
 /** The fixed rules behind every plan, in the order the engine applies them. */
 const METHOD_STEPS = [
   "Classes: as que estão abaixo da banda recebem primeiro, até voltar à meta; o resto vai para as classes na proporção do que falta para a meta de cada uma. Nada é vendido.",
-  "Ativos: dentro de cada classe entram só os elegíveis (lançamentos válidos, finalidade ARCA e aprovados pela Estratégia). O peso alvo de cada um vem da divisão escolhida para a classe, e o dinheiro vai primeiro para quem está mais abaixo desse peso.",
-  "Arredondamento: compram-se unidades inteiras; as sobras compram mais unidades nas classes mais distantes da meta.",
+  "Ativos, em Ações, Real Estate e Internacional: os pesos-alvo da recomendação da semana (portões, lentes, matriz pelo AHP e pesos com o K dinâmico, na tela Recomendação), puxados para os seus pesos atuais pela confiança. Podem entrar ações do catálogo: ao salvar o plano, elas vão para a watchlist.",
+  "Ativos, no Caixa (e numa classe sem rodada recente da recomendação): a divisão da Estratégia, entre os elegíveis.",
+  "Em todas as classes, o dinheiro vai primeiro para quem está mais abaixo do peso-alvo; compram-se unidades inteiras, sem compra abaixo do lote mínimo da recomendação, e as sobras compram mais unidades nas classes mais distantes da meta.",
 ];
 
 const METHOD_NOTES = [
-  "São regras fixas, não uma otimização: o aporte não compara valuation, múltiplos, retorno histórico, risco nem correlação entre os ativos.",
-  "Entre dois ativos da mesma classe decidem só a divisão da classe (nota do checklist, peso manual ou peso igual) e a distância de cada um até o seu peso alvo.",
+  "A recomendação compara os ativos por qualidade, valuation, melhora, momentum, renda, risco, projeção e a sua análise do Cerrado; o porquê de cada escolha está na tela Recomendação.",
+  "A divisão entre classes continua só pela meta e pelas bandas da política.",
+  "Escolher outra divisão neste aporte (checklist, pesos manuais ou iguais) usa a regra antiga em todas as classes, como referência.",
 ];
 
 /** The first-level rule that decided what one class receives, in words. */
@@ -37,8 +39,11 @@ export function classReasonText(r: ClassContributionRationaleDTO): string {
   }
 }
 
-function weightBasis(o: AssetContributionOrderDTO, strategy: IntraClassStrategy | null | undefined): string {
+type Division = IntraClassStrategy | "RECOMMENDATION" | null | undefined;
+
+function weightBasis(o: AssetContributionOrderDTO, strategy: Division): string {
   const target = points(o.intra_class_target_weight_pct);
+  if (strategy === "RECOMMENDATION") return `Recomendação → peso alvo ${target}`;
   if (strategy === "CERRADO") return `Nota ${o.cerrado_score} no checklist → peso alvo ${target}`;
   if (strategy === "MANUAL_WEIGHT") return `Peso manual → alvo ${target}`;
   if (strategy === "EQUAL_WEIGHT") return `Peso igual → alvo ${target}`;
@@ -46,7 +51,7 @@ function weightBasis(o: AssetContributionOrderDTO, strategy: IntraClassStrategy 
 }
 
 /** Why one asset got (or did not get) a purchase; empty for plans saved before the rationale. */
-export function orderReasonText(o: AssetContributionOrderDTO, strategy?: IntraClassStrategy | null): string {
+export function orderReasonText(o: AssetContributionOrderDTO, strategy?: Division): string {
   const leftover = o.leftover_amount_brl ?? 0;
   switch (o.reason) {
     case "BOUGHT": {
@@ -72,19 +77,24 @@ export function orderReasonText(o: AssetContributionOrderDTO, strategy?: IntraCl
           : "Sem peso na classe: não recebe.";
     case "NO_PRICE":
       return "Sem cotação: não dá para calcular a quantidade.";
+    case "BELOW_MIN_LOT":
+      return `Reservados ${brl(o.allocated_amount_brl)}, abaixo do lote mínimo da recomendação: o valor foi para outros ativos.`;
     default:
       return "";
   }
 }
 
 /** Weight basis line under each asset: strategy, current weight and target inside the class. */
-export function orderWeightText(o: AssetContributionOrderDTO, strategy?: IntraClassStrategy | null): string {
+export function orderWeightText(o: AssetContributionOrderDTO, strategy?: Division): string {
   const basis = weightBasis(o, strategy);
   return o.reason ? `${basis} · hoje ${points(o.class_current_weight_pct ?? 0)}` : basis;
 }
 
-export function strategyByClass(saved: SavedContributionPlanDTO): Map<string, IntraClassStrategy | null | undefined> {
-  return new Map((saved.plan.class_rationale ?? []).map((r) => [r.arca_class, r.strategy]));
+/** The division each class followed: the recommendation's targets (45.6b) or the policy's strategy. */
+export function strategyByClass(saved: SavedContributionPlanDTO): Map<string, Division> {
+  return new Map(
+    (saved.plan.class_rationale ?? []).map((r) => [r.arca_class, r.recommendation_as_of ? "RECOMMENDATION" : r.strategy]),
+  );
 }
 
 export function PlanRationale({ saved }: Readonly<{ saved: SavedContributionPlanDTO }>) {
@@ -123,10 +133,14 @@ export function PlanRationale({ saved }: Readonly<{ saved: SavedContributionPlan
                   <td className="app-numeric">{brl(r.received_brl)}</td>
                   <td>
                     <span className="app-cell-main">
-                      {r.strategy ? STRATEGY_LABELS[r.strategy] : "—"}
+                      {r.recommendation_as_of ? "Recomendação" : r.strategy ? STRATEGY_LABELS[r.strategy] : "—"}
                       <small>
-                        {r.strategy_overridden ? "Escolhida neste aporte" : "Da Estratégia"} ·{" "}
-                        {r.eligible_assets === 1 ? "1 ativo elegível" : `${r.eligible_assets} ativos elegíveis`}
+                        {r.recommendation_as_of
+                          ? `Rodada de ${day(r.recommendation_as_of)}`
+                          : r.strategy_overridden
+                            ? "Escolhida neste aporte"
+                            : "Da Estratégia"}{" "}
+                        · {r.eligible_assets === 1 ? "1 ativo elegível" : `${r.eligible_assets} ativos elegíveis`}
                       </small>
                     </span>
                   </td>

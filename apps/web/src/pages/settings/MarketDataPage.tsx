@@ -35,6 +35,8 @@ const JOB_LABELS: Record<string, string> = {
   estimate_forecast_models: "Valuation na previsão de preço",
   sync_mining_universe: "Histórico do garimpo",
   run_mining: "Garimpo",
+  refresh_asset_lenses: "Lentes e portões da recomendação",
+  backtest_recommendation: "Teste no passado da recomendação",
 };
 
 const JOB_STATUS_LABELS: Record<string, string> = {
@@ -86,8 +88,22 @@ export const MANUAL_JOBS: Array<{ name: string; action: string; hint: string }> 
     name: "run_mining",
     action: "Rodar o garimpo",
     hint:
-      "Recalcula, mês a mês e só com o que se sabia em cada mês, os sinais de valor, qualidade, melhora dos resultados e momentum de todas as ações líquidas. " +
+      "Recalcula, mês a mês e só com o que se sabia em cada mês, os sinais de valor, qualidade, melhora dos resultados, momentum, renda e risco de todas as ações líquidas. " +
       "Roda sozinho uma vez por semana, depois dos balanços e do histórico.",
+  },
+  {
+    name: "refresh_asset_lenses",
+    action: "Rodar as lentes e os portões da recomendação",
+    hint:
+      "Calcula as lentes de cada ativo (Cerrado, qualidade, valuation, melhora, momentum, renda, risco e projeção), os portões, a matriz de decisão pelo AHP e os pesos-alvo de cada classe. " +
+      "Roda sozinha uma vez por semana, uma hora depois do garimpo; rode o garimpo antes.",
+  },
+  {
+    name: "backtest_recommendation",
+    action: "Rodar o teste no passado da recomendação",
+    hint:
+      "Refaz a recomendação a cada trimestre do passado, só com o que se sabia, e a compara com pesos iguais; mede também as rodadas guardadas. " +
+      "Roda sozinho uma vez por semana, depois das lentes; rode as lentes antes.",
   },
   {
     name: "refresh_asset_forecasts",

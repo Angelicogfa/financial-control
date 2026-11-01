@@ -113,7 +113,7 @@ describe("Recomendação (Phase 45.5)", () => {
     ]);
     renderAt("/recommendation");
     expect(await screen.findByText(/a recomendação escolheu 2: WEGE3, ABCD3/)).toBeInTheDocument();
-    expect(screen.getByText("Ainda não decide o aporte")).toBeInTheDocument();
+    expect(screen.getByText("Decide o aporte")).toBeInTheDocument();
 
     const chosen = screen.getByRole("table", { name: "Escolhidos e pesos-alvo" });
     expect(within(chosen).getByText("55,0%")).toBeInTheDocument();
@@ -193,10 +193,10 @@ describe("Recomendação (Phase 45.5)", () => {
     ]);
     renderAt("/recommendation");
     fireEvent.change(await screen.findByLabelText("Valor do aporte (R$)"), { target: { value: "5000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Comparar com o aporte atual" }));
-    const recommended = await screen.findByRole("table", { name: "Recomendação" });
+    fireEvent.click(screen.getByRole("button", { name: "Comparar com a regra antiga" }));
+    const recommended = await screen.findByRole("table", { name: "Aporte (recomendação)" });
     expect(within(recommended).getByText("novo")).toBeInTheDocument();
-    expect(within(screen.getByRole("table", { name: "Regra atual" })).getByText("WEGE3")).toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "Regra antiga" })).getByText("WEGE3")).toBeInTheDocument();
     expect(screen.getByText(/Sobra sem compra/)).toBeInTheDocument();
     expect(api.calls.find((c) => c.path === "/recommendation/contribution")?.query.get("amount_brl")).toBe("5000");
   });

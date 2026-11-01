@@ -280,10 +280,12 @@ def test_one_asset_on_request_from_12_months_with_a_warning(api: SimpleNamespace
     assert wege["status"] == "LOW_CONFIDENCE" and not wege["requested"]
 
     # The daily run keeps following the asset the user asked for.
-    tomorrow = NOW + timedelta(days=1)
+    # The request above is dated today (the wall clock), so the next daily run is the day after.
+    tomorrow = max(NOW, datetime.now(UTC)) + timedelta(days=1)
     refresh_asset_forecasts_job(api.uow_factory, offline_gateway(), now=tomorrow)
     later = api.client.get(url).json()
-    assert later["status"] == "OK" and later["requested"] and later["as_of"] == "2026-10-31"
+    assert later["status"] == "OK" and later["requested"]
+    assert later["as_of"] == tomorrow.date().isoformat()
     assert api.client.post("/api/v1/assets/999/forecast").status_code == 404
 
 

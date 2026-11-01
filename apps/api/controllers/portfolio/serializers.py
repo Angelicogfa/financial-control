@@ -132,11 +132,13 @@ def to_contribution_plan_dto(plan: ContributionPlan) -> ContributionPlanResponse
                 class_current_weight_pct=o.class_current_weight_pct,
                 leftover_amount_brl=o.leftover_amount_brl,
                 reason=o.reason,
+                new=o.new,
             )
             for o in plan.orders
         ],
         projected_allocations=[ClassAllocationDTO(**asdict(a)) for a in plan.projected_allocations],
         class_rationale=[ClassContributionRationaleDTO(**asdict(r)) for r in plan.class_rationale],
+        recommendation_as_of=plan.recommendation_as_of,
     )
 
 

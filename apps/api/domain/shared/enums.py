@@ -172,6 +172,7 @@ class ContributionOrderReason(StrEnum):
     ABOVE_TARGET = "ABOVE_TARGET"  # already at or above its weight inside the class
     ZERO_WEIGHT = "ZERO_WEIGHT"  # the class strategy gives it no weight
     NO_PRICE = "NO_PRICE"
+    BELOW_MIN_LOT = "BELOW_MIN_LOT"  # the recommendation's share is below the minimum purchase
 
 
 class CorporateEventKind(StrEnum):

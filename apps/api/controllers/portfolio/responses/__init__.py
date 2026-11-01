@@ -165,7 +165,8 @@ class ContributionSimulationRequest(BaseModel):
 
 
 class AssetContributionOrderDTO(BaseModel):
-    asset_id: int
+    # None: a catalog stock the recommendation chose, registered when the plan is saved.
+    asset_id: int | None = None
     ticker: str
     name: str
     asset_type: AssetType
@@ -185,6 +186,7 @@ class AssetContributionOrderDTO(BaseModel):
     reason: ContributionOrderReason | None = Field(
         None, description="Why the asset got this purchase; null on plans saved before it."
     )
+    new: bool = Field(False, description="Not in the portfolio today.")
 
 
 class ClassContributionRationaleDTO(BaseModel):
@@ -202,6 +204,11 @@ class ClassContributionRationaleDTO(BaseModel):
     eligible_assets: int
     strategy: IntraClassStrategy | None = None
     strategy_overridden: bool = False
+    recommendation_as_of: str | None = Field(
+        None,
+        description="The run of the recommendation whose targets the class followed (45.6b); "
+        "null when the class kept the policy's strategy.",
+    )
 
 
 class ContributionPlanResponseDTO(BaseModel):
@@ -212,6 +219,7 @@ class ContributionPlanResponseDTO(BaseModel):
     orders: list[AssetContributionOrderDTO]
     projected_allocations: list[ClassAllocationDTO]
     class_rationale: list[ClassContributionRationaleDTO] = Field(default_factory=list)
+    recommendation_as_of: str | None = None  # the run any class followed (45.6b)
 
 
 class BenchmarkComparisonDTO(BaseModel):

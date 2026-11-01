@@ -142,9 +142,13 @@ class ConsolidatedPortfolioReport:
 
 @dataclass(frozen=True)
 class AssetContributionOrder:
-    """Suggested purchase order for a single asset inside an ARCA class."""
+    """Suggested purchase order for a single asset inside an ARCA class.
 
-    asset_id: int
+    `asset_id` is None for a stock of the catalog the recommendation chose (Phase 45.6b) that is
+    not registered yet; saving the plan as a draft registers it in the watchlist.
+    """
+
+    asset_id: int | None
     ticker: str
     name: str
     asset_type: AssetType
@@ -161,6 +165,7 @@ class AssetContributionOrder:
     class_current_weight_pct: float = 0.0
     leftover_amount_brl: float = 0.0
     reason: ContributionOrderReason | None = None
+    new: bool = False  # not in the portfolio today
 
 
 @dataclass(frozen=True)
@@ -179,6 +184,9 @@ class ClassContributionRationale:
     eligible_assets: int
     strategy: IntraClassStrategy | None = None
     strategy_overridden: bool = False
+    # The weekly run of the recommendation whose targets the class followed (Phase 45.6b);
+    # None when the class kept the policy's strategy (Caixa, no run, or a strategy override).
+    recommendation_as_of: str | None = None
 
 
 @dataclass(frozen=True)
@@ -192,6 +200,29 @@ class ContributionPlan:
     orders: list[AssetContributionOrder]
     projected_allocations: list[ClassAllocation]
     class_rationale: list[ClassContributionRationale] = field(default_factory=list)
+    recommendation_as_of: str | None = None  # the run any class followed (Phase 45.6b)
+
+
+@dataclass(frozen=True)
+class RecommendedCandidate:
+    """An asset the recommendation targets that the portfolio report does not list."""
+
+    ticker: str
+    name: str
+    asset_type: AssetType
+    asset_id: int | None  # None: a catalog stock not registered yet
+    unit_brl: float
+
+
+@dataclass(frozen=True)
+class RecommendedClass:
+    """The recommendation's targets of one class (Phase 45.6b), already pulled toward the current
+    weights by the confidence, with what the report lacks to buy them."""
+
+    targets: Mapping[str, float]  # ticker -> target weight inside the class
+    candidates: Mapping[str, RecommendedCandidate]
+    min_lot_brl: float
+    as_of: str  # ISO date of the run
 
 
 @dataclass
@@ -426,8 +457,13 @@ def consolidate_portfolio(
     tax_rules: TaxRuleBook | None = None,
     treasury_market_prices: Mapping[str, float] | None = None,
     statement_seen_at: Mapping[str, datetime | None] | None = None,
+    gate_eligibility: Mapping[str, bool] | None = None,
 ) -> ConsolidatedPortfolioReport:
     """Consolidate all assets, positions, fixed income curves, earnings, and ARCA allocations.
+
+    `gate_eligibility` (Phase 45.6b) is whether each asset of the latest run of the
+    recommendation passed its gates: for those, eligible means "passed the gates" and the
+    Cerrado only weighs in the score; an asset outside the run keeps the Cerrado rule.
 
     `split_adjust_through` is for past dates valued with split-adjusted price series: the
     quantity is expressed in the share terms of that date (corporate events, item 12.4).
@@ -515,7 +551,12 @@ def consolidate_portfolio(
             else (0.0, 0.0, "Invalid ledger", 0.0)
         )
         consolidated = round(unrealized_brl + v.realized_brl + received_brl, 2)
-        eligible = is_eligible(cerrado_eval, eligibility_policy, asset.purpose)
+        gates = gate_eligibility or {}
+        eligible = (
+            gates[asset.ticker]
+            if asset.ticker in gates and asset.purpose == AssetPurpose.ARCA
+            else is_eligible(cerrado_eval, eligibility_policy, asset.purpose)
+        )
         holds = (
             v.invested_brl > 0 or v.qty > 0
             if v.is_valid
@@ -684,17 +725,46 @@ def _to_position(
 
 @dataclass
 class _DraftOrder:
-    pos: ValuedAssetPosition
+    asset_id: int | None
+    ticker: str
+    name: str
+    asset_type: AssetType
+    arca_class: ArcaClass
+    current_value_brl: float
+    class_current_weight_pct: float
+    cerrado_score: int
+    cerrado_recommendation: Recommendation
     weight: float
     budget: float
     unit_brl: float
+    min_lot: float = 0.0  # the recommendation's minimum purchase (0 under the policy strategy)
     qty: float = 0.0
     executed: float = 0.0
     first_pass: float = 0.0  # spent from its own share, before the leftover redistribution
 
+    @classmethod
+    def of(
+        cls, pos: ValuedAssetPosition, weight: float, budget: float, min_lot: float = 0.0
+    ) -> _DraftOrder:
+        return cls(
+            asset_id=pos.asset_id,
+            ticker=pos.ticker,
+            name=pos.name,
+            asset_type=pos.asset_type,
+            arca_class=pos.arca_class,
+            current_value_brl=pos.current_value_brl,
+            class_current_weight_pct=pos.class_current_weight_pct,
+            cerrado_score=pos.cerrado_evaluation.score,
+            cerrado_recommendation=pos.cerrado_evaluation.recommendation,
+            weight=weight,
+            budget=budget,
+            unit_brl=max(pos.current_unit_price * pos.fx_rate, 0.0),
+            min_lot=min_lot,
+        )
+
     @property
     def is_integer(self) -> bool:
-        return self.pos.asset_type in INTEGER_QUANTITY_TYPES
+        return self.asset_type in INTEGER_QUANTITY_TYPES
 
     @property
     def can_buy(self) -> bool:
@@ -749,7 +819,11 @@ def _redistribute_leftover(
         progressed = False
         for arca_class in ranked:
             candidates = sorted(
-                (o for o in drafts[arca_class] if o.can_buy),
+                (
+                    o
+                    for o in drafts[arca_class]
+                    if o.can_buy and not (o.min_lot > 0 and o.first_pass <= 0)
+                ),
                 key=lambda o: (o.is_integer, -o.weight, o.unit_brl),
             )
             for order in candidates:
@@ -779,6 +853,8 @@ def _order_reason(order: _DraftOrder) -> ContributionOrderReason:
             if order.first_pass > 0
             else ContributionOrderReason.LEFTOVER_FILL
         )
+    if order.min_lot > 0 and 0.005 < order.budget < order.min_lot:
+        return ContributionOrderReason.BELOW_MIN_LOT
     if order.budget > 0.005:
         return ContributionOrderReason.PRICE_ABOVE_BUDGET
     return ContributionOrderReason.ABOVE_TARGET
@@ -811,11 +887,17 @@ def plan_contribution(
     *,
     strategy_override: IntraClassStrategy | None = None,
     class_strategies: Mapping[ArcaClass, IntraClassStrategy] | None = None,
+    recommended: Mapping[ArcaClass, RecommendedClass] | None = None,
 ) -> ContributionPlan:
     """Build a 2-level contribution plan (Level 1: ARCA classes; Level 2: intra-class assets).
 
     `class_strategies` is the policy's intra-class strategy per class; it only labels the
     rationale (the report's target weights already follow it).
+
+    `recommended` (Phase 45.6b) replaces level 2 of each class it covers with the targets of the
+    recommendation, which may include assets the portfolio does not hold; a class it does not
+    cover (Caixa, or no run) keeps the policy's strategy, and so does every class under a
+    `strategy_override` (the old rules stay available as a reference).
     """
     if amount_brl < 0:
         raise ValidationError("Contribution amount cannot be negative")
@@ -835,8 +917,32 @@ def plan_contribution(
     eligible_count: dict[ArcaClass, int] = {}
     projected = dict(current_by_class)
     leftover = 0.0
+    following = {} if strategy_override is not None else dict(recommended or {})
     for arca_class in ArcaClass:
         class_budget = class_alloc_brl.get(arca_class, 0.0)
+        rec = following.get(arca_class)
+        if rec is not None:
+            members = _recommended_drafts(report, arca_class, rec)
+            eligible_count[arca_class] = sum(1 for o in members if o.weight > 0)
+            if class_budget <= 0 or not members:
+                leftover += max(class_budget, 0.0)
+                continue
+            budgets = distribute_by_targets(
+                {o.ticker: o.current_value_brl for o in members},
+                {o.ticker: o.weight for o in members},
+                class_budget,
+            )
+            drafts[arca_class] = members
+            for order in members:
+                order.budget = budgets.get(order.ticker, 0.0)
+                if order.min_lot > 0 and order.budget < order.min_lot:
+                    leftover += order.budget
+                    continue
+                spent = _fill(order, order.budget)
+                order.first_pass = spent
+                leftover += order.budget - spent
+                projected[arca_class] = projected.get(arca_class, 0.0) + spent
+            continue
         class_positions = [
             p
             for p in report.positions
@@ -855,12 +961,7 @@ def plan_contribution(
             {p.ticker: p.current_value_brl for p in class_positions}, weights, class_budget
         )
         drafts[arca_class] = [
-            _DraftOrder(
-                pos=p,
-                weight=weights.get(p.ticker, 0.0),
-                budget=budgets.get(p.ticker, 0.0),
-                unit_brl=max(p.current_unit_price * p.fx_rate, 0.0),
-            )
+            _DraftOrder.of(p, weights.get(p.ticker, 0.0), budgets.get(p.ticker, 0.0))
             for p in class_positions
         ]
         for order in drafts[arca_class]:
@@ -873,22 +974,23 @@ def plan_contribution(
 
     orders = [
         AssetContributionOrder(
-            asset_id=o.pos.asset_id,
-            ticker=o.pos.ticker,
-            name=o.pos.name,
-            asset_type=o.pos.asset_type,
-            arca_class=o.pos.arca_class,
-            cerrado_score=o.pos.cerrado_evaluation.score,
-            cerrado_recommendation=o.pos.cerrado_evaluation.recommendation,
+            asset_id=o.asset_id,
+            ticker=o.ticker,
+            name=o.name,
+            asset_type=o.asset_type,
+            arca_class=o.arca_class,
+            cerrado_score=o.cerrado_score,
+            cerrado_recommendation=o.cerrado_recommendation,
             intra_class_target_weight_pct=round(o.weight * 100.0, 2),
             allocated_amount_brl=round(o.budget, 2),
             unit_price_brl=round(o.unit_brl, 2),
             recommended_quantity=o.qty if o.is_integer else round(o.qty, 6),
             executed_amount_brl=round(o.executed, 2),
-            projected_value_brl=round(o.pos.current_value_brl + o.executed, 2),
-            class_current_weight_pct=round(o.pos.class_current_weight_pct, 2),
+            projected_value_brl=round(o.current_value_brl + o.executed, 2),
+            class_current_weight_pct=round(o.class_current_weight_pct, 2),
             leftover_amount_brl=round(o.executed - o.first_pass, 2),
             reason=_order_reason(o),
+            new=o.current_value_brl <= 0,
         )
         for arca_class in ArcaClass
         for o in drafts.get(arca_class, [])
@@ -919,6 +1021,9 @@ def plan_contribution(
             eligible_assets=eligible_count[a.arca_class],
             strategy=strategy_override or policy_strategies.get(a.arca_class),
             strategy_overridden=strategy_override is not None,
+            recommendation_as_of=(
+                following[a.arca_class].as_of if a.arca_class in following else None
+            ),
         )
         for a in report.allocations
     ]
@@ -932,4 +1037,45 @@ def plan_contribution(
             {c: round(v, 2) for c, v in projected.items()}, targets, bands=bands
         ),
         class_rationale=rationale,
+        recommendation_as_of=next((r.as_of for r in following.values()), None),
     )
+
+
+def _recommended_drafts(
+    report: ConsolidatedPortfolioReport, arca_class: ArcaClass, rec: RecommendedClass
+) -> list[_DraftOrder]:
+    """The class's draft orders under the recommendation: its targets, held or not."""
+    positions = {
+        p.ticker: p
+        for p in report.positions
+        if p.arca_class == arca_class
+        and p.ledger_status == LEDGER_VALID
+        and p.purpose == AssetPurpose.ARCA
+    }
+    out = []
+    for ticker, weight in rec.targets.items():
+        position = positions.get(ticker)
+        if position is not None:
+            out.append(_DraftOrder.of(position, weight, 0.0, rec.min_lot_brl))
+            continue
+        candidate = rec.candidates.get(ticker)
+        if candidate is None:
+            continue
+        out.append(
+            _DraftOrder(
+                asset_id=candidate.asset_id,
+                ticker=ticker,
+                name=candidate.name,
+                asset_type=candidate.asset_type,
+                arca_class=arca_class,
+                current_value_brl=0.0,
+                class_current_weight_pct=0.0,
+                cerrado_score=0,
+                cerrado_recommendation=Recommendation.INCOMPLETO,
+                weight=weight,
+                budget=0.0,
+                unit_brl=max(candidate.unit_brl, 0.0),
+                min_lot=rec.min_lot_brl,
+            )
+        )
+    return sorted(out, key=lambda o: -o.weight)

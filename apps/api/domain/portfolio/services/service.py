@@ -71,6 +71,7 @@ from domain.portfolio.services.mark_to_market import (
     quantity_lots,
 )
 from domain.portfolio.services.risk_metrics import class_time_weighted_returns, days_out_of_band
+from domain.recommendation.switch import recent_gate_eligibility, recommended_classes
 from domain.shared.entities import AssetEntity, CatalogInstrument
 from domain.shared.enums import (
     ArcaClass,
@@ -423,6 +424,7 @@ class PortfolioApplicationService:
                 ticker: f.statement_seen_at
                 for ticker, f in self.checklist_freshness(uow, assets, ref_date).items()
             },
+            gate_eligibility=recent_gate_eligibility(uow, ref_date),
         )
 
     def simulate_contribution(
@@ -432,15 +434,20 @@ class PortfolioApplicationService:
         amount_brl: float,
         strategy_override: IntraClassStrategy | None = None,
     ) -> ContributionPlan:
-        """Build a 2-level contribution plan from the current consolidated portfolio."""
+        """Build a 2-level contribution plan from the current consolidated portfolio.
+
+        Inside each class the recommendation covers, the plan follows its targets (Phase 45.6b);
+        Caixa, a class without a recent run and any `strategy_override` keep the old rules.
+        """
         report = self.build_portfolio_report(uow)
-        arca = self.load_policy(uow).arca
+        policy = self.load_policy(uow)
         return plan_contribution(
             report=report,
-            targets=arca.targets,
+            targets=policy.arca.targets,
             amount_brl=amount_brl,
             strategy_override=strategy_override,
-            class_strategies=arca.strategies,
+            class_strategies=policy.arca.strategies,
+            recommended=recommended_classes(uow, report, policy),
         )
 
     def analyze_single_asset(self, uow: AbstractUnitOfWork, asset: AssetEntity) -> dict[str, Any]:

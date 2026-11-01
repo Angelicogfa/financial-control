@@ -118,8 +118,13 @@ function AmountStep() {
               disabled={busy}
               onChange={setStrategy}
               options={[
-                { value: "", label: "Como definido na estratégia" },
-                ...codeOptions(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[], STRATEGY_LABELS),
+                { value: "", label: "Pela recomendação (padrão)" },
+                ...codeOptions(
+                  Object.keys(STRATEGY_LABELS) as IntraClassStrategy[],
+                  Object.fromEntries(
+                    Object.entries(STRATEGY_LABELS).map(([k, v]) => [k, `Regra antiga: ${v.toLowerCase()}`]),
+                  ) as Record<IntraClassStrategy, string>,
+                ),
               ]}
             />
           </div>
@@ -217,7 +222,14 @@ interface ExecutionDraft {
   fees: string;
 }
 
-function initialExecutions(orders: AssetContributionOrderDTO[]): Record<number, ExecutionDraft> {
+/** An order of an asset already registered (a saved plan registers the ones it buys). */
+type PlacedOrder = AssetContributionOrderDTO & { asset_id: number };
+
+function placed(orders: AssetContributionOrderDTO[]): PlacedOrder[] {
+  return orders.filter((o): o is PlacedOrder => o.asset_id !== null && o.asset_id !== undefined);
+}
+
+function initialExecutions(orders: PlacedOrder[]): Record<number, ExecutionDraft> {
   return Object.fromEntries(
     orders.map((o) => [
       o.asset_id,
@@ -236,7 +248,10 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
   const report = useApi("contribution-current", () => api.portfolio.report());
   const accounts = useApi("accounts", () => api.accounts.list());
   const draftKey = `contribute:${saved.id}`;
-  const [executions, setExecutions] = useStoredState(`${draftKey}:executions`, initialExecutions(saved.plan.orders));
+  const [executions, setExecutions] = useStoredState(
+    `${draftKey}:executions`,
+    initialExecutions(placed(saved.plan.orders)),
+  );
   const [tradeDate, setTradeDate] = useStoredState(`${draftKey}:date`, today());
   const [accountId, setAccountId] = useStoredState<number | null>(`${draftKey}:account`, null);
   const forgetDraft = () => {
@@ -245,7 +260,8 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [discarding, setDiscarding] = useState(false);
-  const orders = saved.plan.orders;
+  // Catalog stocks the recommendation considered but did not buy have no asset to trade.
+  const orders = placed(saved.plan.orders);
   const strategies = strategyByClass(saved);
   const update =(id: number, change: Partial<ExecutionDraft>) =>
     setExecutions((all) => ({ ...all, [id]: { ...all[id], ...change } }));
@@ -374,9 +390,12 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           </td>
                           <td>
                             <span className="app-cell-main">
-                              <Link className="app-link" to={`/asset/${o.asset_id}`}>
-                                <strong>{o.ticker}</strong>
-                              </Link>
+                              <span>
+                                <Link className="app-link" to={`/asset/${o.asset_id}`}>
+                                  <strong>{o.ticker}</strong>
+                                </Link>{" "}
+                                {o.new && <Badge tone="info">novo</Badge>}
+                              </span>
                               <small>{orderWeightText(o, strategy)}</small>
                             </span>
                           </td>

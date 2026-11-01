@@ -293,17 +293,19 @@ def test_lenses_job_api_and_mcp(api: SimpleNamespace) -> None:
     assert construction["stop_reason"] and all(s["reason"] for s in construction["selected"])
     assert len(construction["curve"]) >= construction["k"]
 
-    # Next to the current contribution, nothing saved.
+    # The contribution (45.6b) next to the policy's old strategy, nothing saved.
     side = api.client.get("/api/v1/recommendation/contribution?amount_brl=100000").json()
     assert side["status"] == "OK" and side["amount"] == 100000
     by_class = {c["arca_class"]: c for c in side["classes"]}
     assert by_class["ACOES"]["covered"] and by_class["ACOES"]["budget"] > 0
     recommended = by_class["ACOES"]["recommended_orders"]
     assert {o["ticker"] for o in recommended} == {s["ticker"] for s in construction["selected"]}
-    spent = sum(o["amount"] for o in recommended) + by_class["ACOES"]["recommended_leftover"]
-    assert spent == pytest.approx(by_class["ACOES"]["budget"], abs=1.0)
+    # Only Ações has assets: the other classes pass their share on, as in the real contribution.
+    spent = sum(o["amount"] for o in recommended)
+    assert by_class["ACOES"]["budget"] - 1.0 <= spent <= 100000
     assert all(o["new"] for o in recommended)  # nothing is held in this portfolio
-    assert not by_class["CAIXA"]["covered"] and "regra atual" in by_class["CAIXA"]["note"]
+    assert [o["ticker"] for o in by_class["ACOES"]["current_orders"]] == ["C113"]  # the old rule
+    assert not by_class["CAIXA"]["covered"] and "regra da política" in by_class["CAIXA"]["note"]
     with api.uow_factory() as uow:
         assert uow.contribution_plans.list_recent() == []  # nothing saved
     side_op = CATALOG_BY_NAME["recommendation.contribution"]

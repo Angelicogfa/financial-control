@@ -167,7 +167,7 @@ export interface AssetComparisonDTO {
 }
 
 export interface AssetContributionOrderDTO {
-  asset_id: number;
+  asset_id?: number | null;
   ticker: string;
   name: string;
   asset_type: AssetType;
@@ -183,6 +183,7 @@ export interface AssetContributionOrderDTO {
   class_current_weight_pct?: number;
   leftover_amount_brl?: number;
   reason?: ContributionOrderReason | null;
+  new?: boolean;
 }
 
 export interface AssetCreateRequest {
@@ -649,6 +650,7 @@ export interface ClassContributionRationaleDTO {
   eligible_assets: number;
   strategy?: IntraClassStrategy | null;
   strategy_overridden?: boolean;
+  recommendation_as_of?: string | null;
 }
 
 export interface ClassMatrixDTO {
@@ -761,7 +763,7 @@ export interface ContributionConfirmRequest {
   executions?: ExecutionDTO[] | null;
 }
 
-export type ContributionOrderReason = "BOUGHT" | "LEFTOVER_FILL" | "PRICE_ABOVE_BUDGET" | "ABOVE_TARGET" | "ZERO_WEIGHT" | "NO_PRICE";
+export type ContributionOrderReason = "BOUGHT" | "LEFTOVER_FILL" | "PRICE_ABOVE_BUDGET" | "ABOVE_TARGET" | "ZERO_WEIGHT" | "NO_PRICE" | "BELOW_MIN_LOT";
 
 export interface ContributionPlanResponseDTO {
   contribution_amount_brl: number;
@@ -771,6 +773,7 @@ export interface ContributionPlanResponseDTO {
   orders: AssetContributionOrderDTO[];
   projected_allocations: ClassAllocationDTO[];
   class_rationale?: ClassContributionRationaleDTO[];
+  recommendation_as_of?: string | null;
 }
 
 export type ContributionPlanStatus = "DRAFT" | "CONFIRMED" | "DISCARDED";
