@@ -4,7 +4,8 @@
  *  breadcrumb, "Voltar" and the browser back button return to the page as it was. Storage
  *  may be unavailable (private window, blocked site data): the state then just starts fresh. */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const PREFIX = "fincontrol:page:";
 
@@ -44,4 +45,45 @@ export function useStoredState<T>(key: string, initial: T): [T, (next: T | ((cur
     [key],
   );
   return [value, set];
+}
+
+/** Navigation state of a page opened from the menu: it starts clean (see `useFreshEntry`). */
+export const FRESH_ENTRY = { fresh: true } as const;
+
+/** Clear every stored value whose key starts with `prefix`. */
+export function clearStoredPrefix(prefix: string): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.sessionStorage.length; i++) {
+      const key = window.sessionStorage.key(i);
+      if (key?.startsWith(PREFIX + prefix)) keys.push(key);
+    }
+    for (const key of keys) window.sessionStorage.removeItem(key);
+  } catch {
+    // storage unavailable: nothing was kept
+  }
+}
+
+/**
+ * A page opened from the menu starts without the state it kept; coming back to it (the trail,
+ * "Voltar", the browser's back button) finds it as it was. The menu link carries `FRESH_ENTRY`:
+ * the page clears its keys before they are read and then drops the mark from the history, so
+ * going back to this entry later restores what was done after it. Returns a value to key the
+ * page's content with, so a new entry from the menu remounts it even when it was already open.
+ */
+export function useFreshEntry(prefix: string): number {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fresh = (location.state as { fresh?: boolean } | null)?.fresh === true;
+  const handled = useRef<string | null>(null);
+  const entries = useRef(0);
+  if (fresh && handled.current !== location.key) {
+    clearStoredPrefix(prefix);
+    handled.current = location.key;
+    entries.current += 1;
+  }
+  useEffect(() => {
+    if (fresh) navigate(`${location.pathname}${location.search}${location.hash}`, { replace: true, state: null });
+  }, [fresh, location.pathname, location.search, location.hash, navigate]);
+  return entries.current;
 }

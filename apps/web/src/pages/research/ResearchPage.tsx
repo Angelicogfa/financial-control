@@ -41,7 +41,7 @@ import {
 import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
 import { compareLink } from "../tools/AssetComparePage";
 import { useScreenerSearch, type ScreenerSearch } from "./useScreenerSearch";
-import { useStoredState } from "../../utils/storedState";
+import { useFreshEntry, useStoredState } from "../../utils/storedState";
 
 type TabKey = "screener" | "treasury" | "watchlist";
 const TABS: TabSpec<TabKey>[] = [
@@ -556,7 +556,13 @@ function Watchlist() {
   );
 }
 
+/** Opened from the menu, the page starts clean; coming back to it keeps the last search. */
 export function ResearchPage() {
+  const entry = useFreshEntry("research:");
+  return <ResearchContent key={entry} />;
+}
+
+function ResearchContent() {
   const [tab, setTab] = useTab(TABS, "screener");
   return (
     <div className="app-page">

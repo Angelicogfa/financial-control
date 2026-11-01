@@ -6,6 +6,7 @@ import { CloseIcon, LogoutIcon, MenuIcon, MoonIcon, SunIcon } from "./icons";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { DESKTOP_QUERY, NAV_SECTIONS } from "./navigation";
 import { applyTheme, currentTheme, type Theme } from "./theme";
+import { FRESH_ENTRY } from "../utils/storedState";
 
 /** Items with another menu item under their path (Pesquisar and Garimpo) are active only on
  *  their own page, so the nested one does not light both. */
@@ -118,6 +119,7 @@ export function AppShell({
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  state={FRESH_ENTRY}
                   end={NESTED_ITEMS.has(item.to)}
                   onClick={closeIfOverlay}
                   className={({ isActive }) => `app-nav-item${isActive ? " active" : ""}`}

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { Breadcrumbs } from "../layout/Breadcrumbs";
 import { crumbsFor, nextTrail, type TrailEntry } from "../layout/trail";
-import { useStoredState } from "../utils/storedState";
+import { FRESH_ENTRY, readStored, useFreshEntry, useStoredState, writeStored } from "../utils/storedState";
 import { savedPlan, report } from "./fixtures";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
@@ -125,3 +125,40 @@ describe("page state kept for the session", () => {
     expect(await screen.findByLabelText("Quantidade de HGLG11")).toHaveValue("5");
   });
 });
+
+function FreshCounter() {
+  const entry = useFreshEntry("test:");
+  return <Counter key={entry} />;
+}
+
+describe("a page opened from the menu starts clean", () => {
+  it("drops the kept state on a menu entry and keeps it when coming back", () => {
+    writeStored("test:counter", 3);
+    const back = render(
+      <MemoryRouter initialEntries={["/page"]}>
+        <FreshCounter />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "Valor 3" })).toBeInTheDocument();
+    back.unmount();
+
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/page", state: FRESH_ENTRY }]}>
+        <FreshCounter />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "Valor 0" })).toBeInTheDocument();
+    expect(readStored("test:counter", null)).toBeNull();
+  });
+
+  it("opens Pesquisar from the menu without the last search", async () => {
+    writeStored("research:screener-search", { filters: { q: "banco" }, page: 0, pageSize: 25 });
+    const { calls } = mockApi([]);
+    renderAt("/research/mining", { shell: true });
+    fireEvent.click(screen.getByRole("link", { name: "Pesquisar" }));
+    expect(await screen.findByRole("heading", { name: "Pesquisar" })).toBeInTheDocument();
+    expect(readStored("research:screener-search", null)).toBeNull();
+    expect(calls.some((c) => c.path === "/research/screener")).toBe(false);
+  });
+});
+
