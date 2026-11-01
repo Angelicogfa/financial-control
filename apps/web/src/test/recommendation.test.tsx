@@ -146,20 +146,24 @@ describe("Recomendação (Phase 45.5)", () => {
 
     const curve = screen.getByRole("table", { name: "Curva do K" });
     expect(within(curve).getByText("recusado")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Matriz de decisão" })).not.toBeInTheDocument();
 
-    const matrix = screen.getByRole("table", { name: "Matriz de decisão" });
+    fireEvent.click(screen.getByRole("tab", { name: "Matriz de decisão" }));
+    const matrix = await screen.findByRole("table", { name: "Matriz de decisão" });
     expect(within(matrix).getByText("catálogo")).toBeInTheDocument();
     expect(within(matrix).getByText(/Faça a análise do Cerrado/)).toBeInTheDocument();
 
     const gates = screen.getByRole("table", { name: "Fora pelos portões" });
     expect(within(gates).getByText(/recuperação judicial/)).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Real Estate" }));
+    expect(await screen.findByText("Nenhum ativo passou nos portões")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Rodadas" }));
     const runs = await screen.findByRole("table", { name: "Rodadas" });
     expect(within(runs).getByText("v4")).toBeInTheDocument();
     expect(within(runs).getByText("Ações: WEGE3, ABCD3")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Real Estate" }));
-    expect(await screen.findByText("Nenhum ativo passou nos portões")).toBeInTheDocument();
+    expect(screen.queryByText("Decide o aporte")).not.toBeInTheDocument();
   });
 
   it("compares A and not B lens by lens", async () => {
@@ -177,7 +181,7 @@ describe("Recomendação (Phase 45.5)", () => {
         },
       },
     ]);
-    renderAt("/recommendation");
+    renderAt("/recommendation?tab=compare");
     fireEvent.click(await screen.findByRole("button", { name: "Comparar" }));
     const table = await screen.findByRole("table", { name: "A e não B" });
     expect(within(table).getByText("Qualidade")).toBeInTheDocument();
@@ -215,7 +219,7 @@ describe("Recomendação (Phase 45.5)", () => {
         },
       },
     ]);
-    renderAt("/recommendation");
+    renderAt("/recommendation?tab=compare");
     fireEvent.change(await screen.findByLabelText("Valor do aporte (R$)"), { target: { value: "5000" } });
     fireEvent.click(screen.getByRole("button", { name: "Comparar com a regra antiga" }));
     const recommended = await screen.findByRole("table", { name: "Aporte (recomendação)" });
@@ -233,6 +237,8 @@ describe("Recomendação (Phase 45.5)", () => {
     ]);
     renderAt("/recommendation");
     expect(await screen.findByText("A recomendação ainda não rodou")).toBeInTheDocument();
+    expect(screen.getByText(/dá para pedir agora na aba Rodadas/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Rodadas" }));
     expect(await screen.findByText("Nenhuma rodada ainda.")).toBeInTheDocument();
   });
   it("shows the past test and the scoreboard (Phase 45.6)", async () => {
@@ -241,7 +247,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/runs", reply: RUNS },
       { path: "/recommendation/backtest", reply: BACKTEST },
     ]);
-    renderAt("/recommendation");
+    renderAt("/recommendation?tab=past");
     expect(await screen.findByText("Não passou")).toBeInTheDocument();
     expect(screen.getAllByText(/71% de chance de ser positiva/).length).toBeGreaterThan(0);
     const years = screen.getByRole("table", { name: "Teste no passado por ano" });
@@ -257,7 +263,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/backtest", reply: BACKTEST },
       { path: "/recommendation/weights", reply: WEIGHTS },
     ]);
-    renderAt("/recommendation");
+    renderAt("/recommendation?tab=past");
     expect(await screen.findByText("Ficam os seus pesos")).toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Pesos validados pelos dados" });
     expect(within(table).getByText("Qualidade")).toBeInTheDocument();
@@ -278,7 +284,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/backtest", reply: BACKTEST },
       { path: "/recommendation/weights", reply: WEIGHTS },
     ]);
-    renderAt("/recommendation");
+    renderAt("/recommendation?tab=matrix");
     const matrix = await screen.findByRole("table", { name: "Matriz de decisão" });
     expect(within(matrix).getByText("T003")).toBeInTheDocument();
     expect(within(matrix).queryByText("T113")).not.toBeInTheDocument();

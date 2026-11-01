@@ -19,6 +19,7 @@ import { Combobox } from "../../components/Combobox";
 import { manualJobs } from "../../api/jobs";
 import { JobRunList } from "../../components/JobRunList";
 import { PageHeader } from "../../components/PageHeader";
+import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { Pagination } from "../../components/Pagination";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
@@ -459,7 +460,7 @@ function PastTest() {
           return (
             <Empty
               title="O teste no passado ainda não rodou"
-              hint="Ele roda toda semana depois das lentes; dá para pedir agora em Rodar agora, no fim desta tela."
+              hint="Ele roda toda semana depois das lentes; dá para pedir agora na aba Rodadas."
             />
           );
         const scoreboard = data.scoreboard ?? [];
@@ -663,7 +664,20 @@ function Runs() {
   );
 }
 
-function ClassView({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
+type TabKey = "chosen" | "matrix" | "compare" | "past" | "runs";
+
+/** One tab per area, so the page does not read as one long scroll (the tab lives in `?tab=`).
+ *  The first three follow the ARCA class chosen above them; the last two are of the whole run. */
+const TABS: TabSpec<TabKey>[] = [
+  { key: "chosen", label: "Escolhidos" },
+  { key: "matrix", label: "Matriz de decisão" },
+  { key: "compare", label: "Comparar" },
+  { key: "past", label: "Teste no passado" },
+  { key: "runs", label: "Rodadas" },
+];
+const CLASS_TABS: TabKey[] = ["chosen", "matrix", "compare"];
+
+function ChosenTab({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   const c = matrix.construction;
   return (
     <div className="app-page-stack">
@@ -690,6 +704,13 @@ function ClassView({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refre
       <Section title="Onde o K parou" subtitle="Cada passo: o melhor ativo que a regra de setores permitia.">
         <Curve matrix={matrix} />
       </Section>
+    </div>
+  );
+}
+
+function MatrixTab({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
+  return (
+    <div className="app-page-stack">
       <Section title="Matriz de decisão" subtitle="Cada lente de 0 a 1 (maior é melhor), já puxada para 0,5 pela confiança.">
         <DecisionMatrix matrix={matrix} refresh={refresh} />
       </Section>
@@ -706,6 +727,13 @@ function ClassView({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refre
       <Section title="Fora pelos portões">
         <Excluded matrix={matrix} refresh={refresh} />
       </Section>
+    </div>
+  );
+}
+
+function CompareTab({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
+  return (
+    <div className="app-page-stack">
       <Section title="Por que A e não B?">
         <AandB key={matrix.arca_class} matrix={matrix} />
       </Section>
@@ -716,7 +744,47 @@ function ClassView({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refre
   );
 }
 
-function Board({ data, refresh }: Readonly<{ data: MatrixBoardDTO; refresh: Refresh }>) {
+function PastTab() {
+  return (
+    <div className="app-page-stack">
+      <Section
+        title="Teste no passado e placar"
+        subtitle="A hierarquia refeita a cada trimestre do passado, só com o que se sabia, contra pesos iguais; e como foram as rodadas guardadas."
+      >
+        <PastTest />
+      </Section>
+      <Section
+        title="Pesos validados pelos dados"
+        subtitle="Os dados podem ajustar os seus pesos só se o ajuste ganhar dos seus pesos fora da amostra."
+      >
+        <ValidatedWeights />
+      </Section>
+    </div>
+  );
+}
+
+function RunsTab({ onChange }: Readonly<{ onChange: () => void }>) {
+  return (
+    <div className="app-page-stack">
+      <Section title="Rodadas" subtitle="Histórico das rodadas semanais e a versão da política que cada uma aplicou.">
+        <Runs />
+      </Section>
+      <Section
+        title="Rodar agora"
+        subtitle="Rodam sozinhas toda semana, nesta ordem, depois do garimpo; o garimpo fica na tela Garimpo."
+      >
+        <JobRunList jobs={manualJobs(["refresh_asset_lenses", "backtest_recommendation"])} onChange={onChange} />
+      </Section>
+    </div>
+  );
+}
+
+/** The class tabs: the run's date, the class chosen and the tab of that class. */
+function ClassTabs({
+  data,
+  tab,
+  refresh,
+}: Readonly<{ data: MatrixBoardDTO; tab: TabKey; refresh: Refresh }>) {
   const classes = data.classes ?? [];
   const [chosen, setChosen] = useState(classes[0]?.arca_class ?? "");
   const matrix = classes.find((m) => m.arca_class === chosen) ?? classes[0];
@@ -734,59 +802,48 @@ function Board({ data, refresh }: Readonly<{ data: MatrixBoardDTO; refresh: Refr
           onChange={setChosen}
         />
       )}
-      <ClassView key={matrix.arca_class} matrix={matrix} refresh={refresh} />
+      {tab === "chosen" && <ChosenTab key={matrix.arca_class} matrix={matrix} />}
+      {tab === "matrix" && <MatrixTab key={matrix.arca_class} matrix={matrix} refresh={refresh} />}
+      {tab === "compare" && <CompareTab key={matrix.arca_class} matrix={matrix} />}
     </div>
   );
 }
 
 export function RecommendationPage() {
   const state = useApi("recommendation-matrix", () => api.recommendation.matrix());
+  const [tab, setTab] = useTab(TABS, "chosen");
   return (
     <div className="app-page">
       <PageHeader
         title="Recomendação"
         subtitle="Por que estes ativos: portões, lentes, matriz de decisão pelo AHP e pesos-alvo de cada classe."
       />
-      <Async state={state}>
-        {(data) =>
-          data.status !== "OK" ? (
-            <Empty
-              title="A recomendação ainda não rodou"
-              hint="Ela roda toda semana depois do garimpo; dá para pedir agora em Rodar agora, no fim desta tela."
-            />
-          ) : (
-            <Board data={data} refresh={{ onRefresh: state.reload, refreshing: state.loading }} />
-          )
-        }
-      </Async>
-      <Section
-        title="Teste no passado e placar"
-        subtitle="A hierarquia refeita a cada trimestre do passado, só com o que se sabia, contra pesos iguais; e como foram as rodadas guardadas."
-      >
-        <PastTest />
-      </Section>
-      <Section
-        title="Pesos validados pelos dados"
-        subtitle="Os dados podem ajustar os seus pesos só se o ajuste ganhar dos seus pesos fora da amostra."
-      >
-        <ValidatedWeights />
-      </Section>
-      <Section title="Rodadas" subtitle="Histórico das rodadas semanais e a versão da política que cada uma aplicou.">
-        <Runs />
-      </Section>
-      <Section
-        title="Rodar agora"
-        subtitle="Rodam sozinhas toda semana, nesta ordem, depois do garimpo; o garimpo fica na tela Garimpo."
-      >
-        <JobRunList jobs={manualJobs(["refresh_asset_lenses", "backtest_recommendation"])} onChange={state.reload} />
-      </Section>
-      <Notes
-        items={[
-          "Os portões só tiram o que é objetivo e grave; o Cerrado é uma lente com peso, e quem não foi analisado tem nota 0.",
-          "O retorno esperado acima da classe usa a escala declarada na política (nota 1 = +6% ao ano); ela ainda não foi calibrada pelo backtest.",
-          "Desde a troca, o aporte segue os pesos-alvo desta tela nas classes cobertas; sem rodada recente (mais de 14 dias), volta à regra da Estratégia.",
-        ]}
-      />
+      <div className="app-page-stack">
+        <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Áreas da recomendação" />
+        {CLASS_TABS.includes(tab) && (
+          <Async state={state}>
+            {(data) =>
+              data.status !== "OK" ? (
+                <Empty
+                  title="A recomendação ainda não rodou"
+                  hint="Ela roda toda semana depois do garimpo; dá para pedir agora na aba Rodadas."
+                />
+              ) : (
+                <ClassTabs data={data} tab={tab} refresh={{ onRefresh: state.reload, refreshing: state.loading }} />
+              )
+            }
+          </Async>
+        )}
+        {tab === "past" && <PastTab />}
+        {tab === "runs" && <RunsTab onChange={state.reload} />}
+        <Notes
+          items={[
+            "Os portões só tiram o que é objetivo e grave; o Cerrado é uma lente com peso, e quem não foi analisado tem nota 0.",
+            "O retorno esperado acima da classe usa a escala declarada na política (nota 1 = +6% ao ano); ela ainda não foi calibrada pelo backtest.",
+            "Desde a troca, o aporte segue os pesos-alvo desta tela nas classes cobertas; sem rodada recente (mais de 14 dias), volta à regra da Estratégia.",
+          ]}
+        />
+      </div>
     </div>
   );
 }
