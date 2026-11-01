@@ -10,6 +10,8 @@ import { errorMessage } from "../../api/http";
 import type { MiningFindingDTO, MiningOverviewDTO, MiningWhyDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge } from "../../components/Badge";
+import { manualJobs } from "../../api/jobs";
+import { JobRunList } from "../../components/JobRunList";
 import { PageHeader } from "../../components/PageHeader";
 import { KpiGrid, Lead, Notes, Section } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
@@ -202,7 +204,13 @@ export function MiningPage() {
       />
       <Async state={state}>
         {(data) => {
-          if (data.status === "NOT_RUN") return <Empty title="O garimpo ainda não rodou" hint={data.reason} />;
+          if (data.status === "NOT_RUN")
+            return (
+              <div className="app-page-stack">
+                <Empty title="O garimpo ainda não rodou" hint={data.reason} />
+                <JobRunList jobs={manualJobs(["run_mining"])} onChange={state.reload} />
+              </div>
+            );
           const weights = data.weights ?? [];
           return (
             <div className="app-page-stack">
@@ -275,6 +283,9 @@ export function MiningPage() {
               </Section>
               <Section title="Por que um ativo não apareceu?">
                 <Why />
+              </Section>
+              <Section title="Rodar agora" subtitle="O garimpo roda sozinho toda semana; o histórico de preço vem de Dados de mercado.">
+                <JobRunList jobs={manualJobs(["run_mining"])} onChange={state.reload} />
               </Section>
               <Notes
                 items={[
