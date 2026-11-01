@@ -189,12 +189,84 @@ textarea:focus {
   box-shadow: 0 0 0 3px var(--app-focus-ring);
 }
 
-input[type="checkbox"],
 input[type="radio"] {
   width: 16px;
   height: 16px;
   padding: 0;
   accent-color: var(--app-primary);
+}
+
+/* Every checkbox is drawn by the app, not the browser, so it looks the same on every screen,
+   in tables, labels and menus, and in both themes. The mark is a mask painted in the
+   primary text colour, so it follows the theme like any other token. */
+input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  background: var(--app-surface);
+  border: 1.5px solid var(--app-border-hover);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--app-primary-text);
+  transform: scale(0);
+  transition: transform 120ms ease;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.2 4 7.5 8.5 2.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.2 4 7.5 8.5 2.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--app-primary);
+}
+
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+input[type="checkbox"]:indeterminate::before {
+  height: 2px;
+  border-radius: 1px;
+  transform: scale(1);
+  -webkit-mask: none;
+  mask: none;
+}
+
+input[type="checkbox"]:focus {
+  border-color: var(--app-border-hover);
+  box-shadow: none;
+}
+
+input[type="checkbox"]:checked:focus,
+input[type="checkbox"]:indeterminate:focus {
+  border-color: var(--app-primary);
+}
+
+input[type="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 3px var(--app-focus-ring);
+}
+
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 fieldset {
@@ -2268,7 +2340,7 @@ details[open] > summary {
   opacity: 0.55;
 }
 
-.app-scope-operation input {
+.app-scope-operation input[type="checkbox"] {
   margin-top: 2px;
 }
 
