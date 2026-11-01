@@ -1,7 +1,7 @@
 # Plano de Refatoração Sistêmica e de Experiência
 
 *Data: 2026-11-01. Diagnóstico e benchmark em [REBUILD_ANALYSIS.md](./REBUILD_ANALYSIS.md).*
-*Status: `[ ]` Proposta — registrada como Fase 48 em [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md).*
+*Status: Aprovada em 2026-11-01 (decisões na §7) — registrada como Fase 48 em [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md).*
 
 ---
 
@@ -228,10 +228,10 @@ Cada fase termina com: testes de unidade e integração (`uv run pytest`, `npm t
 | **R5** | Hub da carteira + Conferir | abas §3.4 (Posições, Rentabilidade, Proventos, Raio-X); `script_00040`; conferência de posição §3.5 | conferência do extrato real bate ou explica cada diferença; Desempenho e Saúde redirecionam | R3 |
 | **R6** | Acompanhar e Aportar unificados | watchlist + alertas + teses; `script_00043`, `script_00044`; worker avalia `alert_rules`; Aportar §3.6; Recomendação técnica → Planejar › Modelo | mesmo plano de aporte que hoje para o mesmo valor (teste de regressão) | R4 |
 | **R7** | Imposto mensal | `script_00041`; apuração por categoria, isenção de R$ 20 mil em ações, compensação, exterior anual (Lei 14.754/2023); aba Imposto; alerta de DARF; **fecha TD-04** | casos de teste da Receita/golden de IR | R5 |
-| **R8** | Planejar | `script_00042`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima) e **36** (carteiras de comparação) se aprovadas | meta mostra progresso e aporte necessário | R5 |
+| **R8** | Planejar | `script_00042`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima), **36** (carteiras de comparação) e **47** (recomendações externas) | meta mostra progresso e aporte necessário | R5 |
 | **R9** | Remoção do legado | apaga `pages/` antigas, `useApi`, rotas de redirecionamento com mais de 2 fases; `saved_views` (`script_00045`); relatório mensal em PDF | nenhum import de `pages/`; docs atualizados | R4–R8 |
 
-Paralelismo possível: depois de R3, **R4** (ativo) e **R5** (carteira) não tocam os mesmos arquivos; **R7** e **R8** são independentes entre si.
+Ordem decidida: **R4** antes de **R5** (§7). Paralelismo possível: depois de R3, R4 (ativo) e R5 (carteira) não tocam os mesmos arquivos; **R7** e **R8** são independentes entre si.
 
 ---
 
@@ -267,9 +267,9 @@ Paralelismo possível: depois de R3, **R4** (ativo) e **R5** (carteira) não toc
 
 ---
 
-## 7. Itens para aprovação
+## 7. Decisões (aprovadas em 2026-11-01)
 
-1. Renomear as rotas para pt-BR (`/carteira`, `/ativo/:ticker`) ou manter em inglês (`/portfolio`, `/instrument/:ticker`)? *(o AGENTS.md exige inglês em rotas da API; rotas do SPA são UI — recomendação: pt-BR no web, inglês na API.)*
-2. Adotar TanStack Query no web (primeira dependência de runtime além de React/Router) ou manter cache próprio?
-3. Ordem R4 × R5: começar pela página do ativo (encontrar) ou pela conferência de posição (validar)?
-4. As propostas 34, 36 e 47 entram em R8 ou ficam como estão?
+1. **Rotas:** pt-BR no SPA (`/carteira`, `/ativo/:ticker`, `/explorar`, `/acompanhar`, `/aportar`, `/planejar`, `/lancamentos`); inglês na API (`/instruments`, `/search`…), como exige o AGENTS.md.
+2. **Cache de dados no web:** **TanStack Query** substitui o `useApi` (primeira dependência de runtime além de React/Router), adotado na R3.
+3. **Ordem R4 × R5:** **R4 (página do ativo) primeiro**, depois R5 (hub da carteira e conferência).
+4. **Propostas 34, 36 e 47:** entram na **R8** (Planejar › Modelo / Simulações), desenhadas sobre a nova arquitetura; não são feitas como fases soltas antes dela.

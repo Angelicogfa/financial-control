@@ -47,9 +47,9 @@
 | **Fase 31** | Melhorias de Interface: Início, Ajudas, Ações e Pesquisa | `[x]` Implementado | 100% |
 | **Fase 32** | Legibilidade da Saúde da Carteira e da Estratégia | `[x]` Implementado | 100% |
 | **Fase 33** | Simulação de Carteira: Backtesting, Machine Learning e Inferência Bayesiana | `[x]` Implementado | 100% |
-| **Fase 34** | Otimização da Composição de Ativos dentro do ARCA | `[ ]` Proposta (aguarda decisões da seção 10 do desenho) | 0% |
+| **Fase 34** | Otimização da Composição de Ativos dentro do ARCA | `[ ]` Proposta — incorporada à Fase 48.R8 (decisão 2026-11-01) | 0% |
 | **Fase 35** | Paginação das Tabelas de Pesquisa | `[x]` Implementado | 100% |
-| **Fase 36** | Carteiras de Comparação com o Seu Fluxo de Aportes | `[ ]` Proposta (aguarda decisões da seção 11 do desenho) | 0% |
+| **Fase 36** | Carteiras de Comparação com o Seu Fluxo de Aportes | `[ ]` Proposta — incorporada à Fase 48.R8 (decisão 2026-11-01) | 0% |
 | **Fase 37** | Leitura Empresarial: Narrativa e Padrão Visual | `[x]` Concluída | 100% |
 | **Fase 38** | Cotações Persistidas: o Worker Atualiza, as Telas Leem do Banco | `[x]` Concluída | 100% |
 | **Fase 39** | Todo Dado Exibido Sai de Tabela Própria | `[x]` Concluída | 100% |
@@ -58,7 +58,8 @@
 | **Fase 42** | Previsão Probabilística do Preço dos Ativos (Bayesiana, com Dados da CVM) | `[~]` Em andamento (42.0 a 42.5 feitas; antes das Fases 34 e 36) | 75% |
 | **Fase 43** | Garimpo: Achados no Catálogo Inteiro | `[~]` Em andamento (43.0 a 43.5 feitas; 43.6 depois de 42.4–42.6) | 85% |
 | **Fase 45** | Hierarquia de Recomendação (motor analítico do aporte) | `[x]` Concluída (45.0 a 45.8) | 100% |
-| **Fase 47** | Recomendações Externas: Engenharia Reversa | `[ ]` Proposta (aguarda decisões da seção 10 do desenho) | 0% |
+| **Fase 47** | Recomendações Externas: Engenharia Reversa | `[ ]` Proposta — incorporada à Fase 48.R8 (decisão 2026-11-01) | 0% |
+| **Fase 48** | Reconstrução da Experiência e Unificação das Camadas | `[ ]` Aprovada (48.0 decidida; próxima: R0) | 0% |
 
 > **Pausa 2026-10-30:** a pedido, nenhuma fase nova avança (42.6, 42.7, 43.6, 34 e 36 incluídas) até a revisão da hierarquia de recomendação ser aprovada. Inventário dos mecanismos e proposta em [RECOMMENDATION_HIERARCHY_DESIGN.md](../features/RECOMMENDATION_HIERARCHY_DESIGN.md) (Fase 45).
 
@@ -902,11 +903,11 @@ Desenho: [EXTERNAL_RECOMMENDATIONS_DESIGN.md](../features/EXTERNAL_RECOMMENDATIO
 - `[ ]` **47.4** A fonte no placar ao vivo, estabilidade e rotatividade.
 - `[ ]` **47.5** Tela, MCP, testes de UI e integração, `docker compose build`.
 
-## Fase 48 — Reconstrução da Experiência e Unificação das Camadas (`[ ]` Proposta)
+## Fase 48 — Reconstrução da Experiência e Unificação das Camadas (`[ ]` Aprovada)
 
 Análise: [REBUILD_ANALYSIS.md](../architecture/REBUILD_ANALYSIS.md). Plano: [REFACTORING_PLAN.md](../architecture/REFACTORING_PLAN.md). Pedida em 2026-11-01: aproximar a ferramenta das referências do mercado (Status Invest, Investidor10, Kinvo, Sharesight, Simply Wall St, Morningstar X-Ray) com uma história fluida, busca e página para qualquer ativo, e conferência da posição — mantendo a base de dados e o código que já operam sobre ela (migrations só aditivas).
 
-- `[ ]` **48.0** Decisões da seção 7 do plano (rotas, cache de dados no web, ordem R4 × R5, propostas 34/36/47).
+- `[x]` **48.0** Decisões da seção 7 do plano (2026-11-01): rotas do SPA em pt-BR e da API em inglês; TanStack Query no lugar do `useApi`; R4 (ativo) antes de R5 (carteira); propostas 34, 36 e 47 entram na R8.
 - `[ ]` **48.R0** Guarda-corpos: contrato de imports com allowlist, snapshot do OpenAPI, teste de migração sobre cópia da base, smoke E2E.
 - `[ ]` **48.R1** Unificação das camadas: use cases devolvem read models, DTOs só nos controllers, portas no lugar de `infra` no domínio, `health.py` dividido; diff de OpenAPI igual a zero.
 - `[ ]` **48.R2** Instrumento por ticker (`InstrumentView`) e busca global na API e no MCP.
@@ -915,5 +916,5 @@ Análise: [REBUILD_ANALYSIS.md](../architecture/REBUILD_ANALYSIS.md). Plano: [RE
 - `[ ]` **48.R5** Hub da carteira (Posições, Rentabilidade, Proventos, Raio-X) e conferência de posição com o extrato da B3.
 - `[ ]` **48.R6** Acompanhar (lista, alertas do usuário, teses) e Aportar com a recomendação embutida.
 - `[ ]` **48.R7** Imposto mensal, compensação de prejuízo e DARF (fecha TD-04).
-- `[ ]` **48.R8** Planejar: metas, renda futura, simulações reposicionadas.
+- `[ ]` **48.R8** Planejar: metas, renda futura, simulações reposicionadas; incorpora as Fases 34, 36 e 47.
 - `[ ]` **48.R9** Remoção do legado e relatório mensal.
