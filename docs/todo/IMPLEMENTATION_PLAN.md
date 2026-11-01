@@ -886,6 +886,10 @@ Cada item das fases 7–14 referencia um ou mais IDs abaixo. Um achado só é en
 - `[x]` **Chave do Cerrado na política** (`use_cerrado`, versionada; ligada por padrão). Desligada, os pesos do AHP vêm da matriz sem a linha e a coluna do Cerrado (`priority_without`), os pesos validados pelos dados perdem o Cerrado e quem não foi analisado deixa de ter nota 0; vale para a matriz, a construção, o otimizador e o aporte. A rodada guarda os pesos da construção com e sem o Cerrado, e o placar ao vivo compara "Recomendação com o Cerrado" e "sem o Cerrado". A tela Estratégia tem a chave; a Recomendação mostra "Sem o Cerrado".
 - `[x]` **Aporte com todas as posições.** O plano lista também as posições que não receberam sugestão, com o motivo (fora do ARCA, pendência no livro, classe sem aporte, fora pela elegibilidade ou pelos portões); a caixa "Só os sugeridos para comprar", desmarcada, mostra todas, e qualquer uma pode ser comprada à mão.
 - Liberação da rodada: mantida automática (o controle é a confirmação de cada aporte).
+- `[x]` **Correções P0 da análise de 2026-11-01** (`docs/questions/analise.md`, validada contra o código):
+  - Garimpo: o teste de sentido passa a ser unilateral (a chance de o sinal ajudar); um prêmio negativo nunca vira peso, e o ranking provisório usa só as estimativas positivas (iguais quando nenhuma é positiva). Antes, um VALUE com prêmio negativo premiava ações caras.
+  - Retornos mensais: um mês com alta de mais de 4x ou queda de mais de 85% é tratado como salto de nível na série (grupamento ou desdobramento não ajustado) e fica fora de todo retorno mensal (`plausible_month`: Garimpo, teste no passado, validação dos pesos, construção e candidatos); a recomendação passa também a tirar os picos isolados (`price_spikes`).
+  - Projeção (L7) no catálogo: a previsão de preço passa a cobrir as ações líquidas que a recomendação avalia, e a lente lê a previsão de qualquer ticker.
 
 ## Fase 47 — Recomendações Externas: Engenharia Reversa (`[ ]` Proposta)
 

@@ -63,10 +63,14 @@ def reason(values: Mapping[str, float], weights: Mapping[str, float]) -> str:
 
 
 def ranking_weights(model: MiningModel) -> dict[str, float]:
-    """The weights used to rank: the gated ones, or the estimates while every one is zero."""
+    """The weights used to rank: the gated ones; while every one is zero, the positive estimates
+    (a signal that hurt is left out, never flipped), and equal weights when none is positive."""
     if any(model.weights.values()):
         return dict(model.weights)
-    return {s.signal: s.estimate for s in model.signals}
+    positive = {s.signal: max(s.estimate, 0.0) for s in model.signals}
+    if any(positive.values()):
+        return positive
+    return {s.signal: 1.0 for s in model.signals}
 
 
 def run_findings(

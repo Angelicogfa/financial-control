@@ -98,7 +98,9 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
             refresh_catalog_fundamentals_job, max_workers=cfg.market_fetch_workers
         ),
         "refresh_asset_forecasts": partial(
-            refresh_asset_forecasts_job, catalog_top=cfg.simulation_catalog_top
+            refresh_asset_forecasts_job,
+            catalog_top=cfg.simulation_catalog_top,
+            min_daily_volume=cfg.mining_min_daily_volume,
         ),
         "calibrate_forecasts": partial(
             calibrate_forecasts_job, catalog_top=cfg.simulation_catalog_top
@@ -261,7 +263,11 @@ def create_scheduler(
     scheduler.add_job(
         guard(
             "refresh_asset_forecasts",
-            partial(refresh_asset_forecasts_job, catalog_top=cfg.simulation_catalog_top),
+            partial(
+                refresh_asset_forecasts_job,
+                catalog_top=cfg.simulation_catalog_top,
+                min_daily_volume=cfg.mining_min_daily_volume,
+            ),
         ),
         trigger="cron",
         day_of_week="mon-fri",

@@ -104,8 +104,20 @@ def _class_of(asset: AssetEntity) -> ArcaClass | None:
         return None
 
 
-def _universe(uow: AbstractUnitOfWork, *, catalog_top: int, today: date) -> _Universe:
+def _universe(
+    uow: AbstractUnitOfWork, *, catalog_top: int, today: date, also: Collection[str] = ()
+) -> _Universe:
+    """`also`: catalog stocks to forecast besides the registered assets (the liquid stocks the
+    recommendation scores, so its projection lens covers them too)."""
     assets = simulation_universe(uow, catalog_top)
+    known = {a.ticker.upper() for a in assets}
+    wanted = {t.upper() for t in also} - known
+    if wanted:
+        for item in uow.catalog.list_all():
+            if item.ticker.upper() in wanted and item.asset_type is not None:
+                assets.append(
+                    AssetEntity(ticker=item.ticker, name=item.name, asset_type=item.asset_type)
+                )
     registered_ids = {a.id for a in uow.assets.list_all(active_only=True)}
     classes = {
         a.ticker.upper(): cls
@@ -123,6 +135,7 @@ def _universe(uow: AbstractUnitOfWork, *, catalog_top: int, today: date) -> _Uni
     needed = [c for c in CLASS_ORDER if c in set(classes.values())]
     sample = class_sample(history, needed)
     registered = [a for a in assets if a.id is not None and a.id in registered_ids]
+    registered += [a for a in assets if a.id is None and a.ticker.upper() in wanted]
     return _Universe(registered, classes, history, sample)
 
 
@@ -194,15 +207,18 @@ def refresh_forecasts(
     deadline: Callable[[], bool] | None = None,
     tickers: Collection[str] | None = None,
     on_demand: bool = False,
+    also: Collection[str] = (),
 ) -> dict[str, int]:
     """Forecast every registered asset with history and store it; the rest get a status.
+
+    `also` adds catalog stocks (by ticker): the liquid stocks the recommendation scores.
 
     `tickers` limits the run to those assets; `on_demand` marks them as asked for by the user,
     which lowers the history needed and keeps them shown with a warning on later runs too.
     """
     as_of = today or date.today()
     try:
-        universe = _universe(uow, catalog_top=catalog_top, today=as_of)
+        universe = _universe(uow, catalog_top=catalog_top, today=as_of, also=also)
     except InsufficientHistory:
         return {"forecasts": 0, "insufficient": 0, "skipped": 1}
     wanted = {t.upper() for t in tickers} if tickers is not None else None

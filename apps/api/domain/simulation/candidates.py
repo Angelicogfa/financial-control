@@ -28,6 +28,7 @@ from typing import Any
 
 import numpy as np
 
+from domain.market.services.price_sanity import plausible_month
 from domain.shared.enums import ArcaClass, AssetType
 from domain.simulation.bayes import credible_interval
 from domain.simulation.market import MarketHistory, month_ends
@@ -134,9 +135,9 @@ def monthly_excess(
     for i, month in enumerate(sample.months):
         prev = (month.year - 1, 12) if month.month == 1 else (month.year, month.month - 1)
         a, b = levels.get(prev), levels.get((month.year, month.month))
-        if a and b and a > 0:
+        if plausible_month(a, b):  # a level jump in the series is not a return
             mask[i] = True
-            excess[i] = (b / a) / (1.0 + sample.cdi[i]) - 1.0
+            excess[i] = (b / a) / (1.0 + sample.cdi[i]) - 1.0  # type: ignore[operator]
     return excess, mask
 
 

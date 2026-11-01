@@ -271,7 +271,7 @@ export function MiningPage() {
                         {w.used ? (
                           <Badge tone="success">usado</Badge>
                         ) : (
-                          <Badge>não usado ({pct(w.sign_probability, 0)} de confiança no sentido)</Badge>
+                          <Badge>não usado ({pct(w.sign_probability, 0)} de chance de ajudar)</Badge>
                         )}
                       </dd>
                     </div>
