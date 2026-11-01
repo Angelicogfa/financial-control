@@ -11,6 +11,7 @@ from domain.policy.services.policy import (
     EligibilityPolicy,
     HealthPolicy,
     InvestmentPolicy,
+    RecommendationPolicy,
     ValuationPolicy,
 )
 from domain.shared.enums import (
@@ -18,6 +19,17 @@ from domain.shared.enums import (
     IntraClassStrategy,
 )
 from infra.data.models.policy import InvestmentPolicyModel
+
+CONSTRUCTION_FIELDS = (
+    "risk_aversion",
+    "k_min",
+    "k_max",
+    "sector_cap",
+    "group_cap",
+    "max_per_sector",
+    "sector_margin_sd",
+    "min_lot_brl",
+)
 
 
 def policy_payload(policy: InvestmentPolicy) -> dict[str, dict]:
@@ -37,7 +49,27 @@ def policy_payload(policy: InvestmentPolicy) -> dict[str, dict]:
             "projections": policy.valuation.projections.as_dict(),
         },
         "health": policy.health.as_dict(),
+        "recommendation": {
+            "objectives": {c.value: o for c, o in policy.recommendation.objectives.items()},
+            "matrices": {
+                o: [list(row) for row in m] for o, m in policy.recommendation.matrices.items()
+            },
+            "score_scale_annual": policy.recommendation.score_scale_annual,
+            **{name: getattr(policy.recommendation, name) for name in CONSTRUCTION_FIELDS},
+        },
     }
+
+
+def _recommendation_policy(raw: dict | None) -> RecommendationPolicy:
+    """Versions saved before Phase 45.3 have no recommendation premises and take the defaults."""
+    if not raw:
+        return RecommendationPolicy()
+    return RecommendationPolicy(
+        objectives={ArcaClass(c): o for c, o in raw.get("objectives", {}).items()},
+        matrices={o: tuple(tuple(row) for row in m) for o, m in raw["matrices"].items()},
+        score_scale_annual=float(raw.get("score_scale_annual", 0.06)),
+        **{name: raw[name] for name in CONSTRUCTION_FIELDS if name in raw},
+    )
 
 
 def _health_policy(raw: dict | None) -> HealthPolicy:
@@ -63,6 +95,7 @@ def to_investment_policy(model: InvestmentPolicyModel) -> InvestmentPolicy:
         eligibility=EligibilityPolicy(**model.eligibility),
         valuation=ValuationPolicy(projections=projections, **valuation),
         health=_health_policy(model.health),
+        recommendation=_recommendation_policy(model.recommendation),
         version=model.version,
         created_at=model.created_at,
     )

@@ -43,6 +43,11 @@ class AbstractMiningRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def all_signals(self) -> list[MiningSignal]:
+        """The whole point-in-time panel (the backtest of the recommendation reads it)."""
+        raise NotImplementedError
+
+    @abstractmethod
     def signals_of_month(self, month: date) -> list[MiningSignal]:
         raise NotImplementedError
 

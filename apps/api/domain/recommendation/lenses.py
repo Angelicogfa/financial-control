@@ -27,29 +27,18 @@ from domain.mining.signals import IMPROVEMENT as SIGNAL_IMPROVEMENT
 from domain.mining.signals import MOMENTUM as SIGNAL_MOMENTUM
 from domain.mining.signals import QUALITY as SIGNAL_QUALITY
 from domain.mining.signals import VALUE as SIGNAL_VALUE
+from domain.recommendation.keys import (
+    CERRADO,
+    IMPROVEMENT,
+    INCOME,
+    MOMENTUM,
+    PROJECTION,
+    QUALITY,
+    RISK,
+    VALUATION,
+)
 from domain.recommendation.signals import INCOME as SIGNAL_INCOME
 from domain.recommendation.signals import RISK as SIGNAL_RISK
-
-CERRADO = "CERRADO"
-QUALITY = "QUALITY"
-VALUATION = "VALUATION"
-IMPROVEMENT = "IMPROVEMENT"
-MOMENTUM = "MOMENTUM"
-INCOME = "INCOME"
-RISK = "RISK"
-PROJECTION = "PROJECTION"
-LENSES = (CERRADO, QUALITY, VALUATION, IMPROVEMENT, MOMENTUM, INCOME, RISK, PROJECTION)
-
-LENS_LABELS = {
-    CERRADO: "Cerrado",
-    QUALITY: "Qualidade",
-    VALUATION: "Valuation",
-    IMPROVEMENT: "Melhora",
-    MOMENTUM: "Momentum",
-    INCOME: "Renda",
-    RISK: "Risco",
-    PROJECTION: "Projeção",
-}
 
 # Lens -> signal of the point-in-time panel.
 LENS_SIGNALS = {

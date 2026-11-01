@@ -5,16 +5,27 @@ It takes and returns pure domain entities and never commits
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 
 from sqlalchemy import delete, func, insert, select
 from sqlalchemy.orm import Session
 
+from domain.recommendation.combination import ClassMatrix
+from domain.recommendation.construction import ClassConstruction
 from domain.recommendation.gates import GATES, AssetGates, GateResult
-from domain.recommendation.lenses import LENSES, AssetLenses, LensScore
-from domain.recommendation.repositories import AbstractRecommendationRepository
-from infra.data.models.recommendation import AssetGateModel, AssetLensModel
+from domain.recommendation.keys import LENSES
+from domain.recommendation.lenses import AssetLenses, LensScore
+from domain.recommendation.repositories import (
+    AbstractRecommendationRepository,
+    RecommendationRun,
+)
+from infra.data.models.recommendation import (
+    AssetGateModel,
+    AssetLensModel,
+    RecommendationMatrixModel,
+    RecommendationRunModel,
+)
 
 CHUNK = 500
 
@@ -131,4 +142,87 @@ class SqlAlchemyRecommendationRepository(AbstractRecommendationRepository):
                 ],
             )
             for ticker in sorted(by_ticker)
+        ]
+
+    def replace_matrices(
+        self,
+        as_of: date,
+        items: Sequence[ClassMatrix],
+        constructions: Mapping[str, ClassConstruction] | None = None,
+    ) -> int:
+        self.session.execute(
+            delete(RecommendationMatrixModel).where(RecommendationMatrixModel.as_of == as_of)
+        )
+        built = constructions or {}
+        for item in items:
+            construction = built.get(item.arca_class)
+            self.session.add(
+                RecommendationMatrixModel(
+                    as_of=as_of,
+                    arca_class=item.arca_class,
+                    payload=item.to_dict(),
+                    construction=construction.to_dict() if construction else None,
+                )
+            )
+        self.session.flush()
+        return len(items)
+
+    def matrices(self, as_of: date | None = None) -> list[ClassMatrix]:
+        day = as_of or self.latest_lens_date()
+        if day is None:
+            return []
+        stmt = (
+            select(RecommendationMatrixModel)
+            .where(RecommendationMatrixModel.as_of == day)
+            .order_by(RecommendationMatrixModel.arca_class)
+        )
+        return [ClassMatrix.from_dict(m.payload) for m in self.session.scalars(stmt).all()]
+
+    def constructions(self, as_of: date | None = None) -> list[ClassConstruction]:
+        day = as_of or self.latest_lens_date()
+        if day is None:
+            return []
+        stmt = (
+            select(RecommendationMatrixModel)
+            .where(RecommendationMatrixModel.as_of == day)
+            .order_by(RecommendationMatrixModel.arca_class)
+        )
+        return [
+            ClassConstruction.from_dict(m.construction)
+            for m in self.session.scalars(stmt).all()
+            if m.construction
+        ]
+
+    def save_run(self, run: RecommendationRun) -> None:
+        self.session.execute(
+            delete(RecommendationRunModel).where(RecommendationRunModel.as_of == run.as_of)
+        )
+        self.session.add(
+            RecommendationRunModel(
+                as_of=run.as_of,
+                policy_version=run.policy_version,
+                signal_month=run.signal_month,
+                assets=run.assets,
+                eligible=run.eligible,
+                selected=dict(run.selected),
+            )
+        )
+        self.session.flush()
+
+    def runs(self, limit: int = 52) -> list[RecommendationRun]:
+        stmt = (
+            select(RecommendationRunModel)
+            .order_by(RecommendationRunModel.as_of.desc())
+            .limit(limit)
+        )
+        return [
+            RecommendationRun(
+                as_of=m.as_of,
+                policy_version=m.policy_version,
+                signal_month=m.signal_month,
+                assets=m.assets,
+                eligible=m.eligible,
+                selected={k: list(v) for k, v in (m.selected or {}).items()},
+            )
+            for m in self.session.scalars(stmt).all()
         ]

@@ -19,6 +19,7 @@ from worker.jobs import (
     UoWFactory,
     backfill_and_record_snapshot_job,
     backfill_snapshots_job,
+    backtest_recommendation_job,
     calibrate_forecasts_job,
     ensure_series_coverage_job,
     estimate_forecast_models_job,
@@ -113,6 +114,9 @@ def manual_jobs(cfg: Settings) -> dict[str, Callable[[UoWFactory, CachedMarketGa
         "run_mining": partial(run_mining_job, min_daily_volume=cfg.mining_min_daily_volume),
         "refresh_asset_lenses": partial(
             refresh_asset_lenses_job, min_daily_volume=cfg.mining_min_daily_volume
+        ),
+        "backtest_recommendation": partial(
+            backtest_recommendation_job, min_daily_volume=cfg.mining_min_daily_volume
         ),
     }
     return {name: jobs[name] for name in MANUAL_JOBS}
@@ -324,6 +328,19 @@ def create_scheduler(
         hour=(cfg.fundamentals_cron_hour + 4) % 24,
         minute=0,
         id="refresh_asset_lenses",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard(
+            "backtest_recommendation",
+            partial(backtest_recommendation_job, min_daily_volume=cfg.mining_min_daily_volume),
+        ),
+        trigger="cron",
+        day_of_week=cfg.fundamentals_cron_day_of_week,
+        hour=(cfg.fundamentals_cron_hour + 5) % 24,
+        minute=0,
+        id="backtest_recommendation",
         replace_existing=True,
         **defaults,
     )

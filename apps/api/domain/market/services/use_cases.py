@@ -41,6 +41,7 @@ MANUAL_JOBS: dict[str, str] = {
     "sync_mining_universe": "Histórico de preço das ações líquidas do garimpo",
     "run_mining": "Garimpo e painel de sinais: valor, qualidade, melhora, momentum, renda e risco",
     "refresh_asset_lenses": "Lentes e portões da recomendação de cada ativo",
+    "backtest_recommendation": "Teste no passado e placar da recomendação",
 }
 
 

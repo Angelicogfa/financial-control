@@ -3,6 +3,12 @@
 import { request } from "./http";
 import type {
   AccountDTO,
+  BacktestDTO,
+  ContributionComparisonDTO,
+  LensBoardDTO,
+  MatrixBoardDTO,
+  RecommendationRunDTO,
+  RowComparisonDTO,
   AccountRequest,
   AgentKeyCreatedDTO,
   AgentKeyCreateRequest,
@@ -248,6 +254,16 @@ export const api = {
     assetStatus: (id: number) => request<AssetTaxStatusDTO>(`/tax/assets/${id}/status`),
     compare: (body: FixedIncomeCompareRequest) =>
       request<FixedIncomeComparisonDTO>("/tax/fixed-income/compare", { method: "POST", body }),
+  },
+  recommendation: {
+    lenses: (filters: { arca_class?: string; source?: string; ticker?: string; eligible?: boolean } = {}) =>
+      request<LensBoardDTO>("/recommendation/lenses", { query: { ...filters } }),
+    matrix: (asOf?: string) => request<MatrixBoardDTO>("/recommendation/matrix", { query: { as_of: asOf } }),
+    compare: (a: string, b: string) => request<RowComparisonDTO>("/recommendation/compare", { query: { a, b } }),
+    contribution: (amount: number) =>
+      request<ContributionComparisonDTO>("/recommendation/contribution", { query: { amount_brl: amount } }),
+    runs: () => request<RecommendationRunDTO[]>("/recommendation/runs"),
+    backtest: () => request<BacktestDTO>("/recommendation/backtest"),
   },
   research: {
     screener: (filters: ScreenerFilters) =>

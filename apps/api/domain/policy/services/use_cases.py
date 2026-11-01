@@ -15,6 +15,7 @@ from controllers.policy.requests import (
     HealthPolicyDTO,
     PolicyUpdateRequest,
     ProjectionAssumptionsDTO,
+    RecommendationPolicyDTO,
     ValuationPolicyDTO,
 )
 from controllers.policy.responses import PolicyDTO
@@ -26,6 +27,7 @@ from domain.policy.services.policy import (
     EligibilityPolicy,
     HealthPolicy,
     InvestmentPolicy,
+    RecommendationPolicy,
     ValuationPolicy,
     current_policy,
 )
@@ -51,6 +53,37 @@ def to_policy_dto(policy: InvestmentPolicy) -> PolicyDTO:
             projections=ProjectionAssumptionsDTO(**policy.valuation.projections.as_dict()),
         ),
         health=HealthPolicyDTO(**policy.health.as_dict()),
+        recommendation=RecommendationPolicyDTO(
+            objectives=dict(policy.recommendation.objectives),  # type: ignore[arg-type]
+            matrices={
+                o: [list(row) for row in m] for o, m in policy.recommendation.matrices.items()
+            },
+            score_scale_annual=policy.recommendation.score_scale_annual,
+            risk_aversion=policy.recommendation.risk_aversion,
+            k_min=policy.recommendation.k_min,
+            k_max=policy.recommendation.k_max,
+            sector_cap=policy.recommendation.sector_cap,
+            group_cap=policy.recommendation.group_cap,
+            max_per_sector=policy.recommendation.max_per_sector,
+            sector_margin_sd=policy.recommendation.sector_margin_sd,
+            min_lot_brl=policy.recommendation.min_lot_brl,
+        ),
+    )
+
+
+def _recommendation_policy(dto: RecommendationPolicyDTO) -> RecommendationPolicy:
+    return RecommendationPolicy(
+        objectives=dict(dto.objectives),
+        matrices={o: tuple(tuple(row) for row in m) for o, m in dto.matrices.items()},
+        score_scale_annual=dto.score_scale_annual,
+        risk_aversion=dto.risk_aversion,
+        k_min=dto.k_min,
+        k_max=dto.k_max,
+        sector_cap=dto.sector_cap,
+        group_cap=dto.group_cap,
+        max_per_sector=dto.max_per_sector,
+        sector_margin_sd=dto.sector_margin_sd,
+        min_lot_brl=dto.min_lot_brl,
     )
 
 
@@ -82,6 +115,11 @@ class PolicyHandler:
             return [to_policy_dto(p) for p in uow.policies.list_versions(limit)]
 
     def update(self, req: PolicyUpdateRequest) -> PolicyDTO:
+        recommendation = (
+            _recommendation_policy(req.recommendation) if req.recommendation is not None else None
+        )
+        with self.uow_factory() as uow:
+            kept = current_policy(uow.policies).recommendation
         policy = InvestmentPolicy(
             arca=_arca_policy(req.arca),
             eligibility=EligibilityPolicy(**req.eligibility.model_dump()),
@@ -90,6 +128,7 @@ class PolicyHandler:
                 projections=ProjectionAssumptions(**req.valuation.projections.model_dump()),
             ),
             health=HealthPolicy(**req.health.model_dump()),
+            recommendation=recommendation or kept,
         )
         with self.uow_factory() as uow:
             saved = uow.policies.add(policy)

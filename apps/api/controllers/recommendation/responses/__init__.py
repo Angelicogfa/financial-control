@@ -57,3 +57,215 @@ class LensBoardDTO(BaseModel):
     assets: list[AssetLensesDTO] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)  # assets per source
     eligible: int = 0  # assets that passed every gate
+
+
+LensKey = Literal[
+    "CERRADO",
+    "QUALITY",
+    "VALUATION",
+    "IMPROVEMENT",
+    "MOMENTUM",
+    "INCOME",
+    "RISK",
+    "PROJECTION",
+]
+
+
+class LensWeightDTO(BaseModel):
+    lens: LensKey
+    label: str
+    weight: float  # AHP weight of the class's objective
+    gaussian_weight: float  # Gaussian AHP reference (not used)
+
+
+class MatrixCellDTO(BaseModel):
+    lens: LensKey
+    value: float  # [0, 1], pulled toward 0.5 by the lens's confidence
+    weight: float
+    contribution: float
+
+
+class MatrixRowDTO(BaseModel):
+    ticker: str
+    source: Literal["PORTFOLIO", "WATCHLIST", "CATALOG"]
+    sector: str = ""
+    rank: int
+    score: float  # [0, 1]
+    expected: float  # a year over the class, on the declared scale
+    expected_low: float
+    expected_high: float
+    confidence: float
+    cells: list[MatrixCellDTO] = Field(default_factory=list)
+    gaussian_score: float
+    gaussian_rank: int
+    flags: list[str] = Field(default_factory=list)  # the Cerrado's highlights
+
+
+class ExcludedAssetDTO(BaseModel):
+    ticker: str
+    source: Literal["PORTFOLIO", "WATCHLIST", "CATALOG"]
+    reasons: list[str] = Field(default_factory=list)
+
+
+class CurvePointDTO(BaseModel):
+    k: int
+    added: str
+    expected: float  # weighted expected return over the class, a year
+    risk: float  # annual volatility of the set
+    utility: float  # expected - lambda x risk
+
+
+class SelectedAssetDTO(BaseModel):
+    ticker: str
+    sector: str
+    group: str  # correlation group (named by its first member)
+    weight: float  # target inside the class, before the pull toward the current weights
+    score: float
+    expected: float
+    confidence: float
+    reason: str
+
+
+class SkippedAssetDTO(BaseModel):
+    ticker: str
+    reason: str
+
+
+class ConstructionDTO(BaseModel):
+    """The weights of the class (Phase 45.4): dynamic K, caps per sector and group."""
+
+    k: int
+    stop_reason: str
+    confidence: float
+    selected: list[SelectedAssetDTO] = Field(default_factory=list)
+    skipped: list[SkippedAssetDTO] = Field(default_factory=list)
+    curve: list[CurvePointDTO] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class ClassMatrixDTO(BaseModel):
+    """The decision matrix of one ARCA class (Phase 45.3): eligible assets ranked by the AHP."""
+
+    arca_class: str
+    objective: Literal["GROWTH", "DIVIDENDS", "MIXED"]
+    objective_label: str
+    consistency_ratio: float
+    scale_annual: float  # expected return over the class of a score of 1 (declared premise)
+    weights: list[LensWeightDTO] = Field(default_factory=list)
+    rows: list[MatrixRowDTO] = Field(default_factory=list)
+    excluded: list[ExcludedAssetDTO] = Field(default_factory=list)
+    construction: ConstructionDTO | None = None
+
+
+class MatrixBoardDTO(BaseModel):
+    status: Literal["OK", "NOT_COMPUTED"]
+    as_of: date | None = None
+    classes: list[ClassMatrixDTO] = Field(default_factory=list)
+
+
+class LensDifferenceDTO(BaseModel):
+    lens: LensKey
+    label: str
+    a: float
+    b: float
+    weight: float
+    difference: float  # what this lens added to A's lead over B (negative: it favoured B)
+
+
+class RowComparisonDTO(BaseModel):
+    """'A and not B' (Phase 45.3): the two rows of the decision matrix, lens by lens."""
+
+    status: Literal["OK", "NOT_COMPUTED", "NOT_COMPARABLE"]
+    reason: str = ""
+    a: MatrixRowDTO | None = None
+    b: MatrixRowDTO | None = None
+    differences: list[LensDifferenceDTO] = Field(default_factory=list)
+
+
+class OrderLineDTO(BaseModel):
+    ticker: str
+    amount: float
+    quantity: float
+    unit_price: float | None = None
+    target_weight: float | None = None  # inside the class
+    current_weight: float | None = None
+    new: bool = False  # not in the portfolio today
+    reason: str = ""
+
+
+class ClassComparisonDTO(BaseModel):
+    """One class of the contribution: the current rule's orders next to the recommendation's."""
+
+    arca_class: str
+    budget: float  # the class's share of the contribution (current ARCA rule, unchanged)
+    covered: bool  # the recommendation has a construction for this class
+    note: str = ""
+    confidence: float | None = None  # how much the targets moved away from the current weights
+    current_orders: list[OrderLineDTO] = Field(default_factory=list)
+    recommended_orders: list[OrderLineDTO] = Field(default_factory=list)
+    recommended_leftover: float = 0.0
+
+
+class ContributionComparisonDTO(BaseModel):
+    """The contribution the recommendation would make, next to the current one (Phase 45.4).
+
+    Nothing is saved; the contribution keeps the current rule until the switch (Phase 45.6).
+    """
+
+    status: Literal["OK", "NOT_COMPUTED"]
+    as_of: date | None = None  # the weekly run of the lenses
+    amount: float
+    classes: list[ClassComparisonDTO] = Field(default_factory=list)
+
+
+class RecommendationRunDTO(BaseModel):
+    """One weekly run of the recommendation (Phase 45.5)."""
+
+    as_of: date
+    policy_version: int | None = None
+    signal_month: date | None = None
+    assets: int
+    eligible: int
+    selected: dict[str, list[str]] = Field(default_factory=dict)  # class -> chosen tickers
+
+
+class BacktestYearDTO(BaseModel):
+    year: int
+    months: int
+    strategy: float  # compounded return over the class in the year
+    equal: float
+
+
+class ScoreLineDTO(BaseModel):
+    horizon: int  # months after the run
+    runs: int
+    vs_equal: float  # mean return difference over the horizon
+    beat_equal: float
+    beat_equal_low: float
+    beat_equal_high: float
+    vs_cerrado: float | None = None
+    beat_cerrado: float | None = None
+    cerrado_runs: int = 0
+
+
+class BacktestDTO(BaseModel):
+    """The hierarchy tested in the past and the scoreboard of its runs (Phase 45.6)."""
+
+    status: Literal["OK", "INSUFFICIENT", "NOT_COMPUTED"]
+    as_of: date | None = None
+    passed: bool = False
+    reason: str = ""
+    first_month: str | None = None
+    last_month: str | None = None
+    months: int = 0
+    rebalances: int = 0
+    average_k: float = 0.0
+    strategy_annual: float = 0.0
+    equal_annual: float = 0.0
+    difference_annual: float = 0.0
+    hit_rate: float = 0.0
+    probability: float = 0.5
+    years: list[BacktestYearDTO] = Field(default_factory=list)
+    weights: dict[str, float] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    scoreboard: list[ScoreLineDTO] = Field(default_factory=list)

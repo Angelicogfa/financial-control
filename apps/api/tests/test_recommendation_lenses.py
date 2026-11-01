@@ -17,12 +17,12 @@ from domain.assets.services.cerrado import (
 )
 from domain.forecast.valuation_model import CompanyInput, add_months
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.recommendation.keys import LENSES
 from domain.recommendation.lenses import (
     CATALOG,
     CERRADO,
     CERRADO_OFF,
     INCOME,
-    LENSES,
     NOT_ANALYZED,
     PARTIAL,
     PROJECTION,
@@ -264,9 +264,70 @@ def test_lenses_job_api_and_mcp(api: SimpleNamespace) -> None:
     found = op.invoke(handlers, op.input_model(ticker="C113"))
     assert [a.ticker for a in found.assets] == ["C113"]
 
+    # The decision matrix (45.3): the Ações class, objective MIXED, every eligible stock ranked.
+    assert result["classes"] == 1
+    board = api.client.get("/api/v1/recommendation/matrix").json()
+    [acoes] = board["classes"]
+    assert acoes["arca_class"] == "ACOES" and acoes["objective"] == "MIXED"
+    assert acoes["consistency_ratio"] <= 0.011 and len(acoes["weights"]) == 8
+    assert [r["rank"] for r in acoes["rows"]] == list(range(1, 13)) and acoes["excluded"] == []
+    analysed = next(r for r in acoes["rows"] if r["ticker"] == "C113")
+    assert analysed["flags"] != [NOT_ANALYZED]
+    other_ticker = next(r["ticker"] for r in acoes["rows"] if r["ticker"] != "C113")
+    compare = api.client.get(f"/api/v1/recommendation/compare?a=C113&b={other_ticker}").json()
+    assert compare["status"] == "OK" and len(compare["differences"]) == 8
+    assert {d["lens"] for d in compare["differences"]} == set(LENSES)
+    missing = api.client.get("/api/v1/recommendation/compare?a=C113&b=ZZZZ3").json()
+    assert missing["status"] == "NOT_COMPARABLE" and "ZZZZ3" in missing["reason"]
+    matrix_op = CATALOG_BY_NAME["recommendation.matrix"]
+    assert matrix_op.invoke(handlers, matrix_op.input_model(arca_class="ACOES")).classes
+    compare_op = CATALOG_BY_NAME["recommendation.compare"]
+    assert (
+        compare_op.invoke(handlers, compare_op.input_model(a="C113", b=other_ticker)).status == "OK"
+    )
+
+    # The construction (45.4): dynamic K with its curve, every chosen asset with its reason.
+    construction = acoes["construction"]
+    assert result["selected"] == {"ACOES": construction["k"]} and construction["k"] >= 3
+    assert sum(s["weight"] for s in construction["selected"]) == pytest.approx(1.0, abs=1e-4)
+    assert construction["stop_reason"] and all(s["reason"] for s in construction["selected"])
+    assert len(construction["curve"]) >= construction["k"]
+
+    # Next to the current contribution, nothing saved.
+    side = api.client.get("/api/v1/recommendation/contribution?amount_brl=100000").json()
+    assert side["status"] == "OK" and side["amount"] == 100000
+    by_class = {c["arca_class"]: c for c in side["classes"]}
+    assert by_class["ACOES"]["covered"] and by_class["ACOES"]["budget"] > 0
+    recommended = by_class["ACOES"]["recommended_orders"]
+    assert {o["ticker"] for o in recommended} == {s["ticker"] for s in construction["selected"]}
+    spent = sum(o["amount"] for o in recommended) + by_class["ACOES"]["recommended_leftover"]
+    assert spent == pytest.approx(by_class["ACOES"]["budget"], abs=1.0)
+    assert all(o["new"] for o in recommended)  # nothing is held in this portfolio
+    assert not by_class["CAIXA"]["covered"] and "regra atual" in by_class["CAIXA"]["note"]
+    with api.uow_factory() as uow:
+        assert uow.contribution_plans.list_recent() == []  # nothing saved
+    side_op = CATALOG_BY_NAME["recommendation.contribution"]
+    assert side_op.invoke(handlers, side_op.input_model(amount_brl=5000)).status == "OK"
+
     # A second run the same day replaces it.
     again = refresh_asset_lenses_job(api.uow_factory, offline_gateway(), now=NOW)
     assert again["assets"] == result["assets"]
     later = NOW + timedelta(days=7)
     refresh_asset_lenses_job(api.uow_factory, offline_gateway(), now=later)
     assert api.client.get("/api/v1/recommendation/lenses").json()["as_of"] == "2026-11-07"
+
+    # The history (45.5): one entry per run, newest first, with the policy it applied; any past
+    # run can be read again by its date.
+    runs = api.client.get("/api/v1/recommendation/runs").json()
+    assert [r["as_of"] for r in runs] == ["2026-11-07", "2026-10-31"]
+    assert runs[1]["policy_version"] == 1 and runs[1]["eligible"] == 12
+    assert runs[1]["selected"]["ACOES"] == [s["ticker"] for s in construction["selected"]]
+    past = api.client.get("/api/v1/recommendation/matrix?as_of=2026-10-31").json()
+    assert (
+        past["as_of"] == "2026-10-31"
+        and past["classes"][0]["construction"]["k"] == construction["k"]
+    )
+    old_lenses = api.client.get("/api/v1/recommendation/lenses?as_of=2026-10-31").json()
+    assert old_lenses["as_of"] == "2026-10-31"
+    runs_op = CATALOG_BY_NAME["recommendation.runs"]
+    assert len(runs_op.invoke(handlers, runs_op.input_model())) == 2

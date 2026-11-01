@@ -15,6 +15,9 @@ from typing import TYPE_CHECKING
 from core.errors import ValidationError
 from domain.policy.services.allocation import ArcaTargets, InvalidTargetsError
 from domain.policy.services.assumptions import ProjectionAssumptions
+from domain.recommendation.ahp import DEFAULT_MATRICES, Matrix, check_consistency, validate
+from domain.recommendation.keys import DIVIDENDS, GROWTH, MIXED, OBJECTIVES
+from domain.recommendation.params import ConstructionParams
 from domain.shared.enums import ArcaClass, IntraClassStrategy
 
 if TYPE_CHECKING:
@@ -247,6 +250,89 @@ class HealthPolicy:
         return {f.name: getattr(self, f.name) for f in fields(self)}
 
 
+def _default_objectives() -> dict[ArcaClass, str]:
+    return {
+        ArcaClass.ACOES: MIXED,
+        ArcaClass.REAL_ESTATE: DIVIDENDS,
+        ArcaClass.ATIVOS_INTERNACIONAIS: GROWTH,
+    }
+
+
+@dataclass(frozen=True)
+class RecommendationPolicy:
+    """Premises of the recommendation (Phase 45.3, design N0 and N5).
+
+    - `objectives`: what each class looks for (GROWTH, DIVIDENDS or MIXED); Caixa has none.
+    - `matrices`: the AHP pairwise matrix of the lenses per objective, on Saaty's scale; a
+      matrix whose judgements contradict each other (CR above 0.10) is refused.
+    - `score_scale_annual`: the expected return over the class of a score of 1 (and minus it for
+      0), a declared premise until the backtest calibrates it.
+    - Construction of the weights (45.4): `risk_aversion` (lambda of the dynamic K), `k_min`,
+      `k_max`, the caps per sector and per correlation group, `max_per_sector`, the score margin
+      for repeating a sector (in standard deviations) and the smallest purchase per asset.
+    """
+
+    objectives: Mapping[ArcaClass, str] = field(default_factory=_default_objectives)
+    matrices: Mapping[str, Matrix] = field(default_factory=lambda: dict(DEFAULT_MATRICES))
+    score_scale_annual: float = 0.06
+    risk_aversion: float = 0.2
+    k_min: int = 3
+    k_max: int = 12
+    sector_cap: float = 0.25
+    group_cap: float = 0.25
+    max_per_sector: int = 2
+    sector_margin_sd: float = 0.5
+    min_lot_brl: float = 500.0
+
+    def __post_init__(self) -> None:
+        for cls, objective in self.objectives.items():
+            if objective not in OBJECTIVES:
+                raise ValidationError(
+                    f"unknown objective {objective!r} for {cls}", code="INVALID_RECOMMENDATION"
+                )
+        if set(self.matrices) != set(OBJECTIVES):
+            raise ValidationError(
+                "one AHP matrix per objective (GROWTH, DIVIDENDS, MIXED) is needed",
+                code="INVALID_RECOMMENDATION",
+            )
+        clean = {objective: validate(m) for objective, m in self.matrices.items()}
+        for matrix in clean.values():
+            check_consistency(matrix)
+        object.__setattr__(self, "matrices", clean)
+        if not 0.0 < self.score_scale_annual <= 0.5:
+            raise ValidationError(
+                "score_scale_annual must be a fraction between 0 and 0.5",
+                code="INVALID_RECOMMENDATION",
+            )
+        if not 1 <= self.k_min <= self.k_max:
+            raise ValidationError(
+                "k_min must be at least 1 and not above k_max", code="INVALID_RECOMMENDATION"
+            )
+        for name in ("sector_cap", "group_cap"):
+            if not 0.0 < getattr(self, name) <= 1.0:
+                raise ValidationError(
+                    f"{name} must be a fraction above 0 and up to 1", code="INVALID_RECOMMENDATION"
+                )
+        if self.max_per_sector < 1:
+            raise ValidationError(
+                "max_per_sector must be at least 1", code="INVALID_RECOMMENDATION"
+            )
+        for name in ("risk_aversion", "sector_margin_sd", "min_lot_brl"):
+            if getattr(self, name) < 0:
+                raise ValidationError(f"{name} cannot be negative", code="INVALID_RECOMMENDATION")
+
+    def construction(self) -> ConstructionParams:
+        return ConstructionParams(
+            risk_aversion=self.risk_aversion,
+            k_min=self.k_min,
+            k_max=self.k_max,
+            sector_cap=self.sector_cap,
+            group_cap=self.group_cap,
+            max_per_sector=self.max_per_sector,
+            sector_margin_sd=self.sector_margin_sd,
+        )
+
+
 @dataclass(frozen=True)
 class InvestmentPolicy:
     """Complete, versioned set of rules applied by every operational context."""
@@ -255,6 +341,7 @@ class InvestmentPolicy:
     eligibility: EligibilityPolicy = field(default_factory=EligibilityPolicy)
     valuation: ValuationPolicy = field(default_factory=ValuationPolicy)
     health: HealthPolicy = field(default_factory=HealthPolicy)
+    recommendation: RecommendationPolicy = field(default_factory=RecommendationPolicy)
     version: int | None = None
     created_at: datetime | None = None
 
