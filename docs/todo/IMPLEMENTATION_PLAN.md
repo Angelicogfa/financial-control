@@ -901,3 +901,19 @@ Desenho: [EXTERNAL_RECOMMENDATIONS_DESIGN.md](../features/EXTERNAL_RECOMMENDATIO
 - `[ ]` **47.3** Pesos implícitos (por lista e por fonte) e concordância com a recomendação.
 - `[ ]` **47.4** A fonte no placar ao vivo, estabilidade e rotatividade.
 - `[ ]` **47.5** Tela, MCP, testes de UI e integração, `docker compose build`.
+
+## Fase 48 — Reconstrução da Experiência e Unificação das Camadas (`[ ]` Proposta)
+
+Análise: [REBUILD_ANALYSIS.md](../architecture/REBUILD_ANALYSIS.md). Plano: [REFACTORING_PLAN.md](../architecture/REFACTORING_PLAN.md). Pedida em 2026-11-01: aproximar a ferramenta das referências do mercado (Status Invest, Investidor10, Kinvo, Sharesight, Simply Wall St, Morningstar X-Ray) com uma história fluida, busca e página para qualquer ativo, e conferência da posição — mantendo a base de dados e o código que já operam sobre ela (migrations só aditivas).
+
+- `[ ]` **48.0** Decisões da seção 7 do plano (rotas, cache de dados no web, ordem R4 × R5, propostas 34/36/47).
+- `[ ]` **48.R0** Guarda-corpos: contrato de imports com allowlist, snapshot do OpenAPI, teste de migração sobre cópia da base, smoke E2E.
+- `[ ]` **48.R1** Unificação das camadas: use cases devolvem read models, DTOs só nos controllers, portas no lugar de `infra` no domínio, `health.py` dividido; diff de OpenAPI igual a zero.
+- `[ ]` **48.R2** Instrumento por ticker (`InstrumentView`) e busca global na API e no MCP.
+- `[ ]` **48.R3** Novo shell e arquitetura de informação (7 destinos + busca `Ctrl+K`), com redirecionamento das rotas antigas.
+- `[ ]` **48.R4** Página do ativo em capítulos, para ativos na carteira ou não.
+- `[ ]` **48.R5** Hub da carteira (Posições, Rentabilidade, Proventos, Raio-X) e conferência de posição com o extrato da B3.
+- `[ ]` **48.R6** Acompanhar (lista, alertas do usuário, teses) e Aportar com a recomendação embutida.
+- `[ ]` **48.R7** Imposto mensal, compensação de prejuízo e DARF (fecha TD-04).
+- `[ ]` **48.R8** Planejar: metas, renda futura, simulações reposicionadas.
+- `[ ]` **48.R9** Remoção do legado e relatório mensal.
