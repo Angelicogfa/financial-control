@@ -85,7 +85,9 @@ def test_reference_portfolio_under_policy(
         plan.executed_total_brl
     )
     assert plan.executed_total_brl + plan.unallocated_cash_brl == pytest.approx(5000.0)
-    assert "RESERVA" not in {o.ticker for o in plan.orders}
+    # The reserve is listed only to be bought by hand: no suggestion, nothing allocated.
+    reserve = next(o for o in plan.orders if o.ticker == "RESERVA")
+    assert reserve.recommended_quantity == 0 and reserve.allocated_amount_brl == 0
 
 
 def test_exposure_class_moves_b3_listed_global_etf() -> None:
