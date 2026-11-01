@@ -19,9 +19,11 @@ import { Combobox } from "../../components/Combobox";
 import { manualJobs } from "../../api/jobs";
 import { JobRunList } from "../../components/JobRunList";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
 import { brl, day, num, parseDecimal, pct, quantity } from "../../utils/format";
+import { usePagedRows } from "../../utils/pagination";
 
 export const CLASS_LABELS: Record<string, string> = {
   ACOES: "Ações",
@@ -136,10 +138,16 @@ function Curve({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   );
 }
 
-function DecisionMatrix({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
+/** Reload of the whole board (the paged tables of a class offer it, as every paged table does). */
+interface Refresh {
+  onRefresh: () => void;
+  refreshing: boolean;
+}
+
+function DecisionMatrix({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
   const weights = matrix.weights ?? [];
-  const rows = matrix.rows ?? [];
-  if (rows.length === 0) return <Empty title="Nenhum ativo passou nos portões" />;
+  const paged = usePagedRows(matrix.rows ?? [], matrix.arca_class);
+  if (paged.pagination.total === 0) return <Empty title="Nenhum ativo passou nos portões" />;
   return (
     <div className="app-table-wrap">
       <table className="app-table" aria-label="Matriz de decisão">
@@ -159,7 +167,7 @@ function DecisionMatrix({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {paged.rows.map((r) => {
             const cells = Object.fromEntries((r.cells ?? []).map((c) => [c.lens, c]));
             return (
               <tr key={r.ticker}>
@@ -188,6 +196,7 @@ function DecisionMatrix({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           })}
         </tbody>
       </table>
+      <Pagination {...paged.pagination} {...refresh} />
     </div>
   );
 }
@@ -217,9 +226,10 @@ function Weights({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   );
 }
 
-function Excluded({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
-  const excluded = matrix.excluded ?? [];
-  if (excluded.length === 0) return <p className="app-muted">Nenhum ativo desta classe foi tirado pelos portões.</p>;
+function Excluded({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
+  const paged = usePagedRows(matrix.excluded ?? [], matrix.arca_class);
+  if (paged.pagination.total === 0)
+    return <p className="app-muted">Nenhum ativo desta classe foi tirado pelos portões.</p>;
   return (
     <div className="app-table-wrap">
       <table className="app-table" aria-label="Fora pelos portões">
@@ -230,7 +240,7 @@ function Excluded({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           </tr>
         </thead>
         <tbody>
-          {excluded.map((e) => (
+          {paged.rows.map((e) => (
             <tr key={e.ticker}>
               <td>
                 <strong>{e.ticker}</strong> <Source source={e.source} />
@@ -240,6 +250,7 @@ function Excluded({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           ))}
         </tbody>
       </table>
+      <Pagination {...paged.pagination} {...refresh} />
     </div>
   );
 }
@@ -652,7 +663,7 @@ function Runs() {
   );
 }
 
-function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
+function ClassView({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
   const c = matrix.construction;
   return (
     <div className="app-page-stack">
@@ -680,7 +691,7 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
         <Curve matrix={matrix} />
       </Section>
       <Section title="Matriz de decisão" subtitle="Cada lente de 0 a 1 (maior é melhor), já puxada para 0,5 pela confiança.">
-        <DecisionMatrix matrix={matrix} />
+        <DecisionMatrix matrix={matrix} refresh={refresh} />
       </Section>
       <Section
         title="Pesos das lentes"
@@ -693,7 +704,7 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
         <Weights matrix={matrix} />
       </Section>
       <Section title="Fora pelos portões">
-        <Excluded matrix={matrix} />
+        <Excluded matrix={matrix} refresh={refresh} />
       </Section>
       <Section title="Por que A e não B?">
         <AandB key={matrix.arca_class} matrix={matrix} />
@@ -705,7 +716,7 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   );
 }
 
-function Board({ data }: Readonly<{ data: MatrixBoardDTO }>) {
+function Board({ data, refresh }: Readonly<{ data: MatrixBoardDTO; refresh: Refresh }>) {
   const classes = data.classes ?? [];
   const [chosen, setChosen] = useState(classes[0]?.arca_class ?? "");
   const matrix = classes.find((m) => m.arca_class === chosen) ?? classes[0];
@@ -723,7 +734,7 @@ function Board({ data }: Readonly<{ data: MatrixBoardDTO }>) {
           onChange={setChosen}
         />
       )}
-      <ClassView key={matrix.arca_class} matrix={matrix} />
+      <ClassView key={matrix.arca_class} matrix={matrix} refresh={refresh} />
     </div>
   );
 }
@@ -744,7 +755,7 @@ export function RecommendationPage() {
               hint="Ela roda toda semana depois do garimpo; dá para pedir agora em Rodar agora, no fim desta tela."
             />
           ) : (
-            <Board data={data} />
+            <Board data={data} refresh={{ onRefresh: state.reload, refreshing: state.loading }} />
           )
         }
       </Async>

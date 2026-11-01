@@ -264,4 +264,38 @@ describe("Recomendação (Phase 45.5)", () => {
     expect(within(table).getByText("31,8%")).toBeInTheDocument();
     expect(within(table).getByText("97% de confiança no sentido")).toBeInTheDocument();
   });
+
+  it("pages the decision matrix and the assets left out by the gates", async () => {
+    const rows = Array.from({ length: 12 }, (_, i) => row(`T${String(i).padStart(2, "0")}3`, i + 1, 0.9 - i * 0.01, "CATALOG"));
+    const excluded = Array.from({ length: 11 }, (_, i) => ({
+      ticker: `X${String(i).padStart(2, "0")}3`,
+      source: "CATALOG" as const,
+      reasons: ["Volume abaixo do piso."],
+    }));
+    const { calls } = mockApi([
+      { path: "/recommendation/matrix", reply: board({ classes: [acoes({ rows, excluded })] }) },
+      { path: "/recommendation/runs", reply: RUNS },
+      { path: "/recommendation/backtest", reply: BACKTEST },
+      { path: "/recommendation/weights", reply: WEIGHTS },
+    ]);
+    renderAt("/recommendation");
+    const matrix = await screen.findByRole("table", { name: "Matriz de decisão" });
+    expect(within(matrix).getByText("T003")).toBeInTheDocument();
+    expect(within(matrix).queryByText("T113")).not.toBeInTheDocument();
+    const [matrixPager, gatesPager] = screen.getAllByRole("navigation", { name: "Paginação" });
+    expect(matrixPager).toHaveTextContent("1–10 de 12");
+    expect(gatesPager).toHaveTextContent("1–10 de 11");
+
+    fireEvent.click(within(matrixPager).getByRole("button", { name: "Próxima página" }));
+    expect(within(screen.getByRole("table", { name: "Matriz de decisão" })).getByText("T113")).toBeInTheDocument();
+    expect(matrixPager).toHaveTextContent("11–12 de 12");
+
+    fireEvent.click(within(gatesPager).getByRole("button", { name: "Próxima página" }));
+    expect(within(screen.getByRole("table", { name: "Fora pelos portões" })).getByText("X103")).toBeInTheDocument();
+
+    const before = calls.filter((c) => c.path === "/recommendation/matrix").length;
+    fireEvent.click(within(matrixPager).getByRole("button", { name: "Recarregar" }));
+    await screen.findByRole("table", { name: "Matriz de decisão" });
+    expect(calls.filter((c) => c.path === "/recommendation/matrix").length).toBeGreaterThan(before);
+  });
 });
