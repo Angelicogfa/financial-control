@@ -23,6 +23,7 @@ from domain.simulation.market import PointInTimeView
 Holdings = dict[ArcaClass, dict[str, float]]  # class -> symbol -> weight inside the class
 
 RECOMMENDATION = "RECOMMENDATION"
+OPTIMIZED = "OPTIMIZED"
 CERRADO_RULE = "CERRADO_RULE"
 EQUAL = "EQUAL"
 INDEX_ARCA = "INDEX_ARCA"
@@ -33,6 +34,7 @@ YOURS = "YOURS"
 LABELS = {
     YOURS: "Sua carteira",
     RECOMMENDATION: "Recomendação",
+    OPTIMIZED: "Otimizador",
     CERRADO_RULE: "Regra antiga (Cerrado)",
     EQUAL: "Pesos iguais",
     INDEX_ARCA: "Índices por classe",

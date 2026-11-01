@@ -6,6 +6,8 @@ from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 from domain.recommendation.gates import FAIL, AssetGates, GateResult
+from domain.recommendation.keys import RECOMMENDATION_BACKTEST
+from domain.recommendation.optimizer import optimized_of, target_weights
 from domain.recommendation.switch import MAX_RUN_AGE_DAYS, recent_gate_eligibility
 from tests.conftest import offline_gateway
 from tests.test_mining_signals import seed_panel
@@ -107,3 +109,32 @@ def test_the_minimum_lot_and_the_lifecycle_by_the_gates(api: SimpleNamespace) ->
     report = api.client.get("/api/v1/portfolio").json()
     position = next(p for p in report["positions"] if p["asset_id"] == asset_id)
     assert position["eligible"] is False
+
+
+def test_the_optimizer_sets_the_targets_only_after_passing_its_test(api: SimpleNamespace) -> None:
+    _prepare(api)
+    data = api.client.get("/api/v1/recommendation/matrix").json()
+    acoes = next(c for c in data["classes"] if c["arca_class"] == "ACOES")
+    built = {s["ticker"] for s in acoes["construction"]["selected"]}
+    optimized = acoes["construction"]["optimized"]
+    assert optimized["status"] == "OK" and optimized["assets"]
+    assert data["optimizer_in_use"] is False
+    with api.uow_factory() as uow:
+        construction = next(
+            c for c in uow.recommendation.constructions() if c.arca_class == "ACOES"
+        )
+    assert set(target_weights(construction, False)) == built
+    assert target_weights(construction, True) == optimized_of(construction).weights  # type: ignore[union-attr]
+
+    before = api.client.post("/api/v1/portfolio/contribution", json={"amount_brl": 50000}).json()
+    assert {o["ticker"] for o in before["orders"] if o["arca_class"] == "ACOES"} == built
+    with api.uow_factory() as uow:
+        uow.forecasts.save_model(
+            RECOMMENDATION_BACKTEST, TODAY, {"backtest": {"optimizer_passed": True}}
+        )
+        uow.commit()
+    after = api.client.post("/api/v1/portfolio/contribution", json={"amount_brl": 50000}).json()
+    assert {o["ticker"] for o in after["orders"] if o["arca_class"] == "ACOES"} == {
+        a["ticker"] for a in optimized["assets"]
+    }
+    assert api.client.get("/api/v1/recommendation/matrix").json()["optimizer_in_use"] is True

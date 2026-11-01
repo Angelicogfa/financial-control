@@ -27,6 +27,7 @@ from controllers.recommendation.responses import (
     MatrixBoardDTO,
     MatrixCellDTO,
     MatrixRowDTO,
+    OptimizedDTO,
     OrderLineDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
@@ -40,12 +41,12 @@ from domain.policy.services.policy import current_policy
 from domain.portfolio.services.consolidation import AssetContributionOrder, plan_contribution
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.recommendation.backtest import Backtest
-from domain.recommendation.backtest_runs import RECOMMENDATION_BACKTEST
 from domain.recommendation.combination import ClassMatrix, MatrixRow, compare_rows
 from domain.recommendation.construction import ClassConstruction
 from domain.recommendation.gates import GATE_LABELS, AssetGates
-from domain.recommendation.keys import LENS_LABELS, OBJECTIVE_LABELS
+from domain.recommendation.keys import LENS_LABELS, OBJECTIVE_LABELS, RECOMMENDATION_BACKTEST
 from domain.recommendation.lenses import AssetLenses
+from domain.recommendation.optimizer import optimized_of, optimizer_passed
 from domain.recommendation.switch import recommended_classes
 from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
 
@@ -132,7 +133,13 @@ def _construction_dto(c: ClassConstruction) -> ConstructionDTO:
             for p in c.curve
         ],
         notes=c.notes,
+        optimized=_optimized_dto(c),
     )
+
+
+def _optimized_dto(c: ClassConstruction) -> OptimizedDTO | None:
+    found = optimized_of(c)
+    return OptimizedDTO.model_validate(found.to_dict()) if found is not None else None
 
 
 def _matrix_dto(m: ClassMatrix, construction: ClassConstruction | None = None) -> ClassMatrixDTO:
@@ -206,11 +213,13 @@ class RecommendationHandler:
         with self.uow_factory() as uow:
             found = uow.recommendation.matrices(as_of)
             built = {c.arca_class: c for c in uow.recommendation.constructions(as_of)}
+            stored = uow.forecasts.latest_model(RECOMMENDATION_BACKTEST)
         if not found:
             return MatrixBoardDTO(status="NOT_COMPUTED")
         return MatrixBoardDTO(
             status="OK",
             as_of=found[0].as_of,
+            optimizer_in_use=optimizer_passed(stored.payload if stored else None),
             classes=[
                 _matrix_dto(m, built.get(m.arca_class))
                 for m in found
@@ -285,6 +294,14 @@ class RecommendationHandler:
             weights=found.weights,
             notes=found.notes,
             scoreboard=[ScoreLineDTO(**line) for line in stored.payload.get("scoreboard", [])],
+            optimizer_status=found.optimizer_status,  # type: ignore[arg-type]
+            optimizer_passed=found.optimizer_passed,
+            optimizer_reason=found.optimizer_reason,
+            optimizer_months=found.optimizer_months,
+            optimizer_annual=found.optimizer_annual,
+            optimizer_difference_annual=found.optimizer_difference_annual,
+            optimizer_hit_rate=found.optimizer_hit_rate,
+            optimizer_probability=found.optimizer_probability,
         )
 
     def weights(self) -> LensWeightsDTO:

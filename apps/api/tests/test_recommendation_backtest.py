@@ -21,6 +21,7 @@ from domain.recommendation.backtest import (
     scoreboard,
 )
 from domain.recommendation.keys import CERRADO, MIXED, PROJECTION
+from domain.recommendation.optimizer import OptimizerParams
 from domain.recommendation.params import ConstructionParams
 from tests.conftest import offline_gateway
 from tests.test_mining_signals import seed_panel
@@ -93,6 +94,41 @@ def test_a_predictive_signal_passes_and_the_report_has_years() -> None:
     assert [y.year for y in found.years][0] == 2017
     assert any("Cerrado manual" in n for n in found.notes)
     assert Backtest.from_dict(found.to_dict()) == found
+
+
+def test_the_optimizer_is_tested_against_the_construction() -> None:
+    panel, alphas, returns, sectors, first = _synthetic(effect=0.0, seed=5, months=40)
+    found = run_backtest(
+        as_of=TODAY,
+        panel=panel,
+        alphas=alphas,
+        returns=returns,
+        sectors=sectors,
+        first_month=first,
+        restructuring={},
+        weights=WEIGHTS,
+        params=ConstructionParams(),
+        scale_annual=0.06,
+        optimizer=OptimizerParams(draws=2, scenarios=60),
+    )
+    assert found.optimizer_status == "OK" and found.optimizer_months > 0
+    # Under three years and pure noise: no verdict for the optimizer, it stays a reference.
+    assert not found.optimizer_passed and "anos testados" in found.optimizer_reason
+    assert 0.0 <= found.optimizer_probability <= 1.0
+    assert Backtest.from_dict(found.to_dict()) == found
+    without = run_backtest(
+        as_of=TODAY,
+        panel=panel,
+        alphas=alphas,
+        returns=returns,
+        sectors=sectors,
+        first_month=first,
+        restructuring={},
+        weights=WEIGHTS,
+        params=ConstructionParams(),
+        scale_annual=0.06,
+    )
+    assert without.optimizer_status == "NOT_RUN"
 
 
 def test_noise_does_not_pass_and_short_histories_say_so() -> None:

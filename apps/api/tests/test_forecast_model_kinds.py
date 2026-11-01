@@ -5,7 +5,7 @@ from __future__ import annotations
 from domain.forecast.event_runs import EVENTS
 from domain.forecast.runs import VALUATION
 from domain.mining.runs import MINING
-from domain.recommendation.backtest_runs import RECOMMENDATION_BACKTEST
+from domain.recommendation.keys import RECOMMENDATION_BACKTEST
 from domain.recommendation.validation import LENS_WEIGHTS
 from infra.data.models.forecast import ForecastModelModel
 

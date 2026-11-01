@@ -374,4 +374,78 @@ describe("Recomendação (Phase 45.5)", () => {
     renderAt("/recommendation?tab=live");
     expect(await screen.findByText("O placar ao vivo ainda não rodou")).toBeInTheDocument();
   });
+
+  it("shows the optimizer next to the construction and its verdict in the past (Phase 45.8b)", async () => {
+    const base = acoes();
+    const optimized = {
+      status: "OK" as const,
+      assets: [
+        { ticker: "WEGE3", weight: 0.6, low: 0.45, high: 0.7, frequency: 1, construction_weight: 0.55 },
+        { ticker: "ABCD3", weight: 0.4, low: 0.2, high: 0.5, frequency: 0.4, construction_weight: 0.45 },
+      ],
+      expected: 0.03,
+      risk: 0.2,
+      utility: -0.01,
+      construction_utility: -0.012,
+      cvar: 0.21,
+      current_cvar: 0.25,
+      construction_cvar: 0.22,
+      cvar_bound: true,
+      draws: 16,
+      notes: ["Instáveis (entram em menos da metade dos sorteios): ABCD3."],
+    };
+    mockApi([
+      {
+        path: "/recommendation/matrix",
+        reply: board({ classes: [acoes({ construction: { ...base.construction!, optimized } })] }),
+      },
+      {
+        path: "/recommendation/backtest",
+        reply: {
+          ...BACKTEST,
+          optimizer_status: "OK",
+          optimizer_passed: false,
+          optimizer_reason: "O otimizador não superou a construção com confiança.",
+          optimizer_months: 72,
+          optimizer_annual: 0.02,
+          optimizer_difference_annual: 0.004,
+          optimizer_hit_rate: 0.52,
+          optimizer_probability: 0.61,
+        },
+      },
+      { path: "/recommendation/weights", reply: WEIGHTS },
+    ]);
+    renderAt("/recommendation");
+    const table = await screen.findByRole("table", { name: "Otimizador" });
+    expect(within(table).getByText("60,0%")).toBeInTheDocument();
+    expect(within(table).getByText("45% a 70%")).toBeInTheDocument();
+    expect(screen.getByText("Referência")).toBeInTheDocument();
+    expect(screen.getByText(/Instáveis/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Teste no passado" }));
+    expect(await screen.findByText("Otimizador contra a construção")).toBeInTheDocument();
+    expect(screen.getByText(/não superou a construção/)).toBeInTheDocument();
+  });
+
+  it("says the optimizer decides the contribution once it passed", async () => {
+    const base = acoes();
+    mockApi([
+      {
+        path: "/recommendation/matrix",
+        reply: board({
+          optimizer_in_use: true,
+          classes: [
+            acoes({
+              construction: {
+                ...base.construction!,
+                optimized: { status: "OK", assets: [], utility: 0, construction_utility: 0, draws: 16 },
+              },
+            }),
+          ],
+        }),
+      },
+    ]);
+    renderAt("/recommendation");
+    expect(await screen.findByText("Em uso: decide o aporte")).toBeInTheDocument();
+  });
 });

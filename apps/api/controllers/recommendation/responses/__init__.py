@@ -131,6 +131,32 @@ class SkippedAssetDTO(BaseModel):
     reason: str
 
 
+class OptimizedAssetDTO(BaseModel):
+    ticker: str
+    weight: float
+    low: float  # 5th percentile of the weight over the draws
+    high: float
+    frequency: float  # share of the draws where it got at least the minimum weight
+    construction_weight: float = 0.0
+
+
+class OptimizedDTO(BaseModel):
+    """The full optimizer of the class (Phase 45.8b): a reference until it passes its test."""
+
+    status: Literal["OK", "NO_CANDIDATES"]
+    assets: list[OptimizedAssetDTO] = Field(default_factory=list)
+    expected: float = 0.0
+    risk: float = 0.0
+    utility: float = 0.0
+    construction_utility: float = 0.0
+    cvar: float | None = None  # 12-month CVaR 95%, a loss
+    current_cvar: float | None = None
+    construction_cvar: float | None = None
+    cvar_bound: bool = False
+    draws: int = 0
+    notes: list[str] = Field(default_factory=list)
+
+
 class ConstructionDTO(BaseModel):
     """The weights of the class (Phase 45.4): dynamic K, caps per sector and group."""
 
@@ -141,6 +167,7 @@ class ConstructionDTO(BaseModel):
     skipped: list[SkippedAssetDTO] = Field(default_factory=list)
     curve: list[CurvePointDTO] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    optimized: OptimizedDTO | None = None
 
 
 class ClassMatrixDTO(BaseModel):
@@ -162,6 +189,8 @@ class MatrixBoardDTO(BaseModel):
     status: Literal["OK", "NOT_COMPUTED"]
     as_of: date | None = None
     classes: list[ClassMatrixDTO] = Field(default_factory=list)
+    # The optimizer passed its walk-forward test: its weights are the targets (Phase 45.8b).
+    optimizer_in_use: bool = False
 
 
 class LensDifferenceDTO(BaseModel):
@@ -269,6 +298,14 @@ class BacktestDTO(BaseModel):
     weights: dict[str, float] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     scoreboard: list[ScoreLineDTO] = Field(default_factory=list)
+    optimizer_status: Literal["OK", "INSUFFICIENT", "NOT_RUN"] = "NOT_RUN"
+    optimizer_passed: bool = False
+    optimizer_reason: str = ""
+    optimizer_months: int = 0
+    optimizer_annual: float = 0.0
+    optimizer_difference_annual: float = 0.0  # over the construction
+    optimizer_hit_rate: float = 0.0
+    optimizer_probability: float = 0.5
 
 
 class LensWeightLineDTO(BaseModel):
