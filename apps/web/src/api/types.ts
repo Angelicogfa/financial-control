@@ -1543,6 +1543,70 @@ export interface LiquidityDetailDTO {
   bracket_lots?: BracketLotDTO[];
 }
 
+export interface LiveBoardDTO {
+  status: "OK" | "NOT_COMPUTED";
+  as_of?: string | null;
+  prospective_since?: string | null;
+  prospective_months?: number;
+  verdict_ready?: boolean;
+  yours?: LiveSummaryDTO | null;
+  lines?: LiveLineDTO[];
+  randoms?: LiveRandomDTO | null;
+  curve?: LiveCurvePointDTO[];
+}
+
+export interface LiveCurvePointDTO {
+  day: string;
+  yours: number;
+  values?: Record<string, number>;
+  random_low?: number | null;
+  random_high?: number | null;
+}
+
+export interface LiveLineDTO {
+  key: string;
+  label: string;
+  started: string;
+  retroactive: boolean;
+  whole: LiveSummaryDTO;
+  yours: LiveSummaryDTO;
+  difference: number;
+  prospective?: LiveSummaryDTO | null;
+  yours_prospective?: LiveSummaryDTO | null;
+}
+
+export interface LiveRandomDTO {
+  portfolios: number;
+  rank?: LiveRankDTO | null;
+  rank_prospective?: LiveRankDTO | null;
+  irr_low?: number | null;
+  irr_mid?: number | null;
+  irr_high?: number | null;
+}
+
+export interface LiveRankDTO {
+  portfolios: number;
+  beaten: number;
+  share: number;
+  low: number;
+  high: number;
+}
+
+export interface LiveSummaryDTO {
+  start: string;
+  end: string;
+  final_value: number;
+  contributed: number;
+  gain: number;
+  irr?: number | null;
+  twr: number;
+  annual_twr: number;
+  volatility: number;
+  max_drawdown: number;
+  fees: number;
+  taxes: number;
+}
+
 export interface LoginRequest {
   username: string;
   password: string;

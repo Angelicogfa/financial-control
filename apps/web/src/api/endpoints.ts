@@ -7,6 +7,7 @@ import type {
   ContributionComparisonDTO,
   LensBoardDTO,
   LensWeightsDTO,
+  LiveBoardDTO,
   MatrixBoardDTO,
   RecommendationRunDTO,
   RowComparisonDTO,
@@ -266,6 +267,7 @@ export const api = {
     runs: () => request<RecommendationRunDTO[]>("/recommendation/runs"),
     backtest: () => request<BacktestDTO>("/recommendation/backtest"),
     weights: () => request<LensWeightsDTO>("/recommendation/weights"),
+    live: () => request<LiveBoardDTO>("/recommendation/live"),
   },
   research: {
     screener: (filters: ScreenerFilters) =>

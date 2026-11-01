@@ -399,4 +399,24 @@ Respondidas em 2026-10-30 (✔). As que restam ficam marcadas como pendentes.
 8. ✔ **Convivência:** a Recomendação **substitui** Cerrado, Manual e Igual em todas as classes, de uma vez. As regras antigas continuam calculadas só como referências internas do placar e do backtest. Como a troca é única, o placar das recomendações (R.6) e o backtest da hierarquia contra essas referências entram antes da troca no aporte. A troca acontece depois de você ver o resultado.
 9. ✔ **Setores:** teto de 25% da classe por setor e por grupo, até 2 ações por setor, margem de 0,5 desvio de nota para repetir um setor já coberto.
 10. ✔ **Grupos por correlação:** sim, além do setor da B3, recalculados a cada trimestre e mostrados na tela.
-11. **Valores do K dinâmico** (pendente): λ (aversão a risco), K mínimo, K máximo e lote mínimo por classe. *Recomendação: definir na 44.4 com a curva real de cada classe à vista.*
+11. ✔ **Valores do K dinâmico** (2026-11-01): ficam os padrões em uso, λ = 0,2, K de 3 a 12; revistos quando o teste no passado rodar com os dados reais.
+
+### 10.1 Decisões da 45.8 (2026-11-01)
+
+A 45.8 junta a otimização (Fase 34) e o placar ao vivo (Fase 36). Das decisões das duas propostas, a hierarquia já respondeu: Cerrado como peso (34, decisão 2), universo com o catálogo e K dinâmico de 3 a 12 (34.3), Caixa fora (34.4), tetos de setor e grupo (34.5), só com aportes (34.7) e rebalanceamento só com aportes (36.8). As demais, todas aceitas como recomendadas:
+
+**Otimização (45.8b, depois do placar):**
+1. ✔ **Objetivo:** a mesma utilidade da construção (retorno esperado − λ · risco). A nota da recomendação é o prior do α de cada ativo, avaliada sobre os cenários da simulação; a "chance de bater a meta" fica para depois.
+2. ✔ **Risco:** CVaR de 12 meses não pior que o da carteira atual.
+3. ✔ **Dependência:** `scipy` na imagem da API.
+4. ✔ **Papel:** o otimizador só dá os pesos-alvo se vencer a construção simples no teste no passado, pelo mesmo portão bayesiano; senão fica como referência na tela. Os escores seguem marcados como "não point-in-time".
+
+**Placar ao vivo (45.8a, primeiro):**
+5. ✔ **Estratégias:** Recomendação, regra antiga do Cerrado, pesos iguais, índices por classe (BOVA11, XFIX11, IVVB11 e Tesouro Selic), carteiras aleatórias e CDI. A otimizada entra com a 45.8b.
+6. ✔ **Aleatórias:** 200, com sementes fixas.
+7. ✔ **Fluxo:** só a parte ARCA, sem a reserva de emergência.
+8. ✔ **Partida:** o patrimônio ARCA da sua carteira no dia da criação, como um aporte inicial.
+9. ✔ **Retroativo:** desde o seu primeiro aporte, marcado; o veredito usa só a parte daqui para frente.
+10. ✔ **Proventos:** reinvestidos no aporte seguinte.
+11. ✔ **Quando cada estratégia escolhe:** a cada aporte, a decisão mais recente; a Recomendação pela rodada semanal, as demais por revisão trimestral.
+12. ✔ **Tela e prazo:** aba "Placar ao vivo" na tela Recomendação; o veredito "melhor ou pior que a sua carteira" só depois de 12 meses de registro, as métricas desde o primeiro dia.

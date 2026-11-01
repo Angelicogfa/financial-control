@@ -19,6 +19,7 @@ from domain.assets.services.cerrado import (
     record_if_changed,
 )
 from domain.assets.services.history import STATEMENT_TYPES
+from domain.comparison.runs import update_comparison_portfolios
 from domain.disclosures.services.events_sync import sync_event_history
 from domain.disclosures.services.statements_sync import sync_statements
 from domain.disclosures.services.sync import sync_documents
@@ -1027,6 +1028,20 @@ def backtest_recommendation_job(
         result = run_recommendation_backtest(
             uow, min_daily_volume=min_daily_volume, today=at.date()
         )
+        uow.commit()
+    return result
+
+
+def update_comparison_portfolios_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """The live scoreboard: your ARCA flow under each strategy, day by day (45.8a)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        result = update_comparison_portfolios(uow, today=at.date())
         uow.commit()
     return result
 

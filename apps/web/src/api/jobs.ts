@@ -27,6 +27,7 @@ export const JOB_LABELS: Record<string, string> = {
   run_mining: "Garimpo",
   refresh_asset_lenses: "Lentes e portões da recomendação",
   backtest_recommendation: "Teste no passado da recomendação",
+  update_comparison_portfolios: "Placar ao vivo",
 };
 
 export const JOB_STATUS_LABELS: Record<string, string> = {
@@ -95,6 +96,13 @@ export const MANUAL_JOBS: ManualJob[] = [
     hint:
       "Refaz a recomendação a cada trimestre do passado, só com o que se sabia, e a compara com pesos iguais; mede também as rodadas guardadas. " +
       "Roda sozinho uma vez por semana, depois das lentes; rode as lentes antes.",
+  },
+  {
+    name: "update_comparison_portfolios",
+    action: "Atualizar o placar ao vivo",
+    hint:
+      "Aplica o seu dinheiro ARCA, nas mesmas datas, em cada estratégia (recomendação, regra antiga, pesos iguais, índices, CDI e 200 aleatórias). " +
+      "Roda sozinho todo dia útil, depois do retrato da carteira; a primeira vez refaz o passado e leva mais tempo.",
   },
   {
     name: "refresh_asset_forecasts",

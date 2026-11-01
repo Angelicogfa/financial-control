@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from types import TracebackType
 
+from domain.comparison.repositories import AbstractComparisonRepository
 from domain.disclosures.repositories import (
     AbstractCvmDocumentRepository,
     AbstractCvmStatementRepository,
@@ -76,6 +77,7 @@ class AbstractUnitOfWork(ABC):
     forecasts: AbstractForecastRepository
     mining: AbstractMiningRepository
     recommendation: AbstractRecommendationRepository
+    comparison: AbstractComparisonRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

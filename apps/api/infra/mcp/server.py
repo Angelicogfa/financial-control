@@ -119,7 +119,8 @@ valuation, melhora, momentum, renda, risco e projeção de cada ativo), \
 nota, ranking e pesos-alvo), `recommendation.compare` (por que A e não B, lente por lente), \
 `recommendation.contribution` (o aporte que a recomendação faria, ao lado do atual), \
 `recommendation.runs` (histórico das rodadas), `recommendation.backtest` (teste no passado \
-e placar) e `recommendation.weights` (pesos das lentes validados pelos dados).
+e placar), `recommendation.weights` (pesos das lentes validados pelos dados) e \
+`recommendation.live` (placar ao vivo: o seu fluxo ARCA em cada estratégia).
 - Documentos da CVM: `disclosures.list`, `disclosures.mark_read` e `disclosures.event_study` \
 (retorno anormal médio por tipo de fato relevante).
 - Política de investimentos e metas ARCA: `policy.get`, `policy.update`, `policy.versions`, \

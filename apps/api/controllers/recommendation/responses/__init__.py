@@ -295,3 +295,69 @@ class LensWeightsDTO(BaseModel):
     improvement_annual: float = 0.0
     probability: float = 0.5
     lines: list[LensWeightLineDTO] = Field(default_factory=list)
+
+
+class LiveSummaryDTO(BaseModel):
+    start: date
+    end: date
+    final_value: float
+    contributed: float
+    gain: float
+    irr: float | None = None  # annual money-weighted return of the flow
+    twr: float
+    annual_twr: float
+    volatility: float
+    max_drawdown: float
+    fees: float
+    taxes: float
+
+
+class LiveRankDTO(BaseModel):
+    portfolios: int
+    beaten: int
+    share: float
+    low: float
+    high: float
+
+
+class LiveLineDTO(BaseModel):
+    key: str
+    label: str
+    started: date
+    retroactive: bool
+    whole: LiveSummaryDTO
+    yours: LiveSummaryDTO  # your portfolio over the same period
+    difference: float
+    prospective: LiveSummaryDTO | None = None
+    yours_prospective: LiveSummaryDTO | None = None
+
+
+class LiveRandomDTO(BaseModel):
+    portfolios: int
+    rank: LiveRankDTO | None = None
+    rank_prospective: LiveRankDTO | None = None
+    irr_low: float | None = None
+    irr_mid: float | None = None
+    irr_high: float | None = None
+
+
+class LiveCurvePointDTO(BaseModel):
+    day: date
+    yours: float
+    values: dict[str, float] = Field(default_factory=dict)
+    random_low: float | None = None
+    random_high: float | None = None
+
+
+class LiveBoardDTO(BaseModel):
+    """The live scoreboard (Phase 45.8a): the same ARCA flow under each strategy."""
+
+    status: Literal["OK", "NOT_COMPUTED"]
+    as_of: date | None = None
+    prospective_since: date | None = None
+    prospective_months: int = 0
+    verdict_ready: bool = False
+    yours: LiveSummaryDTO | None = None
+    lines: list[LiveLineDTO] = Field(default_factory=list)
+    randoms: LiveRandomDTO | None = None
+    curve: list[LiveCurvePointDTO] = Field(default_factory=list)

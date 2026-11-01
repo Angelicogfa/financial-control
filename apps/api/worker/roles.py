@@ -50,6 +50,7 @@ PROCESS_JOBS = frozenset(
         "run_mining",
         "refresh_asset_lenses",
         "backtest_recommendation",
+        "update_comparison_portfolios",
     }
 )
 

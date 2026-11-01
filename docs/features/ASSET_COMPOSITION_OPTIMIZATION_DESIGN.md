@@ -187,6 +187,8 @@ A Fase 28 traz os fatos relevantes (IPE). Para esta proposta, os dados abertos d
 
 ## 10. Decisões que precisam ser tomadas antes de implementar
 
+> **2026-11-01:** respondidas dentro da Fase 45 (etapa 45.8b). Ver a seção 10.1 de [RECOMMENDATION_HIERARCHY_DESIGN.md](RECOMMENDATION_HIERARCHY_DESIGN.md).
+
 1. **Misto:** λ fixo entre renda e valorização (qual valor padrão?) ou a chance de meta da aba Futuro (recomendado)?
 2. **Cerrado:** modo padrão exigido, ponderado (recomendado) ou ignorado?
 3. **Universo:** só carteira e watchlist (recomendado na v1, menos viés) ou também o catálogo filtrado? Qual K por classe (proposta: 15)?
