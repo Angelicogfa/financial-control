@@ -14,7 +14,7 @@ Everything is read from the database (the screens never compute, Phase 39).
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Any
 
@@ -25,7 +25,11 @@ from domain.disclosures.services.sync import base_ticker
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.policy.services.lifecycle import has_position
 from domain.policy.services.policy import RecommendationPolicy, current_policy
-from domain.portfolio.services.positions import InsufficientQuantityError, build_position
+from domain.portfolio.services.positions import (
+    InsufficientQuantityError,
+    build_position,
+    quantity_on,
+)
 from domain.recommendation.ahp import priority
 from domain.recommendation.combination import ClassMatrix, combine_class
 from domain.recommendation.construction import build_class
@@ -37,7 +41,9 @@ from domain.recommendation.lenses import (
     AssetLenses,
     asset_lenses,
 )
+from domain.recommendation.optimizer import optimize_class
 from domain.recommendation.repositories import RecommendationRun
+from domain.recommendation.switch import _price
 from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, AssetPurpose, ChecklistProfile, default_arca_class
@@ -238,6 +244,21 @@ def monthly_returns(
     return out
 
 
+def _held_values(
+    uow: AbstractUnitOfWork, universe: list[_Member], as_of: date
+) -> dict[str, dict[str, float]]:
+    """Value of each held asset of each class today: the CVaR the optimizer must not exceed."""
+    out: dict[str, dict[str, float]] = {}
+    for m in universe:
+        if m.asset is None or m.asset.id is None or m.arca_class is None or m.source != PORTFOLIO:
+            continue
+        quantity = float(quantity_on(m.asset.transactions, m.asset.id, as_of))
+        value = quantity * _price(uow, m.ticker)
+        if value > 0:
+            out.setdefault(m.arca_class, {})[m.ticker] = value
+    return out
+
+
 def refresh_lenses(
     uow: AbstractUnitOfWork,
     evaluate: Evaluate,
@@ -276,9 +297,17 @@ def refresh_lenses(
     stored = uow.forecasts.latest_model(LENS_WEIGHTS)
     validated = LensWeights.from_dict(stored.payload) if stored is not None else None
     matrices = _matrices(policy.recommendation, items, gates, as_of, validated)
-    returns = monthly_returns(uow, [r.ticker for m in matrices for r in m.rows], as_of)
+    held = _held_values(uow, universe, as_of)
+    tickers = {r.ticker for m in matrices for r in m.rows} | {t for c in held.values() for t in c}
+    returns = monthly_returns(uow, sorted(tickers), as_of)
     params = policy.recommendation.construction()
-    constructions = {m.arca_class: build_class(m, returns, params) for m in matrices}
+    constructions = {}
+    for m in matrices:
+        built = build_class(m, returns, params)
+        optimized = optimize_class(
+            m, returns, params, current=held.get(m.arca_class), construction=built
+        )
+        constructions[m.arca_class] = replace(built, optimized=optimized.to_dict())
     stored_count = uow.recommendation.replace_lenses(as_of, items)
     uow.recommendation.replace_gates(as_of, gates)
     uow.recommendation.replace_matrices(as_of, matrices, constructions)

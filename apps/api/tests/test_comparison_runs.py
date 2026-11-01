@@ -14,6 +14,7 @@ from domain.comparison.runs import cerrado_score
 from domain.comparison.strategies import (
     CDI,
     EQUAL,
+    OPTIMIZED,
     RANDOM,
     RANDOM_PORTFOLIOS,
     RECOMMENDATION,
@@ -180,6 +181,11 @@ def test_recommendation_starts_at_its_first_run_with_your_patrimony(
         "recommendation_runs",
         lambda uow: [(first_run, {ArcaClass.ACOES: {"BBBB3": 1.0}})],
     )
+    monkeypatch.setattr(
+        comparison_runs,
+        "optimized_runs",
+        lambda uow: [(first_run, {ArcaClass.ACOES: {"AAAA3": 0.6, "BBBB3": 0.4}})],
+    )
     update_comparison_portfolios_job(api.uow_factory, offline_gateway(), now=NOW)
     with api.uow_factory() as uow:
         rec = uow.comparison.get(RECOMMENDATION)
@@ -190,3 +196,7 @@ def test_recommendation_starts_at_its_first_run_with_your_patrimony(
     assert rec.points[0].day >= first_run
     assert rec.points[0].flow == pytest.approx(opening)
     assert set(rec.state["book"]["units"]) <= {"BBBB3", "CDI"}
+    with api.uow_factory() as uow:
+        optimized = uow.comparison.get(OPTIMIZED)
+    assert optimized is not None and optimized.points[0].day == rec.points[0].day
+    assert set(optimized.state["book"]["units"]) <= {"AAAA3", "BBBB3", "CDI"}

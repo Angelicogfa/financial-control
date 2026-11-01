@@ -19,6 +19,8 @@ from domain.portfolio.services.consolidation import (
     RecommendedClass,
 )
 from domain.recommendation.construction import pulled_targets
+from domain.recommendation.keys import RECOMMENDATION_BACKTEST
+from domain.recommendation.optimizer import optimizer_passed, target_weights
 from domain.shared.enums import ArcaClass, AssetPurpose, AssetType
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.simulation.data import px_symbol
@@ -46,6 +48,8 @@ def recommended_classes(
     if run is None or ((today or date.today()) - run).days > MAX_RUN_AGE_DAYS:
         return {}
     catalog = {i.ticker.upper(): i for i in uow.catalog.list_all()}
+    stored = uow.forecasts.latest_model(RECOMMENDATION_BACKTEST)
+    use_optimizer = optimizer_passed(stored.payload if stored else None)
     out: dict[ArcaClass, RecommendedClass] = {}
     for construction in uow.recommendation.constructions(run):
         if not construction.selected:
@@ -59,7 +63,7 @@ def recommended_classes(
             and p.purpose == AssetPurpose.ARCA
         }
         current = {t: p.current_value_brl for t, p in positions.items() if p.current_value_brl > 0}
-        targets = pulled_targets(construction, current)
+        targets = pulled_targets(construction, current, target_weights(construction, use_optimizer))
         candidates = {}
         for ticker in targets:
             if ticker in positions:

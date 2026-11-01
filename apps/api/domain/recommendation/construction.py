@@ -81,6 +81,8 @@ class ClassConstruction:
     skipped: list[SkippedAsset]
     curve: list[CurvePoint]
     notes: list[str] = field(default_factory=list)
+    # The full optimizer's result for the same class (Phase 45.8b), as stored.
+    optimized: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -380,14 +382,17 @@ def build_class(
 
 
 def pulled_targets(
-    construction: ClassConstruction, current: Mapping[str, float]
+    construction: ClassConstruction,
+    current: Mapping[str, float],
+    weights: Mapping[str, float] | None = None,
 ) -> dict[str, float]:
-    """Final targets: the construction pulled toward the current weights by the confidence
-    (decision 10.6); an asset held but not selected keeps only the current share left."""
+    """Final targets: the construction (or `weights`, the optimizer's) pulled toward the current
+    weights by the confidence (decision 10.6); an asset held but not selected keeps only the
+    current share left."""
     held = sum(v for v in current.values() if v > 0)
     now = {t: v / held for t, v in current.items() if v > 0} if held > 0 else {}
     c = construction.confidence if now else 1.0
-    new = {s.ticker: s.weight for s in construction.selected}
+    new = dict(weights) if weights else {s.ticker: s.weight for s in construction.selected}
     tickers = set(new) | set(now)
     targets = {t: c * new.get(t, 0.0) + (1.0 - c) * now.get(t, 0.0) for t in tickers}
     total = sum(targets.values()) or 1.0

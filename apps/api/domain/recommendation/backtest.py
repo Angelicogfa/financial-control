@@ -20,6 +20,11 @@ The verdict uses the Lab's Bayesian gate on the paired monthly differences: the 
 equal weights out of sample when P(difference > 0) is at least 90% over at least five years.
 "It does not improve" is a valid result.
 
+Optimizer (Phase 45.8b): at each rebalance the full optimizer runs on the same candidates and
+returns, with the CVaR limit of the weights it held the quarter before; its monthly returns are
+paired with the construction's, and the same gate decides whether it beat the construction. Only
+then do its weights become the class's target (decision 10.1.4).
+
 Scoreboard (the runs from now on): for each stored run, the chosen weights are measured 1, 3, 6
 and 12 months later against equal weights over the eligible assets of that run and against an
 approximation of the current rule (the registered assets weighted by their Cerrado score).
@@ -39,6 +44,7 @@ from domain.recommendation.construction import build_class
 from domain.recommendation.gates import PASS, AssetGates, GateResult
 from domain.recommendation.keys import CERRADO, PROJECTION
 from domain.recommendation.lenses import LENS_SIGNALS, AssetLenses, LensScore
+from domain.recommendation.optimizer import OptimizerParams, optimize_class
 from domain.recommendation.params import ConstructionParams
 from domain.simulation.bayes import credible_interval
 from domain.simulation.validation import bayesian_gate
@@ -99,6 +105,15 @@ class Backtest:
     years: list[YearLine] = field(default_factory=list)
     weights: dict[str, float] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    # The optimizer against the construction (Phase 45.8b).
+    optimizer_status: str = "NOT_RUN"  # OK, INSUFFICIENT or NOT_RUN
+    optimizer_passed: bool = False
+    optimizer_reason: str = ""
+    optimizer_months: int = 0
+    optimizer_annual: float = 0.0  # mean monthly return over the class x 12
+    optimizer_difference_annual: float = 0.0  # over the construction
+    optimizer_hit_rate: float = 0.0
+    optimizer_probability: float = 0.5
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -158,12 +173,16 @@ def run_backtest(
     params: ConstructionParams,
     scale_annual: float,
     seed: int = 7,
+    optimizer: OptimizerParams | None = None,
 ) -> Backtest:
     """Quarterly rebalanced walk-forward of the hierarchy against equal weights."""
     used = backtest_weights(weights)
     months = sorted(m for m, rows in panel.items() if len(rows) >= MIN_COMPANIES)
     strategy: list[float] = []
     equal: list[float] = []
+    optimized: list[float] = []  # paired with `paired` (the construction's months it ran)
+    paired: list[float] = []
+    held_before: dict[str, float] = {}
     stamps: list[Month] = []
     ks: list[int] = []
     rebalance = 0
@@ -195,6 +214,13 @@ def run_backtest(
             continue
         rebalance += 1
         ks.append(built.k)
+        best: dict[str, float] = {}
+        if optimizer is not None:
+            found = optimize_class(
+                top, known, params, current=held_before, construction=built, options=optimizer
+            )
+            best = found.weights
+            held_before = dict(best)
         for h in range(1, HOLD_MONTHS + 1):
             nxt = add_months(month, h)
             held = {t: w for t, w in target.items() if nxt in alphas.get(t, {})}
@@ -202,9 +228,15 @@ def run_backtest(
             if not held or not universe:
                 continue
             total = sum(held.values())
-            strategy.append(sum(w / total * alphas[t][nxt] for t, w in held.items()))
+            mine = sum(w / total * alphas[t][nxt] for t, w in held.items())
+            strategy.append(mine)
             equal.append(float(np.mean(universe)))
             stamps.append(nxt)
+            live = {t: w for t, w in best.items() if nxt in alphas.get(t, {})}
+            if live:
+                share = sum(live.values())
+                optimized.append(sum(w / share * alphas[t][nxt] for t, w in live.items()))
+                paired.append(mine)
         # Hold for the quarter: the next rebalance is three months later.
         target_month = add_months(month, HOLD_MONTHS)
         while i < len(months) and months[i] < target_month:
@@ -276,7 +308,53 @@ def run_backtest(
         years=years,
         weights={k: round(v, 6) for k, v in used.items()},
         notes=notes,
+        **_optimizer_verdict(optimizer, optimized, paired, seed),
     )
+
+
+def _optimizer_verdict(
+    optimizer: OptimizerParams | None,
+    optimized: Sequence[float],
+    construction: Sequence[float],
+    seed: int,
+) -> dict[str, Any]:
+    """The same gate, the optimizer against the construction on the months both held."""
+    if optimizer is None:
+        return {}
+    if len(optimized) < 2:
+        return {
+            "optimizer_status": "INSUFFICIENT",
+            "optimizer_reason": "O otimizador não teve meses suficientes para ser testado.",
+        }
+    o, c = np.array(optimized), np.array(construction)
+    gate = bayesian_gate(o, c, seed=seed + 1)
+    years_tested = len(optimized) / 12.0
+    passed = gate.probability >= MIN_PROBABILITY and years_tested >= MIN_YEARS
+    diff = float((o - c).mean() * 12.0)
+    if years_tested < MIN_YEARS:
+        reason = (
+            f"Só {years_tested:.1f} anos testados; são precisos {MIN_YEARS} para um veredito."
+        ).replace(".", ",", 1)
+    elif passed:
+        reason = (
+            f"O otimizador superou a construção em {diff:+.1%} ao ano, com "
+            f"{gate.probability:.0%} de confiança: os pesos dele passam a ser o alvo."
+        )
+    else:
+        reason = (
+            f"O otimizador não superou a construção com confiança: diferença de {diff:+.1%} ao "
+            f"ano e {gate.probability:.0%} de chance de ser positiva. Ele fica como referência."
+        )
+    return {
+        "optimizer_status": "OK",
+        "optimizer_passed": passed,
+        "optimizer_reason": reason,
+        "optimizer_months": len(optimized),
+        "optimizer_annual": round(float(o.mean() * 12.0), 6),
+        "optimizer_difference_annual": round(diff, 6),
+        "optimizer_hit_rate": round(float((o > c).mean()), 4),
+        "optimizer_probability": gate.probability,
+    }
 
 
 # --- scoreboard --------------------------------------------------------------------------------

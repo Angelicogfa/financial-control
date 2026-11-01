@@ -358,6 +358,14 @@ export interface BacktestDTO {
   weights?: Record<string, number>;
   notes?: string[];
   scoreboard?: ScoreLineDTO[];
+  optimizer_status?: "OK" | "INSUFFICIENT" | "NOT_RUN";
+  optimizer_passed?: boolean;
+  optimizer_reason?: string;
+  optimizer_months?: number;
+  optimizer_annual?: number;
+  optimizer_difference_annual?: number;
+  optimizer_hit_rate?: number;
+  optimizer_probability?: number;
 }
 
 export interface BacktestPointDTO {
@@ -747,6 +755,7 @@ export interface ConstructionDTO {
   skipped?: SkippedAssetDTO[];
   curve?: CurvePointDTO[];
   notes?: string[];
+  optimized?: OptimizedDTO | null;
 }
 
 export type ContributionClassReason = "REFILL_BELOW_BAND" | "BELOW_BAND_PRIORITY" | "BELOW_TARGET" | "ABOVE_TARGET" | "NO_ELIGIBLE_ASSETS";
@@ -1685,6 +1694,7 @@ export interface MatrixBoardDTO {
   status: "OK" | "NOT_COMPUTED";
   as_of?: string | null;
   classes?: ClassMatrixDTO[];
+  optimizer_in_use?: boolean;
 }
 
 export interface MatrixCellDTO {
@@ -1831,6 +1841,30 @@ export interface OfferProjectionDTO {
   at_maturity: OfferOutcomeDTO;
   at_common_window: OfferOutcomeDTO;
   equivalent_rates: EquivalentRateDTO[];
+}
+
+export interface OptimizedAssetDTO {
+  ticker: string;
+  weight: number;
+  low: number;
+  high: number;
+  frequency: number;
+  construction_weight?: number;
+}
+
+export interface OptimizedDTO {
+  status: "OK" | "NO_CANDIDATES";
+  assets?: OptimizedAssetDTO[];
+  expected?: number;
+  risk?: number;
+  utility?: number;
+  construction_utility?: number;
+  cvar?: number | null;
+  current_cvar?: number | null;
+  construction_cvar?: number | null;
+  cvar_bound?: boolean;
+  draws?: number;
+  notes?: string[];
 }
 
 export interface OrderLineDTO {

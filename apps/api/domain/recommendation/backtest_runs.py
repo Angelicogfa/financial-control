@@ -20,14 +20,16 @@ from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.policy.services.policy import current_policy
 from domain.recommendation.ahp import priority
 from domain.recommendation.backtest import RunPortfolios, run_backtest, scoreboard
-from domain.recommendation.keys import CERRADO
+from domain.recommendation.keys import CERRADO, RECOMMENDATION_BACKTEST
 from domain.recommendation.lenses import CATALOG
+from domain.recommendation.optimizer import OptimizerParams
 from domain.recommendation.runs import monthly_returns
 from domain.recommendation.validation import LENS_WEIGHTS, validate_lens_weights
 from domain.shared.enums import ArcaClass
 from domain.shared.unit_of_work import AbstractUnitOfWork
 
-RECOMMENDATION_BACKTEST = "RECOMMENDATION_BACKTEST"
+# Fewer draws than the weekly run: the test repeats the optimizer every quarter.
+BACKTEST_OPTIMIZER = OptimizerParams(draws=6, scenarios=120)
 
 
 def _run_portfolios(uow: AbstractUnitOfWork) -> list[RunPortfolios]:
@@ -92,6 +94,7 @@ def run_recommendation_backtest(
         weights=weights,
         params=policy.construction(),
         scale_annual=policy.score_scale_annual,
+        optimizer=BACKTEST_OPTIMIZER,
     )
 
     runs = _run_portfolios(uow)
@@ -124,5 +127,6 @@ def run_recommendation_backtest(
         "months": found.months,
         "probability": found.probability,
         "scored_runs": max((line.runs for line in lines), default=0),
+        "optimizer_passed": found.optimizer_passed,
         "weights_validated": validated.passed,
     }

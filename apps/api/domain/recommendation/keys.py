@@ -33,3 +33,7 @@ DIVIDENDS = "DIVIDENDS"
 MIXED = "MIXED"
 OBJECTIVES = (GROWTH, DIVIDENDS, MIXED)
 OBJECTIVE_LABELS = {GROWTH: "Valorização", DIVIDENDS: "Dividendos", MIXED: "Misto"}
+
+# The stored backtest of the recommendation (forecast_models), read by the switch to know
+# whether the optimizer passed its gate (Phase 45.8b).
+RECOMMENDATION_BACKTEST = "RECOMMENDATION_BACKTEST"
