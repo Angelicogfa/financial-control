@@ -18,6 +18,8 @@ from domain.comparison.strategies import (
     RANDOM,
     RANDOM_PORTFOLIOS,
     RECOMMENDATION,
+    WITH_CERRADO,
+    WITHOUT_CERRADO,
     YOURS,
 )
 from domain.portfolio.services.service import PortfolioApplicationService
@@ -186,6 +188,13 @@ def test_recommendation_starts_at_its_first_run_with_your_patrimony(
         "optimized_runs",
         lambda uow: [(first_run, {ArcaClass.ACOES: {"AAAA3": 0.6, "BBBB3": 0.4}})],
     )
+    monkeypatch.setattr(
+        comparison_runs,
+        "variant_runs",
+        lambda uow, key: (
+            [(first_run, {ArcaClass.ACOES: {"AAAA3": 1.0}})] if key == WITHOUT_CERRADO else []
+        ),
+    )
     update_comparison_portfolios_job(api.uow_factory, offline_gateway(), now=NOW)
     with api.uow_factory() as uow:
         rec = uow.comparison.get(RECOMMENDATION)
@@ -200,3 +209,6 @@ def test_recommendation_starts_at_its_first_run_with_your_patrimony(
         optimized = uow.comparison.get(OPTIMIZED)
     assert optimized is not None and optimized.points[0].day == rec.points[0].day
     assert set(optimized.state["book"]["units"]) <= {"AAAA3", "BBBB3", "CDI"}
+    with api.uow_factory() as uow:
+        assert uow.comparison.get(WITHOUT_CERRADO) is not None
+        assert uow.comparison.get(WITH_CERRADO) is None  # no run kept that variant

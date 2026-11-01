@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from domain.contributions.services.contribution_plans import Execution, check_executions
 from domain.market.entities import Quote
 from domain.policy.services.allocation import ArcaTargets
 from domain.portfolio.services.consolidation import (
@@ -24,6 +25,7 @@ from domain.shared.entities import (
 from domain.shared.enums import (
     ArcaClass,
     AssetType,
+    ContributionOrderReason,
     EarningKind,
     FixedIncomeIndexer,
     FixedIncomeInstrumentKind,
@@ -199,7 +201,14 @@ def test_emergency_reserve_is_valued_but_kept_out_of_arca() -> None:
     assert reserve_pos.class_target_weight_pct == 0.0
 
     plan = plan_contribution(report, ArcaTargets.default(), 1000.0)
-    assert "RESERVA" not in {o.ticker for o in plan.orders}
+    # Listed only to be bought by hand: no suggestion, and the reason says why.
+    reserve = next(o for o in plan.orders if o.ticker == "RESERVA")
+    assert reserve.recommended_quantity == 0 and reserve.allocated_amount_brl == 0
+    assert reserve.reason == ContributionOrderReason.NOT_ARCA
+    # So a purchase of it can be confirmed with the plan.
+    check_executions(
+        plan, [Execution(asset_id=reserve.asset_id, quantity=Decimal("1"), unit_price=Decimal("1"))]
+    )
 
 
 def _single_class_plan(*assets: AssetEntity, prices: dict[str, float], **kwargs):

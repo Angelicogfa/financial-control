@@ -128,6 +128,8 @@ class RecommendationPolicyDTO(BaseModel):
     max_per_sector: int = Field(default=2, ge=1, le=50)
     sector_margin_sd: float = Field(default=0.5, ge=0.0, le=5.0)
     min_lot_brl: float = Field(default=500.0, ge=0.0)
+    # Off: the Cerrado lens leaves the recommendation (the AHP without its row and column).
+    use_cerrado: bool = True
 
 
 class PolicyUpdateRequest(BaseModel):

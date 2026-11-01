@@ -183,6 +183,7 @@ class ClassMatrixDTO(BaseModel):
     excluded: list[ExcludedAssetDTO] = Field(default_factory=list)
     construction: ConstructionDTO | None = None
     weights_source: Literal["AHP", "VALIDATED"] = "AHP"  # VALIDATED: by the data (Phase 45.7)
+    cerrado_in_use: bool = True  # the policy's switch: off, the Cerrado lens left the weights
 
 
 class MatrixBoardDTO(BaseModel):

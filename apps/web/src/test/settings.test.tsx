@@ -80,6 +80,30 @@ describe("strategy", () => {
     const healthLimits = (last(calls, "PUT", "/policy")?.body as { health: Record<string, number> }).health;
     expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
     expect(healthLimits.monthly_expenses_brl).toBe(5000);
+  }, 20_000);
+
+  it("switches the Cerrado lens of the recommendation off, keeping the other premises", async () => {
+    const premises = {
+      objectives: { ACOES: "MIXED" as const },
+      matrices: { MIXED: [[1]] },
+      score_scale_annual: 0.06,
+      k_max: 12,
+      use_cerrado: true,
+    };
+    const withPremises = { ...policy, recommendation: premises } as PolicyDTO;
+    const { calls } = mockApi([
+      { path: "/policy", reply: withPremises },
+      { path: "/policy/versions", reply: [withPremises] },
+      { method: "PUT", path: "/policy", reply: { ...withPremises, version: 4 } },
+    ]);
+    renderAt("/settings/strategy");
+    const box = await screen.findByLabelText(/Usar o Cerrado na recomendação/);
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nova versão" }));
+    await screen.findByText("Nova versão da estratégia salva.");
+    const body = last(calls, "PUT", "/policy")?.body as { recommendation: Record<string, unknown> };
+    expect(body.recommendation).toMatchObject({ use_cerrado: false, k_max: 12, score_scale_annual: 0.06 });
   }, 20_000); // a long form: slow under a loaded full run
 
   it("keeps policy-wide options out of the field grids", async () => {

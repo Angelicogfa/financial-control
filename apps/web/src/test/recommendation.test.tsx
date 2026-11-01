@@ -448,4 +448,10 @@ describe("Recomendação (Phase 45.5)", () => {
     renderAt("/recommendation");
     expect(await screen.findByText("Em uso: decide o aporte")).toBeInTheDocument();
   });
+
+  it("says when the Cerrado lens is off in the policy", async () => {
+    mockApi([{ path: "/recommendation/matrix", reply: board({ classes: [acoes({ cerrado_in_use: false })] }) }]);
+    renderAt("/recommendation");
+    expect(await screen.findByText("Sem o Cerrado")).toBeInTheDocument();
+  });
 });

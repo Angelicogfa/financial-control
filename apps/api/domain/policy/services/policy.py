@@ -270,6 +270,8 @@ class RecommendationPolicy:
     - Construction of the weights (45.4): `risk_aversion` (lambda of the dynamic K), `k_min`,
       `k_max`, the caps per sector and per correlation group, `max_per_sector`, the score margin
       for repeating a sector (in standard deviations) and the smallest purchase per asset.
+    - `use_cerrado`: whether the Cerrado lens (L0) enters the recommendation. Off, the AHP weights
+      come from the matrix without its row and column, and assets not analysed stop scoring 0.
     """
 
     objectives: Mapping[ArcaClass, str] = field(default_factory=_default_objectives)
@@ -283,6 +285,7 @@ class RecommendationPolicy:
     max_per_sector: int = 2
     sector_margin_sd: float = 0.5
     min_lot_brl: float = 500.0
+    use_cerrado: bool = True
 
     def __post_init__(self) -> None:
         for cls, objective in self.objectives.items():

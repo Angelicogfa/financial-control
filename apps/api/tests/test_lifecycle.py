@@ -18,6 +18,7 @@ from domain.shared.enums import (
     AssetLifecycle,
     AssetPurpose,
     AssetType,
+    ContributionOrderReason,
     TransactionKind,
 )
 
@@ -108,7 +109,16 @@ def test_contributions_skip_review_and_watchlist_assets() -> None:
         "NEW3": AssetLifecycle.ELIGIBLE,
         "WATCH3": AssetLifecycle.WATCHLIST,
     }
-    assert {o.ticker for o in plan.orders} == {"GOOD3", "NEW3"}
+    assert {o.ticker for o in plan.orders if o.reason != ContributionOrderReason.NOT_ELIGIBLE} == {
+        "GOOD3",
+        "NEW3",
+    }
+    # A held asset under review is listed without a suggestion, to be bought by hand if wanted.
+    assert all(
+        o.recommended_quantity == 0
+        for o in plan.orders
+        if o.reason == ContributionOrderReason.NOT_ELIGIBLE
+    )
 
 
 def test_strict_policy_turns_unevaluated_assets_into_watchlist() -> None:

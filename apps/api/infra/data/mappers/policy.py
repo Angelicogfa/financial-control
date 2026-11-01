@@ -29,6 +29,7 @@ CONSTRUCTION_FIELDS = (
     "max_per_sector",
     "sector_margin_sd",
     "min_lot_brl",
+    "use_cerrado",
 )
 
 

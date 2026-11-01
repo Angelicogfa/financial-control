@@ -803,6 +803,8 @@ function ClassTabs({
     <div className="app-page-stack">
       <p className="app-muted">
         Rodada de {day(data.as_of)}. <Badge tone="success">Decide o aporte</Badge>
+        {matrix.cerrado_in_use === false && " "}
+        {matrix.cerrado_in_use === false && <Badge tone="warning">Sem o Cerrado</Badge>}
       </p>
       {classes.length > 1 && (
         <Segmented

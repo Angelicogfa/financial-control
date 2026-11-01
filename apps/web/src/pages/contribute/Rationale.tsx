@@ -79,6 +79,14 @@ export function orderReasonText(o: AssetContributionOrderDTO, strategy?: Divisio
       return "Sem cotação: não dá para calcular a quantidade.";
     case "BELOW_MIN_LOT":
       return `Reservados ${brl(o.allocated_amount_brl)}, abaixo do lote mínimo da recomendação: o valor foi para outros ativos.`;
+    case "NOT_ARCA":
+      return "Fora do ARCA (reserva ou outra finalidade): sem sugestão, mas dá para comprar à mão.";
+    case "LEDGER_PENDING":
+      return "O livro deste ativo tem pendência: corrija os lançamentos antes de aportar nele.";
+    case "CLASS_NOT_RECEIVING":
+      return "A classe dele não recebe este aporte: sem sugestão, mas dá para comprar à mão.";
+    case "NOT_ELIGIBLE":
+      return "Fora pela elegibilidade ou pelos portões da recomendação: sem sugestão, mas dá para comprar à mão.";
     default:
       return "";
   }

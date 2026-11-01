@@ -672,6 +672,7 @@ export interface ClassMatrixDTO {
   excluded?: ExcludedAssetDTO[];
   construction?: ConstructionDTO | null;
   weights_source?: "AHP" | "VALIDATED";
+  cerrado_in_use?: boolean;
 }
 
 export interface ClassPolicyDTO {
@@ -773,7 +774,7 @@ export interface ContributionConfirmRequest {
   executions?: ExecutionDTO[] | null;
 }
 
-export type ContributionOrderReason = "BOUGHT" | "LEFTOVER_FILL" | "PRICE_ABOVE_BUDGET" | "ABOVE_TARGET" | "ZERO_WEIGHT" | "NO_PRICE" | "BELOW_MIN_LOT";
+export type ContributionOrderReason = "BOUGHT" | "LEFTOVER_FILL" | "PRICE_ABOVE_BUDGET" | "ABOVE_TARGET" | "ZERO_WEIGHT" | "NO_PRICE" | "BELOW_MIN_LOT" | "NOT_ARCA" | "LEDGER_PENDING" | "CLASS_NOT_RECEIVING" | "NOT_ELIGIBLE";
 
 export interface ContributionPlanResponseDTO {
   contribution_amount_brl: number;
@@ -2131,6 +2132,7 @@ export interface RecommendationPolicyDTO {
   max_per_sector?: number;
   sector_margin_sd?: number;
   min_lot_brl?: number;
+  use_cerrado?: boolean;
 }
 
 export interface RecommendationRunDTO {

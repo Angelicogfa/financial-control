@@ -11,7 +11,7 @@ and excluded from totals and allocations instead of failing the whole report (fi
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -842,6 +842,48 @@ def _redistribute_leftover(
     return leftover
 
 
+def _held_outside(
+    report: ConsolidatedPortfolioReport,
+    orders: Sequence[AssetContributionOrder],
+    receiving: set[ArcaClass],
+) -> list[AssetContributionOrder]:
+    """Every held position the plan does not list, with why it got no suggestion: the screen
+    can show them all and a purchase can still be chosen by hand."""
+    listed = {o.ticker for o in orders}
+    out = []
+    for p in report.positions:
+        if p.ticker in listed or p.asset_id is None or p.quantity <= 0:
+            continue
+        if p.purpose != AssetPurpose.ARCA:
+            reason = ContributionOrderReason.NOT_ARCA
+        elif p.ledger_status != LEDGER_VALID:
+            reason = ContributionOrderReason.LEDGER_PENDING
+        elif p.arca_class not in receiving:
+            reason = ContributionOrderReason.CLASS_NOT_RECEIVING
+        else:
+            reason = ContributionOrderReason.NOT_ELIGIBLE
+        out.append(
+            AssetContributionOrder(
+                asset_id=p.asset_id,
+                ticker=p.ticker,
+                name=p.name,
+                asset_type=p.asset_type,
+                arca_class=p.arca_class,
+                cerrado_score=p.cerrado_evaluation.score,
+                cerrado_recommendation=p.cerrado_evaluation.recommendation,
+                intra_class_target_weight_pct=0.0,
+                allocated_amount_brl=0.0,
+                unit_price_brl=round(max(p.current_unit_price * p.fx_rate, 0.0), 2),
+                recommended_quantity=0.0,
+                executed_amount_brl=0.0,
+                projected_value_brl=round(p.current_value_brl, 2),
+                class_current_weight_pct=round(p.class_current_weight_pct, 2),
+                reason=reason,
+            )
+        )
+    return sorted(out, key=lambda o: (o.arca_class.value, o.ticker))
+
+
 def _order_reason(order: _DraftOrder) -> ContributionOrderReason:
     if order.unit_brl <= 0:
         return ContributionOrderReason.NO_PRICE
@@ -995,6 +1037,7 @@ def plan_contribution(
         for arca_class in ArcaClass
         for o in drafts.get(arca_class, [])
     ]
+    orders += _held_outside(report, orders, set(drafts))
     executed_total = round(sum(o.executed_amount_brl for o in orders), 2)
     # What each class actually receives: a class without eligible assets passes its share on
     # (leftover redistribution), so the first-level split alone would not add up.

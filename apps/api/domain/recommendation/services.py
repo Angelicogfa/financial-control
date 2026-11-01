@@ -44,7 +44,12 @@ from domain.recommendation.backtest import Backtest
 from domain.recommendation.combination import ClassMatrix, MatrixRow, compare_rows
 from domain.recommendation.construction import ClassConstruction
 from domain.recommendation.gates import GATE_LABELS, AssetGates
-from domain.recommendation.keys import LENS_LABELS, OBJECTIVE_LABELS, RECOMMENDATION_BACKTEST
+from domain.recommendation.keys import (
+    CERRADO,
+    LENS_LABELS,
+    OBJECTIVE_LABELS,
+    RECOMMENDATION_BACKTEST,
+)
 from domain.recommendation.lenses import AssetLenses
 from domain.recommendation.optimizer import optimized_of, optimizer_passed
 from domain.recommendation.switch import recommended_classes
@@ -165,6 +170,7 @@ def _matrix_dto(m: ClassMatrix, construction: ClassConstruction | None = None) -
         ],
         construction=_construction_dto(construction) if construction is not None else None,
         weights_source=m.weights_source,  # type: ignore[arg-type]
+        cerrado_in_use=CERRADO in m.weights,
     )
 
 

@@ -5,8 +5,12 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
+from domain.recommendation.ahp import DEFAULT_MATRICES, priority, priority_without
+from domain.recommendation.construction import WITH_CERRADO, WITHOUT_CERRADO
 from domain.recommendation.gates import FAIL, AssetGates, GateResult
-from domain.recommendation.keys import RECOMMENDATION_BACKTEST
+from domain.recommendation.keys import CERRADO, MIXED, QUALITY, RECOMMENDATION_BACKTEST, VALUATION
 from domain.recommendation.optimizer import optimized_of, target_weights
 from domain.recommendation.switch import MAX_RUN_AGE_DAYS, recent_gate_eligibility
 from tests.conftest import offline_gateway
@@ -138,3 +142,36 @@ def test_the_optimizer_sets_the_targets_only_after_passing_its_test(api: SimpleN
         a["ticker"] for a in optimized["assets"]
     }
     assert api.client.get("/api/v1/recommendation/matrix").json()["optimizer_in_use"] is True
+
+
+def test_the_cerrado_lens_can_be_switched_off_in_the_policy(api: SimpleNamespace) -> None:
+    matrix = DEFAULT_MATRICES[MIXED]
+    full = priority(matrix).weights
+    found = priority_without(matrix, CERRADO).weights
+    assert CERRADO not in found and sum(found.values()) == pytest.approx(1.0, abs=1e-5)
+    # The proportions among the other lenses stay close (the matrix is not perfectly consistent).
+    assert found[QUALITY] / found[VALUATION] == pytest.approx(
+        full[QUALITY] / full[VALUATION], rel=0.1
+    )
+
+    _prepare(api)
+    on = api.client.get("/api/v1/recommendation/matrix").json()
+    assert all(c["cerrado_in_use"] for c in on["classes"])
+    policy = api.client.get("/api/v1/policy").json()
+    assert policy["recommendation"]["use_cerrado"] is True
+    policy["recommendation"]["use_cerrado"] = False
+    saved = api.client.put("/api/v1/policy", json=policy)
+    assert saved.status_code == 200, saved.json()
+    assert saved.json()["recommendation"]["use_cerrado"] is False
+    assert api.client.get("/api/v1/policy").json()["recommendation"]["use_cerrado"] is False
+
+    refresh_asset_lenses_job(api.uow_factory, offline_gateway(), now=NOW)
+    off = api.client.get("/api/v1/recommendation/matrix").json()
+    acoes = next(c for c in off["classes"] if c["arca_class"] == "ACOES")
+    assert not acoes["cerrado_in_use"]
+    assert "CERRADO" not in {w["lens"] for w in acoes["weights"]}
+    with api.uow_factory() as uow:
+        built = next(c for c in uow.recommendation.constructions() if c.arca_class == "ACOES")
+    variants = built.cerrado_variants or {}
+    assert set(variants) == {WITH_CERRADO, WITHOUT_CERRADO}
+    assert variants[WITHOUT_CERRADO] == {s.ticker: s.weight for s in built.selected}

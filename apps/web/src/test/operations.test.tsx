@@ -489,7 +489,7 @@ describe("contribute", () => {
       { path: "/accounts", reply: accounts },
     ]);
     renderAt("/contribute/7");
-    const filter = await screen.findByLabelText(/Só os recomendados para comprar \(1 de 2\)/);
+    const filter = await screen.findByLabelText(/Só os sugeridos para comprar \(1 de 2\)/);
     expect(filter).toBeChecked();
     expect(screen.getByLabelText("Comprar HGLG11")).toBeInTheDocument();
     expect(screen.queryByLabelText("Comprar KNRI11")).not.toBeInTheDocument();
@@ -497,9 +497,33 @@ describe("contribute", () => {
     fireEvent.click(filter);
     fireEvent.click(screen.getByLabelText("Comprar KNRI11"));
     // Ticked by hand, it stays listed when the filter comes back.
-    fireEvent.click(screen.getByLabelText(/Só os recomendados para comprar/));
+    fireEvent.click(screen.getByLabelText(/Só os sugeridos para comprar/));
     expect(screen.getByLabelText("Comprar KNRI11")).toBeChecked();
-    expect(screen.getByLabelText(/Só os recomendados para comprar \(2 de 2\)/)).toBeChecked();
+    expect(screen.getByLabelText(/Só os sugeridos para comprar \(2 de 2\)/)).toBeChecked();
+  });
+
+  it("lists every position with the flag off, with why it got no suggestion", async () => {
+    const base = savedPlan();
+    const reserve = {
+      ...base.plan.orders[0],
+      asset_id: 9,
+      ticker: "RESV11",
+      recommended_quantity: 0,
+      allocated_amount_brl: 0,
+      executed_amount_brl: 0,
+      reason: "NOT_ARCA" as const,
+    };
+    mockApi([
+      { path: "/contributions/7", reply: savedPlan({ plan: { ...base.plan, orders: [...base.plan.orders, reserve] } }) },
+      { path: "/portfolio/consolidated", reply: report() },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/contribute/7");
+    const filter = await screen.findByLabelText(/Só os sugeridos para comprar \(1 de 2\)/);
+    expect(screen.queryByLabelText("Comprar RESV11")).not.toBeInTheDocument();
+    fireEvent.click(filter);
+    expect(screen.getByLabelText("Comprar RESV11")).not.toBeChecked();
+    expect(screen.getByText(/Fora do ARCA/)).toBeInTheDocument();
   });
 
   it("refuses to confirm without any asset", async () => {
