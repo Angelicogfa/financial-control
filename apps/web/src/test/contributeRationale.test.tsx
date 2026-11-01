@@ -60,7 +60,29 @@ describe("contribution rationale on the page", () => {
     expect(realEstate).toHaveTextContent("Da Estratégia · 1 ativo elegível");
     expect(screen.getByRole("columnheader", { name: "Por quê" })).toBeInTheDocument();
     expect(screen.getByText(/Abaixo do peso alvo: reservados/)).toBeInTheDocument();
-    expect(screen.getByRole("complementary", { name: "Limites do cálculo" })).toHaveTextContent(/não uma otimização/);
+    expect(screen.getByRole("complementary", { name: "Limites do cálculo" })).toHaveTextContent(
+      /compara os ativos por qualidade/,
+    );
+  });
+
+  it("names the recommendation when a class followed it (Phase 45.6b)", async () => {
+    const plan = savedPlan();
+    plan.plan.class_rationale = plan.plan.class_rationale!.map((r) =>
+      r.arca_class === "REAL_ESTATE" ? { ...r, recommendation_as_of: "2026-11-01" } : r,
+    );
+    plan.plan.orders = [
+      ...plan.plan.orders.map((o) => ({ ...o, new: true })),
+      { ...plan.plan.orders[0], asset_id: null, ticker: "SKIP3", recommended_quantity: 0, reason: "BELOW_MIN_LOT" },
+    ];
+    mockApi(routes(plan));
+    renderAt("/contribute/7");
+    const table = await screen.findByRole("table", { name: "Regra aplicada a cada classe" });
+    const realEstate = within(table).getByRole("row", { name: /Real Estate/ });
+    expect(realEstate).toHaveTextContent("Recomendação");
+    expect(realEstate).toHaveTextContent("Rodada de 01/11/2026");
+    expect(screen.getAllByText("novo").length).toBeGreaterThan(0);
+    // A catalog stock the plan did not buy has no asset to trade: it is not in the table.
+    expect(screen.queryByLabelText("Comprar SKIP3")).not.toBeInTheDocument();
   });
 
   it("says so when the plan was saved before the rationale", async () => {

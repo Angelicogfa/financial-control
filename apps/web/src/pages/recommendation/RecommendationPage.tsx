@@ -352,7 +352,7 @@ function SideBySide({ arcaClass }: Readonly<{ arcaClass: string }>) {
         </div>
         <button type="submit" className="app-secondary-button" disabled={busy}>
           {busy && <Spinner size="sm" />}
-          <span>Comparar com o aporte atual</span>
+          <span>Comparar com a regra antiga</span>
         </button>
       </form>
       {error && (
@@ -364,16 +364,17 @@ function SideBySide({ arcaClass }: Readonly<{ arcaClass: string }>) {
       {line && (
         <div role="status" className="app-page-stack">
           <p>
-            Esta classe recebe {brl(line.budget)} pela regra ARCA, nas duas formas.{" "}
+            Pela regra ARCA, a fatia desta classe é {brl(line.budget)} nas duas formas; o que outras classes sem
+            ativo passam adiante entra nas compras.{" "}
             {line.covered
-              ? `Os alvos da recomendação foram puxados para os pesos atuais pela confiança de ${pct(line.confidence, 0)}.`
+              ? "O aporte segue os pesos-alvo da recomendação, puxados para os seus pesos atuais."
               : line.note}
           </p>
           <div className="app-split">
-            <OrderTable title="Regra atual" orders={line.current_orders ?? []} />
+            <OrderTable title="Regra antiga" orders={line.current_orders ?? []} />
             {line.covered && (
               <OrderTable
-                title="Recomendação"
+                title="Aporte (recomendação)"
                 orders={line.recommended_orders ?? []}
                 leftover={line.recommended_leftover}
                 showReason
@@ -633,7 +634,7 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
       <Section title="Por que A e não B?">
         <AandB key={matrix.arca_class} matrix={matrix} />
       </Section>
-      <Section title="Aporte lado a lado" subtitle="O que a regra atual faria e o que a recomendação faria; nada é gravado.">
+      <Section title="Aporte lado a lado" subtitle="O aporte (pela recomendação) ao lado da regra antiga da Estratégia; nada é gravado.">
         <SideBySide arcaClass={matrix.arca_class} />
       </Section>
     </div>
@@ -648,7 +649,7 @@ function Board({ data }: Readonly<{ data: MatrixBoardDTO }>) {
   return (
     <div className="app-page-stack">
       <p className="app-muted">
-        Rodada de {day(data.as_of)}. <Badge tone="warning">Ainda não decide o aporte</Badge>
+        Rodada de {day(data.as_of)}. <Badge tone="success">Decide o aporte</Badge>
       </p>
       {classes.length > 1 && (
         <Segmented
@@ -696,7 +697,7 @@ export function RecommendationPage() {
         items={[
           "Os portões só tiram o que é objetivo e grave; o Cerrado é uma lente com peso, e quem não foi analisado tem nota 0.",
           "O retorno esperado acima da classe usa a escala declarada na política (nota 1 = +6% ao ano); ela ainda não foi calibrada pelo backtest.",
-          "A recomendação ainda não muda o aporte: a troca só acontece depois que você aprovar o teste no passado e o placar.",
+          "Desde a troca, o aporte segue os pesos-alvo desta tela nas classes cobertas; sem rodada recente (mais de 14 dias), volta à regra da Estratégia.",
         ]}
       />
     </div>

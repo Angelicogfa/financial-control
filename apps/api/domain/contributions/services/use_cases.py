@@ -5,6 +5,7 @@ Scope: saved contribution plans and their confirmation.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -24,8 +25,10 @@ from domain.contributions.services.contribution_plans import (
     discard_plan,
 )
 from domain.ledger.services.ledger import require_fx_rate, validate_ledger
+from domain.portfolio.services.consolidation import ContributionPlan
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.snapshots import invalidate_snapshots_from
+from domain.research.services.service import register_researched_asset
 from domain.shared.entities import TransactionEntity
 from domain.shared.enums import ContributionPlanStatus, TransactionKind
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -67,6 +70,30 @@ def _execution(e: ExecutionDTO, usd_brl: Decimal | None) -> Execution:
     )
 
 
+def _register_new_assets(uow: AbstractUnitOfWork, plan: ContributionPlan) -> ContributionPlan:
+    """Register in the watchlist the catalog stocks the recommendation buys (Phase 45.6b), so
+    the saved plan only holds registered assets and the confirmation stays as it was."""
+    orders = []
+    for order in plan.orders:
+        if order.asset_id is None and order.recommended_quantity > 0:
+            existing = uow.assets.get_by_ticker(order.ticker)
+            if existing is not None and existing.is_active:
+                asset = existing
+            elif existing is not None:
+                asset = uow.assets.update(replace(existing, is_active=True))
+            else:
+                asset = register_researched_asset(
+                    uow,
+                    order.ticker,
+                    asset_type=order.asset_type,
+                    name=order.name,
+                    arca_class=order.arca_class,
+                )
+            order = replace(order, asset_id=asset.id)
+        orders.append(order)
+    return replace(plan, orders=orders)
+
+
 class ContributionHandler:
     """Application handler for persisted contribution plans."""
 
@@ -81,6 +108,7 @@ class ContributionHandler:
             plan = self.portfolio_service.simulate_contribution(
                 uow, amount_brl=req.amount_brl, strategy_override=req.strategy_override
             )
+            plan = _register_new_assets(uow, plan)
             saved = uow.contribution_plans.add(
                 SavedContributionPlan(
                     plan=plan,
@@ -109,7 +137,11 @@ class ContributionHandler:
         with self.uow_factory() as uow:
             saved = self._get(uow, plan_id)
             account_id = resolve_account_id(uow, req.account_id)
-            assets = {o.asset_id: uow.assets.get_by_id(o.asset_id) for o in saved.plan.orders}
+            assets = {
+                o.asset_id: uow.assets.get_by_id(o.asset_id)
+                for o in saved.plan.orders
+                if o.asset_id is not None
+            }
             foreign = {
                 asset_id
                 for asset_id, asset in assets.items()

@@ -206,7 +206,9 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
       <section className="app-card app-card-padded">
         <h2 className="app-card-heading">Alocação ARCA</h2>
         <p className="app-card-hint">
-          Meta de cada classe, banda de tolerância (pontos percentuais) e como o aporte se divide dentro dela.
+          Meta de cada classe, banda de tolerância (pontos percentuais) e como o aporte se divide dentro dela. Em Ações,
+          Real Estate e Internacional o aporte segue a recomendação semanal; a divisão escolhida aqui vale no Caixa e quando
+          a recomendação não tiver rodada recente.
         </p>
         <div className="app-table-wrap">
           <table className="app-table">
@@ -250,6 +252,7 @@ function StrategyForm({ policy, onSaved }: Readonly<{ policy: PolicyDTO; onSaved
                       onChange={(strategy) => setClass(c, { strategy })}
                       options={codeOptions(Object.keys(STRATEGY_LABELS) as IntraClassStrategy[], STRATEGY_LABELS)}
                     />
+                    {c !== "CAIXA" && <small className="app-muted">Reserva: o aporte segue a recomendação.</small>}
                   </td>
                 </tr>
               ))}

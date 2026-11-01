@@ -194,7 +194,8 @@ class OrderLineDTO(BaseModel):
 
 
 class ClassComparisonDTO(BaseModel):
-    """One class of the contribution: the current rule's orders next to the recommendation's."""
+    """One class of the contribution: the policy's old strategy (`current_orders`) next to the
+    contribution, which follows the recommendation (`recommended_orders`, Phase 45.6b)."""
 
     arca_class: str
     budget: float  # the class's share of the contribution (current ARCA rule, unchanged)
@@ -207,10 +208,8 @@ class ClassComparisonDTO(BaseModel):
 
 
 class ContributionComparisonDTO(BaseModel):
-    """The contribution the recommendation would make, next to the current one (Phase 45.4).
-
-    Nothing is saved; the contribution keeps the current rule until the switch (Phase 45.6).
-    """
+    """The contribution, which follows the recommendation since Phase 45.6b, next to what the
+    policy's old strategy would buy. Nothing is saved."""
 
     status: Literal["OK", "NOT_COMPUTED"]
     as_of: date | None = None  # the weekly run of the lenses

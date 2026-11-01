@@ -120,6 +120,7 @@ def plan_from_payload(data: Mapping[str, Any]) -> ContributionPlan:
         orders=orders,
         projected_allocations=allocations,
         class_rationale=rationale,
+        recommendation_as_of=data.get("recommendation_as_of"),
     )
 
 
@@ -147,7 +148,7 @@ def default_executions(
 def check_executions(plan: ContributionPlan, executions: list[Execution]) -> None:
     if not executions:
         raise ValidationError("Nothing to execute in this plan", code="NOTHING_TO_EXECUTE")
-    planned = {o.asset_id for o in plan.orders}
+    planned = {o.asset_id for o in plan.orders if o.asset_id is not None}
     outside = sorted({e.asset_id for e in executions} - planned)
     if outside:
         raise ValidationError(

@@ -32,18 +32,16 @@ from controllers.recommendation.responses import (
 )
 from controllers.shared.dependencies import UoWFactory
 from domain.policy.services.policy import current_policy
-from domain.portfolio.services.consolidation import plan_contribution
+from domain.portfolio.services.consolidation import AssetContributionOrder, plan_contribution
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.recommendation.backtest import Backtest
 from domain.recommendation.backtest_runs import RECOMMENDATION_BACKTEST
 from domain.recommendation.combination import ClassMatrix, MatrixRow, compare_rows
 from domain.recommendation.construction import ClassConstruction
-from domain.recommendation.contribution import recommended_orders
 from domain.recommendation.gates import GATE_LABELS, AssetGates
 from domain.recommendation.keys import LENS_LABELS, OBJECTIVE_LABELS
 from domain.recommendation.lenses import AssetLenses
-from domain.shared.enums import INTEGER_QUANTITY_TYPES, AssetType
-from domain.simulation.data import px_symbol
+from domain.recommendation.switch import recommended_classes
 
 
 def _asset_dto(item: AssetLenses, gates: AssetGates | None) -> AssetLensesDTO:
@@ -287,115 +285,70 @@ class RecommendationHandler:
         return list_runs(self, limit)
 
     def contribution(self, amount_brl: float) -> ContributionComparisonDTO:
-        """The current rule's contribution next to the recommendation's (nothing saved)."""
+        """The contribution (which follows the recommendation, Phase 45.6b) next to what the
+        policy's old strategy would buy; nothing is saved."""
         if self.portfolio_service is None:
             raise RuntimeError("the contribution comparison needs the portfolio service")
         service = self.portfolio_service
         with self.uow_factory() as uow:
-            built = {c.arca_class: c for c in uow.recommendation.constructions()}
-            if not built:
-                return ContributionComparisonDTO(status="NOT_COMPUTED", amount=amount_brl)
-            as_of = uow.recommendation.latest_lens_date()
             report = service.build_portfolio_report(uow)
             policy = current_policy(uow.policies)
-            plan = plan_contribution(
-                report=report,
-                targets=policy.arca.targets,
-                amount_brl=amount_brl,
-                class_strategies=policy.arca.strategies,
-            )
-            wanted = {s.ticker for c in built.values() for s in c.selected}
-            held = {p.ticker for p in report.positions if p.current_value_brl > 0}
-            registered = {a.ticker.upper(): a for a in uow.assets.list_all(active_only=True)}
-            prices: dict[str, float] = {
-                p.ticker: p.current_unit_price * p.fx_rate
-                for p in report.positions
-                if p.current_unit_price > 0
-            }
-            missing = sorted(wanted - set(prices))
-            quotes = uow.market_data.get_many(missing)
-            for ticker in missing:
-                data = quotes.get(ticker)
-                if data is not None and data.quote is not None and data.quote.price > 0:
-                    prices[ticker] = data.quote.price
-                else:
-                    points = uow.market_series.list_series(px_symbol(ticker))
-                    if points:
-                        prices[ticker] = points[-1].value
-        whole = {t: _whole_units(t, report, registered) for t in wanted | held}
-        classes = []
-        # The class's share by the ARCA rule (level 1), even when the current rule could not
-        # spend it for lack of an eligible asset in the portfolio.
+            recommended = recommended_classes(uow, report, policy)
+            if not recommended:
+                return ContributionComparisonDTO(status="NOT_COMPUTED", amount=amount_brl)
+            as_of = uow.recommendation.latest_lens_date()
+        args = {
+            "report": report,
+            "targets": policy.arca.targets,
+            "amount_brl": amount_brl,
+            "class_strategies": policy.arca.strategies,
+        }
+        plan = plan_contribution(**args, recommended=recommended)
+        old = plan_contribution(**args)
         shares = {r.arca_class: r.first_level_brl for r in plan.class_rationale}
+        classes = []
         for arca_class in plan.by_class_allocated_brl:
-            budget = shares.get(arca_class, plan.by_class_allocated_brl[arca_class])
-            current = [o for o in plan.orders if o.arca_class == arca_class]
+            rec = recommended.get(arca_class)
             line = ClassComparisonDTO(
                 arca_class=arca_class.value,
-                budget=round(budget, 2),
-                covered=arca_class.value in built,
-                current_orders=[
-                    OrderLineDTO(
-                        ticker=o.ticker,
-                        amount=round(o.executed_amount_brl, 2),
-                        quantity=o.recommended_quantity,
-                        unit_price=o.unit_price_brl,
-                        target_weight=round(o.intra_class_target_weight_pct / 100.0, 6),
-                        current_weight=round(o.class_current_weight_pct / 100.0, 6),
-                    )
-                    for o in current
-                    if o.executed_amount_brl > 0
-                ],
+                budget=round(shares.get(arca_class, 0.0), 2),
+                covered=rec is not None,
+                current_orders=[_line(o) for o in old.orders if o.arca_class == arca_class],
+                recommended_orders=[_line(o) for o in plan.orders if o.arca_class == arca_class],
             )
-            construction = built.get(arca_class.value)
-            if construction is None or not construction.selected:
+            if rec is None:
                 line.note = (
-                    "A recomendação não cobre esta classe (Caixa ou sem ativos aptos): segue a "
-                    "regra atual."
+                    "A recomendação não cobre esta classe (Caixa ou sem rodada recente): o aporte "
+                    "segue a regra da política."
                 )
-                classes.append(line)
-                continue
-            values = {
-                p.ticker: p.current_value_brl
-                for p in report.positions
-                if p.arca_class == arca_class
-            }
-            found = recommended_orders(
-                budget,
-                construction,
-                values,
-                prices,
-                whole,
-                policy.recommendation.min_lot_brl,
-            )
-            line.confidence = construction.confidence
-            line.recommended_leftover = found.leftover
-            line.recommended_orders = [
-                OrderLineDTO(
-                    ticker=o.ticker,
-                    amount=o.amount,
-                    quantity=o.quantity,
-                    unit_price=o.unit_price,
-                    target_weight=o.target_weight,
-                    current_weight=o.current_weight,
-                    new=o.ticker not in held,
-                    reason=o.reason,
-                )
-                for o in found.orders
-            ]
             classes.append(line)
         return ContributionComparisonDTO(
             status="OK", as_of=as_of, amount=amount_brl, classes=classes
         )
 
 
-def _whole_units(ticker: str, report: object, registered: dict) -> bool:
-    position = next((p for p in report.positions if p.ticker == ticker), None)  # type: ignore[attr-defined]
-    if position is not None:
-        return position.asset_type in INTEGER_QUANTITY_TYPES
-    asset = registered.get(ticker)
-    kind = asset.asset_type if asset is not None else AssetType.STOCK_BR  # catalog: B3 stocks
-    return kind in INTEGER_QUANTITY_TYPES
+_REASON_TEXT = {
+    "BOUGHT": "Comprado",
+    "LEFTOVER_FILL": "Comprado com as sobras",
+    "PRICE_ABOVE_BUDGET": "A parte não compra uma unidade",
+    "ABOVE_TARGET": "Já está no peso-alvo ou acima",
+    "ZERO_WEIGHT": "Sem peso",
+    "NO_PRICE": "Sem preço",
+    "BELOW_MIN_LOT": "Abaixo do lote mínimo",
+}
+
+
+def _line(order: AssetContributionOrder) -> OrderLineDTO:
+    return OrderLineDTO(
+        ticker=order.ticker,
+        amount=order.executed_amount_brl,
+        quantity=order.recommended_quantity,
+        unit_price=order.unit_price_brl,
+        target_weight=round(order.intra_class_target_weight_pct / 100.0, 6),
+        current_weight=round(order.class_current_weight_pct / 100.0, 6),
+        new=order.new,
+        reason=_REASON_TEXT.get(order.reason.value, "") if order.reason else "",
+    )
 
 
 def _run_dto(run) -> RecommendationRunDTO:  # type: ignore[no-untyped-def]
