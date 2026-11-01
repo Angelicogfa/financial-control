@@ -155,6 +155,7 @@ class ClassMatrixDTO(BaseModel):
     rows: list[MatrixRowDTO] = Field(default_factory=list)
     excluded: list[ExcludedAssetDTO] = Field(default_factory=list)
     construction: ConstructionDTO | None = None
+    weights_source: Literal["AHP", "VALIDATED"] = "AHP"  # VALIDATED: by the data (Phase 45.7)
 
 
 class MatrixBoardDTO(BaseModel):
@@ -268,3 +269,29 @@ class BacktestDTO(BaseModel):
     weights: dict[str, float] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     scoreboard: list[ScoreLineDTO] = Field(default_factory=list)
+
+
+class LensWeightLineDTO(BaseModel):
+    lens: LensKey
+    label: str
+    declared: float  # AHP weight
+    estimate_annual_per_z: float  # what the data say: extra return a year per unit of z
+    sign_probability: float
+    data: float  # the data's weight (0 when the sign is not clear or it hurts)
+    candidate: float  # half declared, half data
+    used: float
+
+
+class LensWeightsDTO(BaseModel):
+    """The lens weights validated by the data (Phase 45.7): used only if they pass the gate."""
+
+    status: Literal["OK", "NOT_COMPUTED"]
+    as_of: date | None = None
+    objective: str | None = None
+    passed: bool = False
+    reason: str = ""
+    origins: int = 0
+    oos_months: int = 0
+    improvement_annual: float = 0.0
+    probability: float = 0.5
+    lines: list[LensWeightLineDTO] = Field(default_factory=list)

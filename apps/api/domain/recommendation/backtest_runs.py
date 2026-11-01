@@ -3,7 +3,9 @@
 The backtest reads the Garimpo's panel (the point-in-time signals, every month), the monthly
 returns of the mining universe over the class and over the CDI, and the dated judicial recovery
 announcements; the scoreboard reads the stored runs (45.5) and the stored prices after each one.
-Both are stored together, weekly, as the RECOMMENDATION_BACKTEST model.
+Both are stored together, weekly, as the RECOMMENDATION_BACKTEST model. On the same data, the
+lens weights are validated (Phase 45.7) and stored as LENS_WEIGHTS; the next run of the lenses
+uses them when they passed.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from datetime import date
 from typing import Any
 
 from domain.disclosures.events import RESTRUCTURING
+from domain.forecast.valuation_model import forward_alpha
 from domain.mining.runs import mining_panel
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.policy.services.policy import current_policy
@@ -20,6 +23,7 @@ from domain.recommendation.backtest import RunPortfolios, run_backtest, scoreboa
 from domain.recommendation.keys import CERRADO
 from domain.recommendation.lenses import CATALOG
 from domain.recommendation.runs import monthly_returns
+from domain.recommendation.validation import LENS_WEIGHTS, validate_lens_weights
 from domain.shared.enums import ArcaClass
 from domain.shared.unit_of_work import AbstractUnitOfWork
 
@@ -100,10 +104,25 @@ def run_recommendation_backtest(
         "scoreboard": [line.__dict__ for line in lines],
     }
     uow.forecasts.save_model(RECOMMENDATION_BACKTEST, as_of, payload)
+
+    by_ticker: dict[str, dict[tuple[int, int], dict[str, float]]] = {}
+    for month, rows in panel.items():
+        for ticker, values in rows.items():
+            by_ticker.setdefault(ticker, {})[month] = dict(values)
+    validated = validate_lens_weights(
+        as_of=as_of,
+        objective=objective or "",
+        declared=weights,
+        panel=by_ticker,
+        alphas=alphas,
+        forward={t: forward_alpha(a) for t, a in alphas.items()},
+    )
+    uow.forecasts.save_model(LENS_WEIGHTS, as_of, validated.to_dict())
     return {
         "status": found.status,
         "passed": found.passed,
         "months": found.months,
         "probability": found.probability,
         "scored_runs": max((line.runs for line in lines), default=0),
+        "weights_validated": validated.passed,
     }

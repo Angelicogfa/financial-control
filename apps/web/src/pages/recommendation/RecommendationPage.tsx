@@ -19,9 +19,11 @@ import { Combobox } from "../../components/Combobox";
 import { manualJobs } from "../../api/jobs";
 import { JobRunList } from "../../components/JobRunList";
 import { PageHeader } from "../../components/PageHeader";
+import { Pagination } from "../../components/Pagination";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
 import { brl, day, num, parseDecimal, pct, quantity } from "../../utils/format";
+import { usePagedRows } from "../../utils/pagination";
 
 export const CLASS_LABELS: Record<string, string> = {
   ACOES: "Ações",
@@ -136,10 +138,16 @@ function Curve({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   );
 }
 
-function DecisionMatrix({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
+/** Reload of the whole board (the paged tables of a class offer it, as every paged table does). */
+interface Refresh {
+  onRefresh: () => void;
+  refreshing: boolean;
+}
+
+function DecisionMatrix({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
   const weights = matrix.weights ?? [];
-  const rows = matrix.rows ?? [];
-  if (rows.length === 0) return <Empty title="Nenhum ativo passou nos portões" />;
+  const paged = usePagedRows(matrix.rows ?? [], matrix.arca_class);
+  if (paged.pagination.total === 0) return <Empty title="Nenhum ativo passou nos portões" />;
   return (
     <div className="app-table-wrap">
       <table className="app-table" aria-label="Matriz de decisão">
@@ -159,7 +167,7 @@ function DecisionMatrix({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {paged.rows.map((r) => {
             const cells = Object.fromEntries((r.cells ?? []).map((c) => [c.lens, c]));
             return (
               <tr key={r.ticker}>
@@ -188,6 +196,7 @@ function DecisionMatrix({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           })}
         </tbody>
       </table>
+      <Pagination {...paged.pagination} {...refresh} />
     </div>
   );
 }
@@ -217,9 +226,10 @@ function Weights({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   );
 }
 
-function Excluded({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
-  const excluded = matrix.excluded ?? [];
-  if (excluded.length === 0) return <p className="app-muted">Nenhum ativo desta classe foi tirado pelos portões.</p>;
+function Excluded({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
+  const paged = usePagedRows(matrix.excluded ?? [], matrix.arca_class);
+  if (paged.pagination.total === 0)
+    return <p className="app-muted">Nenhum ativo desta classe foi tirado pelos portões.</p>;
   return (
     <div className="app-table-wrap">
       <table className="app-table" aria-label="Fora pelos portões">
@@ -230,7 +240,7 @@ function Excluded({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           </tr>
         </thead>
         <tbody>
-          {excluded.map((e) => (
+          {paged.rows.map((e) => (
             <tr key={e.ticker}>
               <td>
                 <strong>{e.ticker}</strong> <Source source={e.source} />
@@ -240,6 +250,7 @@ function Excluded({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
           ))}
         </tbody>
       </table>
+      <Pagination {...paged.pagination} {...refresh} />
     </div>
   );
 }
@@ -555,6 +566,61 @@ function PastTest() {
   );
 }
 
+/** Phase 45.7: what the data say about each lens and whether the adjusted weights passed. */
+function ValidatedWeights() {
+  const state = useApi("recommendation-weights", () => api.recommendation.weights());
+  return (
+    <Async state={state}>
+      {(data) =>
+        data.status !== "OK" ? (
+          <p className="app-muted">A validação roda junto com o teste no passado.</p>
+        ) : (
+          <div className="app-page-stack">
+            <Lead tone={data.passed ? "positive" : "neutral"}>
+              <p>
+                {data.passed ? <Badge tone="success">Em uso</Badge> : <Badge>Ficam os seus pesos</Badge>} {data.reason}
+              </p>
+            </Lead>
+            <div className="app-table-wrap">
+              <table className="app-table" aria-label="Pesos validados pelos dados">
+                <thead>
+                  <tr>
+                    <th>Lente</th>
+                    <th className="app-numeric">Seu peso (AHP)</th>
+                    <th className="app-numeric">O que os dados dizem</th>
+                    <th className="app-numeric">Peso pelos dados</th>
+                    <th className="app-numeric">Candidato</th>
+                    <th className="app-numeric">Em uso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.lines ?? []).map((line) => (
+                    <tr key={line.lens}>
+                      <td>{line.label}</td>
+                      <td className="app-numeric">{pct(line.declared, 1)}</td>
+                      <td className="app-numeric">
+                        {pct(line.estimate_annual_per_z, 1, true)} ao ano por desvio
+                        <div className="app-muted">{pct(line.sign_probability, 0)} de confiança no sentido</div>
+                      </td>
+                      <td className="app-numeric">{pct(line.data, 1)}</td>
+                      <td className="app-numeric">{pct(line.candidate, 1)}</td>
+                      <td className="app-numeric">{pct(line.used, 1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="app-muted">
+              Só as lentes com passado são testadas; o Cerrado e a projeção mantêm o seu peso. Os pesos validados valem só
+              na classe Ações, nos objetivos Valorização e Misto, a partir da rodada seguinte das lentes.
+            </p>
+          </div>
+        )
+      }
+    </Async>
+  );
+}
+
 function Runs() {
   const state = useApi("recommendation-runs", () => api.recommendation.runs());
   return (
@@ -597,7 +663,7 @@ function Runs() {
   );
 }
 
-function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
+function ClassView({ matrix, refresh }: Readonly<{ matrix: ClassMatrixDTO; refresh: Refresh }>) {
   const c = matrix.construction;
   return (
     <div className="app-page-stack">
@@ -625,13 +691,20 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
         <Curve matrix={matrix} />
       </Section>
       <Section title="Matriz de decisão" subtitle="Cada lente de 0 a 1 (maior é melhor), já puxada para 0,5 pela confiança.">
-        <DecisionMatrix matrix={matrix} />
+        <DecisionMatrix matrix={matrix} refresh={refresh} />
       </Section>
-      <Section title="Pesos das lentes" subtitle={`Objetivo ${matrix.objective_label}, pela matriz AHP da política.`}>
+      <Section
+        title="Pesos das lentes"
+        subtitle={
+          matrix.weights_source === "VALIDATED"
+            ? `Objetivo ${matrix.objective_label}: pesos validados pelos dados (metade AHP, metade dados).`
+            : `Objetivo ${matrix.objective_label}, pela matriz AHP da política.`
+        }
+      >
         <Weights matrix={matrix} />
       </Section>
       <Section title="Fora pelos portões">
-        <Excluded matrix={matrix} />
+        <Excluded matrix={matrix} refresh={refresh} />
       </Section>
       <Section title="Por que A e não B?">
         <AandB key={matrix.arca_class} matrix={matrix} />
@@ -643,7 +716,7 @@ function ClassView({ matrix }: Readonly<{ matrix: ClassMatrixDTO }>) {
   );
 }
 
-function Board({ data }: Readonly<{ data: MatrixBoardDTO }>) {
+function Board({ data, refresh }: Readonly<{ data: MatrixBoardDTO; refresh: Refresh }>) {
   const classes = data.classes ?? [];
   const [chosen, setChosen] = useState(classes[0]?.arca_class ?? "");
   const matrix = classes.find((m) => m.arca_class === chosen) ?? classes[0];
@@ -661,7 +734,7 @@ function Board({ data }: Readonly<{ data: MatrixBoardDTO }>) {
           onChange={setChosen}
         />
       )}
-      <ClassView key={matrix.arca_class} matrix={matrix} />
+      <ClassView key={matrix.arca_class} matrix={matrix} refresh={refresh} />
     </div>
   );
 }
@@ -682,7 +755,7 @@ export function RecommendationPage() {
               hint="Ela roda toda semana depois do garimpo; dá para pedir agora em Rodar agora, no fim desta tela."
             />
           ) : (
-            <Board data={data} />
+            <Board data={data} refresh={{ onRefresh: state.reload, refreshing: state.loading }} />
           )
         }
       </Async>
@@ -691,6 +764,12 @@ export function RecommendationPage() {
         subtitle="A hierarquia refeita a cada trimestre do passado, só com o que se sabia, contra pesos iguais; e como foram as rodadas guardadas."
       >
         <PastTest />
+      </Section>
+      <Section
+        title="Pesos validados pelos dados"
+        subtitle="Os dados podem ajustar os seus pesos só se o ajuste ganhar dos seus pesos fora da amostra."
+      >
+        <ValidatedWeights />
       </Section>
       <Section title="Rodadas" subtitle="Histórico das rodadas semanais e a versão da política que cada uma aplicou.">
         <Runs />

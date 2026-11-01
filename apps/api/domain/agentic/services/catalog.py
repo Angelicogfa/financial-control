@@ -84,6 +84,7 @@ from controllers.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
     LensBoardDTO,
+    LensWeightsDTO,
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
@@ -830,6 +831,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=EmptyInput,
         output_type=BacktestDTO,
         invoke=lambda h, _p: h.recommendation.backtest(),
+    ),
+    OperationSpec(
+        name="recommendation.weights",
+        kind="query",
+        description=(
+            "Pesos das lentes validados pelos dados (Fase 45.7): o que a regressão mensal diz de "
+            "cada lente com passado, os pesos candidatos (metade AHP, metade dados) e o portão "
+            "fora da amostra (as 10 melhores notas com os pesos candidatos contra os declarados, "
+            "90% de confiança em 5 anos). Só passam a valer na classe Ações, nos objetivos "
+            "Valorização e Misto, se o portão aprovar."
+        ),
+        input_model=EmptyInput,
+        output_type=LensWeightsDTO,
+        invoke=lambda h, _p: h.recommendation.weights(),
     ),
     OperationSpec(
         name="recommendation.runs",

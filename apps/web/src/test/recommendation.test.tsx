@@ -104,6 +104,30 @@ const BACKTEST = {
   ],
 };
 
+const WEIGHTS = {
+  status: "OK",
+  as_of: "2026-11-01",
+  objective: "MIXED",
+  passed: false,
+  reason: "Os dados não justificaram mudar os seus pesos: os pesos ajustados renderam +0.8% ao ano a mais nas 10 melhores notas, com 64% de confiança (são precisos 90%).",
+  origins: 9,
+  oos_months: 108,
+  improvement_annual: 0.008,
+  probability: 0.64,
+  lines: [
+    {
+      lens: "QUALITY",
+      label: "Qualidade",
+      declared: 0.236,
+      estimate_annual_per_z: 0.012,
+      sign_probability: 0.97,
+      data: 0.4,
+      candidate: 0.318,
+      used: 0.236,
+    },
+  ],
+};
+
 describe("Recomendação (Phase 45.5)", () => {
   it("explains the choice of the class: lead, chosen assets, curve, matrix, gates and runs", async () => {
     mockApi([
@@ -224,5 +248,54 @@ describe("Recomendação (Phase 45.5)", () => {
     expect(within(years).getByText("2025")).toBeInTheDocument();
     const score = screen.getByRole("table", { name: "Placar das rodadas" });
     expect(within(score).getByText("-0,2% (4)")).toBeInTheDocument();
+  });
+
+  it("shows the lens weights validated by the data (Phase 45.7)", async () => {
+    mockApi([
+      { path: "/recommendation/matrix", reply: board() },
+      { path: "/recommendation/runs", reply: RUNS },
+      { path: "/recommendation/backtest", reply: BACKTEST },
+      { path: "/recommendation/weights", reply: WEIGHTS },
+    ]);
+    renderAt("/recommendation");
+    expect(await screen.findByText("Ficam os seus pesos")).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: "Pesos validados pelos dados" });
+    expect(within(table).getByText("Qualidade")).toBeInTheDocument();
+    expect(within(table).getByText("31,8%")).toBeInTheDocument();
+    expect(within(table).getByText("97% de confiança no sentido")).toBeInTheDocument();
+  });
+
+  it("pages the decision matrix and the assets left out by the gates", async () => {
+    const rows = Array.from({ length: 12 }, (_, i) => row(`T${String(i).padStart(2, "0")}3`, i + 1, 0.9 - i * 0.01, "CATALOG"));
+    const excluded = Array.from({ length: 11 }, (_, i) => ({
+      ticker: `X${String(i).padStart(2, "0")}3`,
+      source: "CATALOG" as const,
+      reasons: ["Volume abaixo do piso."],
+    }));
+    const { calls } = mockApi([
+      { path: "/recommendation/matrix", reply: board({ classes: [acoes({ rows, excluded })] }) },
+      { path: "/recommendation/runs", reply: RUNS },
+      { path: "/recommendation/backtest", reply: BACKTEST },
+      { path: "/recommendation/weights", reply: WEIGHTS },
+    ]);
+    renderAt("/recommendation");
+    const matrix = await screen.findByRole("table", { name: "Matriz de decisão" });
+    expect(within(matrix).getByText("T003")).toBeInTheDocument();
+    expect(within(matrix).queryByText("T113")).not.toBeInTheDocument();
+    const [matrixPager, gatesPager] = screen.getAllByRole("navigation", { name: "Paginação" });
+    expect(matrixPager).toHaveTextContent("1–10 de 12");
+    expect(gatesPager).toHaveTextContent("1–10 de 11");
+
+    fireEvent.click(within(matrixPager).getByRole("button", { name: "Próxima página" }));
+    expect(within(screen.getByRole("table", { name: "Matriz de decisão" })).getByText("T113")).toBeInTheDocument();
+    expect(matrixPager).toHaveTextContent("11–12 de 12");
+
+    fireEvent.click(within(gatesPager).getByRole("button", { name: "Próxima página" }));
+    expect(within(screen.getByRole("table", { name: "Fora pelos portões" })).getByText("X103")).toBeInTheDocument();
+
+    const before = calls.filter((c) => c.path === "/recommendation/matrix").length;
+    fireEvent.click(within(matrixPager).getByRole("button", { name: "Recarregar" }));
+    await screen.findByRole("table", { name: "Matriz de decisão" });
+    expect(calls.filter((c) => c.path === "/recommendation/matrix").length).toBeGreaterThan(before);
   });
 });

@@ -12,6 +12,7 @@ from controllers.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
     LensBoardDTO,
+    LensWeightsDTO,
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
@@ -80,3 +81,11 @@ def get_backtest(
 ) -> BacktestDTO:
     """The hierarchy tested in the past and the scoreboard of its runs (Phase 45.6)."""
     return handler.backtest()
+
+
+@recommendation_router.get("/weights", response_model=LensWeightsDTO)
+def get_weights(
+    handler: RecommendationHandler = Depends(get_recommendation_handler),
+) -> LensWeightsDTO:
+    """The lens weights validated by the data (Phase 45.7) and whether they are used."""
+    return handler.weights()
