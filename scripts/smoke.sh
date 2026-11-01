@@ -86,7 +86,7 @@ expect_status 200 -b "$COOKIES" "$BASE/api/v1/market/job-runs"
 echo "==> web app and hardening"
 expect_status 200 "$BASE/"
 curl -s -D - -o /dev/null "$BASE/" | grep -qi "x-frame-options: deny" || fail "missing security headers"
-for service in api worker; do
+for service in api worker-ingest worker-process; do
   uid="$("${COMPOSE[@]}" exec -T "$service" id -u | tr -d '\r')"
   [[ "$uid" != "0" ]] || fail "$service runs as root"
 done
@@ -95,6 +95,6 @@ done
 published="$("${COMPOSE[@]}" ps --format '{{.Service}} {{.Publishers}}' | grep -vE '^web ' | grep -c 'PublishedPort:[1-9]' || true)"
 [[ "$published" == "0" ]] || fail "only the web service may publish ports"
 
-"${COMPOSE[@]}" exec -T worker python -m worker.seed_demo --help >/dev/null   || fail "seed_demo is not available in the worker image"
+"${COMPOSE[@]}" exec -T worker-process python -m worker.seed_demo --help >/dev/null   || fail "seed_demo is not available in the worker image"
 
 echo "SMOKE OK"

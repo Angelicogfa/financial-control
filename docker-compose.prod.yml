@@ -8,6 +8,31 @@ x-app-env: &app-env
   env_file:
     - ${APP_ENV_FILE:-.env}
 
+# Two workers from the api image: ingestion (fetches from outside) and processing (computes from
+# the database), so a long download never holds back a calculation (apps/api/worker/roles.py).
+x-worker: &worker
+  <<: *app-env
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  working_dir: /app/apps/api
+  command: ["python", "-m", "worker.scheduler"]
+  # Healthy while the scheduler is the container's main process (`up --wait` needs a check).
+  healthcheck:
+    test: ["CMD-SHELL", "grep -q worker.scheduler /proc/1/cmdline"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -70,28 +95,15 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  worker:
-    <<: *app-env
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    working_dir: /app/apps/api
-    command: ["python", "-m", "worker.scheduler"]
-    # Healthy while the scheduler is the container's main process (`up --wait` needs a check).
-    healthcheck:
-      test: ["CMD-SHELL", "grep -q worker.scheduler /proc/1/cmdline"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
+  worker-ingest:
+    <<: *worker
+    environment:
+      WORKER_ROLE: ingest
+
+  worker-process:
+    <<: *worker
+    environment:
+      WORKER_ROLE: process
 
   web:
     build:

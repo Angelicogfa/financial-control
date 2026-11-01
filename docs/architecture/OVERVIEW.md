@@ -96,7 +96,7 @@ flowchart LR
     WK --> BCB
 ```
 
-Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e novas tentativas):
+Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e novas tentativas). Desde a Fase 46 são dois processos da mesma imagem, pelo `WORKER_ROLE` (`apps/api/worker/roles.py`): `worker-ingest` roda as rotinas que buscam dados fora e `worker-process` as que calculam com o que está no banco; um pedido manual é atendido pelo worker do papel da rotina, e `all` junta os dois num processo só:
 
 | Rotina | Quando | O que faz |
 |---|---|---|

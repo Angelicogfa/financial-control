@@ -41,7 +41,7 @@ docs/           arquitetura, ADRs, funcionalidades, débitos técnicos e plano
 scripts/        portão de qualidade, smoke test e E2E
 ```
 
-Serviços do Docker Compose: `postgres` (16), `redis` (7), `migrate` (Alembic), `api`, `worker` e `web`. Os dados ficam nos volumes nomeados `fincontrol_pgdata` e `fincontrol_redisdata`, que sobrevivem a rebuilds e a `docker compose down` (sem `-v`).
+Serviços do Docker Compose: `postgres` (16), `redis` (7), `migrate` (Alembic), `api`, `worker-ingest` (busca dados fora: Yahoo, Brapi, BCB, CVM, B3, Tesouro), `worker-process` (calcula com o que está no banco: retratos, simulações, previsões, garimpo, recomendação) e `web`. Os dados ficam nos volumes nomeados `fincontrol_pgdata` e `fincontrol_redisdata`, que sobrevivem a rebuilds e a `docker compose down` (sem `-v`).
 
 Cotações e fundamentos vêm da [brapi.dev](https://brapi.dev) e do Yahoo Finance; CDI, SELIC e IPCA, do Banco Central (SGS). Quando um provedor falha, a tela mostra o dado de reserva sinalizado e um alerta, nunca um número inventado.
 
@@ -128,7 +128,7 @@ docker compose -f docker-compose.prod.yml ps -a
 4. Renda fixa e caixa: **Carteira › Novo ativo**, informando o contrato (indexador, taxa, aplicação e vencimento).
 5. **Aportar:** informe o valor, revise a distribuição e confirme as compras executadas.
 
-O worker sincroniza séries, cotações, catálogo da B3, demonstrativos e os comunicados da CVM sozinho; o andamento aparece em **Configuração › Dados de mercado**, onde também dá para rodar já a carga do histórico da simulação e a dos comunicados.
+Os workers sincronizam séries, cotações, catálogo da B3, demonstrativos e os comunicados da CVM sozinhos; o andamento aparece em **Configuração › Dados de mercado**, onde também dá para pedir já as cargas de dados. As rotinas de cálculo têm o botão na tela do assunto (Garimpo, Recomendação, Qualidade dos modelos).
 
 **Simular carteira** (Ferramentas): antes do primeiro uso, rode a carga do histórico em Dados de mercado (alguns minutos); a calibração entra na fila sozinha ao fim. As abas respondem perguntas diferentes, e cada uma explica a sua no topo: Passado (as suas regras no histórico), Futuro (faixas prováveis e chance de meta), Candidatos (ativos para investigar), Robustez (crises, variantes e a validação estatística), Confiança (se as chances costumam se confirmar) e Laboratório (modelos de regime e risco com portões). É simulação, não recomendação.
 
@@ -137,7 +137,7 @@ O worker sincroniza séries, cotações, catálogo da B3, demonstrativos e os co
 Para explorar o app sem os seus dados, use um banco **vazio** (por exemplo uma stack isolada com outros volumes). O comando recusa rodar em um banco que já tenha ativos:
 
 ```bash
-docker compose exec worker python -m worker.seed_demo
+docker compose exec worker-process python -m worker.seed_demo
 ```
 
 Ele cria uma carteira com dois anos de histórico (aportes mensais, proventos, renda fixa, reserva e retratos diários).
@@ -172,7 +172,7 @@ docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_restore -U 
 Logs (JSON, com `request_id` por requisição):
 
 ```bash
-docker compose -f docker-compose.prod.yml logs -f api worker
+docker compose -f docker-compose.prod.yml logs -f api worker-ingest worker-process
 ```
 
 > **Cuidado:** `docker compose down -v` apaga os volumes, ou seja, **todos os seus dados**.
@@ -229,7 +229,7 @@ Cada release é uma tag `vX.Y.Z` e publica uma imagem por módulo no GitHub Cont
 
 | Imagem | Usada por |
 |---|---|
-| `ghcr.io/angelicogfa/finance-controle-api:vX.Y.Z` | `api`, `worker` e `migrate` |
+| `ghcr.io/angelicogfa/finance-controle-api:vX.Y.Z` | `api`, `worker-ingest`, `worker-process` e `migrate` |
 | `ghcr.io/angelicogfa/finance-controle-web:vX.Y.Z` | `web` |
 
 A release mais nova também recebe a tag `latest`. Para rodar o app a partir dessas imagens, sem clonar o repositório nem compilar nada, siga o passo a passo de [`stand-alone/`](stand-alone/README.md).

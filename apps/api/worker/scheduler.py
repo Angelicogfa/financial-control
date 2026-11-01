@@ -46,6 +46,7 @@ from worker.jobs import (
     sync_treasury_prices_job,
     warm_portfolio_quotes_job,
 )
+from worker.roles import runs_here
 from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job, run_requested
 
 logger = logging.getLogger("fincontrol_worker")
@@ -469,6 +470,10 @@ def create_scheduler(
             replace_existing=True,
             **defaults,
         )
+    # Ingestion and processing can run in separate workers (worker/roles.py).
+    for job in scheduler.get_jobs():
+        if not runs_here(job.id, cfg.worker_role):
+            scheduler.remove_job(job.id)
     return scheduler
 
 
@@ -504,6 +509,8 @@ def run_startup_jobs(
         ("backfill_snapshots", backfill_snapshots_job),
         ("record_daily_snapshot", record_daily_snapshot_job),
     ):
+        if not runs_here(name, settings.worker_role):
+            continue
         _guarded(
             name, job, uow_factory=uow_factory, gateway=gateway, lock=job_lock, policy=policy
         )()
@@ -514,6 +521,7 @@ def main() -> None:
     settings = get_settings()
     configure_logging(settings.log_level, settings.log_format)
     gateway = build_market_gateway(settings)
+    logger.info("Worker role: %s", settings.worker_role)
     logger.info("Running startup sync, snapshot backfill and daily snapshot")
     run_startup_jobs(gateway, settings=settings)
 
