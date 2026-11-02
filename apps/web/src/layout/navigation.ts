@@ -98,6 +98,8 @@ export const DESTINATIONS: Destination[] = [
     icon: HistoryIcon,
     question: "Para onde vou?",
     sections: [
+      { to: "/planejar/metas", label: "Metas" },
+      { to: "/planejar/renda-futura", label: "Renda futura" },
       { to: "/planejar", label: "Simulações" },
       { to: "/planejar/renda-fixa", label: "Comparar renda fixa" },
       { to: "/planejar/modelo", label: "Modelo" },

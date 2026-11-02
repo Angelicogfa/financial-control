@@ -40,6 +40,7 @@ from infra.data.models.market import (
     TreasuryCatalogModel,
 )
 from infra.data.models.mining import MiningFindingModel, MiningSignalModel
+from infra.data.models.planning import GoalModel
 from infra.data.models.policy import InvestmentPolicyModel
 from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshotModel
 from infra.data.models.recommendation import (
@@ -61,6 +62,7 @@ from infra.data.models.tax import MonthlyTaxAssessmentModel, TaxRuleModel
 from infra.data.models.watch import AlertRuleModel, AssetNoteModel
 
 __all__ = [
+    "GoalModel",
     "MonthlyTaxAssessmentModel",
     "AlertRuleModel",
     "AssetNoteModel",

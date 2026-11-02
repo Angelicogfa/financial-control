@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -61,6 +62,28 @@ function Steps({ current }: Readonly<{ current: number }>) {
   );
 }
 
+/** "Valor sugerido pelas metas" (Phase 48.R8): the largest monthly contribution an active
+ *  goal asks for (the same wealth serves every goal, so they are not added). */
+export function GoalHint({ onUse }: Readonly<{ onUse: (value: number) => void }>) {
+  const goals = useQuery({ queryKey: ["goals"], queryFn: () => api.goals.list() });
+  const open = (goals.data ?? []).filter(
+    (g) => g.is_active && (g.status === "ON_TRACK" || g.status === "OFF_TRACK") && g.required_monthly_brl > 0,
+  );
+  if (open.length === 0) return null;
+  const top = open.reduce((a, b) => (b.required_monthly_brl > a.required_monthly_brl ? b : a));
+  const value = Math.ceil(top.required_monthly_brl);
+  return (
+    <Lead eyebrow="Pelas suas metas" tone={top.status === "OFF_TRACK" ? "caution" : "neutral"}>
+      <p>
+        A meta “{top.name}” pede {brl(value)} por mês até {top.target_date.split("-").reverse().join("/")}.{" "}
+        <button type="button" className="app-link-button" onClick={() => onUse(value)}>
+          Usar este valor
+        </button>
+      </p>
+    </Lead>
+  );
+}
+
 function AmountStep() {
   const navigate = useNavigate();
   const [amount, setAmount] = useState("");
@@ -97,6 +120,7 @@ function AmountStep() {
           quantidades. Nada é registrado até você confirmar as compras.
         </p>
       </Lead>
+      <GoalHint onUse={(value) => setAmount(String(value).replace(".", ","))} />
       <form className="app-card app-card-padded" onSubmit={submit} aria-busy={busy}>
         {error && <p className="app-error-banner">{error}</p>}
         <div className="app-field-grid">

@@ -33,6 +33,10 @@ import type {
   AlertRuleUpdateRequest,
   AssetNoteDTO,
   AssetNoteRequest,
+  GoalCreateRequest,
+  GoalDTO,
+  GoalUpdateRequest,
+  IncomeForecastDTO,
   IncomeSummaryDTO,
   TaxMonthDTO,
   TaxYearDTO,
@@ -185,6 +189,9 @@ export const api = {
   portfolio: {
     /** Earnings received by month and year, net in BRL (Phase 48.R5). */
     income: (months = 24) => request<IncomeSummaryDTO>("/portfolio/income", { query: { months } }),
+    /** Declared plus estimated passive income, month by month (Phase 48.R8). */
+    incomeForecast: (months: 12 | 24 | 36 = 12) =>
+      request<IncomeForecastDTO>("/portfolio/income-forecast", { query: { months } }),
     report: (accountId?: number) =>
       request<PortfolioReportResponseDTO>("/portfolio/consolidated", {
         query: { account_id: accountId },
@@ -460,5 +467,12 @@ export const api = {
       request<AssetNoteDTO>(`/assets/${assetId}/notes/${noteId}`, { method: "PUT", body }),
     deleteNote: (assetId: number, noteId: number) =>
       request<void>(`/assets/${assetId}/notes/${noteId}`, { method: "DELETE" }),
+  },
+  /** Planejar (Phase 48.R8): goals with progress and the required contribution. */
+  goals: {
+    list: () => request<GoalDTO[]>("/goals"),
+    create: (body: GoalCreateRequest) => request<GoalDTO>("/goals", { method: "POST", body }),
+    update: (id: number, body: GoalUpdateRequest) => request<GoalDTO>(`/goals/${id}`, { method: "PUT", body }),
+    remove: (id: number) => request<void>(`/goals/${id}`, { method: "DELETE" }),
   },
 };

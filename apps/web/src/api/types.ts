@@ -267,6 +267,12 @@ export interface AssetIncomeDTO {
   yield_on_cost?: number | null;
 }
 
+export interface AssetIncomeForecastDTO {
+  asset_id: number;
+  ticker: string;
+  next_12m_brl: number;
+}
+
 export interface AssetLensesDTO {
   ticker: string;
   source: "PORTFOLIO" | "WATCHLIST" | "CATALOG";
@@ -1230,6 +1236,13 @@ export interface ForecastHorizonDTO {
   price_quantiles?: number[];
 }
 
+export interface ForecastMonthDTO {
+  month: string;
+  declared_brl: number;
+  estimated_brl: number;
+  total_brl: number;
+}
+
 export interface ForecastProbabilityDTO {
   value: number;
   low: number;
@@ -1336,6 +1349,39 @@ export interface GeneratorShareDTO {
   paths: number;
 }
 
+export interface GoalCreateRequest {
+  kind: GoalKind;
+  name: string;
+  target_brl: number | string;
+  target_date: string;
+  monthly_contribution_brl?: number | string;
+  annual_return?: number | string;
+  income_yield?: number | string;
+}
+
+export interface GoalDTO {
+  id: number;
+  kind: GoalKind;
+  name: string;
+  target_brl: number;
+  target_date: string;
+  monthly_contribution_brl: number;
+  annual_return: number;
+  income_yield: number;
+  is_active: boolean;
+  created_at?: string | null;
+  months_left: number;
+  current_brl: number;
+  target_wealth_brl: number;
+  current_wealth_brl: number;
+  progress: number;
+  projected_wealth_brl: number;
+  required_monthly_brl: number;
+  status: GoalStatus;
+}
+
+export type GoalKind = "WEALTH" | "PASSIVE_INCOME";
+
 export interface GoalOutcomeDTO {
   target: number;
   probability: number;
@@ -1344,6 +1390,18 @@ export interface GoalOutcomeDTO {
   low?: number;
   high?: number;
   by_generator?: Record<string, number>;
+}
+
+export type GoalStatus = "REACHED" | "ON_TRACK" | "OFF_TRACK" | "MISSED";
+
+export interface GoalUpdateRequest {
+  name?: string | null;
+  target_brl?: number | string | null;
+  target_date?: string | null;
+  monthly_contribution_brl?: number | string | null;
+  annual_return?: number | string | null;
+  income_yield?: number | string | null;
+  is_active?: boolean | null;
 }
 
 export interface GrantOptionsDTO {
@@ -1497,6 +1555,14 @@ export interface ImportPreviewDTO {
   counts: Record<string, number>;
   unknown_tickers: UnknownTickerDTO[];
   lines: ImportLineDTO[];
+}
+
+export interface IncomeForecastDTO {
+  as_of: string;
+  months: ForecastMonthDTO[];
+  next_12m_brl: number;
+  declared_brl: number;
+  assets: AssetIncomeForecastDTO[];
 }
 
 export interface IncomeSummaryDTO {

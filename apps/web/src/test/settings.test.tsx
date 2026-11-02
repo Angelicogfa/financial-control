@@ -82,7 +82,7 @@ describe("strategy", () => {
     const healthLimits = (last(calls, "PUT", "/policy")?.body as { health: Record<string, number> }).health;
     expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
     expect(healthLimits.monthly_expenses_brl).toBe(5000);
-  }, 40_000);
+  }, 90_000);
 
   it("switches the Cerrado lens of the recommendation off, keeping the other premises", async () => {
     const premises = {

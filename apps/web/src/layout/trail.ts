@@ -64,6 +64,8 @@ const ROUTES: RouteSpec[] = [
   { test: (p) => p === "/planejar/qualidade", label: "Qualidade dos modelos", parent: under("/planejar") },
   { test: (p) => p === "/planejar/renda-fixa", label: "Comparar renda fixa", parent: under("/planejar") },
   { test: (p) => p === "/planejar/modelo", label: "Modelo da recomendação", parent: under("/planejar") },
+  { test: (p) => p === "/planejar/metas", label: "Metas", parent: under("/planejar") },
+  { test: (p) => p === "/planejar/renda-futura", label: "Renda futura", parent: under("/planejar") },
   { test: (p) => p.startsWith("/planejar"), label: "Planejar", parent: under(HOME) },
   { test: (p) => p === "/lancamentos/importar", label: "Importar extrato B3", parent: under("/lancamentos") },
   { test: (p) => p.startsWith("/lancamentos/negociacoes/"), label: "Negociação", parent: under("/lancamentos"), detail: true },

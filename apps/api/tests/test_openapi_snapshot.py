@@ -47,3 +47,23 @@ def test_openapi_is_deterministic() -> None:
 def test_snapshot_is_canonical() -> None:
     stored = SNAPSHOT.read_text(encoding="utf-8")
     assert stored == _render(json.loads(stored))
+
+
+def test_schema_names_are_unique_across_contexts() -> None:
+    """Two schemas of different contexts with the same class name collide in the OpenAPI: one
+    silently replaces the other (Phase 48.R8 caught a second `AssetForecastDTO`). Identical
+    copies (same fields) are harmless and predate this guard."""
+    import ast
+
+    contracts = Path(__file__).resolve().parents[1] / "contracts"
+    seen: dict[str, tuple[str, str]] = {}
+    duplicates: list[str] = []
+    for path in sorted(contracts.rglob("*.py")):
+        context = path.relative_to(contracts).parts[0]
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.ClassDef):
+                shape = ast.dump(ast.Module(body=node.body, type_ignores=[]))
+                first_context, first_shape = seen.setdefault(node.name, (context, shape))
+                if first_context != context and first_shape != shape:
+                    duplicates.append(f"{node.name}: {first_context} and {context}")
+    assert not duplicates, duplicates

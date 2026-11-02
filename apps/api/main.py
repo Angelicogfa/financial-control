@@ -24,6 +24,7 @@ from controllers.ledger.router import (
     transactions_router,
 )
 from controllers.market.router import market_router
+from controllers.planning.router import goals_router, income_forecast_router
 from controllers.policy.router import policy_router, settings_router
 from controllers.portfolio.router import portfolio_router
 from controllers.recommendation.router import recommendation_router
@@ -69,6 +70,8 @@ PROTECTED_ROUTERS = (
     reconciliation_router,
     alert_rules_router,
     notes_router,
+    goals_router,
+    income_forecast_router,
 )
 
 

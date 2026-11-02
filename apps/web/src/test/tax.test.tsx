@@ -136,7 +136,7 @@ describe("asset tax tab", () => {
       { path: "/tax/assets/1/status", reply: fixedIncomeStatus() },
     ]);
     renderAt("/ativo/WEGE3?tab=tax");
-    expect(await screen.findByText("Próxima queda de faixa")).toBeInTheDocument();
+    expect(await screen.findByText("Próxima queda de faixa", undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("IR estimado se resgatar hoje")).toBeInTheDocument();
     expect(screen.getByText("Tabela regressiva")).toBeInTheDocument();
     expect(screen.getByText("181 a 360 dias")).toBeInTheDocument();

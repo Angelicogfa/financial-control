@@ -18,6 +18,7 @@ from domain.market.repositories import (
     AbstractPriceHistoryRepository,
 )
 from domain.mining.repositories import AbstractMiningRepository
+from domain.planning.repositories import AbstractGoalRepository
 from domain.recommendation.repositories import AbstractRecommendationRepository
 from domain.reconciliation.repositories import AbstractReconciliationRepository
 from domain.shared.repositories import (
@@ -85,6 +86,7 @@ class AbstractUnitOfWork(ABC):
     reconciliations: AbstractReconciliationRepository
     alert_rules: AbstractAlertRuleRepository
     asset_notes: AbstractAssetNoteRepository
+    goals: AbstractGoalRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

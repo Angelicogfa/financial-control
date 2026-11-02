@@ -395,3 +395,7 @@ Acompanhar tem as abas Lista (watchlist), Alertas e Teses. As regras de alerta (
 ### Imposto mensal (Fase 48.R7)
 
 A aba Carteira › Imposto mostra o IR da renda variável apurado a partir do livro (`domain/tax/assessment.py`). Cada venda sai pelo custo médio em reais, e o day trade é separado do swing. A apuração é mensal por categoria (operações comuns com a isenção de R$ 20 mil para ações, day trade e FII), com o prejuízo compensado dentro de cada categoria, o IRRF estimado descontado e o DARF 6015 com o vencimento. As aplicações no exterior têm apuração anual. `monthly_tax_assessments` guarda os valores e a data em que cada DARF foi pago; o alerta `DARF_DUE` avisa no Início.
+
+### Planejar: metas e renda futura (Fase 48.R8)
+
+Planejar começa pelas Metas (`goals`): patrimônio ou renda passiva por mês até uma data, com o aporte planejado e as premissas de retorno real e de yield. O progresso parte do último retrato e da renda dos últimos 12 meses; a meta mostra a projeção na data e o aporte mensal necessário, que o Aportar sugere. A Renda futura (`GET /portfolio/income-forecast`) junta os proventos anunciados à estimativa pelo histórico de cada ativo na quantidade de hoje. Simulações, Comparar renda fixa, Modelo e Qualidade seguem como as outras abas de Planejar.

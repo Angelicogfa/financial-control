@@ -111,6 +111,24 @@ test("the monthly income tax opens from the Carteira (Phase 48.R7)", async ({ pa
   await expect(page.getByLabel("Imposto do ano")).toBeVisible();
 });
 
+test("a goal shows its progress and suggests the amount in Aportar (Phase 48.R8)", async ({ page }) => {
+  await login(page);
+  await navigate(page, "Planejar");
+  await page.getByRole("navigation", { name: "Seções de Planejar" }).getByRole("link", { name: "Metas" }).click();
+  const form = page.getByRole("form", { name: "Nova meta" });
+  await form.getByLabel("Nome", { exact: true }).fill("Primeiro milhão");
+  await form.getByLabel("Patrimônio (R$)", { exact: true }).fill("1000000");
+  await form.getByLabel("Até", { exact: true }).fill("2040-01-01");
+  await form.getByLabel("Aporte mensal (R$)", { exact: true }).fill("100");
+  await form.getByRole("button", { name: "Criar meta" }).click();
+  const goal = page.getByRole("list", { name: "Metas" }).getByRole("listitem").filter({ hasText: "Primeiro milhão" });
+  await expect(goal).toContainText("Fora do caminho");
+  await expect(goal.getByRole("progressbar")).toBeVisible();
+
+  await navigate(page, "Aportar");
+  await expect(page.getByRole("note", { name: "Pelas suas metas" })).toContainText("Primeiro milhão");
+});
+
 test("an unknown address shows the not-found screen", async ({ page }) => {
   await login(page);
   await page.goto("/does-not-exist");

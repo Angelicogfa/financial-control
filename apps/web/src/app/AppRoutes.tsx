@@ -7,6 +7,8 @@ import { InstrumentRoute, LegacyAssetRedirect } from "../features/instrument/Ins
 import { IncomePage } from "../features/portfolio/IncomePage";
 import { ReconciliationPage } from "../features/portfolio/ReconciliationPage";
 import { TaxPage } from "../features/portfolio/TaxPage";
+import { GoalsPage } from "../features/planning/GoalsPage";
+import { IncomeForecastPage } from "../features/planning/IncomeForecastPage";
 import { WatchlistPage } from "../features/watchlist/WatchlistPage";
 import { AssetFormPage } from "../pages/asset/AssetFormPage";
 import { ContributePage } from "../pages/contribute/ContributePage";
@@ -77,6 +79,8 @@ export function AppRoutes() {
       <Route path="/planejar/qualidade" element={<QualityPage />} />
       <Route path="/planejar/renda-fixa" element={<FixedIncomeComparePage />} />
       <Route path="/planejar/modelo" element={<RecommendationPage />} />
+      <Route path="/planejar/metas" element={<GoalsPage />} />
+      <Route path="/planejar/renda-futura" element={<IncomeForecastPage />} />
 
       <Route path="/lancamentos" element={<LedgerPage />} />
       <Route path="/lancamentos/importar" element={<ImportPage />} />

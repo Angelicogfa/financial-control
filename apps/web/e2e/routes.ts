@@ -45,6 +45,8 @@ export const NEW_ROUTES: { path: string; screen: string }[] = [
   { path: "/explorar/fatos-relevantes", screen: "Explorar › Fatos relevantes" },
   { path: "/acompanhar", screen: "Acompanhar" },
   { path: "/aportar", screen: "Aportar" },
+  { path: "/planejar/metas", screen: "Planejar › Metas" },
+  { path: "/planejar/renda-futura", screen: "Planejar › Renda futura" },
   { path: "/planejar", screen: "Planejar › Simulações" },
   { path: "/planejar/estudos/novo", screen: "Novo estudo" },
   { path: "/planejar/estudos/comparar", screen: "Comparar estudos" },

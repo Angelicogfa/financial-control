@@ -3737,3 +3737,9 @@ details[open] > summary {
   margin: var(--space-2) 0 0;
   white-space: pre-wrap;
 }
+
+/* Phase 48.R8: progress bar of a goal. */
+.app-goal-track {
+  display: block;
+  margin: var(--space-3) 0 var(--space-2);
+}

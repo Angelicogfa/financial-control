@@ -41,6 +41,7 @@ from infra.data.repositories.market import (
     SqlAlchemyTreasuryCatalogRepository,
 )
 from infra.data.repositories.mining import SqlAlchemyMiningRepository
+from infra.data.repositories.planning import SqlAlchemyGoalRepository
 from infra.data.repositories.policy import SqlAlchemyPolicyRepository
 from infra.data.repositories.portfolio import (
     SqlAlchemyContributionPlanRepository,
@@ -105,6 +106,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.reconciliations = SqlAlchemyReconciliationRepository(self.session)
         self.alert_rules = SqlAlchemyAlertRuleRepository(self.session)
         self.asset_notes = SqlAlchemyAssetNoteRepository(self.session)
+        self.goals = SqlAlchemyGoalRepository(self.session)
         return self
 
     def __exit__(

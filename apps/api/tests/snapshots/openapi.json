@@ -1620,6 +1620,29 @@
         "title": "AssetIncomeDTO",
         "type": "object"
       },
+      "AssetIncomeForecastDTO": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "integer"
+          },
+          "next_12m_brl": {
+            "title": "Next 12M Brl",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "ticker",
+          "next_12m_brl"
+        ],
+        "title": "AssetIncomeForecastDTO",
+        "type": "object"
+      },
       "AssetLensesDTO": {
         "properties": {
           "arca_class": {
@@ -7550,6 +7573,37 @@
         "title": "ForecastHorizonDTO",
         "type": "object"
       },
+      "ForecastMonthDTO": {
+        "properties": {
+          "declared_brl": {
+            "description": "Already announced, net",
+            "title": "Declared Brl",
+            "type": "number"
+          },
+          "estimated_brl": {
+            "description": "From the last 12 months, at today's quantity",
+            "title": "Estimated Brl",
+            "type": "number"
+          },
+          "month": {
+            "description": "YYYY-MM",
+            "title": "Month",
+            "type": "string"
+          },
+          "total_brl": {
+            "title": "Total Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "declared_brl",
+          "estimated_brl",
+          "total_brl"
+        ],
+        "title": "ForecastMonthDTO",
+        "type": "object"
+      },
       "ForecastProbabilityDTO": {
         "properties": {
           "high": {
@@ -8129,6 +8183,201 @@
         "title": "GeneratorShareDTO",
         "type": "object"
       },
+      "GoalCreateRequest": {
+        "properties": {
+          "annual_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "0.06",
+            "description": "Fraction a year",
+            "title": "Annual Return"
+          },
+          "income_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "0.06",
+            "description": "Fraction a year that the wealth pays as income",
+            "title": "Income Yield"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GoalKind"
+          },
+          "monthly_contribution_brl": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Monthly Contribution Brl"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "target_brl": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Wealth, or the passive income per month",
+            "title": "Target Brl"
+          },
+          "target_date": {
+            "format": "date",
+            "title": "Target Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "target_brl",
+          "target_date"
+        ],
+        "title": "GoalCreateRequest",
+        "type": "object"
+      },
+      "GoalDTO": {
+        "properties": {
+          "annual_return": {
+            "title": "Annual Return",
+            "type": "number"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "current_brl": {
+            "description": "Wealth now, or the passive income per month now",
+            "title": "Current Brl",
+            "type": "number"
+          },
+          "current_wealth_brl": {
+            "title": "Current Wealth Brl",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "income_yield": {
+            "title": "Income Yield",
+            "type": "number"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GoalKind"
+          },
+          "monthly_contribution_brl": {
+            "title": "Monthly Contribution Brl",
+            "type": "number"
+          },
+          "months_left": {
+            "title": "Months Left",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "progress": {
+            "description": "Current over target, from 0 to 1",
+            "title": "Progress",
+            "type": "number"
+          },
+          "projected_wealth_brl": {
+            "description": "At the target date with the planned contribution",
+            "title": "Projected Wealth Brl",
+            "type": "number"
+          },
+          "required_monthly_brl": {
+            "description": "Monthly contribution that reaches the goal",
+            "title": "Required Monthly Brl",
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GoalStatus"
+          },
+          "target_brl": {
+            "title": "Target Brl",
+            "type": "number"
+          },
+          "target_date": {
+            "format": "date",
+            "title": "Target Date",
+            "type": "string"
+          },
+          "target_wealth_brl": {
+            "description": "The wealth the goal needs",
+            "title": "Target Wealth Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "target_brl",
+          "target_date",
+          "monthly_contribution_brl",
+          "annual_return",
+          "income_yield",
+          "is_active",
+          "months_left",
+          "current_brl",
+          "target_wealth_brl",
+          "current_wealth_brl",
+          "progress",
+          "projected_wealth_brl",
+          "required_monthly_brl",
+          "status"
+        ],
+        "title": "GoalDTO",
+        "type": "object"
+      },
+      "GoalKind": {
+        "enum": [
+          "WEALTH",
+          "PASSIVE_INCOME"
+        ],
+        "title": "GoalKind",
+        "type": "string"
+      },
       "GoalOutcomeDTO": {
         "properties": {
           "by_generator": {
@@ -8177,6 +8426,116 @@
           "standard_error"
         ],
         "title": "GoalOutcomeDTO",
+        "type": "object"
+      },
+      "GoalStatus": {
+        "enum": [
+          "REACHED",
+          "ON_TRACK",
+          "OFF_TRACK",
+          "MISSED"
+        ],
+        "title": "GoalStatus",
+        "type": "string"
+      },
+      "GoalUpdateRequest": {
+        "properties": {
+          "annual_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Return"
+          },
+          "income_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Income Yield"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "monthly_contribution_brl": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Contribution Brl"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "target_brl": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Brl"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
+          }
+        },
+        "title": "GoalUpdateRequest",
         "type": "object"
       },
       "GrantOptionsDTO": {
@@ -9159,6 +9518,47 @@
           "lines"
         ],
         "title": "ImportPreviewDTO",
+        "type": "object"
+      },
+      "IncomeForecastDTO": {
+        "description": "Passive income of the portfolio as it is now, month by month (Phase 48.R8).",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetIncomeForecastDTO"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "declared_brl": {
+            "title": "Declared Brl",
+            "type": "number"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastMonthDTO"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "next_12m_brl": {
+            "title": "Next 12M Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "as_of",
+          "months",
+          "next_12m_brl",
+          "declared_brl",
+          "assets"
+        ],
+        "title": "IncomeForecastDTO",
         "type": "object"
       },
       "IncomeSummaryDTO": {
@@ -21516,6 +21916,155 @@
         ]
       }
     },
+    "/api/v1/goals": {
+      "get": {
+        "operationId": "list_goals_api_v1_goals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GoalDTO"
+                  },
+                  "title": "Response List Goals Api V1 Goals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Goals",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "post": {
+        "operationId": "create_goal_api_v1_goals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Goal",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
+    "/api/v1/goals/{goal_id}": {
+      "delete": {
+        "operationId": "delete_goal_api_v1_goals__goal_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Goal",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "put": {
+        "operationId": "update_goal_api_v1_goals__goal_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Goal",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Liveness check: the process is up (no dependency is touched).",
@@ -22668,6 +23217,51 @@
         "summary": "Get Income",
         "tags": [
           "Portfolio & ARCA"
+        ]
+      }
+    },
+    "/api/v1/portfolio/income-forecast": {
+      "get": {
+        "operationId": "get_income_forecast_api_v1_portfolio_income_forecast_get",
+        "parameters": [
+          {
+            "description": "12, 24 or 36",
+            "in": "query",
+            "name": "months",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "description": "12, 24 or 36",
+              "title": "Months",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomeForecastDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Income Forecast",
+        "tags": [
+          "Planning"
         ]
       }
     },

@@ -127,6 +127,10 @@ Imposto mensal (Fase 48.R7):
 prejuízo por categoria, DARF 6015) e o exterior por ano; `tax.monthly_month` mostra as vendas de \
 um mês; `tax.darf_paid` marca o DARF como pago.
 
+Planejar (Fase 48.R8):
+- `planning.goals_list` e `planning.goals_create` cuidam das metas (patrimônio ou renda passiva) \
+com progresso e aporte necessário; `planning.income_forecast` projeta a renda passiva mês a mês.
+
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \
 `research.classify`, `research.unfollow`.

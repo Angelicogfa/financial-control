@@ -69,6 +69,9 @@ from contracts.market.responses import (
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
+from contracts.planning.requests import GoalCreateRequest
+from contracts.planning.responses import GoalDTO, IncomeForecastDTO
+from contracts.planning.serializers import to_goal_dto, to_income_forecast_dto
 from contracts.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
@@ -160,6 +163,8 @@ from domain.ledger.services.use_cases.transactions import TransactionHandler
 from domain.market.services.stored import distribution_lookup
 from domain.market.services.use_cases import MarketDataHandler
 from domain.mining.services import MiningHandler
+from domain.planning.goals import Goal
+from domain.planning.services import GoalHandler, IncomeForecastHandler
 from domain.policy.services.use_cases import PolicyHandler
 from domain.portfolio.services.income import IncomeHandler
 from domain.portfolio.services.service import PortfolioApplicationService
@@ -202,6 +207,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "reconciliation": "Conferência de posição (B3)",
     "watch": "Acompanhar · regras de alerta e teses",
     "tax": "Imposto mensal (IR e DARF)",
+    "planning": "Planejar · metas e renda futura",
 }
 
 
@@ -376,6 +382,10 @@ class TaxMonthInput(BaseModel):
 class DarfPaidInput(BaseModel):
     month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
     paid_on: date | None = Field(default=None, description="Null marks the DARF as not paid")
+
+
+class IncomeForecastInput(BaseModel):
+    months: Literal[12, 24, 36] = 12
 
 
 class InstrumentKeyInput(BaseModel):
@@ -674,6 +684,16 @@ class AgenticRuntimeHandlers:
     @property
     def monthly_tax(self) -> MonthlyTaxHandler:
         return MonthlyTaxHandler(uow_factory=self.uow_factory)
+
+    @property
+    def goals(self) -> GoalHandler:
+        return GoalHandler(uow_factory=self.uow_factory)
+
+    @property
+    def income_forecast(self) -> IncomeForecastHandler:
+        return IncomeForecastHandler(
+            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
+        )
 
     @property
     def reconciliation(self) -> ReconciliationHandler:
@@ -2168,6 +2188,48 @@ OPERATIONS = (
         input_model=DarfPaidInput,
         output_type=TaxMonthDTO,
         invoke=lambda h, p: to_tax_month_dto(h.monthly_tax.set_paid(p.month, p.paid_on)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 20. Planejar: goals and future income (Phase 48.R8)
+    OperationSpec(
+        name="planning.goals_list",
+        kind="query",
+        description=(
+            "Metas do investidor (patrimônio, ou renda passiva por mês) com o progresso: valor "
+            "de hoje, o patrimônio que a meta pede, a projeção na data com o aporte planejado, "
+            "o aporte mensal necessário e se está no caminho (REACHED, ON_TRACK, OFF_TRACK, "
+            "MISSED). As premissas de retorno e de yield são de cada meta."
+        ),
+        input_model=EmptyInput,
+        output_type=list[GoalDTO],
+        invoke=lambda h, p: [to_goal_dto(g) for g in h.goals.list()],
+    ),
+    OperationSpec(
+        name="planning.goals_create",
+        kind="command",
+        description=(
+            "Cria uma meta: `kind` WEALTH (patrimônio em R$) ou PASSIVE_INCOME (renda por mês "
+            "em R$), `target_date`, `monthly_contribution_brl` e, opcionais, `annual_return` e "
+            "`income_yield` como frações (0.06 = 6% ao ano)."
+        ),
+        input_model=GoalCreateRequest,
+        output_type=GoalDTO,
+        invoke=lambda h, p: to_goal_dto(h.goals.create(Goal(**p.model_dump()))),
+    ),
+    OperationSpec(
+        name="planning.income_forecast",
+        kind="query",
+        description=(
+            "Renda passiva futura mês a mês (12, 24 ou 36 meses): proventos já anunciados e a "
+            "estimativa pelo que cada ativo pagou nos últimos 12 meses, na quantidade de hoje, "
+            "sem contar duas vezes. Para o que já foi recebido, use portfolio.income."
+        ),
+        input_model=IncomeForecastInput,
+        output_type=IncomeForecastDTO,
+        invoke=lambda h, p: to_income_forecast_dto(h.income_forecast.forecast(months=p.months)),
     ),
 )
 
