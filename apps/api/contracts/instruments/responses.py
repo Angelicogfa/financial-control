@@ -13,7 +13,7 @@ class InstrumentQuoteDTO(BaseModel):
     price: float
     currency: str
     source: QuoteSource
-    change_pct: float | None = None
+    change_pct: float | None = Field(default=None, description="Change of the day as a fraction")
     as_of: datetime | None = None
     freshness: str | None = None
 

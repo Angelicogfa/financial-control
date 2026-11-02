@@ -43,11 +43,10 @@ import { compareLink } from "../tools/AssetComparePage";
 import { useScreenerSearch, type ScreenerSearch } from "./useScreenerSearch";
 import { useFreshEntry, useStoredState } from "../../utils/storedState";
 
-type TabKey = "screener" | "treasury" | "watchlist";
+type TabKey = "screener" | "treasury";
 const TABS: TabSpec<TabKey>[] = [
   { key: "screener", label: "Screener" },
   { key: "treasury", label: "Tesouro Direto" },
-  { key: "watchlist", label: "Em observação" },
 ];
 
 const SCREEN_TYPES: AssetType[] = ["STOCK_BR", "FII", "ETF_BR", "BDR"];
@@ -387,7 +386,7 @@ function Screener() {
   );
 }
 
-function Watchlist() {
+export function Watchlist() {
   const watchlist = useApi("watchlist", () => api.research.watchlist());
   const [error, setError] = useState<string | null>(null);
   const [ticker, setTicker] = useState("");
@@ -567,13 +566,12 @@ function ResearchContent() {
   return (
     <div className="app-page">
       <PageHeader
-        title="Pesquisar"
-        subtitle="Encontre ativos no catálogo da B3, títulos do Tesouro Direto e acompanhe candidatos antes de comprar."
+        title="Explorar"
+        subtitle="Encontre ativos no catálogo da B3 e títulos do Tesouro Direto; os que você observa ficam em Acompanhar."
       />
       <Tabs tabs={TABS} active={tab} onSelect={setTab} label="Pesquisa" />
       {tab === "screener" && <Screener />}
       {tab === "treasury" && <TreasuryScreener />}
-      {tab === "watchlist" && <Watchlist />}
     </div>
   );
 }

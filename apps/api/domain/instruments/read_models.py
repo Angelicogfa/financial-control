@@ -15,7 +15,9 @@ from enum import StrEnum
 from core.errors import ValidationError
 
 TREASURY_PREFIX = "tesouro-"
-_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-=^]{0,31}$")
+# Registered fixed income, Tesouro and cash assets carry generated codes such as
+# `TESOURO_IPCA-TESOURONAC-2032` (domain/assets/services/codes.py), hence the underscore.
+_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9_.\-=^]{0,31}$")
 _TREASURY = re.compile(r"^tesouro-[a-z0-9\-]{1,60}$")
 
 
@@ -56,7 +58,7 @@ class InstrumentQuote:
     price: float
     currency: str
     source: QuoteSource
-    change_pct: float | None = None
+    change_pct: float | None = None  # fraction of the day (0.012 = +1.2%)
     as_of: datetime | None = None
     freshness: str | None = None  # QuoteFreshness of a stored quote
 

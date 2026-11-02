@@ -1,81 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 
 import { fetchSession, logout, type AuthState } from "./api/auth";
 import { UNAUTHORIZED_EVENT } from "./api/http";
 import { AppShell } from "./layout/AppShell";
-import { AssetDetailPage } from "./pages/asset/AssetDetailPage";
-import { AssetFormPage } from "./pages/asset/AssetFormPage";
-import { ContributePage } from "./pages/contribute/ContributePage";
-import { HealthPage } from "./pages/health/HealthPage";
-import { HomePage } from "./pages/home/HomePage";
-import { EarningFormPage } from "./pages/ledger/EarningFormPage";
-import { EventFormPage } from "./pages/ledger/EventFormPage";
-import { ImportPage } from "./pages/ledger/ImportPage";
-import { LedgerPage } from "./pages/ledger/LedgerPage";
-import { TradeFormPage } from "./pages/ledger/TradeFormPage";
+import { AppProviders } from "./app/AppProviders";
+import { AppRoutes } from "./app/AppRoutes";
 import { LoginPage } from "./pages/LoginPage";
-import { NotFoundPage } from "./pages/NotFoundPage";
-import { PerformancePage } from "./pages/performance/PerformancePage";
-import { PortfolioPage } from "./pages/portfolio/PortfolioPage";
-import { ResearchPage } from "./pages/research/ResearchPage";
-import { AccountsPage } from "./pages/settings/AccountsPage";
-import { AgenticPage } from "./pages/settings/agentic/AgenticPage";
-import { AgentKeyFormPage } from "./pages/settings/agentic/AgentKeyFormPage";
-import { DisclosuresPage } from "./pages/disclosures/DisclosuresPage";
-import { MarketDataPage } from "./pages/settings/MarketDataPage";
-import { AssetComparePage } from "./pages/tools/AssetComparePage";
-import { MiningPage } from "./pages/research/MiningPage";
-import { RecommendationPage } from "./pages/recommendation/RecommendationPage";
-import { FixedIncomeComparePage } from "./pages/tools/FixedIncomeComparePage";
-import { CompareStudiesPage } from "./pages/simulation/CompareStudiesPage";
-import { NewStudyPage } from "./pages/simulation/NewStudyPage";
-import { QualityPage } from "./pages/simulation/QualityPage";
-import { StudiesPage } from "./pages/simulation/StudiesPage";
-import { StudyPage } from "./pages/simulation/StudyPage";
-import { StrategyPage } from "./pages/settings/StrategyPage";
 
-export function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/home" replace />} />
-      <Route path="/home" element={<HomePage />} />
-      <Route path="/performance" element={<PerformancePage />} />
-      <Route path="/health" element={<HealthPage />} />
-      <Route path="/disclosures" element={<DisclosuresPage />} />
-      <Route path="/portfolio" element={<PortfolioPage />} />
-      <Route path="/asset/new" element={<AssetFormPage />} />
-      <Route path="/asset/:id" element={<AssetDetailPage />} />
-      <Route path="/asset/:id/edit" element={<AssetFormPage />} />
-      <Route path="/research" element={<ResearchPage />} />
-      <Route path="/research/mining" element={<MiningPage />} />
-      <Route path="/recommendation" element={<RecommendationPage />} />
-      <Route path="/contribute" element={<ContributePage />} />
-      <Route path="/contribute/:planId" element={<ContributePage />} />
-      <Route path="/ledger" element={<LedgerPage />} />
-      <Route path="/ledger/import" element={<ImportPage />} />
-      <Route path="/ledger/trades/new" element={<TradeFormPage />} />
-      <Route path="/ledger/trades/:id/edit" element={<TradeFormPage />} />
-      <Route path="/ledger/earnings/new" element={<EarningFormPage />} />
-      <Route path="/ledger/earnings/:id/edit" element={<EarningFormPage />} />
-      <Route path="/ledger/events/new" element={<EventFormPage />} />
-      <Route path="/tools/fixed-income" element={<FixedIncomeComparePage />} />
-      <Route path="/tools/compare" element={<AssetComparePage />} />
-      <Route path="/tools/simulation" element={<StudiesPage />} />
-      <Route path="/tools/simulation/new" element={<NewStudyPage />} />
-      <Route path="/tools/simulation/compare" element={<CompareStudiesPage />} />
-      <Route path="/tools/simulation/quality" element={<QualityPage />} />
-      <Route path="/tools/simulation/:studyId" element={<StudyPage />} />
-      <Route path="/settings/strategy" element={<StrategyPage />} />
-      <Route path="/settings/accounts" element={<AccountsPage />} />
-      <Route path="/settings/market-data" element={<MarketDataPage />} />
-      <Route path="/settings/agentic" element={<AgenticPage />} />
-      <Route path="/settings/agentic/new" element={<AgentKeyFormPage />} />
-      <Route path="/settings/agentic/:keyId" element={<AgentKeyFormPage />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
-  );
-}
+export { AppRoutes };
 
 /** Session gate: the login stays outside the shell; an expired session returns to it. */
 export function App() {
@@ -113,10 +46,12 @@ export function App() {
     );
   }
   return (
-    <BrowserRouter>
-      <AppShell username={auth.username} onLogout={() => void handleLogout()}>
-        <AppRoutes />
-      </AppShell>
-    </BrowserRouter>
+    <AppProviders>
+      <BrowserRouter>
+        <AppShell username={auth.username} onLogout={() => void handleLogout()}>
+          <AppRoutes />
+        </AppShell>
+      </BrowserRouter>
+    </AppProviders>
   );
 }

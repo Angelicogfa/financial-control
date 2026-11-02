@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { login, navigate } from "./helpers";
-import { CURRENT_ROUTES } from "./routes";
+import { CURRENT_ROUTES, NEW_ROUTES } from "./routes";
 
 /** Smoke of every current screen (Phase 48.R0): it opens with a title, is not the "page not
  *  found" screen and throws no uncaught error. Runs after the journey (scripts/e2e.sh), so the
@@ -22,6 +22,26 @@ test("every current screen opens", async ({ page }) => {
     await page.goto(route.path);
     await expectScreen(page, errors, `${route.screen} (${route.path})`);
   }
+});
+
+test("every new address opens its screen (Phase 48.R3)", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await login(page);
+
+  for (const route of NEW_ROUTES) {
+    await page.goto(route.path);
+    await expect(page, route.path).toHaveURL(new RegExp(`${route.path}$`));
+    await expectScreen(page, errors, `${route.screen} (${route.path})`);
+  }
+});
+
+test("an old address lands on its new place, filters included", async ({ page }) => {
+  await login(page);
+  await page.goto("/tools/compare?tickers=ITSA4,WEGE3");
+  await expect(page).toHaveURL(/\/explorar\/comparar\?tickers=ITSA4%2CWEGE3$/);
+  await page.goto("/research?tab=watchlist");
+  await expect(page).toHaveURL(/\/acompanhar$/);
 });
 
 test("an asset opens from the portfolio, with its tabs", async ({ page }) => {

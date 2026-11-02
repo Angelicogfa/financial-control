@@ -375,3 +375,7 @@ A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, prem
 ### Instrumento por ticker e busca global (Fase 48.R2)
 
 `GET /instruments/{key}` abre qualquer ticker ou título do Tesouro (`tesouro-ipca-15052035`) sem cadastrá-lo. A view junta a cotação guardada (ou, na falta dela, o fechamento do catálogo da B3), os indicadores, as lentes da recomendação, a faixa da previsão (só com selo a partir de "Use com cautela") e, se o ativo estiver cadastrado, o `tracking` com o `asset_id`. `GET /search` procura ao mesmo tempo nos ativos cadastrados, no catálogo da B3 e no Tesouro. Os dois só leem o banco (`domain/instruments`); o MCP expõe `instruments.get`, `instruments.prices` e `instruments.search`.
+
+### Navegação por tarefa e busca global (Fase 48.R3)
+
+O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Carteira (está tudo certo?), Explorar (o que existe por aí?), Acompanhar (o que estou vigiando?), Aportar (o que faço com o dinheiro?), Planejar (para onde vou?) e Lançamentos (o que eu fiz?), além de Configurações. As seções de cada destino aparecem como abas abaixo da barra superior. As rotas do web estão em pt-BR (`app/AppRoutes.tsx`); toda rota antiga redireciona para a nova, com a query preservada (`app/legacyRoutes.ts`), até a R9. `Ctrl+K` ou `/` abre a busca global (`features/search`), que usa `GET /search` e o cache do TanStack Query; `/ativo/:ticker` abre qualquer ativo.

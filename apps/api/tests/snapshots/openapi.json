@@ -9039,6 +9039,7 @@
                 "type": "null"
               }
             ],
+            "description": "Change of the day as a fraction",
             "title": "Change Pct"
           },
           "currency": {

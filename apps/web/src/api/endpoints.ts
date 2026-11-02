@@ -28,6 +28,8 @@ import type {
   AssetCreateRequest,
   AssetResponseDTO,
   AssetTaxStatusDTO,
+  InstrumentViewDTO,
+  SearchResultDTO,
   AssetType,
   AssetUpdateRequest,
   BacktestRequest,
@@ -393,4 +395,15 @@ export const api = {
       }),
     revoke: (id: number) => request<void>(`/agents/keys/${id}`, { method: "DELETE" }),
   },
+  /** Any ticker or Tesouro bond, registered or not (Phase 48.R2): only reads the database. */
+  instruments: {
+    get: (key: string, signal?: AbortSignal) =>
+      request<InstrumentViewDTO>(`/instruments/${encodeURIComponent(key)}`, { signal }),
+    prices: (key: string, range: AssetPriceHistoryDTO["range"]) =>
+      request<AssetPriceHistoryDTO>(`/instruments/${encodeURIComponent(key)}/prices`, {
+        query: { range },
+      }),
+  },
+  search: (q: string, limit = 8, signal?: AbortSignal) =>
+    request<SearchResultDTO>("/search", { query: { q, limit }, signal }),
 };

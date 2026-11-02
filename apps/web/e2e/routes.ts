@@ -1,5 +1,5 @@
-/** Every screen reachable today (Phase 48.R0). The rebuild (R3 onwards) must keep each of
- *  these addresses working, either as the screen itself or as a redirect to its new place. */
+/** Every screen reachable before the rebuild (Phase 48.R0). They must keep working: since
+ *  Phase 48.R3 each one redirects to its new place in NEW_ROUTES. */
 export const CURRENT_ROUTES: { path: string; screen: string }[] = [
   { path: "/home", screen: "Início" },
   { path: "/performance", screen: "Desempenho" },
@@ -27,4 +27,35 @@ export const CURRENT_ROUTES: { path: string; screen: string }[] = [
   { path: "/settings/market-data", screen: "Dados de mercado" },
   { path: "/settings/agentic", screen: "Acesso agêntico" },
   { path: "/settings/agentic/new", screen: "Nova chave agêntica" },
+];
+
+/** The addresses of the seven destinations and the settings (Phase 48.R3). */
+export const NEW_ROUTES: { path: string; screen: string }[] = [
+  { path: "/inicio", screen: "Início" },
+  { path: "/carteira", screen: "Carteira › Posições" },
+  { path: "/carteira/rentabilidade", screen: "Carteira › Rentabilidade" },
+  { path: "/carteira/raio-x", screen: "Carteira › Raio-X" },
+  { path: "/carteira/novo-ativo", screen: "Novo ativo" },
+  { path: "/explorar", screen: "Explorar" },
+  { path: "/explorar/garimpo", screen: "Explorar › Garimpo" },
+  { path: "/explorar/comparar", screen: "Explorar › Comparar" },
+  { path: "/explorar/fatos-relevantes", screen: "Explorar › Fatos relevantes" },
+  { path: "/acompanhar", screen: "Acompanhar" },
+  { path: "/aportar", screen: "Aportar" },
+  { path: "/planejar", screen: "Planejar › Simulações" },
+  { path: "/planejar/estudos/novo", screen: "Novo estudo" },
+  { path: "/planejar/estudos/comparar", screen: "Comparar estudos" },
+  { path: "/planejar/qualidade", screen: "Planejar › Qualidade" },
+  { path: "/planejar/renda-fixa", screen: "Planejar › Renda fixa" },
+  { path: "/planejar/modelo", screen: "Planejar › Modelo" },
+  { path: "/lancamentos", screen: "Lançamentos" },
+  { path: "/lancamentos/importar", screen: "Importar extrato" },
+  { path: "/lancamentos/negociacoes/nova", screen: "Nova negociação" },
+  { path: "/lancamentos/proventos/novo", screen: "Novo provento" },
+  { path: "/lancamentos/eventos/novo", screen: "Novo evento" },
+  { path: "/configuracoes/estrategia", screen: "Estratégia" },
+  { path: "/configuracoes/contas", screen: "Contas" },
+  { path: "/configuracoes/dados-de-mercado", screen: "Dados de mercado" },
+  { path: "/configuracoes/acesso-agentico", screen: "Acesso agêntico" },
+  { path: "/configuracoes/acesso-agentico/nova", screen: "Nova chave" },
 ];

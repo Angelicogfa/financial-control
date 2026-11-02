@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WealthByAccountDTO } from "../api/types";
-import { NAV_SECTIONS } from "../layout/navigation";
+import { DESTINATIONS } from "../layout/navigation";
 import { AccountsWealth } from "../pages/home/AccountsWealth";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
@@ -77,9 +77,9 @@ describe("wealth by account on the Home", () => {
 });
 
 describe("relevant facts page", () => {
-  it("sits right below the portfolio health in the menu", () => {
-    const overview = NAV_SECTIONS[0].items.map((i) => i.to);
-    expect(overview.indexOf("/disclosures")).toBe(overview.indexOf("/health") + 1);
+  it("is a section of Explorar (Phase 48.R3)", () => {
+    const explore = DESTINATIONS.find((d) => d.to === "/explorar");
+    expect(explore?.sections.map((s) => s.to)).toContain("/explorar/fatos-relevantes");
   });
 
   it("shows the CVM feed with its reading notes", async () => {

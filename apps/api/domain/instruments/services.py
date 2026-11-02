@@ -75,7 +75,8 @@ def _quote(
             price=q.price,
             currency=q.currency,
             source=QuoteSource.STORED_QUOTE,
-            change_pct=q.change_pct,
+            # Provider quotes carry the change in percent; the view always uses a fraction.
+            change_pct=q.change_pct / 100.0 if q.change_pct is not None else None,
             as_of=q.market_time or stored.quote_fetched_at,
             freshness=q.freshness.value,
         )

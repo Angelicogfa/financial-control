@@ -46,7 +46,7 @@ def _seed(api: SimpleNamespace) -> None:
                     asset_type=AssetType.STOCK_BR,
                     sector="Petróleo, Gás e Biocombustíveis",
                     close=38.5,
-                    change_pct=1.2,
+                    change_pct=0.012,  # the catalog stores a fraction
                     volume_brl=2.0e9,
                     updated_at=NOW,
                 ),
@@ -128,6 +128,11 @@ def test_instrument_key_normalizes_tickers_and_tesouro_symbols() -> None:
     assert instrument_key(" itsa4 ").value == "ITSA4"
     assert instrument_key("ITSA4").kind == InstrumentKind.LISTED
     assert instrument_key("BRK.B").value == "BRK.B"
+    generated = instrument_key("tesouro_ipca-tesouronac-2032")
+    assert (generated.value, generated.kind) == (
+        "TESOURO_IPCA-TESOURONAC-2032",
+        InstrumentKind.LISTED,
+    )
     treasury = instrument_key("Tesouro-IPCA-15052035")
     assert (treasury.value, treasury.kind) == ("tesouro-ipca-15052035", InstrumentKind.TREASURY)
 
@@ -168,6 +173,7 @@ def test_a_catalog_ticker_opens_without_registering_it(api: SimpleNamespace) -> 
     assert body["in_catalog"] is True
     assert body["quote"]["source"] == "CATALOG_CLOSE"
     assert body["quote"]["price"] == 38.5
+    assert body["quote"]["change_pct"] == 0.012
     assert body["tracking"] is None
     assert body["indicators"] is None
     assert body["forecast"]["status"] == "NOT_COMPUTED"
@@ -184,6 +190,7 @@ def test_a_stored_quote_wins_over_the_catalog_close(api: SimpleNamespace) -> Non
 
     assert body["quote"]["source"] == "STORED_QUOTE"
     assert body["quote"]["price"] == 10.5
+    assert body["quote"]["change_pct"] == pytest.approx(0.004)  # 0.4% from the provider
     assert body["indicators"]["price_to_earnings"] == 7.5
     assert body["lenses"]["arca_class"] == "ACOES"
     assert body["lenses"]["items"][0]["lens"] == "VALUATION"
@@ -226,6 +233,21 @@ def test_a_registered_asset_outside_the_catalog_still_opens(api: SimpleNamespace
     assert body["quote"] is None
     assert body["tracking"]["asset_id"] > 0
     assert "Ainda não há cotação guardada deste ativo." in body["data_gaps"]
+
+
+def test_a_registered_fixed_income_code_opens(api: SimpleNamespace) -> None:
+    resp = api.client.post(
+        "/api/v1/assets",
+        json={"name": "Reserva corretora", "asset_type": "CASH", "manual_price": "1"},
+    )
+    assert resp.status_code == 201, resp.text
+    code = resp.json()["ticker"]
+
+    body = api.client.get(f"/api/v1/instruments/{code}").json()
+
+    assert body["key"] == code
+    assert body["tracking"]["asset_id"] == resp.json()["id"]
+    assert body["quote"]["source"] == "MANUAL"
 
 
 def test_unknown_and_invalid_keys(api: SimpleNamespace) -> None:

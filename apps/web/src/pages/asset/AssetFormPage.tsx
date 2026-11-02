@@ -555,8 +555,10 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
   );
 }
 
-export function AssetFormPage() {
-  const { id } = useParams();
+/** `assetId` comes from `/ativo/:ticker/editar` (InstrumentRoute); without it, a new asset. */
+export function AssetFormPage({ assetId }: Readonly<{ assetId?: number }> = {}) {
+  const { id: routeId } = useParams();
+  const id = assetId !== undefined ? String(assetId) : routeId;
   const editing = id !== undefined;
   const asset = useApi(`asset-form-${id ?? "new"}`, () =>
     editing ? api.assets.get(Number(id)) : Promise.resolve(null),

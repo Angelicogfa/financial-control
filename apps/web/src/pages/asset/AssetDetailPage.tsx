@@ -619,9 +619,10 @@ function Ledger({ assetId }: Readonly<{ assetId: number }>) {
   );
 }
 
-export function AssetDetailPage() {
+/** `assetId` comes from `/ativo/:ticker` (InstrumentRoute) or, on old links, from the URL. */
+export function AssetDetailPage({ assetId: given }: Readonly<{ assetId?: number }> = {}) {
   const { id } = useParams();
-  const assetId = Number(id);
+  const assetId = given ?? Number(id);
   const [tab, setTab] = useTab(TREASURY_TABS, "summary");
   const [checklistSaved, setChecklistSaved] = useState(false);
   const analysis = useApi(`asset-${assetId}`, () => api.assets.analysis(assetId));

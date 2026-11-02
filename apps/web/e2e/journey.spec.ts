@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { FIXTURES, login, navigate } from "./helpers";
 
-/** The whole cycle through the UI (item 14.2): strategy → import → research → contribute →
- *  portfolio, home and performance → edit and delete a ledger entry. */
+/** The whole cycle through the UI (item 14.2): strategy → import → follow → contribute →
+ *  portfolio, home, performance and the global search → edit and delete a ledger entry. */
 test("operational journey", async ({ page }) => {
   page.on("dialog", (dialog) => void dialog.accept());
   await login(page);
@@ -28,9 +28,8 @@ test("operational journey", async ({ page }) => {
   // MXRF11 is unknown and pre-checked for registration, so its yield comes in too.
   await expect(page.getByText(/4 provento\(s\) e 2 evento\(s\); ativos cadastrados: MXRF11/)).toBeVisible();
 
-  // Research: follow a ticker that is not in the catalog yet.
-  await navigate(page, "Pesquisar");
-  await page.getByRole("tab", { name: "Em observação" }).click();
+  // Acompanhar: follow a ticker that is not in the catalog yet.
+  await navigate(page, "Acompanhar");
   await page.getByLabel("Observar código", { exact: true }).fill("BBAS3");
   await page.getByLabel("Tipo", { exact: true }).fill("Ação B3");
   await page.getByRole("option", { name: "Ação B3", exact: true }).click();
@@ -62,8 +61,16 @@ test("operational journey", async ({ page }) => {
   await navigate(page, "Início");
   await expect(page.getByText("Como está a carteira")).toBeVisible();
   await expect(page.getByText("Patrimônio", { exact: true })).toBeVisible();
-  await navigate(page, "Desempenho");
+  await navigate(page, "Carteira");
+  await page.getByRole("navigation", { name: "Seções de Carteira" }).getByRole("link", { name: "Rentabilidade" }).click();
   await expect(page.getByRole("heading", { name: "Desempenho" })).toBeVisible();
+
+  // Global search: Ctrl+K finds the asset and opens its page by ticker.
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox", { name: "Buscar ativo ou ação" }).fill("ITSA4");
+  await page.getByRole("option", { name: /ITSA4/ }).first().click();
+  await expect(page).toHaveURL(/\/ativo\/ITSA4$/);
+  await expect(page.getByRole("tab", { name: "Resumo" })).toBeVisible();
 
   // Edit and delete ledger entries.
   await navigate(page, "Lançamentos");
