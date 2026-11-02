@@ -120,7 +120,7 @@ describe("asset comparator", () => {
     const table = await screen.findByRole("table");
     expect(calls.find((c) => c.path === "/research/compare")?.query.get("tickers")).toBe("WEGE3,HGLG11");
     expect(screen.getByRole("note")).toHaveTextContent("Perfis diferentes");
-    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/asset/7");
+    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/ativo/WEGE3");
 
     const pl = within(table).getByText("P/L").closest("tr") as HTMLElement;
     const cells = within(pl).getAllByRole("cell");

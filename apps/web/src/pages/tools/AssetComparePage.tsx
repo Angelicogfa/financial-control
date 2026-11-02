@@ -30,6 +30,7 @@ import {
 import { TrendChart } from "../../viz/TrendChart";
 import { useScreenerSearch, type ScreenerSearch } from "../research/useScreenerSearch";
 import { useStoredState } from "../../utils/storedState";
+import { instrumentPath } from "../../features/instrument/paths";
 
 export const MAX_COMPARED = 5;
 
@@ -430,7 +431,7 @@ function Comparison({ data }: Readonly<{ data: AssetComparisonDTO }>) {
               {data.assets.map((a) => (
                 <th key={a.ticker} className="app-numeric">
                   {a.asset_id ? (
-                    <Link className="app-link" to={`/asset/${a.asset_id}`}>
+                    <Link className="app-link" to={instrumentPath(a.ticker)}>
                       {a.ticker}
                     </Link>
                   ) : (

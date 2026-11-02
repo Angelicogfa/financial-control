@@ -195,7 +195,7 @@ export const api = {
   },
   assets: {
     list: (activeOnly = true) => listAllAssets(activeOnly),
-    get: (id: number) => request<AssetResponseDTO>(`/assets/${id}`),
+    get: (id: number, signal?: AbortSignal) => request<AssetResponseDTO>(`/assets/${id}`, { signal }),
     analysis: (id: number) => request<AssetAnalysisResponseDTO>(`/assets/${id}/analysis`),
     prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>
       request<AssetPriceHistoryDTO>(`/assets/${id}/prices`, { query: { range } }),

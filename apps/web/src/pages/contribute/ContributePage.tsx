@@ -20,6 +20,7 @@ import { ARCA_LABELS, PLAN_STATUS_LABELS, STRATEGY_LABELS } from "../../utils/la
 import { BarList } from "../../viz/BarList";
 import { clearStored, useStoredState } from "../../utils/storedState";
 import { orderReasonText, orderWeightText, PlanRationale, strategyByClass } from "./Rationale";
+import { instrumentPath } from "../../features/instrument/paths";
 
 const STEPS = ["Valor", "Classes", "Ativos", "Confirmar"];
 
@@ -391,7 +392,7 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           <td>
                             <span className="app-cell-main">
                               <span>
-                                <Link className="app-link" to={`/asset/${o.asset_id}`}>
+                                <Link className="app-link" to={instrumentPath(o.ticker)}>
                                   <strong>{o.ticker}</strong>
                                 </Link>{" "}
                                 {o.new && <Badge tone="info">novo</Badge>}

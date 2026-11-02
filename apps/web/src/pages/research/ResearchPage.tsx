@@ -42,6 +42,7 @@ import { formatTreasuryRate, percentToContractedRate } from "../../utils/rates";
 import { compareLink } from "../tools/AssetComparePage";
 import { useScreenerSearch, type ScreenerSearch } from "./useScreenerSearch";
 import { useFreshEntry, useStoredState } from "../../utils/storedState";
+import { instrumentPath } from "../../features/instrument/paths";
 
 type TabKey = "screener" | "treasury";
 const TABS: TabSpec<TabKey>[] = [
@@ -165,7 +166,7 @@ function ResultsTable({
               <td>
                 <span className="app-cell-main">
                   {item.asset_id ? (
-                    <Link className="app-link" to={`/asset/${item.asset_id}`}>
+                    <Link className="app-link" to={instrumentPath(item.ticker)}>
                       {item.ticker}
                     </Link>
                   ) : (
@@ -497,7 +498,7 @@ export function Watchlist() {
                     <tr key={item.asset_id}>
                       <td>
                         <span className="app-cell-main">
-                          <Link className="app-link" to={`/asset/${item.asset_id}`}>
+                          <Link className="app-link" to={instrumentPath(item.ticker)}>
                             {item.ticker}
                           </Link>
                           <small>

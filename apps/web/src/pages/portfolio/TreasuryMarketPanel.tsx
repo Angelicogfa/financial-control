@@ -6,6 +6,7 @@ import { Badge, Signed } from "../../components/Badge";
 import { ErrorBanner } from "../../components/States";
 import { brl, pct } from "../../utils/format";
 import { MARKET_STATUS_LABELS, MARKET_STATUS_TONES } from "../asset/MarketTab";
+import { instrumentPath } from "../../features/instrument/paths";
 
 /** Treasury bonds at market next to the curve, with the early-sale signal of each one. */
 export function TreasuryMarketPanel() {
@@ -36,7 +37,7 @@ export function TreasuryMarketPanel() {
               <tr key={item.ticker}>
                 <td>
                   {item.asset_id ? (
-                    <Link className="app-link" to={`/asset/${item.asset_id}?tab=market`}>
+                    <Link className="app-link" to={`${instrumentPath(item.ticker)}?capitulo=preco`}>
                       {item.name}
                     </Link>
                   ) : (

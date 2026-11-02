@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AssetForecastDTO, ForecastHorizonDTO } from "../api/types";
 import { chanceAbove } from "../pages/asset/ForecastTab";
-import { analysis } from "./fixtures";
+import { analysis, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -87,10 +87,11 @@ describe("Probabilidades tab (Phase 42.1)", () => {
 
   it("shows the lead, the chances, the drivers and the seal", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       { path: "/assets/1/forecast", reply: forecast() },
     ]);
-    renderAt("/asset/1?tab=forecast");
+    renderAt("/ativo/WEGE3?tab=forecast");
     expect(await screen.findByText(/há 62% de chance de WEGE3/)).toBeInTheDocument();
     expect(screen.getByText("Chance de subir")).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Chances em 12 meses" });
@@ -111,6 +112,7 @@ describe("Probabilidades tab (Phase 42.1)", () => {
 
   it("hides a forecast the calibration does not back", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/assets/1/forecast",
@@ -122,7 +124,7 @@ describe("Probabilidades tab (Phase 42.1)", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=forecast");
+    renderAt("/ativo/WEGE3?tab=forecast");
     expect(await screen.findByText("Previsão oculta por baixa confiança")).toBeInTheDocument();
     expect(screen.getByText("Poucas janelas.")).toBeInTheDocument();
     expect(screen.queryByText("Chance de subir")).not.toBeInTheDocument();
@@ -143,6 +145,7 @@ describe("Probabilidades tab (Phase 42.1)", () => {
       cautions: ["Histórico curto: 13 meses de 36.", "A calibração ainda não confirma estas faixas."],
     });
     const { calls } = mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       { method: "GET", path: "/assets/1/forecast", reply: () => (computed ? requested : short) },
       {
@@ -154,7 +157,7 @@ describe("Probabilidades tab (Phase 42.1)", () => {
         },
       },
     ]);
-    renderAt("/asset/1?tab=forecast");
+    renderAt("/ativo/WEGE3?tab=forecast");
     expect(await screen.findByText("Histórico insuficiente")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Calcular só para este ativo" }));
     expect(await screen.findByText("Histórico curto: 13 meses de 36.")).toBeInTheDocument();
@@ -165,13 +168,14 @@ describe("Probabilidades tab (Phase 42.1)", () => {
 
   it("offers no request below 12 months of history", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/assets/1/forecast",
         reply: forecast({ status: "INSUFFICIENT_HISTORY", horizons: [], months_used: 8, warnings: ["Tem 8."] }),
       },
     ]);
-    renderAt("/asset/1?tab=forecast");
+    renderAt("/ativo/WEGE3?tab=forecast");
     expect(await screen.findByText("Histórico insuficiente")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Calcular só para este ativo" })).not.toBeInTheDocument();
   });

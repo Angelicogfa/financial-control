@@ -7,6 +7,7 @@ import { Badge } from "../../components/Badge";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
 import { brl, day, monthLabel, num } from "../../utils/format";
 import { EARNING_LABELS } from "../../utils/labels";
+import { instrumentPath } from "../../features/instrument/paths";
 
 export const AGENDA_STATUS_LABELS: Record<AgendaStatus, string> = {
   UPCOMING: "Antes da data com",
@@ -54,7 +55,7 @@ export function DeclaredEarnings() {
                 <tr key={`${item.ticker}-${item.kind}-${item.com_date}-${item.payment_date}`}>
                   <td>
                     {item.asset_id ? (
-                      <Link className="app-link" to={`/asset/${item.asset_id}`}>
+                      <Link className="app-link" to={instrumentPath(item.ticker)}>
                         {item.ticker}
                       </Link>
                     ) : (

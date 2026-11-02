@@ -1,13 +1,14 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { analysis } from "./fixtures";
+import { analysis, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
 describe("Indicator ratings in the Fundamentals tab", () => {
   it("says beside each indicator whether it is good, and against what", async () => {
     mockApi([
+      trackedInstrument(),
       {
         path: "/assets/1/analysis",
         reply: analysis({
@@ -22,7 +23,7 @@ describe("Indicator ratings in the Fundamentals tab", () => {
       },
       { path: "/assets/1/statements", reply: { asset_id: 1, ticker: "WEGE3", status: "NOT_A_COMPANY" } },
     ]);
-    renderAt("/asset/1?tab=fundamentals");
+    renderAt("/ativo/WEGE3?tab=fundamentals");
     const card = (await screen.findByText("Indicadores atuais", undefined, { timeout: 5000 })).closest("section")!;
     expect(within(card).getByText("Ruim")).toBeInTheDocument();
     expect(within(card).getByText("Atenção")).toBeInTheDocument();

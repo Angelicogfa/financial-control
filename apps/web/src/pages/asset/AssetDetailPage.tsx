@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
-import type { AssetAnalysisResponseDTO, IndicatorRatingDTO } from "../../api/types";
+import type { AssetAnalysisResponseDTO, IndicatorRatingDTO, InstrumentViewDTO } from "../../api/types";
 import { useApi } from "../../api/useApi";
 import { Badge, Signed } from "../../components/Badge";
 import { Hint } from "../../components/Hint";
@@ -11,10 +11,10 @@ import { Lead } from "../../components/Section";
 import { IconLink } from "../../components/RowActions";
 import { EditIcon } from "../../layout/icons";
 import { Async, Empty } from "../../components/States";
-import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { DisclosureFeed } from "../disclosures/DisclosureFeed";
 import { brl, brlCompact, day, money, num, pct, points, quantity } from "../../utils/format";
 import {
+  ARCA_LABELS,
   ASSET_TYPE_LABELS,
   EARNING_LABELS,
   EVENT_LABELS,
@@ -33,6 +33,16 @@ import { MarketTab } from "./MarketTab";
 import { PriceHistory } from "./PriceHistory";
 import { TaxTab } from "./TaxTab";
 import { compareLink } from "../tools/AssetComparePage";
+import {
+  Chapter,
+  ChapterIndex,
+  CHAPTER_TITLES,
+  LensBars,
+  lensHighlights,
+  useOpenChapters,
+  type ChapterKey,
+} from "../../features/instrument/chapters";
+import { instrumentPath, QuoteAge } from "../../features/instrument/paths";
 
 const BENCHMARK_LABELS: Record<string, string> = {
   IBOV: "Ibovespa",
@@ -41,31 +51,6 @@ const BENCHMARK_LABELS: Record<string, string> = {
   CDI: "CDI",
   IPCA: "IPCA",
 };
-
-type TabKey =
-  | "summary"
-  | "market"
-  | "fundamentals"
-  | "valuation"
-  | "forecast"
-  | "checklist"
-  | "tax"
-  | "earnings"
-  | "ledger"
-  | "disclosures";
-const TABS: TabSpec<TabKey>[] = [
-  { key: "summary", label: "Resumo" },
-  { key: "fundamentals", label: "Fundamentos" },
-  { key: "valuation", label: "Valuation" },
-  { key: "forecast", label: "Probabilidades" },
-  { key: "checklist", label: "Checklist" },
-  { key: "tax", label: "Tributação" },
-  { key: "earnings", label: "Proventos" },
-  { key: "ledger", label: "Lançamentos" },
-  { key: "disclosures", label: "Comunicados" },
-];
-/** Treasury bonds also show the curve versus the redemption price (Phase 26). */
-const TREASURY_TABS: TabSpec<TabKey>[] = [TABS[0], { key: "market", label: "Mercado" }, ...TABS.slice(1)];
 
 /**
  * The price of an asset without a position: the report's or the valuation's price when there is
@@ -79,11 +64,15 @@ function currentQuote(analysis: AssetAnalysisResponseDTO): { price: number; date
   return last?.close ? { price: last.close, date: last.date } : null;
 }
 
-function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
+function isHeld(analysis: AssetAnalysisResponseDTO): boolean {
   const p = analysis.position;
-  const prices = analysis.price_history as Array<{ date?: string; close?: number }>;
-  const risk = analysis.risk_return;
-  const held = Boolean(p && (p.quantity > 0 || p.invested_value_brl > 0));
+  return Boolean(p && (p.quantity > 0 || p.invested_value_brl > 0));
+}
+
+/** Chapter "Na minha carteira": the position, or the price of an asset under observation. */
+function PositionSummary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
+  const p = analysis.position;
+  const held = isHeld(analysis);
   const quote = held ? null : currentQuote(analysis);
   return (
     <div className="app-page-stack">
@@ -102,82 +91,60 @@ function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>)
           </p>
         </Lead>
       )}
-      <div className="app-split">
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Posição</h2>
-          {held && p ? (
-            <dl className="app-definition-list">
-              <dt>Quantidade</dt>
-              <dd>{quantity(p.quantity)}</dd>
-              <dt>Preço médio</dt>
-              <dd>{money(p.average_price, p.currency)}</dd>
-              <dt>Preço atual</dt>
-              <dd>{money(p.current_unit_price, p.currency)}</dd>
-              <dt>Valor atual</dt>
-              <dd>{brl(p.current_value_brl)}</dd>
-              <dt>Investido</dt>
-              <dd>{brl(p.invested_value_brl)}</dd>
-              <dt>Resultado consolidado</dt>
-              <dd>
-                <Signed value={p.consolidated_pnl_brl}>
-                  {brl(p.consolidated_pnl_brl)} ({points(p.consolidated_return_pct, 1, true)})
-                </Signed>
-              </dd>
-              <dt>Proventos recebidos</dt>
-              <dd>{brl(p.received_earnings_brl)}</dd>
-              <dt>Peso na classe</dt>
-              <dd>
-                {points(p.class_current_weight_pct)} (alvo {points(p.class_target_weight_pct)})
-              </dd>
-            </dl>
-          ) : (
-            <>
-              {quote && (
-                <dl className="app-definition-list">
-                  <dt>Preço atual</dt>
-                  <dd>
-                    {money(quote.price, p?.currency || analysis.asset.currency || "BRL")}
-                    {quote.date && <span className="app-muted"> · fechamento de {day(quote.date)}</span>}
-                  </dd>
-                </dl>
-              )}
-              <p className="app-muted" style={quote ? { marginTop: "var(--space-3)" } : undefined}>
-                Sem posição: o ativo está em observação.
-              </p>
-            </>
-          )}
-        </section>
-        <section className="app-card app-card-padded">
-          <h2 className="app-card-heading">Risco em 12 meses</h2>
-          {risk.observations < 2 ? (
-            <p className="app-muted">Sem histórico de preços suficiente.</p>
-          ) : (
-            <dl className="app-definition-list">
-              <dt>Retorno do preço</dt>
-              <dd>{pct(risk.cumulative_return, 1, true)}</dd>
-              <dt>Volatilidade anual</dt>
-              <dd>{pct(risk.annualized_volatility, 1)}</dd>
-              <dt>Queda máxima</dt>
-              <dd>{pct(risk.max_drawdown, 1)}</dd>
-              {risk.benchmarks.map((b) => (
-                <div key={b.benchmark} style={{ display: "contents" }}>
-                  <dt>{BENCHMARK_LABELS[b.benchmark] ?? b.benchmark} no período</dt>
-                  <dd>
-                    {pct(b.benchmark_return, 1, true)}
-                    {b.beta !== null && b.beta !== undefined && <span className="app-muted"> · beta {num(b.beta, 2)}</span>}
-                  </dd>
-                </div>
-              ))}
-              {!risk.benchmarks.some((b) => b.benchmark === analysis.benchmark) && (
-                <>
-                  <dt>{BENCHMARK_LABELS[analysis.benchmark] ?? analysis.benchmark}</dt>
-                  <dd className="app-muted">Sem série no período</dd>
-                </>
-              )}
-            </dl>
-          )}
-        </section>
-      </div>
+      <section className="app-card app-card-padded">
+        <h3 className="app-card-heading">Posição</h3>
+        {held && p ? (
+          <dl className="app-definition-list">
+            <dt>Quantidade</dt>
+            <dd>{quantity(p.quantity)}</dd>
+            <dt>Preço médio</dt>
+            <dd>{money(p.average_price, p.currency)}</dd>
+            <dt>Preço atual</dt>
+            <dd>{money(p.current_unit_price, p.currency)}</dd>
+            <dt>Valor atual</dt>
+            <dd>{brl(p.current_value_brl)}</dd>
+            <dt>Investido</dt>
+            <dd>{brl(p.invested_value_brl)}</dd>
+            <dt>Resultado consolidado</dt>
+            <dd>
+              <Signed value={p.consolidated_pnl_brl}>
+                {brl(p.consolidated_pnl_brl)} ({points(p.consolidated_return_pct, 1, true)})
+              </Signed>
+            </dd>
+            <dt>Proventos recebidos</dt>
+            <dd>{brl(p.received_earnings_brl)}</dd>
+            <dt>Peso na classe</dt>
+            <dd>
+              {points(p.class_current_weight_pct)} (alvo {points(p.class_target_weight_pct)})
+            </dd>
+          </dl>
+        ) : (
+          <>
+            {quote && (
+              <dl className="app-definition-list">
+                <dt>Preço atual</dt>
+                <dd>
+                  {money(quote.price, p?.currency || analysis.asset.currency || "BRL")}
+                  {quote.date && <span className="app-muted"> · fechamento de {day(quote.date)}</span>}
+                </dd>
+              </dl>
+            )}
+            <p className="app-muted" style={quote ? { marginTop: "var(--space-3)" } : undefined}>
+              Sem posição: o ativo está em observação.
+            </p>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/** Chapter "Preço": the chart of a chosen period and the risk of the last 12 months. */
+function PriceAndRisk({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>) {
+  const prices = analysis.price_history as Array<{ date?: string; close?: number }>;
+  const risk = analysis.risk_return;
+  return (
+    <div className="app-page-stack">
       {prices.length >= 2 && (
         <PriceHistory
           assetId={analysis.asset.id}
@@ -186,6 +153,36 @@ function Summary({ analysis }: Readonly<{ analysis: AssetAnalysisResponseDTO }>)
           fallback={prices}
         />
       )}
+      <section className="app-card app-card-padded">
+        <h3 className="app-card-heading">Risco em 12 meses</h3>
+        {risk.observations < 2 ? (
+          <p className="app-muted">Sem histórico de preços suficiente.</p>
+        ) : (
+          <dl className="app-definition-list">
+            <dt>Retorno do preço</dt>
+            <dd>{pct(risk.cumulative_return, 1, true)}</dd>
+            <dt>Volatilidade anual</dt>
+            <dd>{pct(risk.annualized_volatility, 1)}</dd>
+            <dt>Queda máxima</dt>
+            <dd>{pct(risk.max_drawdown, 1)}</dd>
+            {risk.benchmarks.map((b) => (
+              <div key={b.benchmark} style={{ display: "contents" }}>
+                <dt>{BENCHMARK_LABELS[b.benchmark] ?? b.benchmark} no período</dt>
+                <dd>
+                  {pct(b.benchmark_return, 1, true)}
+                  {b.beta !== null && b.beta !== undefined && <span className="app-muted"> · beta {num(b.beta, 2)}</span>}
+                </dd>
+              </div>
+            ))}
+            {!risk.benchmarks.some((b) => b.benchmark === analysis.benchmark) && (
+              <>
+                <dt>{BENCHMARK_LABELS[analysis.benchmark] ?? analysis.benchmark}</dt>
+                <dd className="app-muted">Sem série no período</dd>
+              </>
+            )}
+          </dl>
+        )}
+      </section>
     </div>
   );
 }
@@ -619,83 +616,232 @@ function Ledger({ assetId }: Readonly<{ assetId: number }>) {
   );
 }
 
-/** `assetId` comes from `/ativo/:ticker` (InstrumentRoute) or, on old links, from the URL. */
-export function AssetDetailPage({ assetId: given }: Readonly<{ assetId?: number }> = {}) {
+function forecastLead(view: InstrumentViewDTO | undefined): string | undefined {
+  const forecast = view?.forecast;
+  if (!forecast) return undefined;
+  const year = forecast.bands?.find((b) => b.months === 12);
+  if (forecast.status === "OK" && year) {
+    return `Em 12 meses, a faixa provável vai de ${money(year.p5)} a ${money(year.p95)} (mediana ${money(year.p50)}); chance de subir de ${pct(year.up_probability, 0)}.`;
+  }
+  if (forecast.status === "LOW_CONFIDENCE") return "A previsão fica oculta até a calibração subir para “Use com cautela”.";
+  if (forecast.status === "INSUFFICIENT_HISTORY") return "Ainda não há histórico de preço suficiente para a previsão.";
+  return "A previsão deste ativo ainda não foi calculada.";
+}
+
+function valuationLead(analysis: AssetAnalysisResponseDTO): ReactNode {
+  const v = analysis.valuation;
+  if (!v.applicable) return "O valuation não se aplica a este tipo de ativo; os detalhes dizem por quê.";
+  const verdict = VERDICT_LABELS[v.verdict] ?? v.verdict;
+  return (
+    <>
+      <Badge tone={VERDICT_TONES[v.verdict]}>{verdict}</Badge>
+      {v.fair_value ? ` Preço justo ${money(v.fair_value, analysis.asset.currency || "BRL")}` : ""}
+      {v.margin !== null && v.margin !== undefined ? `, margem de ${pct(v.margin, 1, true)}.` : v.fair_value ? "." : ""}
+    </>
+  );
+}
+
+function checklistLead(analysis: AssetAnalysisResponseDTO): string {
+  const c = analysis.checklist;
+  if (c.answered === 0) return "O checklist do Cerrado ainda não foi respondido.";
+  const pending = c.pending > 0 ? `; faltam ${c.pending} pergunta(s)` : "";
+  return `Nota ${num(c.score, 0)} de ${num(c.max_score, 0)} no perfil ${PROFILE_LABELS[c.profile] ?? c.profile}${pending}.`;
+}
+
+function resultsLead(analysis: AssetAnalysisResponseDTO): string {
+  const f = (analysis.fundamentals ?? {}) as Record<string, number | null | undefined>;
+  const parts = [
+    typeof f.price_to_earnings === "number" ? `P/L ${num(f.price_to_earnings, 1)}` : null,
+    typeof f.price_to_book === "number" ? `P/VP ${num(f.price_to_book, 2)}` : null,
+    typeof f.return_on_equity === "number" ? `ROE ${pct(f.return_on_equity, 1)}` : null,
+    typeof f.dividend_yield === "number" ? `DY ${pct(f.dividend_yield, 1)}` : null,
+  ].filter(Boolean);
+  return parts.length ? `${parts.join(" · ")}.` : "Sem indicadores guardados deste ativo.";
+}
+
+/** The page of a registered asset as chapters (Phase 48.R4). `view` is the instrument read
+ *  model (lenses, forecast band, quote age); `assetId` alone still works without it. */
+export function AssetDetailPage({
+  assetId: given,
+  view,
+}: Readonly<{ assetId?: number; view?: InstrumentViewDTO }> = {}) {
   const { id } = useParams();
   const assetId = given ?? Number(id);
-  const [tab, setTab] = useTab(TREASURY_TABS, "summary");
   const [checklistSaved, setChecklistSaved] = useState(false);
   const analysis = useApi(`asset-${assetId}`, () => api.assets.analysis(assetId));
+  const chapters = useOpenChapters(["preco"]);
 
   return (
     <div className="app-page">
       <Async state={analysis} lines={6}>
         {(data) => {
           const status = data.position?.lifecycle_status;
+          const held = isHeld(data);
+          const ticker = data.asset.ticker;
+          const treasury = data.asset.asset_type === "TREASURY";
+          const highlights = lensHighlights(view?.lenses);
+          const holdingTitle = held ? CHAPTER_TITLES.carteira : "Em observação";
+          const index: Array<{ key: ChapterKey; title?: string }> = [
+            { key: "resumo" },
+            { key: "carteira", title: holdingTitle },
+            { key: "preco" },
+            { key: "checklist" },
+            { key: "valuation" },
+            { key: "resultados" },
+            { key: "proventos" },
+            { key: "previsao" },
+            { key: "noticias" },
+            { key: "imposto" },
+          ];
+          const risk = data.risk_return;
           return (
             <>
               <PageHeader
                 title={
                   <>
-                    {data.asset.ticker} <span className="app-muted">· {data.asset.name}</span>
+                    {ticker} <span className="app-muted">· {data.asset.name}</span>
                   </>
                 }
                 subtitle={
                   <span className="app-button-row">
                     <Badge>{ASSET_TYPE_LABELS[data.asset.asset_type]}</Badge>
+                    {data.asset.arca_class && <Badge>{ARCA_LABELS[data.asset.arca_class]}</Badge>}
                     {status && <Badge tone={LIFECYCLE_TONES[status]}>{LIFECYCLE_LABELS[status]}</Badge>}
                     {!data.asset.is_active && <Badge>Arquivado</Badge>}
-                    <Badge tone={VERDICT_TONES[data.valuation.verdict]}>
-                      {VERDICT_LABELS[data.valuation.verdict] ?? data.valuation.verdict}
-                    </Badge>
+                    {view?.quote && <QuoteAge quote={view.quote} />}
                   </span>
                 }
                 actions={
                   <>
-                    <Link className="app-secondary-button" to={compareLink(data.asset.ticker)}>
+                    <Link className="app-secondary-button" to={compareLink(ticker)}>
                       Comparar
                     </Link>
-                    <Link className="app-secondary-button" to={`/asset/${assetId}/edit`}>
+                    <Link className="app-secondary-button" to={`${instrumentPath(ticker)}/editar`}>
                       Editar ativo
                     </Link>
-                    <Link className="app-primary-button" to={`/ledger/trades/new?asset=${assetId}`}>
+                    <Link className="app-secondary-button" to="/aportar">
+                      Aportar
+                    </Link>
+                    <Link className="app-primary-button" to={`/lancamentos/negociacoes/nova?asset=${assetId}`}>
                       Registrar compra
                     </Link>
                   </>
                 }
               />
-              <Tabs
-                tabs={data.asset.asset_type === "TREASURY" ? TREASURY_TABS : TABS}
-                active={tab}
-                onSelect={setTab}
-                label="Seções do ativo"
-              />
-              {tab === "summary" && <Summary analysis={data} />}
-              {tab === "fundamentals" && <Fundamentals analysis={data} />}
-              {tab === "valuation" && <Valuation analysis={data} />}
-              {tab === "forecast" && <ForecastTab assetId={assetId} />}
-              {tab === "checklist" && (
-                <>
-                  {checklistSaved && (
-                    <p className="app-success-banner" role="status" style={{ marginBottom: "var(--space-3)" }}>
-                      Checklist salvo.
-                    </p>
-                  )}
-                  <ChecklistTab
-                    key={`${data.asset.checklist_profile}-${(data.checklist_history ?? []).length}`}
-                    analysis={data}
-                    onSaved={() => {
-                      setChecklistSaved(true);
-                      analysis.reload();
-                    }}
-                  />
-                </>
-              )}
-              {tab === "market" && data.asset.asset_type === "TREASURY" && <MarketTab assetId={assetId} />}
-              {tab === "tax" && <TaxTab assetId={assetId} />}
-              {tab === "earnings" && <Earnings assetId={assetId} />}
-              {tab === "ledger" && <Ledger assetId={assetId} />}
-              {tab === "disclosures" && <DisclosureFeed assetId={assetId} title="Comunicados à CVM" />}
+              <div className="app-chapters">
+                <ChapterIndex chapters={index} />
+                <div className="app-chapters-body">
+                  <Chapter
+                    id="resumo"
+                    lead={
+                      <>
+                        <p>{highlights.strong ?? "As lentes da recomendação ainda não foram calculadas para este ativo."}</p>
+                        {highlights.weak && <p>{highlights.weak}</p>}
+                      </>
+                    }
+                  >
+                    {view?.lenses && <LensBars lenses={view.lenses} />}
+                  </Chapter>
+
+                  <Chapter id="carteira" title={holdingTitle}>
+                    <PositionSummary analysis={data} />
+                  </Chapter>
+
+                  <Chapter
+                    id="preco"
+                    lead={
+                      risk.observations >= 2
+                        ? `Em 12 meses, ${pct(risk.cumulative_return, 1, true)} com volatilidade de ${pct(risk.annualized_volatility, 1)} ao ano.`
+                        : "Sem histórico de preços suficiente para medir o risco."
+                    }
+                    open={chapters.isOpen("preco")}
+                    onToggle={() => chapters.toggle("preco")}
+                  >
+                    <PriceAndRisk analysis={data} />
+                    {treasury && <MarketTab assetId={assetId} />}
+                  </Chapter>
+
+                  <Chapter
+                    id="checklist"
+                    lead={checklistLead(data)}
+                    open={chapters.isOpen("checklist")}
+                    onToggle={() => chapters.toggle("checklist")}
+                  >
+                    {checklistSaved && (
+                      <p className="app-success-banner" role="status" style={{ marginBottom: "var(--space-3)" }}>
+                        Checklist salvo.
+                      </p>
+                    )}
+                    <ChecklistTab
+                      key={`${data.asset.checklist_profile}-${(data.checklist_history ?? []).length}`}
+                      analysis={data}
+                      onSaved={() => {
+                        setChecklistSaved(true);
+                        analysis.reload();
+                      }}
+                    />
+                  </Chapter>
+
+                  <Chapter
+                    id="valuation"
+                    lead={valuationLead(data)}
+                    open={chapters.isOpen("valuation")}
+                    onToggle={() => chapters.toggle("valuation")}
+                  >
+                    <Valuation analysis={data} />
+                  </Chapter>
+
+                  <Chapter
+                    id="resultados"
+                    lead={resultsLead(data)}
+                    open={chapters.isOpen("resultados")}
+                    onToggle={() => chapters.toggle("resultados")}
+                  >
+                    <Fundamentals analysis={data} />
+                  </Chapter>
+
+                  <Chapter
+                    id="proventos"
+                    lead={
+                      held && data.position && data.position.received_earnings_brl > 0
+                        ? `Você já recebeu ${brl(data.position.received_earnings_brl)} em proventos deste ativo.`
+                        : "Histórico de proventos por ano e os próximos anunciados."
+                    }
+                    open={chapters.isOpen("proventos")}
+                    onToggle={() => chapters.toggle("proventos")}
+                  >
+                    <Earnings assetId={assetId} />
+                  </Chapter>
+
+                  <Chapter
+                    id="previsao"
+                    lead={forecastLead(view) ?? "Faixa provável do preço em 3, 6, 12 e 24 meses."}
+                    open={chapters.isOpen("previsao")}
+                    onToggle={() => chapters.toggle("previsao")}
+                  >
+                    <ForecastTab assetId={assetId} />
+                  </Chapter>
+
+                  <Chapter
+                    id="noticias"
+                    lead="Comunicados à CVM e a reação típica de cada tipo de fato."
+                    open={chapters.isOpen("noticias")}
+                    onToggle={() => chapters.toggle("noticias")}
+                  >
+                    <DisclosureFeed assetId={assetId} title="Comunicados à CVM" />
+                  </Chapter>
+
+                  <Chapter
+                    id="imposto"
+                    lead={held ? "Situação tributária, compras, vendas e proventos lançados." : "Sem posição: nada a tributar."}
+                    open={chapters.isOpen("imposto")}
+                    onToggle={() => chapters.toggle("imposto")}
+                  >
+                    <TaxTab assetId={assetId} />
+                    <Ledger assetId={assetId} />
+                  </Chapter>
+                </div>
+              </div>
             </>
           );
         }}

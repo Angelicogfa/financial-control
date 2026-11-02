@@ -31,17 +31,22 @@ const RANGE_PHRASES: Record<Range, string> = {
  *  one-year series of the analysis is shown while the period loads or when the API fails. */
 export function PriceHistory({
   assetId,
+  instrumentKey,
   ticker,
   currency,
   fallback,
 }: Readonly<{
-  assetId: number;
+  /** A registered asset; or `instrumentKey` for any ticker (Phase 48.R4). */
+  assetId?: number;
+  instrumentKey?: string;
   ticker: string;
   currency: string;
   fallback: Array<{ date?: string; close?: number }>;
 }>) {
   const [range, setRange] = useState<Range>("1y");
-  const state = useApi(`asset-prices-${assetId}-${range}`, () => api.assets.prices(assetId, range));
+  const state = useApi(`asset-prices-${assetId ?? instrumentKey}-${range}`, () =>
+    assetId !== undefined ? api.assets.prices(assetId, range) : api.instruments.prices(instrumentKey ?? ticker, range),
+  );
   const data = state.data;
   const fromFallback = !data && range === "1y" && fallback.length >= 2;
   const points = data

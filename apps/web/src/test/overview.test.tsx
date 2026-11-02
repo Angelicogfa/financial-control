@@ -142,7 +142,7 @@ describe("portfolio", () => {
       }),
     });
     renderAt("/portfolio");
-    expect(await screen.findByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/asset/1");
+    expect(await screen.findByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/ativo/WEGE3");
     expect(screen.getByText(/Ações · R\$/)).toBeInTheDocument();
     expect(screen.getByText("Em revisão")).toBeInTheDocument();
     expect(screen.getByText("Sem cotação")).toBeInTheDocument();

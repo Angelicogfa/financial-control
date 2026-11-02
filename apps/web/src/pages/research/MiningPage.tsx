@@ -16,6 +16,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { KpiGrid, Lead, Notes, Section } from "../../components/Section";
 import { Async, Empty, Spinner } from "../../components/States";
 import { day, num, pct } from "../../utils/format";
+import { instrumentPath } from "../../features/instrument/paths";
 
 const SIGNAL_LABELS: Record<string, string> = {
   VALUE: "Valor",
@@ -85,7 +86,7 @@ function Findings({ data, onFollowed }: Readonly<{ data: MiningOverviewDTO; onFo
               <td className="app-numeric">{f.rank}</td>
               <td className="app-cell-wrap">
                 {f.asset_id ? (
-                  <Link className="app-link" to={`/asset/${f.asset_id}`}>
+                  <Link className="app-link" to={instrumentPath(f.ticker)}>
                     {f.ticker}
                   </Link>
                 ) : (

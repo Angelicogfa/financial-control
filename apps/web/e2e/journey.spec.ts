@@ -44,7 +44,7 @@ test("operational journey", async ({ page }) => {
   await page.getByLabel("Nome", { exact: true }).fill("Reserva corretora");
   await page.getByLabel("Preço manual", { exact: true }).fill("1");
   await page.getByRole("button", { name: "Cadastrar ativo" }).click();
-  await expect(page.getByRole("tab", { name: "Resumo" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Capítulos" })).toBeVisible();
 
   // Contribute and confirm.
   await navigate(page, "Aportar");
@@ -70,7 +70,7 @@ test("operational journey", async ({ page }) => {
   await page.getByRole("combobox", { name: "Buscar ativo ou ação" }).fill("ITSA4");
   await page.getByRole("option", { name: /ITSA4/ }).first().click();
   await expect(page).toHaveURL(/\/ativo\/ITSA4$/);
-  await expect(page.getByRole("tab", { name: "Resumo" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Capítulos" })).toBeVisible();
 
   // Edit and delete ledger entries.
   await navigate(page, "Lançamentos");

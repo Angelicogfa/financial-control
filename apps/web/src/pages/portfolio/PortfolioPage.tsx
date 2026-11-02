@@ -22,6 +22,7 @@ import { BarList } from "../../viz/BarList";
 import { compareLink } from "../tools/AssetComparePage";
 import { TreasuryMarketPanel } from "./TreasuryMarketPanel";
 import { useStoredState } from "../../utils/storedState";
+import { instrumentPath } from "../../features/instrument/paths";
 
 type ClassTab = "ALL" | ArcaClass;
 const TABS: TabSpec<ClassTab>[] = [
@@ -112,7 +113,7 @@ function PositionRow({ p }: Readonly<{ p: ValuedPositionDTO }>) {
     <tr>
       <td>
         <span className="app-cell-main">
-          <Link className="app-link" to={`/asset/${p.asset_id}`}>
+          <Link className="app-link" to={instrumentPath(p.ticker)}>
             {p.ticker}
           </Link>
           <small>
@@ -242,7 +243,7 @@ export function PortfolioPage() {
                 options={[{ value: "", label: "Todas" }, ...(accounts.data ?? []).map((a) => ({ value: a.id, label: a.name }))]}
               />
             </label>
-            <Link className="app-primary-button" to="/asset/new">
+            <Link className="app-primary-button" to="/carteira/novo-ativo">
               Novo ativo
             </Link>
           </>
@@ -264,7 +265,7 @@ export function PortfolioPage() {
               <Link className="app-primary-button" to="/ledger/import">
                 Importar extrato
               </Link>
-              <Link className="app-secondary-button" to="/asset/new">
+              <Link className="app-secondary-button" to="/carteira/novo-ativo">
                 Cadastrar ativo
               </Link>
             </Empty>

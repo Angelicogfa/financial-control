@@ -9,7 +9,7 @@ import { api } from "../../api/endpoints";
 import type { SearchHitDTO } from "../../api/types";
 import { SearchIcon } from "../../layout/icons";
 import { DESTINATIONS, SETTINGS } from "../../layout/navigation";
-import { instrumentPath } from "../instrument/InstrumentRoute";
+import { instrumentPath } from "../instrument/paths";
 import { money } from "../../utils/format";
 
 export const SEARCH_DEBOUNCE_MS = 200;

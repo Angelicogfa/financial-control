@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AssetTaxStatusDTO, FixedIncomeComparisonDTO, OfferOutcomeDTO, OfferProjectionDTO } from "../api/types";
 import { toOfferRequest } from "../pages/tools/FixedIncomeComparePage";
-import { analysis, asset } from "./fixtures";
+import { analysis, asset, trackedInstrument } from "./fixtures";
 import { optionLabels } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
@@ -131,10 +131,11 @@ function comparison(): FixedIncomeComparisonDTO {
 describe("asset tax tab", () => {
   it("shows the bracket, the next drop and the lot table for fixed income", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis({ asset: asset({ asset_type: "FIXED_INCOME" }) }) },
       { path: "/tax/assets/1/status", reply: fixedIncomeStatus() },
     ]);
-    renderAt("/asset/1?tab=tax");
+    renderAt("/ativo/WEGE3?tab=tax");
     expect(await screen.findByText("Próxima queda de faixa")).toBeInTheDocument();
     expect(screen.getByText("IR estimado se resgatar hoje")).toBeInTheDocument();
     expect(screen.getByText("Tabela regressiva")).toBeInTheDocument();
@@ -152,6 +153,7 @@ describe("asset tax tab", () => {
   it("shows IOF still due and exempt positions", async () => {
     const base = fixedIncomeStatus();
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/tax/assets/1/status",
@@ -163,7 +165,7 @@ describe("asset tax tab", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=tax");
+    renderAt("/ativo/WEGE3?tab=tax");
     expect(await screen.findByText("zera em 01/02/2026")).toBeInTheDocument();
     expect(screen.getByText("Isento")).toBeInTheDocument();
     expect(screen.getByText("Renda fixa isenta")).toBeInTheDocument();
@@ -172,6 +174,7 @@ describe("asset tax tab", () => {
 
   it("shows the informative regimes of market assets", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/tax/assets/1/status",
@@ -186,7 +189,7 @@ describe("asset tax tab", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=tax");
+    renderAt("/ativo/WEGE3?tab=tax");
     expect(await screen.findByText("Ganho na venda de ações")).toBeInTheDocument();
     expect(screen.getByText("Juros sobre capital próprio")).toBeInTheDocument();
     expect(screen.getByText(/LC 224\/2025/)).toBeInTheDocument();

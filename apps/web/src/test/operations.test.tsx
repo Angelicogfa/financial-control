@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { analysis, asset, report, savedPlan } from "./fixtures";
+import { analysis, asset, report, savedPlan, trackedInstrument } from "./fixtures";
 import { optionLabels, pick, pickWhenLoaded } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
@@ -16,28 +16,28 @@ const last = (calls: Call[], method: string, path: string) =>
 
 describe("asset detail", () => {
   it("shows the current price of an asset without a position", async () => {
-    mockApi([{ path: "/assets/1/analysis", reply: analysis({ position: null }) }]);
-    renderAt("/asset/1");
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis({ position: null }) }]);
+    renderAt("/ativo/WEGE3");
     expect(await screen.findByText("Sem posição: o ativo está em observação.")).toBeInTheDocument();
     expect(screen.getByText("Preço atual").nextElementSibling).toHaveTextContent("R$ 50,00");
   });
 
   it("falls back to the last stored close, dated, when no price is known", async () => {
     const base = analysis();
-    mockApi([{ path: "/assets/1/analysis", reply: analysis({ position: null, valuation: { ...base.valuation, price: null } }) }]);
-    renderAt("/asset/1");
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis({ position: null, valuation: { ...base.valuation, price: null } }) }]);
+    renderAt("/ativo/WEGE3");
     await screen.findByText("Sem posição: o ativo está em observação.");
     expect(screen.getByText("Preço atual").nextElementSibling).toHaveTextContent("R$ 50,00 · fechamento de 02/03/2026");
   });
 
   it("shows summary, fundamentals and valuation by tab", async () => {
-    mockApi([{ path: "/assets/1/analysis", reply: analysis() }]);
-    renderAt("/asset/1");
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis() }]);
+    renderAt("/ativo/WEGE3");
     expect(await screen.findByText("Posição")).toBeInTheDocument();
     expect(screen.getByText("Descontado", { selector: ".app-badge" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Preço de WEGE3/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Fundamentos" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalhes: Resultados" }));
     expect(screen.getByText("ROE médio")).toBeInTheDocument();
     const peHelp = screen.getByRole("button", { name: "Ajuda sobre P/L" });
     fireEvent.mouseEnter(peHelp);
@@ -45,13 +45,14 @@ describe("asset detail", () => {
     expect(screen.getByRole("button", { name: "Ajuda sobre Payout médio" })).toHaveAccessibleDescription(/parcela do lucro líquido distribuída/);
     expect(screen.getByRole("img", { name: /Lucro líquido anual/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Valuation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalhes: Está barato?" }));
     expect(screen.getByText("Preço justo de Graham")).toBeInTheDocument();
     expect(screen.getByText("Não passa")).toBeInTheDocument();
   });
 
   it("explains when valuation does not apply", async () => {
     mockApi([
+      trackedInstrument(),
       {
         path: "/assets/1/analysis",
         reply: analysis({
@@ -59,16 +60,17 @@ describe("asset detail", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=valuation");
+    renderAt("/ativo/WEGE3?tab=valuation");
     expect(await screen.findByText("ETFs replicam índices.")).toBeInTheDocument();
   });
 
   it("saves checklist answers with evidence and the chosen profile", async () => {
     const { calls } = mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       { method: "PUT", path: "/assets/1/checklist", reply: asset() },
     ]);
-    renderAt("/asset/1?tab=checklist");
+    renderAt("/ativo/WEGE3?tab=checklist");
     expect(await screen.findByText(/automática: ROE médio 18,0%/)).toBeInTheDocument();
     const governance = screen.getByRole("group", { name: "Tem boa governança?" });
     fireEvent.click(within(governance).getByRole("button", { name: "Sim" }));
@@ -88,6 +90,7 @@ describe("asset detail", () => {
 
   it("lists the asset's trades and earnings", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/transactions",
@@ -99,9 +102,9 @@ describe("asset detail", () => {
         reply: page([{ id: 9, asset_id: 1, kind: "DIVIDEND", payment_date: "2025-03-01", gross_amount: 12, withholding_tax: 0, net_amount: 12, net_amount_brl: 12 }]),
       },
     ]);
-    renderAt("/asset/1?tab=ledger");
+    renderAt("/ativo/WEGE3?tab=ledger");
     expect(await screen.findByRole("link", { name: "Editar" })).toHaveAttribute("href", "/ledger/trades/5/edit");
-    fireEvent.click(screen.getByRole("tab", { name: "Proventos" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalhes: Proventos" }));
     expect(await screen.findByRole("img", { name: "Proventos líquidos recebidos por ano" })).toBeInTheDocument();
   });
 });
@@ -331,7 +334,7 @@ describe("research", () => {
       { method: "DELETE", path: "/research/watchlist/9", reply: { status: 204 } },
     ]);
     renderAt("/research?tab=watchlist");
-    expect(await screen.findByRole("link", { name: "BBAS3" })).toHaveAttribute("href", "/asset/9");
+    expect(await screen.findByRole("link", { name: "BBAS3" })).toHaveAttribute("href", "/ativo/BBAS3");
     expect(screen.getByText("Elegível")).toBeInTheDocument();
 
     // Reclassify in place.

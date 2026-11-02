@@ -3,9 +3,8 @@
 
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import { InstrumentRoute } from "../features/instrument/InstrumentRoute";
+import { InstrumentRoute, LegacyAssetRedirect } from "../features/instrument/InstrumentRoute";
 import { WatchlistPage } from "../features/watchlist/WatchlistPage";
-import { AssetDetailPage } from "../pages/asset/AssetDetailPage";
 import { AssetFormPage } from "../pages/asset/AssetFormPage";
 import { ContributePage } from "../pages/contribute/ContributePage";
 import { DisclosuresPage } from "../pages/disclosures/DisclosuresPage";
@@ -88,11 +87,9 @@ export function AppRoutes() {
       <Route path="/configuracoes/acesso-agentico/nova" element={<AgentKeyFormPage />} />
       <Route path="/configuracoes/acesso-agentico/:keyId" element={<AgentKeyFormPage />} />
 
-      {/* The asset by id stays as an alias until Phase 48.R4 moves its links to /ativo/:ticker. */}
-      <Route path="/asset/:id" element={<AssetDetailPage />} />
-      <Route path="/asset/:id/edit" element={<AssetFormPage />} />
-
-      {/* Old navigation (until Phase 48.R9). */}
+      {/* Old navigation (until Phase 48.R9); the asset by id needs its ticker first. */}
+      <Route path="/asset/:id" element={<LegacyAssetRedirect />} />
+      <Route path="/asset/:id/edit" element={<LegacyAssetRedirect edit />} />
       {LEGACY_PATTERNS.map((pattern) => (
         <Route key={pattern} path={pattern} element={<LegacyRedirect />} />
       ))}

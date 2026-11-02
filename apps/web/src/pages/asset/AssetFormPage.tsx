@@ -44,6 +44,7 @@ import {
   formatTreasuryRate,
   percentToContractedRate,
 } from "../../utils/rates";
+import { instrumentPath } from "../../features/instrument/paths";
 
 interface FormState {
   ticker: string;
@@ -302,7 +303,7 @@ function AssetForm({ asset }: Readonly<{ asset: AssetResponseDTO | null }>) {
       const saved = asset
         ? await api.assets.update(asset.id, { ...body, ticker: form.ticker.trim() || null, is_active: form.active })
         : await api.assets.create({ ...body, ticker: form.ticker.trim() || null });
-      navigate(`/asset/${saved.id}`);
+      navigate(instrumentPath(saved.ticker));
     } catch (err) {
       setError(errorMessage(err));
     } finally {

@@ -16,6 +16,7 @@ import { EARNING_LABELS, EVENT_LABELS, TRADE_LABELS } from "../../utils/labels";
 import { clampPage, usePagedRows, usePagination, type PaginationState } from "../../utils/pagination";
 import { EditIcon, TrashIcon } from "../../layout/icons";
 import { useStoredState } from "../../utils/storedState";
+import { instrumentPath } from "../../features/instrument/paths";
 
 type TabKey = "trades" | "earnings" | "events";
 const TABS: TabSpec<TabKey>[] = [
@@ -164,7 +165,7 @@ function Trades({ filters }: Readonly<{ filters: LedgerFilters }>) {
                     <tr key={t.id}>
                       <td>{day(t.trade_date)}</td>
                       <td>
-                        <Link className="app-link" to={`/asset/${t.asset_id}`}>
+                        <Link className="app-link" to={t.ticker ? instrumentPath(t.ticker) : `/asset/${t.asset_id}`}>
                           {t.ticker ?? t.asset_id}
                         </Link>
                       </td>
@@ -228,7 +229,7 @@ function Earnings({ filters }: Readonly<{ filters: LedgerFilters }>) {
                     <tr key={e.id}>
                       <td>{day(e.payment_date)}</td>
                       <td>
-                        <Link className="app-link" to={`/asset/${e.asset_id}`}>
+                        <Link className="app-link" to={e.ticker ? instrumentPath(e.ticker) : `/asset/${e.asset_id}`}>
                           {e.ticker ?? e.asset_id}
                         </Link>
                       </td>

@@ -44,16 +44,26 @@ test("an old address lands on its new place, filters included", async ({ page })
   await expect(page).toHaveURL(/\/acompanhar$/);
 });
 
-test("an asset opens from the portfolio, with its tabs", async ({ page }) => {
+test("an asset opens from the portfolio, in chapters", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await login(page);
 
   await navigate(page, "Carteira");
   await page.getByRole("link", { name: "ITSA4" }).click();
-  await expect(page).toHaveURL(/\/asset\/\d+$/);
+  await expect(page).toHaveURL(/\/ativo\/ITSA4$/);
   await expectScreen(page, errors, "ativo ITSA4");
-  await expect(page.getByRole("tab", { name: "Resumo" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Capítulos" })).toBeVisible();
+});
+
+test("the portfolio links the asset by ticker and a chapter opens its details (Phase 48.R4)", async ({ page }) => {
+  await login(page);
+  await navigate(page, "Carteira");
+  const href = await page.getByRole("link", { name: "ITSA4" }).getAttribute("href");
+  expect(href).toBe("/ativo/ITSA4");
+  await page.goto("/ativo/ITSA4");
+  await page.getByRole("button", { name: "Ver detalhes: Está barato?" }).click();
+  await expect(page.getByRole("button", { name: "Ocultar detalhes: Está barato?" })).toBeVisible();
 });
 
 test("an unknown address shows the not-found screen", async ({ page }) => {

@@ -379,3 +379,7 @@ A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, prem
 ### Navegação por tarefa e busca global (Fase 48.R3)
 
 O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Carteira (está tudo certo?), Explorar (o que existe por aí?), Acompanhar (o que estou vigiando?), Aportar (o que faço com o dinheiro?), Planejar (para onde vou?) e Lançamentos (o que eu fiz?), além de Configurações. As seções de cada destino aparecem como abas abaixo da barra superior. As rotas do web estão em pt-BR (`app/AppRoutes.tsx`); toda rota antiga redireciona para a nova, com a query preservada (`app/legacyRoutes.ts`), até a R9. `Ctrl+K` ou `/` abre a busca global (`features/search`), que usa `GET /search` e o cache do TanStack Query; `/ativo/:ticker` abre qualquer ativo.
+
+### Página do ativo em capítulos (Fase 48.R4)
+
+`/ativo/:ticker` conta a história do ativo em capítulos, com um índice lateral: Em resumo (lentes), Na minha carteira (ou Como entraria), Preço, Vale a pena?, Está barato?, Resultados, Proventos, O que pode acontecer, Notícias e eventos, Imposto e lançamentos. Cada capítulo abre com a conclusão; "Ver detalhes" monta a tabela, que só busca seus dados quando é aberta. Os links do app usam o ticker, e `/asset/:id` redireciona.

@@ -128,7 +128,7 @@ describe("page state kept for the session", () => {
     ]);
     const first = renderAt("/contribute/7");
     fireEvent.change(await screen.findByLabelText("Quantidade de HGLG11"), { target: { value: "5" } });
-    expect(screen.getByRole("link", { name: "HGLG11" })).toHaveAttribute("href", "/asset/3");
+    expect(screen.getByRole("link", { name: "HGLG11" })).toHaveAttribute("href", "/ativo/HGLG11");
     first.unmount();
     renderAt("/contribute/7");
     expect(await screen.findByLabelText("Quantidade de HGLG11")).toHaveValue("5");
