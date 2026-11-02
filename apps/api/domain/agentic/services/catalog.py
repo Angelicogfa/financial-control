@@ -133,6 +133,9 @@ from contracts.simulation.responses import (
 )
 from contracts.tax.requests import FixedIncomeCompareRequest
 from contracts.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
+from contracts.watch.requests import AlertRuleCreateRequest
+from contracts.watch.responses import AlertRuleDTO, AssetNoteDTO
+from contracts.watch.serializers import to_note_dto, to_rule_dto
 from core.errors import ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.accounts.services.use_cases import AccountHandler
@@ -165,6 +168,7 @@ from domain.simulation.entities import SimulationKind
 from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
+from domain.watch.services import AlertRuleHandler, AssetNoteHandler
 
 OperationKind = Literal["query", "command"]
 
@@ -188,6 +192,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "recommendation": "Recomendação",
     "instruments": "Instrumentos & Busca",
     "reconciliation": "Conferência de posição (B3)",
+    "watch": "Acompanhar · regras de alerta e teses",
 }
 
 
@@ -335,6 +340,20 @@ class AssetListInput(BaseModel):
     asset_type: str | None = None
     use_cerrado: bool | None = None
     active_only: bool = True
+
+
+class AlertRuleIdInput(BaseModel):
+    rule_id: int
+
+
+class NotesInput(BaseModel):
+    due_only: bool = False
+
+
+class AssetNoteToolInput(BaseModel):
+    asset_id: int
+    text: str = Field(min_length=1, max_length=4000)
+    review_at: date | None = None
 
 
 class InstrumentKeyInput(BaseModel):
@@ -621,6 +640,14 @@ class AgenticRuntimeHandlers:
     @property
     def mining(self) -> MiningHandler:
         return MiningHandler(uow_factory=self.uow_factory)
+
+    @property
+    def alert_rules(self) -> AlertRuleHandler:
+        return AlertRuleHandler(uow_factory=self.uow_factory)
+
+    @property
+    def notes(self) -> AssetNoteHandler:
+        return AssetNoteHandler(uow_factory=self.uow_factory)
 
     @property
     def reconciliation(self) -> ReconciliationHandler:
@@ -2023,6 +2050,63 @@ OPERATIONS = (
         input_model=IncomeInput,
         output_type=IncomeSummaryDTO,
         invoke=lambda h, p: to_income_summary_dto(h.income.summary(months=p.months)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 18. Acompanhar: alert rules and thesis notes (Phase 48.R6)
+    OperationSpec(
+        name="watch.rules_list",
+        kind="query",
+        description=(
+            "Regras de alerta do investidor (preço, dividend yield, P/L ou P/VP acima ou abaixo "
+            "de um limite, em qualquer ticker), com o valor lido agora do banco e se dispararam."
+        ),
+        input_model=EmptyInput,
+        output_type=list[AlertRuleDTO],
+        invoke=lambda h, p: [to_rule_dto(r) for r in h.alert_rules.list()],
+    ),
+    OperationSpec(
+        name="watch.rules_create",
+        kind="command",
+        description=(
+            "Cria uma regra de alerta: `metric` PRICE, DIVIDEND_YIELD (fração: 0.08 = 8%), "
+            "PRICE_TO_EARNINGS ou PRICE_TO_BOOK; `operator` ABOVE ou BELOW; `threshold`. Ao "
+            "disparar, vira um alerta comum em alerts.list."
+        ),
+        input_model=AlertRuleCreateRequest,
+        output_type=AlertRuleDTO,
+        invoke=lambda h, p: to_rule_dto(
+            h.alert_rules.create(p.ticker, p.metric, p.operator, p.threshold, p.note)
+        ),
+    ),
+    OperationSpec(
+        name="watch.rules_delete",
+        kind="command",
+        description="Apaga uma regra de alerta.",
+        input_model=AlertRuleIdInput,
+        output_type=OperationStatusDTO,
+        invoke=lambda h, p: (h.alert_rules.delete(p.rule_id), OperationStatusDTO())[1],
+    ),
+    OperationSpec(
+        name="watch.notes_list",
+        kind="query",
+        description=(
+            "Teses dos ativos (notas com data de revisão), as vencidas primeiro; `due_only` "
+            "traz só as que chegaram à data de revisão."
+        ),
+        input_model=NotesInput,
+        output_type=list[AssetNoteDTO],
+        invoke=lambda h, p: [to_note_dto(n, t) for n, t in h.notes.list_all(due_only=p.due_only)],
+    ),
+    OperationSpec(
+        name="watch.notes_create",
+        kind="command",
+        description="Escreve uma nota na tese de um ativo, com a data em que revisá-la.",
+        input_model=AssetNoteToolInput,
+        output_type=AssetNoteDTO,
+        invoke=lambda h, p: to_note_dto(h.notes.create(p.asset_id, p.text, review_at=p.review_at)),
     ),
 )
 

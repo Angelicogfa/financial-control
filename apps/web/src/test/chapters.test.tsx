@@ -107,6 +107,7 @@ describe("registered asset in chapters", () => {
       "Proventos",
       "O que pode acontecer",
       "Notícias e eventos",
+      "Minha tese",
       "Imposto e lançamentos",
     ]);
     const summary = screen.getByRole("region", { name: "Em resumo" });

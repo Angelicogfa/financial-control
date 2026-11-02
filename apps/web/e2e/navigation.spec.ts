@@ -84,6 +84,25 @@ test("the position check compares the B3 statement and saves it (Phase 48.R5)", 
   await expect(page.getByText(/diferença\(s\) em aberto/)).toBeVisible();
 });
 
+test("Acompanhar keeps an alert rule and the asset keeps its thesis (Phase 48.R6)", async ({ page }) => {
+  await login(page);
+  await page.goto("/acompanhar?tab=alerts");
+  const form = page.getByRole("form", { name: "Nova regra de alerta" });
+  await form.getByLabel("Código", { exact: true }).fill("ITSA4");
+  await form.getByLabel("Limite", { exact: true }).fill("1000");
+  await form.getByRole("button", { name: "Criar regra" }).click();
+  await expect(page.getByRole("table", { name: "Regras de alerta" })).toContainText("Preço de ITSA4 abaixo de R$ 1.000,00");
+
+  await page.goto("/ativo/ITSA4?capitulo=tese");
+  const thesis = page.getByRole("region", { name: "Minha tese" });
+  await thesis.getByLabel("Nota da tese", { exact: true }).fill("Holding com desconto; revisar no próximo balanço");
+  await thesis.getByRole("button", { name: "Guardar nota" }).click();
+  await expect(thesis.getByRole("list", { name: "Notas da tese" })).toContainText("Holding com desconto");
+
+  await page.goto("/acompanhar?tab=theses");
+  await expect(page.getByRole("list", { name: "Teses" })).toContainText("ITSA4");
+});
+
 test("an unknown address shows the not-found screen", async ({ page }) => {
   await login(page);
   await page.goto("/does-not-exist");

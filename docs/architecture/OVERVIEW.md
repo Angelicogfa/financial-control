@@ -387,3 +387,7 @@ O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Car
 ### Hub da carteira e conferência com a B3 (Fase 48.R5)
 
 A Carteira tem as abas Posições, Rentabilidade, Proventos, Raio-X e Conferir. Proventos lê `GET /portfolio/income` (recebidos por mês e ano e yield on cost) e a agenda declarada. Conferir envia o extrato de **Posição** da Área do Investidor: `domain/reconciliation` lê as abas por produto e compara cada ticker e conta com a posição do livro na data-base. A conferência gravada (`position_reconciliations`, `position_reconciliation_lines`) **nunca altera o livro**: cada diferença leva ao lançamento pré-preenchido ou é marcada como explicada. O alerta `POSITION_NOT_CHECKED` lembra de conferir todo mês.
+
+### Acompanhar e Aportar com o porquê (Fase 48.R6)
+
+Acompanhar tem as abas Lista (watchlist), Alertas e Teses. As regras de alerta (`alert_rules`) valem para qualquer ticker: são lidas do banco a cada `GET /alerts`, e o job `evaluate_alert_rules` guarda quando cada uma disparou. As teses (`asset_notes`) ficam no capítulo "Minha tese" de cada ativo, com data de revisão, e geram alerta quando vencem. No Aportar, cada linha do plano mostra as lentes do ativo, e um plano confirmado termina na etapa Conferir.

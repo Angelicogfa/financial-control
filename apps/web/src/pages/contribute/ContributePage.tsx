@@ -20,9 +20,10 @@ import { ARCA_LABELS, PLAN_STATUS_LABELS, STRATEGY_LABELS } from "../../utils/la
 import { BarList } from "../../viz/BarList";
 import { clearStored, useStoredState } from "../../utils/storedState";
 import { orderReasonText, orderWeightText, PlanRationale, strategyByClass } from "./Rationale";
+import { LensWhy } from "../../features/instrument/LensWhy";
 import { instrumentPath } from "../../features/instrument/paths";
 
-const STEPS = ["Valor", "Classes", "Ativos", "Confirmar"];
+const STEPS = ["Valor", "Classes", "Ativos", "Confirmar", "Conferir"];
 
 /** Where the money goes, in words: the classes that receive it, the buys and what is left over. */
 export function planStory(saved: SavedContributionPlanDTO): string {
@@ -404,7 +405,10 @@ function DraftPlan({ saved, onChange }: Readonly<{ saved: SavedContributionPlanD
                           <td className="app-numeric">
                             {quantity(o.recommended_quantity)} × {num(o.unit_price_brl)} = {brl(o.executed_amount_brl)}
                           </td>
-                          <td className="contribute-reason">{orderReasonText(o, strategy) || "—"}</td>
+                          <td className="contribute-reason">
+                            {orderReasonText(o, strategy) || "—"}
+                            <LensWhy ticker={o.ticker} />
+                          </td>
                           <td>
                             <input
                               aria-label={`Quantidade de ${o.ticker}`}
@@ -504,15 +508,26 @@ function ClosedPlan({ saved }: Readonly<{ saved: SavedContributionPlanDTO }>) {
           : `Plano descartado em ${dateTime(saved.discarded_at)}.`}
         <span className="app-button-row">
           {saved.status === "CONFIRMED" && (
-            <Link className="app-secondary-button" to="/ledger">
+            <Link className="app-secondary-button" to="/lancamentos">
               Ver lançamentos
             </Link>
           )}
-          <Link className="app-primary-button" to="/contribute">
+          <Link className="app-primary-button" to="/aportar">
             Novo aporte
           </Link>
         </span>
       </div>
+      {saved.status === "CONFIRMED" && (
+        <>
+          <Steps current={4} />
+          <Lead tone="neutral">
+            <p>
+              Depois da liquidação na B3 (dois dias úteis), confira se a custódia bate com o livro: envie o extrato de
+              Posição em <Link to="/carteira/conferir">Carteira › Conferir</Link>.
+            </p>
+          </Lead>
+        </>
+      )}
       <ClassesStep saved={saved} current={null} />
       <PlanRationale saved={saved} />
     </div>

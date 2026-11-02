@@ -19,6 +19,7 @@ export type ChapterKey =
   | "proventos"
   | "previsao"
   | "noticias"
+  | "tese"
   | "imposto";
 
 export const CHAPTER_TITLES: Record<ChapterKey, string> = {
@@ -31,6 +32,7 @@ export const CHAPTER_TITLES: Record<ChapterKey, string> = {
   proventos: "Proventos",
   previsao: "O que pode acontecer",
   noticias: "Notícias e eventos",
+  tese: "Minha tese",
   imposto: "Imposto e lançamentos",
 };
 

@@ -75,11 +75,13 @@ Hoje o ativo só tem página depois de cadastrado (`assets.id`). O mercado abre 
 | Migration | Tabela | Uso |
 |---|---|---|
 | `script_00040_position_reconciliations` | `position_reconciliations`, `position_reconciliation_lines` | cada conferência (data-base, arquivo, hash) e cada linha (ticker, conta, qtd B3, qtd livro, diferença, status `MATCH`/`DIVERGENT`/`ONLY_B3`/`ONLY_LEDGER`, resolução) |
-| `script_00041_monthly_tax_assessments` | `monthly_tax_assessments` | apuração por mês e categoria (`STOCK_SWING`, `DAY_TRADE`, `FII`, `FOREIGN_ANNUAL`), prejuízo acumulado, imposto devido, status do DARF |
-| `script_00042_goals` | `goals` | tipo (`WEALTH`, `PASSIVE_INCOME`), alvo, prazo, aporte mensal planejado |
-| `script_00043_alert_rules` | `alert_rules` | ticker, métrica, operador, limite, ativo/inativo; disparo vira alerta comum em `GET /alerts` |
-| `script_00044_asset_notes` | `asset_notes` | `asset_id`, data, texto, `review_at` |
+| `script_00043_monthly_tax_assessments` | `monthly_tax_assessments` | apuração por mês e categoria (`STOCK_SWING`, `DAY_TRADE`, `FII`, `FOREIGN_ANNUAL`), prejuízo acumulado, imposto devido, status do DARF |
+| `script_00044_goals` | `goals` | tipo (`WEALTH`, `PASSIVE_INCOME`), alvo, prazo, aporte mensal planejado |
+| `script_00041_alert_rules` | `alert_rules` | ticker, métrica, operador, limite, ativo/inativo; disparo vira alerta comum em `GET /alerts` |
+| `script_00042_asset_notes` | `asset_notes` | `asset_id`, data, texto, `review_at` |
 | `script_00045_saved_views` | `saved_views` | filtros salvos do screener e da carteira (hoje em `sessionStorage`) |
+
+> **Numeração (decidida na R6, 2026-11-02):** o Alembic exige uma cadeia linear, e os números seguem a ordem em que as fases entram — R5 `00040`, R6 `00041`/`00042`, R7 `00043`, R8 `00044`, R9 `00045`.
 
 Cada migration tem teste de `upgrade`/`downgrade` (como `test_phase8_migrations.py`) e roda contra uma cópia restaurada da base real antes do merge.
 
@@ -228,9 +230,9 @@ Cada fase termina com: testes de unidade e integração (`uv run pytest`, `npm t
 | **R3** | Novo shell e arquitetura de informação | `app/` (rotas, legado, providers) + `features/` (busca, instrumento, acompanhar; as páginas existentes seguem em `pages/` até a R9); cache de dados; busca global `Ctrl+K`; 7 destinos; rotas em pt-BR (`/carteira`, `/ativo/:ticker`, `/explorar`, `/acompanhar`, `/aportar`, `/planejar`, `/lancamentos`) com **redirecionamento** de todas as rotas antigas | toda URL antiga leva ao lugar novo; testes de navegação | R2 |
 | **R4** | Página do ativo em capítulos | §3.3 com as abas atuais reaproveitadas como seções; "Como entraria" para não possuído; os links internos passam de `/asset/:id` para `/ativo/:ticker` | `/asset/:id` redireciona; mesmo dado que as abas atuais (teste contra `mockApi`) | R3 |
 | **R5** | Hub da carteira + Conferir | abas §3.4 (Posições, Rentabilidade, Proventos, Raio-X); `script_00040`; conferência de posição §3.5 | conferência do extrato real bate ou explica cada diferença; Desempenho e Saúde redirecionam | R3 |
-| **R6** | Acompanhar e Aportar unificados | watchlist + alertas + teses; `script_00043`, `script_00044`; worker avalia `alert_rules`; Aportar §3.6; Recomendação técnica → Planejar › Modelo | mesmo plano de aporte que hoje para o mesmo valor (teste de regressão) | R4 |
-| **R7** | Imposto mensal | `script_00041`; apuração por categoria, isenção de R$ 20 mil em ações, compensação, exterior anual (Lei 14.754/2023); aba Imposto; alerta de DARF; **fecha TD-04** | casos de teste da Receita/golden de IR | R5 |
-| **R8** | Planejar | `script_00042`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima), **36** (carteiras de comparação) e **47** (recomendações externas) | meta mostra progresso e aporte necessário | R5 |
+| **R6** | Acompanhar e Aportar unificados | watchlist + alertas + teses; `script_00041`, `script_00042`; worker avalia `alert_rules`; Aportar §3.6; Recomendação técnica → Planejar › Modelo | mesmo plano de aporte que hoje para o mesmo valor (teste de regressão) | R4 |
+| **R7** | Imposto mensal | `script_00043`; apuração por categoria, isenção de R$ 20 mil em ações, compensação, exterior anual (Lei 14.754/2023); aba Imposto; alerta de DARF; **fecha TD-04** | casos de teste da Receita/golden de IR | R5 |
+| **R8** | Planejar | `script_00044`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima), **36** (carteiras de comparação) e **47** (recomendações externas) | meta mostra progresso e aporte necessário | R5 |
 | **R9** | Remoção do legado | apaga `pages/` antigas, `useApi`, rotas de redirecionamento com mais de 2 fases; `saved_views` (`script_00045`); relatório mensal em PDF | nenhum import de `pages/`; docs atualizados | R4–R8 |
 
 Ordem decidida: **R4** antes de **R5** (§7). Paralelismo possível: depois de R3, R4 (ativo) e R5 (carteira) não tocam os mesmos arquivos; **R7** e **R8** são independentes entre si.

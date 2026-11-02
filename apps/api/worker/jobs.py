@@ -84,6 +84,7 @@ from domain.simulation.data import (
     tr_symbol,
 )
 from domain.simulation.runs import execute_next_run, queue_calibration
+from domain.watch.services import evaluate_alert_rules
 from infra.providers.gateway import CachedMarketGateway
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
@@ -1160,3 +1161,17 @@ def run_pending_simulations_job(
 def has_pending_simulations(uow_factory: UoWFactory) -> bool:
     with uow_factory() as uow:
         return uow.simulations.next_pending() is not None
+
+
+def evaluate_alert_rules_job(
+    uow_factory: UoWFactory,
+    gateway: CachedMarketGateway,
+    *,
+    now: datetime | None = None,
+) -> dict[str, int]:
+    """Alert rules against the stored data: last value and when each fired (Phase 48.R6)."""
+    at = now or datetime.now(UTC)
+    with uow_factory() as uow:
+        result = evaluate_alert_rules(uow, now=at)
+        uow.commit()
+    return result

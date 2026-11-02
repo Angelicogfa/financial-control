@@ -43,6 +43,7 @@ import {
   type ChapterKey,
 } from "../../features/instrument/chapters";
 import { instrumentPath, QuoteAge } from "../../features/instrument/paths";
+import { Thesis, thesisLead, useAssetNotes } from "../../features/instrument/Thesis";
 
 const BENCHMARK_LABELS: Record<string, string> = {
   IBOV: "Ibovespa",
@@ -670,6 +671,7 @@ export function AssetDetailPage({
   const [checklistSaved, setChecklistSaved] = useState(false);
   const analysis = useApi(`asset-${assetId}`, () => api.assets.analysis(assetId));
   const chapters = useOpenChapters(["preco"]);
+  const notes = useAssetNotes(assetId);
 
   return (
     <div className="app-page">
@@ -691,6 +693,7 @@ export function AssetDetailPage({
             { key: "proventos" },
             { key: "previsao" },
             { key: "noticias" },
+            { key: "tese" },
             { key: "imposto" },
           ];
           const risk = data.risk_return;
@@ -829,6 +832,15 @@ export function AssetDetailPage({
                     onToggle={() => chapters.toggle("noticias")}
                   >
                     <DisclosureFeed assetId={assetId} title="Comunicados à CVM" />
+                  </Chapter>
+
+                  <Chapter
+                    id="tese"
+                    lead={thesisLead(notes.data)}
+                    open={chapters.isOpen("tese")}
+                    onToggle={() => chapters.toggle("tese")}
+                  >
+                    <Thesis assetId={assetId} />
                   </Chapter>
 
                   <Chapter

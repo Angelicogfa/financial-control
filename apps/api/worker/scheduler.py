@@ -24,6 +24,7 @@ from worker.jobs import (
     calibrate_forecasts_job,
     ensure_series_coverage_job,
     estimate_forecast_models_job,
+    evaluate_alert_rules_job,
     has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
@@ -222,6 +223,14 @@ def create_scheduler(
         hour=(cfg.snapshot_cron_hour + 1) % 24,
         minute=cfg.snapshot_cron_minute,
         id="update_comparison_portfolios",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("evaluate_alert_rules", evaluate_alert_rules_job),
+        trigger="interval",
+        minutes=cfg.quote_refresh_minutes,
+        id="evaluate_alert_rules",
         replace_existing=True,
         **defaults,
     )

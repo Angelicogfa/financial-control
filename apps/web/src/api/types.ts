@@ -111,6 +111,36 @@ export interface AlertDismissRequest {
   days?: number | null;
 }
 
+export interface AlertRuleCreateRequest {
+  ticker: string;
+  metric: RuleMetric;
+  operator: RuleOperator;
+  threshold: number | string;
+  note?: string | null;
+}
+
+export interface AlertRuleDTO {
+  id: number;
+  ticker: string;
+  metric: RuleMetric;
+  operator: RuleOperator;
+  threshold: number;
+  is_active: boolean;
+  note?: string | null;
+  description: string;
+  current_value?: number | null;
+  triggered: boolean;
+  triggered_at?: string | null;
+  last_checked_at?: string | null;
+  created_at?: string | null;
+}
+
+export interface AlertRuleUpdateRequest {
+  threshold?: number | string | null;
+  is_active?: boolean | null;
+  note?: string | null;
+}
+
 export interface AlertsResponseDTO {
   alerts: AlertDTO[];
   dismissed: number;
@@ -249,6 +279,24 @@ export interface AssetLensesDTO {
 }
 
 export type AssetLifecycle = "WATCHLIST" | "ELIGIBLE" | "HELD" | "REVIEW" | "ARCHIVED";
+
+export interface AssetNoteDTO {
+  id: number;
+  asset_id: number;
+  ticker?: string | null;
+  written_on: string;
+  text: string;
+  review_at?: string | null;
+  due: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AssetNoteRequest {
+  text: string;
+  review_at?: string | null;
+  written_on?: string | null;
+}
 
 export interface AssetPriceHistoryDTO {
   range: "6mo" | "1y" | "2y" | "5y" | "max";
@@ -2386,6 +2434,10 @@ export interface RowComparisonDTO {
   b?: MatrixRowDTO | null;
   differences?: LensDifferenceDTO[];
 }
+
+export type RuleMetric = "PRICE" | "DIVIDEND_YIELD" | "PRICE_TO_EARNINGS" | "PRICE_TO_BOOK";
+
+export type RuleOperator = "ABOVE" | "BELOW";
 
 export type SaleSignal = "EXCESS_RETURN" | "REINVESTMENT";
 

@@ -28,6 +28,11 @@ import type {
   AssetCreateRequest,
   AssetResponseDTO,
   AssetTaxStatusDTO,
+  AlertRuleCreateRequest,
+  AlertRuleDTO,
+  AlertRuleUpdateRequest,
+  AssetNoteDTO,
+  AssetNoteRequest,
   IncomeSummaryDTO,
   InstrumentViewDTO,
   LineResolutionRequest,
@@ -431,5 +436,22 @@ export const api = {
     get: (id: number) => request<ReconciliationDTO>(`/reconciliation/${id}`),
     resolve: (id: number, lineId: number, body: LineResolutionRequest) =>
       request<ReconciliationLineDTO>(`/reconciliation/${id}/lines/${lineId}`, { method: "PUT", body }),
+  },
+  /** Acompanhar (Phase 48.R6): alert rules on any ticker and the thesis of each asset. */
+  watch: {
+    rules: () => request<AlertRuleDTO[]>("/alert-rules"),
+    createRule: (body: AlertRuleCreateRequest) =>
+      request<AlertRuleDTO>("/alert-rules", { method: "POST", body }),
+    updateRule: (id: number, body: AlertRuleUpdateRequest) =>
+      request<AlertRuleDTO>(`/alert-rules/${id}`, { method: "PUT", body }),
+    deleteRule: (id: number) => request<void>(`/alert-rules/${id}`, { method: "DELETE" }),
+    notes: (dueOnly = false) => request<AssetNoteDTO[]>("/notes", { query: { due_only: dueOnly } }),
+    assetNotes: (assetId: number) => request<AssetNoteDTO[]>(`/assets/${assetId}/notes`),
+    createNote: (assetId: number, body: AssetNoteRequest) =>
+      request<AssetNoteDTO>(`/assets/${assetId}/notes`, { method: "POST", body }),
+    updateNote: (assetId: number, noteId: number, body: AssetNoteRequest) =>
+      request<AssetNoteDTO>(`/assets/${assetId}/notes/${noteId}`, { method: "PUT", body }),
+    deleteNote: (assetId: number, noteId: number) =>
+      request<void>(`/assets/${assetId}/notes/${noteId}`, { method: "DELETE" }),
   },
 };

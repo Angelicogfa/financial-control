@@ -645,6 +645,207 @@
         "title": "AlertDismissRequest",
         "type": "object"
       },
+      "AlertRuleCreateRequest": {
+        "properties": {
+          "metric": {
+            "$ref": "#/components/schemas/RuleMetric"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/RuleOperator"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Dividend yield as a fraction (0.08 = 8%)",
+            "title": "Threshold"
+          },
+          "ticker": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "metric",
+          "operator",
+          "threshold"
+        ],
+        "title": "AlertRuleCreateRequest",
+        "type": "object"
+      },
+      "AlertRuleDTO": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "current_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Read now from the database",
+            "title": "Current Value"
+          },
+          "description": {
+            "description": "The rule in words, pt-BR",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/RuleMetric"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/RuleOperator"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "triggered": {
+            "description": "Active and holding now",
+            "title": "Triggered",
+            "type": "boolean"
+          },
+          "triggered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the worker saw it fire",
+            "title": "Triggered At"
+          }
+        },
+        "required": [
+          "id",
+          "ticker",
+          "metric",
+          "operator",
+          "threshold",
+          "is_active",
+          "description",
+          "triggered"
+        ],
+        "title": "AlertRuleDTO",
+        "type": "object"
+      },
+      "AlertRuleUpdateRequest": {
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "title": "AlertRuleUpdateRequest",
+        "type": "object"
+      },
       "AlertsResponseDTO": {
         "properties": {
           "alerts": {
@@ -1505,6 +1706,128 @@
         ],
         "title": "AssetLifecycle",
         "type": "string"
+      },
+      "AssetNoteDTO": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "due": {
+            "description": "The review date arrived",
+            "title": "Due",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "review_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review At"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "written_on": {
+            "format": "date",
+            "title": "Written On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "asset_id",
+          "written_on",
+          "text",
+          "due"
+        ],
+        "title": "AssetNoteDTO",
+        "type": "object"
+      },
+      "AssetNoteRequest": {
+        "properties": {
+          "review_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review At"
+          },
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "written_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Today when omitted (create only)",
+            "title": "Written On"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "AssetNoteRequest",
+        "type": "object"
       },
       "AssetPriceHistoryDTO": {
         "description": "Closes of one period for the chart (at most 500 points) and its summary.",
@@ -14252,6 +14575,24 @@
         "title": "RowComparisonDTO",
         "type": "object"
       },
+      "RuleMetric": {
+        "enum": [
+          "PRICE",
+          "DIVIDEND_YIELD",
+          "PRICE_TO_EARNINGS",
+          "PRICE_TO_BOOK"
+        ],
+        "title": "RuleMetric",
+        "type": "string"
+      },
+      "RuleOperator": {
+        "enum": [
+          "ABOVE",
+          "BELOW"
+        ],
+        "title": "RuleOperator",
+        "type": "string"
+      },
       "SaleSignal": {
         "enum": [
           "EXCESS_RETURN",
@@ -18705,6 +19046,155 @@
         ]
       }
     },
+    "/api/v1/alert-rules": {
+      "get": {
+        "operationId": "list_alert_rules_api_v1_alert_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertRuleDTO"
+                  },
+                  "title": "Response List Alert Rules Api V1 Alert Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Alert Rules",
+        "tags": [
+          "Watch"
+        ]
+      },
+      "post": {
+        "operationId": "create_alert_rule_api_v1_alert_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertRuleCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRuleDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Alert Rule",
+        "tags": [
+          "Watch"
+        ]
+      }
+    },
+    "/api/v1/alert-rules/{rule_id}": {
+      "delete": {
+        "operationId": "delete_alert_rule_api_v1_alert_rules__rule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Alert Rule",
+        "tags": [
+          "Watch"
+        ]
+      },
+      "put": {
+        "operationId": "update_alert_rule_api_v1_alert_rules__rule_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertRuleUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRuleDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Alert Rule",
+        "tags": [
+          "Watch"
+        ]
+      }
+    },
     "/api/v1/alerts": {
       "get": {
         "operationId": "list_alerts_api_v1_alerts_get",
@@ -19416,6 +19906,205 @@
         "summary": "Refresh Asset Forecast",
         "tags": [
           "Assets"
+        ]
+      }
+    },
+    "/api/v1/assets/{asset_id}/notes": {
+      "get": {
+        "operationId": "list_asset_notes_api_v1_assets__asset_id__notes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetNoteDTO"
+                  },
+                  "title": "Response List Asset Notes Api V1 Assets  Asset Id  Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Asset Notes",
+        "tags": [
+          "Watch"
+        ]
+      },
+      "post": {
+        "operationId": "create_asset_note_api_v1_assets__asset_id__notes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetNoteDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Asset Note",
+        "tags": [
+          "Watch"
+        ]
+      }
+    },
+    "/api/v1/assets/{asset_id}/notes/{note_id}": {
+      "delete": {
+        "operationId": "delete_asset_note_api_v1_assets__asset_id__notes__note_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Asset Note",
+        "tags": [
+          "Watch"
+        ]
+      },
+      "put": {
+        "operationId": "update_asset_note_api_v1_assets__asset_id__notes__note_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetNoteDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Asset Note",
+        "tags": [
+          "Watch"
         ]
       }
     },
@@ -20990,6 +21679,53 @@
         "summary": "Resolve Worker Error",
         "tags": [
           "Market Data"
+        ]
+      }
+    },
+    "/api/v1/notes": {
+      "get": {
+        "operationId": "list_notes_api_v1_notes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "due_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Due Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetNoteDTO"
+                  },
+                  "title": "Response List Notes Api V1 Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notes",
+        "tags": [
+          "Watch"
         ]
       }
     },

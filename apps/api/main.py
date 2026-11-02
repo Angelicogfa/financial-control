@@ -33,6 +33,7 @@ from controllers.simulation.router import simulation_router
 from controllers.simulation.study_router import study_router
 from controllers.system.router import health_router
 from controllers.tax.router import tax_router
+from controllers.watch.router import alert_rules_router, notes_router
 from core.http_errors import install_error_handlers
 from core.logging import configure_logging
 from core.middleware import install_middleware
@@ -66,6 +67,8 @@ PROTECTED_ROUTERS = (
     instruments_router,
     search_router,
     reconciliation_router,
+    alert_rules_router,
+    notes_router,
 )
 
 

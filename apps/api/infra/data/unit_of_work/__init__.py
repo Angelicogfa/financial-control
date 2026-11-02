@@ -53,6 +53,10 @@ from infra.data.repositories.simulation import (
     SqlAlchemySimulationStudyRepository,
 )
 from infra.data.repositories.tax import SqlAlchemyTaxRuleRepository
+from infra.data.repositories.watch import (
+    SqlAlchemyAlertRuleRepository,
+    SqlAlchemyAssetNoteRepository,
+)
 
 
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
@@ -95,6 +99,8 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.recommendation = SqlAlchemyRecommendationRepository(self.session)
         self.comparison = SqlAlchemyComparisonRepository(self.session)
         self.reconciliations = SqlAlchemyReconciliationRepository(self.session)
+        self.alert_rules = SqlAlchemyAlertRuleRepository(self.session)
+        self.asset_notes = SqlAlchemyAssetNoteRepository(self.session)
         return self
 
     def __exit__(

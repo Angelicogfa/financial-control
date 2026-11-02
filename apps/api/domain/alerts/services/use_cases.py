@@ -40,6 +40,7 @@ from domain.shared.entities import AssetEntity
 from domain.shared.enums import AssetLifecycle, Market
 from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 from domain.tax.services.status import asset_tax_status
+from domain.watch.services import current_readings, rule_alerts, thesis_alerts
 
 VALUED_STATUSES = frozenset({AssetLifecycle.HELD, AssetLifecycle.ELIGIBLE})
 
@@ -130,6 +131,14 @@ class AlertHandler:
                 ),
             ]
             alerts.extend(self._calendar_alerts(uow, report, assets, reference))
+            alerts.extend(rule_alerts(current_readings(uow, active_only=True)))
+            alerts.extend(
+                thesis_alerts(
+                    uow.asset_notes.list_all(),
+                    {a.id: t for t, a in assets.items() if a.id is not None},
+                    reference,
+                )
+            )
             checks = uow.reconciliations.list_recent(1)
             alerts.extend(
                 position_check_alerts(

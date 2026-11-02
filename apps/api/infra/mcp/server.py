@@ -117,6 +117,11 @@ conta, sem gravar; `reconciliation.commit` grava a conferência (nunca altera o 
 `reconciliation.list` e `reconciliation.get` consultam as gravadas. `portfolio.income` traz os \
 proventos recebidos por mês e ano e o yield on cost.
 
+Acompanhar (Fase 48.R6):
+- `watch.rules_list`, `watch.rules_create` e `watch.rules_delete` cuidam das regras de alerta \
+(preço, DY, P/L, P/VP); as que disparam aparecem em `alerts.list`. `watch.notes_list` e \
+`watch.notes_create` guardam a tese de cada ativo com a data de revisão.
+
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \
 `research.classify`, `research.unfollow`.
