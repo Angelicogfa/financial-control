@@ -391,3 +391,7 @@ A Carteira tem as abas Posições, Rentabilidade, Proventos, Raio-X e Conferir. 
 ### Acompanhar e Aportar com o porquê (Fase 48.R6)
 
 Acompanhar tem as abas Lista (watchlist), Alertas e Teses. As regras de alerta (`alert_rules`) valem para qualquer ticker: são lidas do banco a cada `GET /alerts`, e o job `evaluate_alert_rules` guarda quando cada uma disparou. As teses (`asset_notes`) ficam no capítulo "Minha tese" de cada ativo, com data de revisão, e geram alerta quando vencem. No Aportar, cada linha do plano mostra as lentes do ativo, e um plano confirmado termina na etapa Conferir.
+
+### Imposto mensal (Fase 48.R7)
+
+A aba Carteira › Imposto mostra o IR da renda variável apurado a partir do livro (`domain/tax/assessment.py`). Cada venda sai pelo custo médio em reais, e o day trade é separado do swing. A apuração é mensal por categoria (operações comuns com a isenção de R$ 20 mil para ações, day trade e FII), com o prejuízo compensado dentro de cada categoria, o IRRF estimado descontado e o DARF 6015 com o vencimento. As aplicações no exterior têm apuração anual. `monthly_tax_assessments` guarda os valores e a data em que cada DARF foi pago; o alerta `DARF_DUE` avisa no Início.

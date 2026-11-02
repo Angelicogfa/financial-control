@@ -57,10 +57,11 @@ from infra.data.models.simulation import (
     SimulationRunModel,
     SimulationStudyModel,
 )
-from infra.data.models.tax import TaxRuleModel
+from infra.data.models.tax import MonthlyTaxAssessmentModel, TaxRuleModel
 from infra.data.models.watch import AlertRuleModel, AssetNoteModel
 
 __all__ = [
+    "MonthlyTaxAssessmentModel",
     "AlertRuleModel",
     "AssetNoteModel",
     "PositionReconciliationLineModel",

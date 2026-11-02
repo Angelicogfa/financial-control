@@ -929,6 +929,10 @@ export interface CvmDocumentDTO {
   typical_20?: number | null;
 }
 
+export interface DarfPaymentRequest {
+  paid_on?: string | null;
+}
+
 export interface DatedPriceDTO {
   date: string;
   price: number;
@@ -1276,6 +1280,17 @@ export interface ForecastValuationDTO {
   oos_improvement: number;
   oos_win_share: number;
   origins?: ValuationOriginDTO[];
+}
+
+export interface ForeignTaxYearDTO {
+  year: number;
+  sales_brl: number;
+  result_brl: number;
+  loss_in_brl: number;
+  loss_out_brl: number;
+  taxable_brl: number;
+  rate: number;
+  tax_brl: number;
 }
 
 export interface FundamentalSnapshotDTO {
@@ -2792,7 +2807,44 @@ export interface TaxBracketDTO {
   rate: number;
 }
 
+export interface TaxCategoryMonthDTO {
+  category: string;
+  sales_brl: number;
+  result_brl: number;
+  exempt_gain_brl: number;
+  loss_in_brl: number;
+  loss_used_brl: number;
+  loss_out_brl: number;
+  taxable_brl: number;
+  rate: number;
+  tax_brl: number;
+}
+
 export type TaxKind = "INCOME_TAX" | "IOF";
+
+export interface TaxLedgerIssueDTO {
+  ticker: string;
+  on: string;
+  message: string;
+}
+
+export interface TaxMonthDTO {
+  month: string;
+  categories: TaxCategoryMonthDTO[];
+  stock_sales_brl: number;
+  exempt: boolean;
+  tax_brl: number;
+  withheld_brl: number;
+  withheld_credit_in_brl: number;
+  withheld_credit_out_brl: number;
+  carried_darf_in_brl: number;
+  darf_brl: number;
+  carried_darf_out_brl: number;
+  due_date: string;
+  darf_code?: string;
+  paid_on?: string | null;
+  sales?: TaxSaleDTO[];
+}
 
 export type TaxRegime = "FIXED_INCOME_REGRESSIVE" | "FIXED_INCOME_EXEMPT" | "IOF_REGRESSIVE" | "STOCK_SWING_TRADE" | "ETF_BDR_SWING_TRADE" | "FII_CAPITAL_GAIN" | "FII_DISTRIBUTION" | "DIVIDEND_WITHHOLDING" | "JCP_WITHHOLDING" | "FOREIGN_ANNUAL" | "CRYPTO_CAPITAL_GAIN";
 
@@ -2816,6 +2868,29 @@ export interface TaxRuleDTO {
   valid_to?: string | null;
   legal_basis: string;
   description: string;
+}
+
+export interface TaxSaleDTO {
+  asset_id: number;
+  ticker: string;
+  on: string;
+  quantity: number;
+  sale_value_brl: number;
+  cost_brl: number;
+  fees_brl: number;
+  gain_brl: number;
+  day_trade: boolean;
+  category: string;
+}
+
+export interface TaxYearDTO {
+  year: number;
+  months: TaxMonthDTO[];
+  foreign?: ForeignTaxYearDTO | null;
+  tax_brl: number;
+  darf_brl: number;
+  open_darf_brl: number;
+  issues?: TaxLedgerIssueDTO[];
 }
 
 export interface TransactionCreateRequest {

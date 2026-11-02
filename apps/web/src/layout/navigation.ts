@@ -63,6 +63,7 @@ export const DESTINATIONS: Destination[] = [
       { to: "/carteira/proventos", label: "Proventos" },
       { to: "/carteira/raio-x", label: "Raio-X" },
       { to: "/carteira/conferir", label: "Conferir" },
+      { to: "/carteira/imposto", label: "Imposto" },
     ],
   },
   {

@@ -122,6 +122,11 @@ Acompanhar (Fase 48.R6):
 (preço, DY, P/L, P/VP); as que disparam aparecem em `alerts.list`. `watch.notes_list` e \
 `watch.notes_create` guardam a tese de cada ativo com a data de revisão.
 
+Imposto mensal (Fase 48.R7):
+- `tax.monthly_year` apura o IR da renda variável mês a mês (isenção de R$ 20 mil em ações, \
+prejuízo por categoria, DARF 6015) e o exterior por ano; `tax.monthly_month` mostra as vendas de \
+um mês; `tax.darf_paid` marca o DARF como pago.
+
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \
 `research.classify`, `research.unfollow`.

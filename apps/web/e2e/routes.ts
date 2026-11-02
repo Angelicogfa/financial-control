@@ -37,6 +37,7 @@ export const NEW_ROUTES: { path: string; screen: string }[] = [
   { path: "/carteira/proventos", screen: "Carteira › Proventos" },
   { path: "/carteira/raio-x", screen: "Carteira › Raio-X" },
   { path: "/carteira/conferir", screen: "Carteira › Conferir" },
+  { path: "/carteira/imposto", screen: "Carteira › Imposto" },
   { path: "/carteira/novo-ativo", screen: "Novo ativo" },
   { path: "/explorar", screen: "Explorar" },
   { path: "/explorar/garimpo", screen: "Explorar › Garimpo" },

@@ -34,6 +34,8 @@ import type {
   AssetNoteDTO,
   AssetNoteRequest,
   IncomeSummaryDTO,
+  TaxMonthDTO,
+  TaxYearDTO,
   InstrumentViewDTO,
   LineResolutionRequest,
   ReconciliationDTO,
@@ -270,6 +272,11 @@ export const api = {
     assetStatus: (id: number) => request<AssetTaxStatusDTO>(`/tax/assets/${id}/status`),
     compare: (body: FixedIncomeCompareRequest) =>
       request<FixedIncomeComparisonDTO>("/tax/fixed-income/compare", { method: "POST", body }),
+    /** Monthly income tax of a year and the DARF of each month (Phase 48.R7). */
+    monthly: (year?: number) => request<TaxYearDTO>("/tax/monthly", { query: { year } }),
+    month: (month: string) => request<TaxMonthDTO>(`/tax/monthly/${month}`),
+    markDarfPaid: (month: string, paidOn: string | null) =>
+      request<TaxMonthDTO>(`/tax/monthly/${month}/darf`, { method: "PUT", body: { paid_on: paidOn } }),
   },
   recommendation: {
     lenses: (filters: { arca_class?: string; source?: string; ticker?: string; eligible?: boolean } = {}) =>

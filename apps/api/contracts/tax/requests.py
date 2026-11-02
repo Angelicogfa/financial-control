@@ -41,3 +41,9 @@ class FixedIncomeCompareRequest(BaseModel):
     principal: float = Field(default=DEFAULT_PRINCIPAL, gt=0)
     start_date: date | None = None
     scenarios: list[RateScenarioRequest] | None = Field(default=None, max_length=6)
+
+
+class DarfPaymentRequest(BaseModel):
+    """The day the DARF of the month was paid; null marks it as not paid (Phase 48.R7)."""
+
+    paid_on: date | None = None

@@ -5737,6 +5737,25 @@
         "title": "CvmDocumentDTO",
         "type": "object"
       },
+      "DarfPaymentRequest": {
+        "description": "The day the DARF of the month was paid; null marks it as not paid (Phase 48.R7).",
+        "properties": {
+          "paid_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid On"
+          }
+        },
+        "title": "DarfPaymentRequest",
+        "type": "object"
+      },
       "DatedPriceDTO": {
         "properties": {
           "date": {
@@ -7841,6 +7860,54 @@
           "oos_win_share"
         ],
         "title": "ForecastValuationDTO",
+        "type": "object"
+      },
+      "ForeignTaxYearDTO": {
+        "properties": {
+          "loss_in_brl": {
+            "title": "Loss In Brl",
+            "type": "number"
+          },
+          "loss_out_brl": {
+            "title": "Loss Out Brl",
+            "type": "number"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "number"
+          },
+          "result_brl": {
+            "title": "Result Brl",
+            "type": "number"
+          },
+          "sales_brl": {
+            "title": "Sales Brl",
+            "type": "number"
+          },
+          "tax_brl": {
+            "title": "Tax Brl",
+            "type": "number"
+          },
+          "taxable_brl": {
+            "title": "Taxable Brl",
+            "type": "number"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "sales_brl",
+          "result_brl",
+          "loss_in_brl",
+          "loss_out_brl",
+          "taxable_brl",
+          "rate",
+          "tax_brl"
+        ],
+        "title": "ForeignTaxYearDTO",
         "type": "object"
       },
       "FundamentalSnapshotDTO": {
@@ -16792,6 +16859,66 @@
         "title": "TaxBracketDTO",
         "type": "object"
       },
+      "TaxCategoryMonthDTO": {
+        "description": "One category of a month: COMMON, DAY_TRADE or FII (Phase 48.R7).",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "exempt_gain_brl": {
+            "title": "Exempt Gain Brl",
+            "type": "number"
+          },
+          "loss_in_brl": {
+            "title": "Loss In Brl",
+            "type": "number"
+          },
+          "loss_out_brl": {
+            "title": "Loss Out Brl",
+            "type": "number"
+          },
+          "loss_used_brl": {
+            "title": "Loss Used Brl",
+            "type": "number"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "number"
+          },
+          "result_brl": {
+            "description": "Gains minus losses, exempt gains left out",
+            "title": "Result Brl",
+            "type": "number"
+          },
+          "sales_brl": {
+            "title": "Sales Brl",
+            "type": "number"
+          },
+          "tax_brl": {
+            "title": "Tax Brl",
+            "type": "number"
+          },
+          "taxable_brl": {
+            "title": "Taxable Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "sales_brl",
+          "result_brl",
+          "exempt_gain_brl",
+          "loss_in_brl",
+          "loss_used_brl",
+          "loss_out_brl",
+          "taxable_brl",
+          "rate",
+          "tax_brl"
+        ],
+        "title": "TaxCategoryMonthDTO",
+        "type": "object"
+      },
       "TaxKind": {
         "description": "Which tax a rule describes.",
         "enum": [
@@ -16800,6 +16927,129 @@
         ],
         "title": "TaxKind",
         "type": "string"
+      },
+      "TaxLedgerIssueDTO": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "on",
+          "message"
+        ],
+        "title": "TaxLedgerIssueDTO",
+        "type": "object"
+      },
+      "TaxMonthDTO": {
+        "properties": {
+          "carried_darf_in_brl": {
+            "title": "Carried Darf In Brl",
+            "type": "number"
+          },
+          "carried_darf_out_brl": {
+            "title": "Carried Darf Out Brl",
+            "type": "number"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/TaxCategoryMonthDTO"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "darf_brl": {
+            "description": "To pay by DARF 6015 (0 below R$ 10, carried)",
+            "title": "Darf Brl",
+            "type": "number"
+          },
+          "darf_code": {
+            "default": "6015",
+            "title": "Darf Code",
+            "type": "string"
+          },
+          "due_date": {
+            "format": "date",
+            "title": "Due Date",
+            "type": "string"
+          },
+          "exempt": {
+            "description": "Ações sales of the month up to R$ 20 thousand",
+            "title": "Exempt",
+            "type": "boolean"
+          },
+          "month": {
+            "description": "YYYY-MM",
+            "title": "Month",
+            "type": "string"
+          },
+          "paid_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid On"
+          },
+          "sales": {
+            "items": {
+              "$ref": "#/components/schemas/TaxSaleDTO"
+            },
+            "title": "Sales",
+            "type": "array"
+          },
+          "stock_sales_brl": {
+            "title": "Stock Sales Brl",
+            "type": "number"
+          },
+          "tax_brl": {
+            "title": "Tax Brl",
+            "type": "number"
+          },
+          "withheld_brl": {
+            "title": "Withheld Brl",
+            "type": "number"
+          },
+          "withheld_credit_in_brl": {
+            "title": "Withheld Credit In Brl",
+            "type": "number"
+          },
+          "withheld_credit_out_brl": {
+            "title": "Withheld Credit Out Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "categories",
+          "stock_sales_brl",
+          "exempt",
+          "tax_brl",
+          "withheld_brl",
+          "withheld_credit_in_brl",
+          "withheld_credit_out_brl",
+          "carried_darf_in_brl",
+          "darf_brl",
+          "carried_darf_out_brl",
+          "due_date"
+        ],
+        "title": "TaxMonthDTO",
+        "type": "object"
       },
       "TaxRegime": {
         "description": "Tax treatment of an income or gain for an individual (pessoa física) in Brazil.",
@@ -16937,6 +17187,119 @@
           "description"
         ],
         "title": "TaxRuleDTO",
+        "type": "object"
+      },
+      "TaxSaleDTO": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "integer"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "cost_brl": {
+            "title": "Cost Brl",
+            "type": "number"
+          },
+          "day_trade": {
+            "title": "Day Trade",
+            "type": "boolean"
+          },
+          "fees_brl": {
+            "title": "Fees Brl",
+            "type": "number"
+          },
+          "gain_brl": {
+            "title": "Gain Brl",
+            "type": "number"
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "sale_value_brl": {
+            "title": "Sale Value Brl",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "ticker",
+          "on",
+          "quantity",
+          "sale_value_brl",
+          "cost_brl",
+          "fees_brl",
+          "gain_brl",
+          "day_trade",
+          "category"
+        ],
+        "title": "TaxSaleDTO",
+        "type": "object"
+      },
+      "TaxYearDTO": {
+        "description": "The monthly income tax of a year (Phase 48.R7): what was due and what is still open.",
+        "properties": {
+          "darf_brl": {
+            "title": "Darf Brl",
+            "type": "number"
+          },
+          "foreign": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ForeignTaxYearDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/TaxLedgerIssueDTO"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/TaxMonthDTO"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "open_darf_brl": {
+            "title": "Open Darf Brl",
+            "type": "number"
+          },
+          "tax_brl": {
+            "title": "Tax Brl",
+            "type": "number"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "months",
+          "tax_brl",
+          "darf_brl",
+          "open_darf_brl"
+        ],
+        "title": "TaxYearDTO",
         "type": "object"
       },
       "TransactionCreateRequest": {
@@ -24978,6 +25341,150 @@
           }
         },
         "summary": "Compare Fixed Income",
+        "tags": [
+          "Tax"
+        ]
+      }
+    },
+    "/api/v1/tax/monthly": {
+      "get": {
+        "operationId": "get_monthly_tax_api_v1_tax_monthly_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 2000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxYearDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Monthly Tax",
+        "tags": [
+          "Tax"
+        ]
+      }
+    },
+    "/api/v1/tax/monthly/{month}": {
+      "get": {
+        "operationId": "get_tax_month_api_v1_tax_monthly__month__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxMonthDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tax Month",
+        "tags": [
+          "Tax"
+        ]
+      }
+    },
+    "/api/v1/tax/monthly/{month}/darf": {
+      "put": {
+        "operationId": "mark_darf_paid_api_v1_tax_monthly__month__darf_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DarfPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxMonthDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Darf Paid",
         "tags": [
           "Tax"
         ]

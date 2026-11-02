@@ -55,6 +55,7 @@ class AlertKind(StrEnum):
     POSITION_NOT_CHECKED = "POSITION_NOT_CHECKED"
     USER_RULE = "USER_RULE"
     THESIS_REVIEW = "THESIS_REVIEW"
+    DARF_DUE = "DARF_DUE"
 
 
 SEVERITY_ORDER = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}

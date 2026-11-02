@@ -44,7 +44,7 @@ from domain.simulation.repositories import (
     AbstractSimulationRepository,
     AbstractSimulationStudyRepository,
 )
-from domain.tax.repositories import AbstractTaxRuleRepository
+from domain.tax.repositories import AbstractTaxAssessmentRepository, AbstractTaxRuleRepository
 from domain.watch.repositories import AbstractAlertRuleRepository, AbstractAssetNoteRepository
 
 
@@ -70,6 +70,7 @@ class AbstractUnitOfWork(ABC):
     alert_dismissals: AbstractAlertDismissalRepository
     agent_keys: AbstractAgentKeyRepository
     tax_rules: AbstractTaxRuleRepository
+    tax_assessments: AbstractTaxAssessmentRepository
     simulations: AbstractSimulationRepository
     simulation_studies: AbstractSimulationStudyRepository
     cvm_issuers: AbstractIssuerTickerRepository

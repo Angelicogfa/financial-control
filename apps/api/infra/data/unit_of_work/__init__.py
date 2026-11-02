@@ -52,7 +52,10 @@ from infra.data.repositories.simulation import (
     SqlAlchemySimulationRepository,
     SqlAlchemySimulationStudyRepository,
 )
-from infra.data.repositories.tax import SqlAlchemyTaxRuleRepository
+from infra.data.repositories.tax import (
+    SqlAlchemyTaxAssessmentRepository,
+    SqlAlchemyTaxRuleRepository,
+)
 from infra.data.repositories.watch import (
     SqlAlchemyAlertRuleRepository,
     SqlAlchemyAssetNoteRepository,
@@ -87,6 +90,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.alert_dismissals = SqlAlchemyAlertDismissalRepository(self.session)
         self.agent_keys = SqlAlchemyAgentKeyRepository(self.session)
         self.tax_rules = SqlAlchemyTaxRuleRepository(self.session)
+        self.tax_assessments = SqlAlchemyTaxAssessmentRepository(self.session)
         self.simulations = SqlAlchemySimulationRepository(self.session)
         self.simulation_studies = SqlAlchemySimulationStudyRepository(self.session)
         self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)

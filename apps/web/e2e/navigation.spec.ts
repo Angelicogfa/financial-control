@@ -103,6 +103,14 @@ test("Acompanhar keeps an alert rule and the asset keeps its thesis (Phase 48.R6
   await expect(page.getByRole("list", { name: "Teses" })).toContainText("ITSA4");
 });
 
+test("the monthly income tax opens from the Carteira (Phase 48.R7)", async ({ page }) => {
+  await login(page);
+  await navigate(page, "Carteira");
+  await page.getByRole("navigation", { name: "Seções de Carteira" }).getByRole("link", { name: "Imposto" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Imposto" })).toBeVisible();
+  await expect(page.getByLabel("Imposto do ano")).toBeVisible();
+});
+
 test("an unknown address shows the not-found screen", async ({ page }) => {
   await login(page);
   await page.goto("/does-not-exist");

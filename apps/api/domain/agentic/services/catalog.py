@@ -132,7 +132,14 @@ from contracts.simulation.responses import (
     StudySummaryDTO,
 )
 from contracts.tax.requests import FixedIncomeCompareRequest
-from contracts.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
+from contracts.tax.responses import (
+    AssetTaxStatusDTO,
+    FixedIncomeComparisonDTO,
+    TaxMonthDTO,
+    TaxRuleDTO,
+    TaxYearDTO,
+)
+from contracts.tax.serializers import to_tax_month_dto, to_tax_year_dto
 from contracts.watch.requests import AlertRuleCreateRequest
 from contracts.watch.responses import AlertRuleDTO, AssetNoteDTO
 from contracts.watch.serializers import to_note_dto, to_rule_dto
@@ -167,6 +174,7 @@ from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.entities import SimulationKind
 from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
+from domain.tax.services.monthly import MonthlyTaxHandler
 from domain.tax.services.use_cases import TaxHandler
 from domain.watch.services import AlertRuleHandler, AssetNoteHandler
 
@@ -193,6 +201,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "instruments": "Instrumentos & Busca",
     "reconciliation": "Conferência de posição (B3)",
     "watch": "Acompanhar · regras de alerta e teses",
+    "tax": "Imposto mensal (IR e DARF)",
 }
 
 
@@ -354,6 +363,19 @@ class AssetNoteToolInput(BaseModel):
     asset_id: int
     text: str = Field(min_length=1, max_length=4000)
     review_at: date | None = None
+
+
+class TaxYearInput(BaseModel):
+    year: int | None = Field(default=None, ge=2000, description="Current year when omitted")
+
+
+class TaxMonthInput(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
+
+
+class DarfPaidInput(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
+    paid_on: date | None = Field(default=None, description="Null marks the DARF as not paid")
 
 
 class InstrumentKeyInput(BaseModel):
@@ -648,6 +670,10 @@ class AgenticRuntimeHandlers:
     @property
     def notes(self) -> AssetNoteHandler:
         return AssetNoteHandler(uow_factory=self.uow_factory)
+
+    @property
+    def monthly_tax(self) -> MonthlyTaxHandler:
+        return MonthlyTaxHandler(uow_factory=self.uow_factory)
 
     @property
     def reconciliation(self) -> ReconciliationHandler:
@@ -2107,6 +2133,41 @@ OPERATIONS = (
         input_model=AssetNoteToolInput,
         output_type=AssetNoteDTO,
         invoke=lambda h, p: to_note_dto(h.notes.create(p.asset_id, p.text, review_at=p.review_at)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 19. Monthly income tax and DARF (Phase 48.R7)
+    OperationSpec(
+        name="tax.monthly_year",
+        kind="query",
+        description=(
+            "Apuração mensal do IR sobre a renda variável num ano: por mês e categoria "
+            "(COMMON = ações, ETF e BDR em operações comuns; DAY_TRADE; FII), isenção de R$ 20 "
+            "mil em vendas de ações no mês, prejuízo acumulado por categoria, IRRF estimado, "
+            "DARF 6015 (abaixo de R$ 10 acumula) com vencimento e se foi pago; e a apuração "
+            "anual das aplicações no exterior (Lei 14.754/2023). Calculado do livro."
+        ),
+        input_model=TaxYearInput,
+        output_type=TaxYearDTO,
+        invoke=lambda h, p: to_tax_year_dto(h.monthly_tax.year(p.year or date.today().year)),
+    ),
+    OperationSpec(
+        name="tax.monthly_month",
+        kind="query",
+        description="Um mês da apuração com cada venda: custo médio, resultado e categoria.",
+        input_model=TaxMonthInput,
+        output_type=TaxMonthDTO,
+        invoke=lambda h, p: to_tax_month_dto(h.monthly_tax.month(p.month)),
+    ),
+    OperationSpec(
+        name="tax.darf_paid",
+        kind="command",
+        description="Marca (ou desmarca, com paid_on nulo) o DARF de um mês como pago.",
+        input_model=DarfPaidInput,
+        output_type=TaxMonthDTO,
+        invoke=lambda h, p: to_tax_month_dto(h.monthly_tax.set_paid(p.month, p.paid_on)),
     ),
 )
 

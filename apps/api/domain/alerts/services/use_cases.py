@@ -39,6 +39,8 @@ from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import AssetLifecycle, Market
 from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
+from domain.tax.services.monthly import compute as compute_tax
+from domain.tax.services.monthly import tax_alerts
 from domain.tax.services.status import asset_tax_status
 from domain.watch.services import current_readings, rule_alerts, thesis_alerts
 
@@ -139,6 +141,8 @@ class AlertHandler:
                     reference,
                 )
             )
+            tax_months, _, _ = compute_tax(uow, reference)
+            alerts.extend(tax_alerts(tax_months, uow.tax_assessments.paid_months(), reference))
             checks = uow.reconciliations.list_recent(1)
             alerts.extend(
                 position_check_alerts(
