@@ -16,6 +16,7 @@ from controllers.auth.dependencies import require_user
 from controllers.auth.router import auth_router
 from controllers.contributions.router import contributions_router
 from controllers.disclosures.router import disclosures_router
+from controllers.instruments.router import instruments_router, search_router
 from controllers.ledger.router import (
     earnings_router,
     events_router,
@@ -61,6 +62,8 @@ PROTECTED_ROUTERS = (
     simulation_router,
     disclosures_router,
     recommendation_router,
+    instruments_router,
+    search_router,
 )
 
 

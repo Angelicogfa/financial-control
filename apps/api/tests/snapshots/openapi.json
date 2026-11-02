@@ -6931,6 +6931,39 @@
         "title": "FixedIncomeValuationDTO",
         "type": "object"
       },
+      "ForecastBandDTO": {
+        "properties": {
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          },
+          "p5": {
+            "title": "P5",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p95": {
+            "title": "P95",
+            "type": "number"
+          },
+          "up_probability": {
+            "title": "Up Probability",
+            "type": "number"
+          }
+        },
+        "required": [
+          "months",
+          "p5",
+          "p50",
+          "p95",
+          "up_probability"
+        ],
+        "title": "ForecastBandDTO",
+        "type": "object"
+      },
       "ForecastDriverDTO": {
         "properties": {
           "annual": {
@@ -8722,6 +8755,496 @@
         "title": "InstitutionExposureDTO",
         "type": "object"
       },
+      "InstrumentForecastDTO": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastBandDTO"
+            },
+            "title": "Bands",
+            "type": "array"
+          },
+          "price_now": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Now"
+          },
+          "seal_label": {
+            "title": "Seal Label",
+            "type": "string"
+          },
+          "seal_level": {
+            "title": "Seal Level",
+            "type": "integer"
+          },
+          "status": {
+            "description": "OK | NOT_COMPUTED | INSUFFICIENT_HISTORY | LOW_CONFIDENCE",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "seal_level",
+          "seal_label"
+        ],
+        "title": "InstrumentForecastDTO",
+        "type": "object"
+      },
+      "InstrumentIndicatorsDTO": {
+        "properties": {
+          "avg_daily_volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Daily Volume"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "net_debt_to_ebitda": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Debt To Ebitda"
+          },
+          "price_to_book": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price To Book"
+          },
+          "price_to_earnings": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price To Earnings"
+          },
+          "profit_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Margin"
+          },
+          "return_on_equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return On Equity"
+          },
+          "suspicious": {
+            "default": false,
+            "title": "Suspicious",
+            "type": "boolean"
+          }
+        },
+        "title": "InstrumentIndicatorsDTO",
+        "type": "object"
+      },
+      "InstrumentKind": {
+        "enum": [
+          "LISTED",
+          "TREASURY"
+        ],
+        "title": "InstrumentKind",
+        "type": "string"
+      },
+      "InstrumentLensDTO": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "lens": {
+            "title": "Lens",
+            "type": "string"
+          },
+          "normalized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lens",
+          "confidence",
+          "note"
+        ],
+        "title": "InstrumentLensDTO",
+        "type": "object"
+      },
+      "InstrumentLensesDTO": {
+        "properties": {
+          "arca_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arca Class"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligible"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentLensDTO"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sector": {
+            "title": "Sector",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "as_of",
+          "source",
+          "sector",
+          "items"
+        ],
+        "title": "InstrumentLensesDTO",
+        "type": "object"
+      },
+      "InstrumentQuoteDTO": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "source": {
+            "$ref": "#/components/schemas/QuoteSource"
+          }
+        },
+        "required": [
+          "price",
+          "currency",
+          "source"
+        ],
+        "title": "InstrumentQuoteDTO",
+        "type": "object"
+      },
+      "InstrumentTrackingDTO": {
+        "properties": {
+          "arca_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arca Class"
+          },
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "integer"
+          },
+          "holds_position": {
+            "title": "Holds Position",
+            "type": "boolean"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "is_active",
+          "holds_position",
+          "purpose"
+        ],
+        "title": "InstrumentTrackingDTO",
+        "type": "object"
+      },
+      "InstrumentViewDTO": {
+        "description": "Any ticker or Tesouro bond, registered or not; only what the database already has.",
+        "properties": {
+          "asset_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Type"
+          },
+          "data_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Gaps",
+            "type": "array"
+          },
+          "forecast": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentForecastDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "in_catalog": {
+            "title": "In Catalog",
+            "type": "boolean"
+          },
+          "indicators": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentIndicatorsDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/InstrumentKind"
+          },
+          "lenses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentLensesDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentQuoteDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "tracking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentTrackingDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The registered asset; its id opens checklist, tax and ledger in /assets/{id}"
+          },
+          "treasury": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TreasuryTermsDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "ticker",
+          "name",
+          "in_catalog"
+        ],
+        "title": "InstrumentViewDTO",
+        "type": "object"
+      },
       "IntraClassStrategy": {
         "description": "How contributions are distributed among assets inside an ARCA class.",
         "enum": [
@@ -10228,6 +10751,16 @@
           "OPPORTUNITY"
         ],
         "title": "MarketStatus",
+        "type": "string"
+      },
+      "MatchKind": {
+        "enum": [
+          "TICKER_EXACT",
+          "TICKER_PREFIX",
+          "NAME_PREFIX",
+          "NAME_CONTAINS"
+        ],
+        "title": "MatchKind",
         "type": "string"
       },
       "MatrixBoardDTO": {
@@ -12474,6 +13007,16 @@
         "title": "QuoteFreshness",
         "type": "string"
       },
+      "QuoteSource": {
+        "enum": [
+          "STORED_QUOTE",
+          "CATALOG_CLOSE",
+          "TREASURY_PRICE",
+          "MANUAL"
+        ],
+        "title": "QuoteSource",
+        "type": "string"
+      },
       "QuoteStatusDTO": {
         "description": "How old the stored quotes are (Phase 38): screens read them, the worker refreshes them.",
         "properties": {
@@ -13666,6 +14209,112 @@
           "catalog_size"
         ],
         "title": "ScreenerResponseDTO",
+        "type": "object"
+      },
+      "SearchHitDTO": {
+        "properties": {
+          "asset_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Type"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "holds_position": {
+            "default": false,
+            "title": "Holds Position",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/InstrumentKind"
+          },
+          "match": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "tracked_asset_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracked Asset Id"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "ticker",
+          "name",
+          "match"
+        ],
+        "title": "SearchHitDTO",
+        "type": "object"
+      },
+      "SearchResultDTO": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitDTO"
+            },
+            "title": "Hits",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query",
+          "hits",
+          "total"
+        ],
+        "title": "SearchResultDTO",
         "type": "object"
       },
       "SelectedAssetDTO": {
@@ -16183,6 +16832,91 @@
           "total"
         ],
         "title": "TreasurySearchResponseDTO",
+        "type": "object"
+      },
+      "TreasuryTermsDTO": {
+        "properties": {
+          "base_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Date"
+          },
+          "bond_type": {
+            "title": "Bond Type",
+            "type": "string"
+          },
+          "buy_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Price"
+          },
+          "buy_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Rate"
+          },
+          "indexer": {
+            "title": "Indexer",
+            "type": "string"
+          },
+          "liquidity": {
+            "title": "Liquidity",
+            "type": "string"
+          },
+          "maturity_date": {
+            "format": "date",
+            "title": "Maturity Date",
+            "type": "string"
+          },
+          "sell_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Price"
+          },
+          "sell_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Rate"
+          }
+        },
+        "required": [
+          "bond_type",
+          "maturity_date",
+          "indexer",
+          "liquidity"
+        ],
+        "title": "TreasuryTermsDTO",
         "type": "object"
       },
       "UnknownTickerDTO": {
@@ -19368,6 +20102,107 @@
         ]
       }
     },
+    "/api/v1/instruments/{key}": {
+      "get": {
+        "operationId": "get_instrument_api_v1_instruments__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentViewDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Instrument",
+        "tags": [
+          "Instruments"
+        ]
+      }
+    },
+    "/api/v1/instruments/{key}/prices": {
+      "get": {
+        "operationId": "get_instrument_prices_api_v1_instruments__key__prices_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1y",
+              "enum": [
+                "6mo",
+                "1y",
+                "2y",
+                "5y",
+                "max"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetPriceHistoryDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Instrument Prices",
+        "tags": [
+          "Instruments"
+        ]
+      }
+    },
     "/api/v1/market/forecast-quality": {
       "get": {
         "description": "How often the price forecast bands held in the past (rolling-origin calibration).",
@@ -21478,6 +22313,62 @@
         "summary": "Classify Watchlist Item",
         "tags": [
           "Research"
+        ]
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "search_instruments_api_v1_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResultDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Instruments",
+        "tags": [
+          "Instruments"
         ]
       }
     },

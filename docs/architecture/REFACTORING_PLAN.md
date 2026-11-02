@@ -59,9 +59,9 @@ Hoje o ativo só tem página depois de cadastrado (`assets.id`). O mercado abre 
 
 | Rota | Handler | Compõe |
 |---|---|---|
-| `GET /search?q=&limit=` | `SearchQueryHandler` | `assets` (por ticker/nome) + `instrument_catalog` + catálogo do Tesouro; marca "na carteira", "acompanhando" |
-| `GET /instruments/{ticker}` | `InstrumentViewHandler` | §2.2 — resumo, veredito das lentes, faixa da previsão, posição |
-| `GET /instruments/{ticker}/{section}` | idem | `fundamentals`, `valuation`, `earnings`, `disclosures`, `prices?range=`, `forecast`, `checklist`, `tax`, `ledger` — delegam aos use cases atuais quando há `asset_id` |
+| `GET /search?q=&limit=` | `SearchHandler` | `assets` (por ticker/nome) + `instrument_catalog` + catálogo do Tesouro; marca "na carteira", "acompanhando" |
+| `GET /instruments/{key}` (ticker ou símbolo do Tesouro) | `InstrumentHandler` | §2.2 — resumo, veredito das lentes, faixa da previsão, posição |
+| `GET /instruments/{key}/prices?range=` | idem | fechamentos guardados de qualquer ticker. *Feito na R2:* indicadores, lentes e faixa da previsão vêm na própria view; as seções que exigem cadastro (checklist, IR, lançamentos, valuation) ficam em `/assets/{id}`, usando o `tracking.asset_id` da view |
 | `GET /portfolio/hub?tab=` | `PortfolioHubHandler` | consolidação + analytics + health + by-account num read model por aba |
 | `POST /reconciliation/b3/preview`, `POST /reconciliation/b3/commit`, `GET /reconciliation` | `PositionReconciliation*` | extrato de **Posição** da Área do Investidor × posição do livro por ticker e conta |
 | `GET /tax/monthly?year=`, `GET /tax/monthly/{yyyy-mm}` | `MonthlyTaxAssessment*` | lucro realizado do livro + regras de `domain/tax` (fecha TD-04) |
@@ -224,7 +224,7 @@ Cada fase termina com: testes de unidade e integração (`uv run pytest`, `npm t
 |---|---|---|---|---|
 | **R0** | Guarda-corpos | `tests/test_architecture_contracts.py` (inicialmente com a lista de violações atual como *allowlist* que só pode diminuir); snapshot do OpenAPI versionado; script de restauração de cópia da base para teste de migração; smoke E2E Playwright das 10 jornadas atuais | CI local verde; allowlist com 25 + 10 módulos de `domain` (no total 29 módulos e 118 imports, incluindo `infra → worker/controllers` e `core → domain`) | — |
 | **R1** | Unificação das camadas | use cases devolvem read models; DTOs só em `controllers`; portas no lugar de `infra` dentro de `domain`; MCP serializando read models; `health.py` dividido por pilar; `OVERVIEW.md` §2.1 corrigido | allowlist vazia; **diff de OpenAPI = 0**; golden e caracterização iguais | R0 |
-| **R2** | Instrumento por ticker e busca | `InstrumentView`, `GET /instruments/{ticker}[/section]`, `GET /search`; MCP `instruments.get`, `search` | qualquer ticker do catálogo abre sem cadastro; nenhum provedor chamado na requisição | R1 |
+| **R2** | Instrumento por ticker e busca | `InstrumentView`, `GET /instruments/{ticker}[/section]`, `GET /search`; MCP `instruments.get`, `instruments.prices`, `instruments.search` | qualquer ticker do catálogo abre sem cadastro; nenhum provedor chamado na requisição | R1 |
 | **R3** | Novo shell e arquitetura de informação | `app/` + `features/`; cache de dados; busca global `Ctrl+K`; 7 destinos; rotas em pt-BR (`/carteira`, `/ativo/:ticker`, `/explorar`, `/acompanhar`, `/aportar`, `/planejar`, `/lancamentos`) com **redirecionamento** de todas as rotas antigas | toda URL antiga leva ao lugar novo; testes de navegação | R2 |
 | **R4** | Página do ativo em capítulos | §3.3 com as abas atuais reaproveitadas como seções; "Como entraria" para não possuído | `/asset/:id` redireciona; mesmo dado que as abas atuais (teste contra `mockApi`) | R3 |
 | **R5** | Hub da carteira + Conferir | abas §3.4 (Posições, Rentabilidade, Proventos, Raio-X); `script_00040`; conferência de posição §3.5 | conferência do extrato real bate ou explica cada diferença; Desempenho e Saúde redirecionam | R3 |

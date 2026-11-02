@@ -105,6 +105,12 @@ Lançamentos (Ledger) e Extrato B3:
 - Importação de extrato B3: envie o conteúdo para `ledger.imports.preview` antes de confirmar \
 com `ledger.imports.commit`.
 
+Busca e página de qualquer ativo (Fase 48):
+- `instruments.search` acha por ticker ou nome entre os ativos cadastrados, o catálogo da B3 e \
+o Tesouro Direto; `instruments.get` abre qualquer um deles pela `key`, sem cadastrar (cotação \
+guardada, indicadores, lentes, faixa da previsão e, se cadastrado, o `asset_id`); \
+`instruments.prices` traz os fechamentos guardados.
+
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \
 `research.classify`, `research.unfollow`.

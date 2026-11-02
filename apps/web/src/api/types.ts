@@ -1131,6 +1131,14 @@ export interface FixedIncomeValuationDTO {
   curve_coverage?: number;
 }
 
+export interface ForecastBandDTO {
+  months: number;
+  p5: number;
+  p50: number;
+  p95: number;
+  up_probability: number;
+}
+
 export interface ForecastDriverDTO {
   key: "MARKET" | "OWN" | "VALUATION" | "EVENTS";
   label: string;
@@ -1437,6 +1445,81 @@ export interface InstitutionExposureDTO {
   usage: number;
 }
 
+export interface InstrumentForecastDTO {
+  status: string;
+  seal_level: number;
+  seal_label: string;
+  as_of?: string | null;
+  price_now?: number | null;
+  bands?: ForecastBandDTO[];
+}
+
+export interface InstrumentIndicatorsDTO {
+  fetched_at?: string | null;
+  price_to_earnings?: number | null;
+  price_to_book?: number | null;
+  dividend_yield?: number | null;
+  return_on_equity?: number | null;
+  profit_margin?: number | null;
+  net_debt_to_ebitda?: number | null;
+  market_cap?: number | null;
+  avg_daily_volume?: number | null;
+  suspicious?: boolean;
+}
+
+export type InstrumentKind = "LISTED" | "TREASURY";
+
+export interface InstrumentLensDTO {
+  lens: string;
+  normalized?: number | null;
+  confidence: number;
+  note: string;
+}
+
+export interface InstrumentLensesDTO {
+  as_of: string;
+  source: string;
+  arca_class?: string | null;
+  sector: string;
+  eligible?: boolean | null;
+  items: InstrumentLensDTO[];
+}
+
+export interface InstrumentQuoteDTO {
+  price: number;
+  currency: string;
+  source: QuoteSource;
+  change_pct?: number | null;
+  as_of?: string | null;
+  freshness?: string | null;
+}
+
+export interface InstrumentTrackingDTO {
+  asset_id: number;
+  is_active: boolean;
+  holds_position: boolean;
+  arca_class?: string | null;
+  purpose: string;
+}
+
+export interface InstrumentViewDTO {
+  key: string;
+  kind: InstrumentKind;
+  ticker: string;
+  name: string;
+  asset_type?: string | null;
+  sector?: string | null;
+  logo_url?: string | null;
+  in_catalog: boolean;
+  quote?: InstrumentQuoteDTO | null;
+  indicators?: InstrumentIndicatorsDTO | null;
+  lenses?: InstrumentLensesDTO | null;
+  forecast?: InstrumentForecastDTO | null;
+  tracking?: InstrumentTrackingDTO | null;
+  treasury?: TreasuryTermsDTO | null;
+  data_gaps?: string[];
+}
+
 export type IntraClassStrategy = "CERRADO" | "MANUAL_WEIGHT" | "EQUAL_WEIGHT";
 
 export interface JobRunDTO {
@@ -1690,6 +1773,8 @@ export interface MarketHistoryPointDTO {
 }
 
 export type MarketStatus = "NO_MARKET_DATA" | "BELOW_CURVE" | "NEUTRAL" | "OPPORTUNITY";
+
+export type MatchKind = "TICKER_EXACT" | "TICKER_PREFIX" | "NAME_PREFIX" | "NAME_CONTAINS";
 
 export interface MatrixBoardDTO {
   status: "OK" | "NOT_COMPUTED";
@@ -2089,6 +2174,8 @@ export interface QuoteDayDTO {
 
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
 
+export type QuoteSource = "STORED_QUOTE" | "CATALOG_CLOSE" | "TREASURY_PRICE" | "MANUAL";
+
 export interface QuoteStatusDTO {
   holdings: number;
   stored: number;
@@ -2285,6 +2372,25 @@ export interface ScreenerResponseDTO {
   arca_classes?: ArcaClass[];
   catalog_size: number;
   catalog_updated_at?: string | null;
+}
+
+export interface SearchHitDTO {
+  key: string;
+  kind: InstrumentKind;
+  ticker: string;
+  name: string;
+  asset_type?: string | null;
+  sector?: string | null;
+  close?: number | null;
+  match: MatchKind;
+  tracked_asset_id?: number | null;
+  holds_position?: boolean;
+}
+
+export interface SearchResultDTO {
+  query: string;
+  hits: SearchHitDTO[];
+  total: number;
 }
 
 export interface SelectedAssetDTO {
@@ -2680,6 +2786,18 @@ export interface TreasurySearchResponseDTO {
   catalog_size?: number;
   catalog_updated_at?: string | null;
   unavailable_reason?: string | null;
+}
+
+export interface TreasuryTermsDTO {
+  bond_type: string;
+  maturity_date: string;
+  indexer: string;
+  liquidity: string;
+  buy_rate?: number | null;
+  sell_rate?: number | null;
+  buy_price?: number | null;
+  sell_price?: number | null;
+  base_date?: string | null;
 }
 
 export interface UnknownTickerDTO {

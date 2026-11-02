@@ -41,6 +41,12 @@ from contracts.disclosures.responses import (
     EventStudyDTO,
     MarkReadResultDTO,
 )
+from contracts.instruments.responses import InstrumentViewDTO, SearchResultDTO
+from contracts.instruments.serializers import (
+    to_instrument_view_dto,
+    to_price_history_dto,
+    to_search_result_dto,
+)
 from contracts.ledger.requests import (
     CorporateEventRequest,
     EarningCreateRequest,
@@ -132,6 +138,7 @@ from domain.contributions.services.use_cases import ContributionHandler
 from domain.disclosures.services.statements_view import StatementsHandler
 from domain.disclosures.services.use_cases import DisclosureHandler
 from domain.forecast.services import ForecastHandler
+from domain.instruments.services import InstrumentHandler, SearchHandler
 from domain.ledger.services.use_cases.b3_import import ImportHandler
 from domain.ledger.services.use_cases.corporate_events import CorporateEventHandler
 from domain.ledger.services.use_cases.earnings import EarningHandler
@@ -173,6 +180,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "study": "Estudos de simulação",
     "disclosures": "Comunicados da CVM",
     "recommendation": "Recomendação",
+    "instruments": "Instrumentos & Busca",
 }
 
 
@@ -320,6 +328,22 @@ class AssetListInput(BaseModel):
     asset_type: str | None = None
     use_cerrado: bool | None = None
     active_only: bool = True
+
+
+class InstrumentKeyInput(BaseModel):
+    """A ticker (any B3 or international code) or a Tesouro symbol (tesouro-ipca-15052035)."""
+
+    key: str = Field(min_length=1, max_length=64)
+
+
+class InstrumentPricesInput(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+    range: Literal["6mo", "1y", "2y", "5y", "max"] = "1y"
+
+
+class InstrumentSearchInput(BaseModel):
+    q: str = Field(min_length=1, max_length=64)
+    limit: int = Field(default=10, ge=1, le=50)
 
 
 class AssetIdInput(BaseModel):
@@ -576,6 +600,14 @@ class AgenticRuntimeHandlers:
     @property
     def mining(self) -> MiningHandler:
         return MiningHandler(uow_factory=self.uow_factory)
+
+    @property
+    def instruments(self) -> InstrumentHandler:
+        return InstrumentHandler(uow_factory=self.uow_factory)
+
+    @property
+    def search(self) -> SearchHandler:
+        return SearchHandler(uow_factory=self.uow_factory)
 
     @property
     def recommendation(self) -> RecommendationHandler:
@@ -1857,6 +1889,50 @@ OPERATIONS = (
         input_model=MarkReadRequest,
         output_type=MarkReadResultDTO,
         invoke=lambda h, p: MarkReadResultDTO(updated=h.disclosures.mark_read(p)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 16. Instruments and global search (Phase 48.R2)
+    OperationSpec(
+        name="instruments.search",
+        kind="query",
+        description=(
+            "Busca global por ticker ou nome em uma só chamada: ativos cadastrados, catálogo da "
+            "B3 e títulos do Tesouro Direto, com o tipo de correspondência, o fechamento, se "
+            "está cadastrado (`tracked_asset_id`) e se há posição. Use a `key` de um resultado "
+            "em instruments.get."
+        ),
+        input_model=InstrumentSearchInput,
+        output_type=SearchResultDTO,
+        invoke=lambda h, p: to_search_result_dto(h.search.search(p.q, limit=p.limit)),
+    ),
+    OperationSpec(
+        name="instruments.get",
+        kind="query",
+        description=(
+            "Página de QUALQUER ativo, cadastrado ou não, pela `key` (ticker ou símbolo do "
+            "Tesouro): nome, tipo, setor, cotação guardada (ou o fechamento do catálogo), "
+            "indicadores, lentes da recomendação, faixa da previsão (só com selo a partir de "
+            "“Use com cautela”), termos do título do Tesouro e, se cadastrado, `tracking` com o "
+            "`asset_id` para assets.get, assets.checklist, assets.tax_status e os lançamentos. "
+            "Não cadastra nada e não chama provedor; `data_gaps` diz o que ainda falta no banco."
+        ),
+        input_model=InstrumentKeyInput,
+        output_type=InstrumentViewDTO,
+        invoke=lambda h, p: to_instrument_view_dto(h.instruments.view(p.key)),
+    ),
+    OperationSpec(
+        name="instruments.prices",
+        kind="query",
+        description=(
+            "Fechamentos diários guardados de qualquer ticker (6 meses, 1, 2 ou 5 anos, ou todo "
+            "o histórico), limpos como no gráfico do ativo, sem precisar de cadastro."
+        ),
+        input_model=InstrumentPricesInput,
+        output_type=AssetPriceHistoryDTO,
+        invoke=lambda h, p: to_price_history_dto(h.instruments.prices(p.key, p.range)),
     ),
 )
 
