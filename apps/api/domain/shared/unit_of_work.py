@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from types import TracebackType
 
 from domain.comparison.repositories import AbstractComparisonRepository
@@ -100,3 +101,7 @@ class AbstractUnitOfWork(ABC):
     def rollback(self) -> None:
         """Roll back any uncommitted changes in the current transaction."""
         raise NotImplementedError
+
+
+# What handlers receive: a callable that opens a fresh Unit of Work (`with uow_factory() as uow`).
+UoWFactory = Callable[[], AbstractUnitOfWork]

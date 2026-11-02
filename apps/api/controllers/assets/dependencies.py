@@ -9,12 +9,12 @@ from fastapi import Depends
 
 from composition import get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
 from core.settings import AppSettings, get_settings
 from domain.assets.services.use_cases import AssetHandler
 from domain.disclosures.services.statements_view import StatementsHandler
 from domain.forecast.services import ForecastHandler
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.unit_of_work import UoWFactory
 
 
 def get_asset_handler(

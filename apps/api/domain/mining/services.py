@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from controllers.research.responses import (
+from contracts.research.responses import (
     MiningFindingDTO,
     MiningMemberDTO,
     MiningOverviewDTO,
@@ -12,7 +12,6 @@ from controllers.research.responses import (
     MiningUniverseDTO,
     MiningWhyDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from domain.disclosures.services.sync import base_ticker
 from domain.forecast.valuation_model import month_of
 from domain.mining.findings import RecordLine, ranking_weights
@@ -21,6 +20,7 @@ from domain.mining.runs import MINING
 from domain.mining.signals import IMPROVEMENT, MOMENTUM, QUALITY, SIGNALS, VALUE
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.shared.enums import AssetType
+from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.data import px_symbol
 
 _WORDS = {

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
+from contracts.accounts.requests import AccountRequest
+from contracts.accounts.responses import AccountDTO
 from controllers.accounts.dependencies import get_account_handler
-from controllers.accounts.requests import AccountRequest
-from controllers.accounts.responses import AccountDTO
 from domain.accounts.services.use_cases import AccountHandler
 
 accounts_router = APIRouter(prefix="/accounts", tags=["Accounts"])

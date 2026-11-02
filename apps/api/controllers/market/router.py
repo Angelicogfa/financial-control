@@ -9,16 +9,16 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from controllers.assets.dependencies import get_forecast_handler
-from controllers.assets.responses import ForecastQualityDTO
-from controllers.market.dependencies import get_market_data_handler
-from controllers.market.responses import (
+from contracts.assets.responses import ForecastQualityDTO
+from contracts.market.responses import (
     JobRunDTO,
     QuoteDayDTO,
     QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
+from controllers.assets.dependencies import get_forecast_handler
+from controllers.market.dependencies import get_market_data_handler
 from domain.forecast.services import ForecastHandler
 from domain.market.services.use_cases import MarketDataHandler
 

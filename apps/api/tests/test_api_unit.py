@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from controllers.policy.requests import ArcaTargetItemDTO, ArcaTargetsUpdateRequest
+from contracts.policy.requests import ArcaTargetItemDTO, ArcaTargetsUpdateRequest
 from domain.policy.services.allocation import InvalidTargetsError
 from domain.policy.services.use_cases import PolicyHandler
 from domain.shared.enums import ArcaClass

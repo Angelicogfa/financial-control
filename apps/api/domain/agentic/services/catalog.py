@@ -15,16 +15,16 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from controllers.accounts.requests import AccountRequest
-from controllers.accounts.responses import AccountDTO
-from controllers.alerts.requests import AlertDismissRequest
-from controllers.alerts.responses import AlertsResponseDTO
-from controllers.assets.requests import (
+from contracts.accounts.requests import AccountRequest
+from contracts.accounts.responses import AccountDTO
+from contracts.alerts.requests import AlertDismissRequest
+from contracts.alerts.responses import AlertsResponseDTO
+from contracts.assets.requests import (
     AssetCreateRequest,
     AssetUpdateRequest,
     CerradoUpdateRequest,
 )
-from controllers.assets.responses import (
+from contracts.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
     AssetForecastDTO,
@@ -32,16 +32,16 @@ from controllers.assets.responses import (
     AssetResponseDTO,
     ForecastQualityDTO,
 )
-from controllers.contributions.requests import ContributionConfirmRequest
-from controllers.contributions.responses import SavedContributionPlanDTO
-from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import (
+from contracts.contributions.requests import ContributionConfirmRequest
+from contracts.contributions.responses import SavedContributionPlanDTO
+from contracts.disclosures.requests import MarkReadRequest
+from contracts.disclosures.responses import (
     AssetStatementsDTO,
     DisclosureFeedDTO,
     EventStudyDTO,
     MarkReadResultDTO,
 )
-from controllers.ledger.requests import (
+from contracts.ledger.requests import (
     CorporateEventRequest,
     EarningCreateRequest,
     EarningUpdateRequest,
@@ -49,28 +49,28 @@ from controllers.ledger.requests import (
     TransactionCreateRequest,
     TransactionUpdateRequest,
 )
-from controllers.ledger.responses import (
+from contracts.ledger.responses import (
     CorporateEventDTO,
     EarningResponseDTO,
     ImportCommitDTO,
     ImportPreviewDTO,
     TransactionResponseDTO,
 )
-from controllers.market.responses import (
+from contracts.market.responses import (
     JobRunDTO,
     QuoteDayDTO,
     QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
-from controllers.policy.requests import (
+from contracts.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
     PolicyUpdateRequest,
 )
-from controllers.policy.responses import PolicyDTO
-from controllers.portfolio.requests import ContributionSimulationRequest
-from controllers.portfolio.responses import (
+from contracts.policy.responses import PolicyDTO
+from contracts.portfolio.requests import ContributionSimulationRequest
+from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
     PortfolioAnalyticsResponseDTO,
@@ -80,7 +80,7 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from controllers.recommendation.responses import (
+from contracts.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
     LensBoardDTO,
@@ -90,8 +90,8 @@ from controllers.recommendation.responses import (
     RecommendationRunDTO,
     RowComparisonDTO,
 )
-from controllers.research.requests import WatchlistAddRequest
-from controllers.research.responses import (
+from contracts.research.requests import WatchlistAddRequest
+from contracts.research.responses import (
     AssetComparisonDTO,
     MiningOverviewDTO,
     MiningRecordDTO,
@@ -100,16 +100,15 @@ from controllers.research.responses import (
     ScreenerResponseDTO,
     WatchlistItemDTO,
 )
-from controllers.shared.dependencies import UoWFactory
-from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.requests import (
+from contracts.shared.responses import PaginatedResponse
+from contracts.simulation.requests import (
     BacktestRequest,
     CandidatesRequest,
     ProjectionRequest,
     StudyRequest,
     StudyVariationRequest,
 )
-from controllers.simulation.responses import (
+from contracts.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
     CoverageReportDTO,
@@ -122,8 +121,8 @@ from controllers.simulation.responses import (
     StudyDTO,
     StudySummaryDTO,
 )
-from controllers.tax.requests import FixedIncomeCompareRequest
-from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
+from contracts.tax.requests import FixedIncomeCompareRequest
+from contracts.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from core.errors import ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.accounts.services.use_cases import AccountHandler
@@ -137,6 +136,7 @@ from domain.ledger.services.use_cases.b3_import import ImportHandler
 from domain.ledger.services.use_cases.corporate_events import CorporateEventHandler
 from domain.ledger.services.use_cases.earnings import EarningHandler
 from domain.ledger.services.use_cases.transactions import TransactionHandler
+from domain.market.services.stored import distribution_lookup
 from domain.market.services.use_cases import MarketDataHandler
 from domain.mining.services import MiningHandler
 from domain.policy.services.use_cases import PolicyHandler
@@ -147,11 +147,11 @@ from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
+from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.entities import SimulationKind
 from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
 from domain.tax.services.use_cases import TaxHandler
-from infra.providers.stored import distribution_lookup
 
 OperationKind = Literal["query", "command"]
 

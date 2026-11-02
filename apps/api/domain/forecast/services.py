@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from controllers.assets.responses import (
+from contracts.assets.responses import (
     AssetForecastDTO,
     ForecastDriverDTO,
     ForecastEventDTO,
@@ -23,7 +23,6 @@ from controllers.assets.responses import (
     ForecastValuationDTO,
     ValuationOriginDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError, ValidationError
 from domain.disclosures.events import EVENT_LABELS
 from domain.forecast.calibration import ForecastCalibration
@@ -31,11 +30,12 @@ from domain.forecast.model import FALL_THRESHOLD, PriceForecast, chance_above
 from domain.forecast.repositories import StoredCalibration
 from domain.forecast.runs import REQUESTED_MIN_MONTHS, VALUATION, refresh_forecasts
 from domain.forecast.valuation_model import ValuationModel
+from domain.market.services.stored import stored_fundamentals, stored_macro_rates, stored_usd_brl
 from domain.policy.services.policy import current_policy
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.candidates import MIN_HISTORY_MONTHS
 from domain.simulation.studies import Seal, confidence_seal, money, pct
-from infra.providers.stored import stored_fundamentals, stored_macro_rates, stored_usd_brl
 
 MIN_SEAL_LEVEL = 2  # "Use com cautela" or better (decision 42.0-5)
 LEAD_HORIZON = 12

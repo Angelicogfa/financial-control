@@ -6,9 +6,9 @@ from fastapi import Depends
 
 from composition import get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.recommendation.services import RecommendationHandler
+from domain.shared.unit_of_work import UoWFactory
 
 
 def get_recommendation_handler(

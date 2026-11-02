@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
+from contracts.contributions.requests import ContributionConfirmRequest
+from contracts.contributions.responses import SavedContributionPlanDTO
+from contracts.portfolio.requests import ContributionSimulationRequest
 from controllers.contributions.dependencies import get_contribution_handler
-from controllers.contributions.requests import ContributionConfirmRequest
-from controllers.contributions.responses import SavedContributionPlanDTO
-from controllers.portfolio.requests import ContributionSimulationRequest
 from domain.contributions.services.use_cases import ContributionHandler
 from domain.shared.enums import ContributionPlanStatus
 

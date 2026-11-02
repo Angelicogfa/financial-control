@@ -10,7 +10,6 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from core.helpers.calendar import business_days_between, is_business_day
-from core.helpers.units import BCB_SERIES_UNITS
 from domain.assets.services.cerrado import (
     answer_freshness,
     evaluate,
@@ -30,6 +29,13 @@ from domain.forecast.runs import (
     run_calibration,
 )
 from domain.market.entities import Quote, QuoteFreshness
+from domain.market.services.batch import fetch_distributions, fetch_histories, fetch_market_data
+from domain.market.services.stored import (
+    refresh_stored_market_data,
+    refresh_stored_usd_brl,
+    stored_macro_rates,
+    stored_usd_brl,
+)
 from domain.market.services.treasury_prices import (
     RATE_SUFFIX,
     asset_family,
@@ -66,6 +72,7 @@ from domain.shared.enums import (
     SeriesUnit,
 )
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.units import BCB_SERIES_UNITS
 from domain.simulation.data import (
     FX_USDBRL,
     INDEX_SOURCES,
@@ -77,14 +84,7 @@ from domain.simulation.data import (
     tr_symbol,
 )
 from domain.simulation.runs import execute_next_run, queue_calibration
-from infra.providers.batch import fetch_distributions, fetch_histories, fetch_market_data
 from infra.providers.gateway import CachedMarketGateway
-from infra.providers.stored import (
-    refresh_stored_market_data,
-    refresh_stored_usd_brl,
-    stored_macro_rates,
-    stored_usd_brl,
-)
 
 UoWFactory = Callable[[], AbstractUnitOfWork]
 

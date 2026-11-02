@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from controllers.policy.requests import (
+from contracts.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
     ClassPolicyDTO,
@@ -18,8 +18,7 @@ from controllers.policy.requests import (
     RecommendationPolicyDTO,
     ValuationPolicyDTO,
 )
-from controllers.policy.responses import PolicyDTO
-from controllers.shared.dependencies import UoWFactory
+from contracts.policy.responses import PolicyDTO
 from domain.policy.services.assumptions import ProjectionAssumptions
 from domain.policy.services.policy import (
     ArcaPolicy,
@@ -32,6 +31,7 @@ from domain.policy.services.policy import (
     current_policy,
 )
 from domain.shared.enums import ArcaClass
+from domain.shared.unit_of_work import UoWFactory
 
 
 def to_policy_dto(policy: InvestmentPolicy) -> PolicyDTO:

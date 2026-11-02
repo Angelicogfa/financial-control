@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
+from contracts.disclosures.requests import MarkReadRequest
+from contracts.disclosures.responses import DisclosureFeedDTO, EventStudyDTO, MarkReadResultDTO
 from controllers.disclosures.dependencies import get_disclosure_handler
-from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import DisclosureFeedDTO, EventStudyDTO, MarkReadResultDTO
 from domain.disclosures.services.use_cases import DisclosureHandler
 
 disclosures_router = APIRouter(prefix="/disclosures", tags=["Disclosures"])

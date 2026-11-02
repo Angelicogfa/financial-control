@@ -7,9 +7,12 @@ import time
 from decimal import Decimal
 
 from domain.market.entities import Fundamentals, Quote
+from domain.market.services.batch import fetch_market_data
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import AssetType
-from infra.providers.batch import fetch_market_data
+from infra.cache.redis_cache import InMemoryCache
+from infra.providers.error_tracker import capture_worker_request_errors
+from infra.providers.gateway import CachedMarketGateway
 
 
 class _SlowGateway:
@@ -19,6 +22,10 @@ class _SlowGateway:
         self.active = 0
         self.peak = 0
         self._lock = threading.Lock()
+        self.timeouts: list[tuple[str, str, float]] = []
+
+    def report_fetch_timeout(self, kind: str, ticker: str, timeout_seconds: float) -> None:
+        self.timeouts.append((kind, ticker, timeout_seconds))
 
     def _enter(self, ticker: str) -> None:
         with self._lock:
@@ -81,3 +88,17 @@ def test_timeout_and_provider_errors_do_not_block_valuation() -> None:
     assert time.perf_counter() - started < 2.0
     assert set(snapshot.quotes) == {"FAST3"}
     assert snapshot.timed_out == ["SLOW3"]
+    assert gateway.timeouts == [("quote", "SLOW3", 0.5)]
+
+
+def test_gateway_records_a_batch_timeout_as_a_worker_request_error() -> None:
+    gateway = CachedMarketGateway(cache=InMemoryCache())
+
+    with capture_worker_request_errors("warm_portfolio_quotes") as recorder:
+        gateway.report_fetch_timeout("quote", "SLOW3", 0.5)
+
+    [error] = recorder.drain()
+    assert (error.provider, error.operation, error.target) == ("gateway", "quote", "SLOW3")
+    assert error.request_url == "batch://quote/SLOW3"
+    assert error.error_type == "TimeoutError"
+    assert "0.5s" in error.error_detail

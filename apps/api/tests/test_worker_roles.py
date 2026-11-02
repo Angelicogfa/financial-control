@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from core.settings import Settings
 from domain.market.services.use_cases import MANUAL_JOBS
+from infra.cache.job_lock import LocalJobLock
 from worker.roles import INGEST, INGEST_JOBS, PROCESS, PROCESS_JOBS, job_name, runs_here
-from worker.runner import LocalJobLock
 from worker.scheduler import create_scheduler
 
 

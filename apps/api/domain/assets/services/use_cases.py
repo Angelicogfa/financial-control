@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from controllers.assets.requests import AssetCreateRequest, AssetUpdateRequest, CerradoUpdateRequest
-from controllers.assets.responses import (
+from contracts.assets.requests import AssetCreateRequest, AssetUpdateRequest, CerradoUpdateRequest
+from contracts.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
     AssetPriceHistoryDTO,
@@ -16,10 +16,9 @@ from controllers.assets.responses import (
     DatedPriceDTO,
     PricePointDTO,
 )
-from controllers.assets.serializers import to_asset_analysis_dto, to_asset_dto
-from controllers.shared.dependencies import UoWFactory
-from controllers.shared.responses import PaginatedResponse
-from controllers.shared.serializers import to_page_meta_dto
+from contracts.assets.serializers import to_asset_analysis_dto, to_asset_dto
+from contracts.shared.responses import PaginatedResponse
+from contracts.shared.serializers import to_page_meta_dto
 from core.errors import ConflictError, NotFoundError, ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.assets.services.codes import CODE_ASSET_TYPES, generated_asset_code
@@ -28,6 +27,7 @@ from domain.market.services.price_chart import PRICE_RANGES
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AssetEntity, ChecklistAnswer, FixedIncomeTermEntity
 from domain.shared.enums import AssetLifecycle, AssetType
+from domain.shared.unit_of_work import UoWFactory
 
 
 class AssetHandler:

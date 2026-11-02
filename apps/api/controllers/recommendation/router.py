@@ -7,8 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.recommendation.dependencies import get_recommendation_handler
-from controllers.recommendation.responses import (
+from contracts.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
     LensBoardDTO,
@@ -18,6 +17,7 @@ from controllers.recommendation.responses import (
     RecommendationRunDTO,
     RowComparisonDTO,
 )
+from controllers.recommendation.dependencies import get_recommendation_handler
 from domain.recommendation.services import RecommendationHandler
 
 recommendation_router = APIRouter(prefix="/recommendation", tags=["Recommendation"])

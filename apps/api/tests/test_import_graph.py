@@ -10,6 +10,7 @@ API_DIR = Path(__file__).resolve().parents[1]
 SOURCES = [
     API_DIR / "core",
     API_DIR / "infra",
+    API_DIR / "contracts",
     API_DIR / "domain",
     API_DIR / "controllers",
     API_DIR / "worker",

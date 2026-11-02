@@ -119,25 +119,26 @@ Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e nova
 
 Além da rotina semanal, a API busca os demonstrativos de um ativo **logo após cadastrá-lo** pela Pesquisa ou pela importação B3 (`StatementRefresher`, em `BackgroundTasks`, sem atrasar a resposta).
 
-### 2.1 Estrutura do backend (ADR 0008)
+### 2.1 Estrutura do backend (ADRs 0009 e 0010)
 
 ```text
-apps/api/src/fincontrol_api/
+apps/api/
   main.py            app factory: middleware, erros e routers
-  composition.py     raiz de composição (SqlAlchemyUnitOfWork, gateway, sonda do banco)
-  core/              config, security, deps, middleware, http_errors
-  modules/<feature>/ router → use_cases → service, com schemas, dependencies e serializers
-apps/packages/
-  config/            Settings compartilhado (espelha o .env.example)
-  core/              domínio puro e portas (repositórios, Unit of Work, gateway)
-  persistence/       core/ (Unit of Work), models/, repositories/, mappers/ por feature, migrations/
+  composition.py     raiz de composição (SqlAlchemyUnitOfWork, gateway, sonda do banco, serviços)
+  controllers/<ctx>/ router.py e dependencies.py: validam o HTTP e chamam o handler
+  contracts/<ctx>/   requests.py, responses.py e serializers.py (Pydantic, sem FastAPI)
+  domain/<ctx>/      entities/, services/ (handlers e motores puros), repositories/ (portas)
+  domain/shared/     entidades e enums comuns, unit_of_work.py (UoW e UoWFactory), gateways.py
+  infra/             data/ (models, mappers, UoW, repositórios, migrations), cache/, providers/, mcp/
+  core/              settings, logging, middleware, security, erros, helpers sem domínio
+  worker/            scheduler, runner e jobs (papéis de ingestão e processamento)
 ```
 
-A API e o worker usam os mesmos pacotes de `apps/packages/`; o worker nunca importa a API.
+A API, o MCP e o worker compõem os mesmos handlers. O domínio depende apenas de portas: o UoW e a `MarketDataGateway`, implementada pelo `CachedMarketGateway`.
 
-**Guarda-corpos da Fase 48.R0** (a correção desta seção para a estrutura atual é da R1):
+**Guarda-corpos (Fases 48.R0 e 48.R1):**
 
-- `tests/test_architecture_contracts.py` verifica o contrato de imports entre camadas (`core` não importa nenhuma; `domain` não importa `controllers`, `infra` nem `worker`; `controllers` não importa `infra.data` nem `worker`; `infra` e `worker` não importam `controllers`). As violações anteriores ao contrato estão em `tests/architecture_allowlist.py`, que só pode diminuir: 29 módulos e 118 imports, sendo 25 módulos de `domain` que importam `controllers` e 10 que importam `infra`.
+- `tests/test_architecture_contracts.py` verifica o contrato de imports entre camadas (tabela no ADR 0010). A allowlist (`tests/architecture_allowlist.py`) foi zerada na R1 e continua vazia.
 - `tests/test_openapi_snapshot.py` congela o contrato da API em `tests/snapshots/openapi.json`. Uma mudança intencional regenera o snapshot com `scripts/update_openapi_snapshot.py`.
 - `scripts/migration_rehearsal.sh` restaura um dump da base real num Postgres descartável e roda `infra/data/migration_rehearsal.py`, que confere se as migrations são só aditivas (nenhuma tabela, coluna ou linha perdida) e faz a ida e volta `downgrade`/`upgrade`.
 - `apps/web/e2e/navigation.spec.ts` abre cada tela listada em `e2e/routes.ts`; essas URLs precisam continuar funcionando, ou redirecionar, durante a reconstrução.

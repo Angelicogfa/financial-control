@@ -13,14 +13,9 @@ from sqlalchemy.orm import sessionmaker
 
 from core.settings import Settings
 from domain.shared.enums import JobRunStatus
+from infra.cache.job_lock import LocalJobLock, RedisJobLock, build_job_lock
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
-from worker.runner import (
-    LocalJobLock,
-    RedisJobLock,
-    RetryPolicy,
-    build_job_lock,
-    run_job,
-)
+from worker.runner import RetryPolicy, run_job
 from worker.scheduler import create_scheduler
 
 UoWFactory = Callable[[], SqlAlchemyUnitOfWork]

@@ -34,9 +34,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import Receive, Scope, Send
 
-from composition import get_market_gateway, get_uow_factory
-from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
+from composition import get_market_gateway, get_portfolio_service, get_uow_factory
 from core.errors import ConflictError, DomainError
 from core.http_errors import error_body
 from core.security import AuthenticationError
@@ -51,6 +49,7 @@ from domain.agentic.services.catalog import (
 from domain.agentic.services.use_cases import AgentKeyHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AgentApiKeyEntity
+from domain.shared.unit_of_work import UoWFactory
 
 logger = logging.getLogger("fincontrol_api")
 

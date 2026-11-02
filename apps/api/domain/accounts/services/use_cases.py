@@ -7,12 +7,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from controllers.accounts.requests import AccountRequest
-from controllers.accounts.responses import AccountDTO
-from controllers.shared.dependencies import UoWFactory
+from contracts.accounts.requests import AccountRequest
+from contracts.accounts.responses import AccountDTO
 from core.errors import ConflictError, NotFoundError, ValidationError
 from domain.shared.entities import AccountEntity
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 
 def to_account_dto(account: AccountEntity) -> AccountDTO:

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from controllers.system.responses import ReadinessCheckDTO, ReadinessDTO
-from infra.data.health import DatabaseStatus
-from infra.providers.gateway import CachedMarketGateway
+from contracts.system.responses import ReadinessCheckDTO, ReadinessDTO
+from domain.shared.gateways import MarketDataGateway
+from domain.system.entities import DatabaseStatus
 
 DatabaseProbe = Callable[[], DatabaseStatus]
 
@@ -17,7 +17,7 @@ DatabaseProbe = Callable[[], DatabaseStatus]
 class SystemHandler:
     """Reports whether the API can serve traffic: database reachable and migrated, cache up."""
 
-    def __init__(self, gateway: CachedMarketGateway, database_probe: DatabaseProbe) -> None:
+    def __init__(self, gateway: MarketDataGateway, database_probe: DatabaseProbe) -> None:
         self.gateway = gateway
         self.database_probe = database_probe
 

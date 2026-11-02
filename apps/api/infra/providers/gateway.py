@@ -32,6 +32,7 @@ from infra.providers.b3_listed import B3ListedProvider
 from infra.providers.bcb import BcbSgsProvider
 from infra.providers.brapi import BrapiProvider
 from infra.providers.cvm import CvmOpenDataProvider
+from infra.providers.error_tracker import report_provider_error
 from infra.providers.tesouro import TesouroTransparenteProvider
 from infra.providers.yfinance_provider import YFinanceProvider
 
@@ -360,6 +361,17 @@ class CachedMarketGateway:
                 self.quote_ttl,
             )
         return result
+
+    def report_fetch_timeout(self, kind: str, ticker: str, timeout_seconds: float) -> None:
+        """Record a batch fetch that missed its deadline as a worker request error."""
+        report_provider_error(
+            provider="gateway",
+            operation=kind,
+            target=ticker,
+            request_url=f"batch://{kind}/{ticker}",
+            error_type="TimeoutError",
+            error_detail=f"Batch market fetch timed out after {timeout_seconds:.1f}s",
+        )
 
     def get_usd_brl_rate(self) -> float:
         """Fetch live or cached USD/BRL exchange rate with safe fallback."""

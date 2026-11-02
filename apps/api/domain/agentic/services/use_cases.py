@@ -12,24 +12,24 @@ import secrets
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-from controllers.agentic.requests import (
+from contracts.agentic.requests import (
     AgentKeyCreateRequest,
     AgentKeyRenewRequest,
     AgentKeyUpdateRequest,
     KeyExpiryDays,
 )
-from controllers.agentic.responses import (
+from contracts.agentic.responses import (
     AgentKeyCreatedDTO,
     AgentKeyDTO,
     GrantableContextDTO,
     GrantableOperationDTO,
     GrantOptionsDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from core.security import AuthenticationError
 from domain.agentic.services.catalog import CONTEXT_LABELS, catalog, validate_grant
 from domain.shared.entities import AgentApiKeyEntity, AgentGrant
+from domain.shared.unit_of_work import UoWFactory
 
 KEY_PREFIX_TAG = "fck_"
 KEY_ENTROPY_BYTES = 32

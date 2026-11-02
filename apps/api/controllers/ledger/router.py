@@ -21,13 +21,7 @@ from fastapi import (
 from pydantic import TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
-from controllers.ledger.dependencies import (
-    get_earning_handler,
-    get_event_handler,
-    get_import_handler,
-    get_transaction_handler,
-)
-from controllers.ledger.requests import (
+from contracts.ledger.requests import (
     CorporateEventRequest,
     EarningCreateRequest,
     EarningUpdateRequest,
@@ -35,16 +29,22 @@ from controllers.ledger.requests import (
     TransactionCreateRequest,
     TransactionUpdateRequest,
 )
-from controllers.ledger.responses import (
+from contracts.ledger.responses import (
     CorporateEventDTO,
     EarningResponseDTO,
     ImportCommitDTO,
     ImportPreviewDTO,
     TransactionResponseDTO,
 )
+from contracts.shared.responses import PaginatedResponse
+from controllers.ledger.dependencies import (
+    get_earning_handler,
+    get_event_handler,
+    get_import_handler,
+    get_transaction_handler,
+)
 from controllers.research.dependencies import get_statement_refresher
 from controllers.shared.dependencies import pagination_query
-from controllers.shared.responses import PaginatedResponse
 from core.errors import ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.ledger.services.use_cases.b3_import import ImportHandler

@@ -17,6 +17,14 @@ from domain.market.entities import (
     Quote,
 )
 from domain.market.services.macro import annual_cdi_rate, annual_ipca_rate
+from domain.market.services.stored import (
+    MAX_LIVE_FETCH,
+    distribution_lookup,
+    stored_distributions,
+    stored_histories,
+    stored_macro_rates,
+    stored_market_data,
+)
 from domain.shared.entities import (
     AssetEntity,
     CatalogInstrument,
@@ -25,14 +33,6 @@ from domain.shared.entities import (
 )
 from domain.shared.enums import ArcaClass, AssetType, SeriesUnit, TransactionKind
 from infra.providers.gateway import CachedMarketGateway
-from infra.providers.stored import (
-    MAX_LIVE_FETCH,
-    distribution_lookup,
-    stored_distributions,
-    stored_histories,
-    stored_macro_rates,
-    stored_market_data,
-)
 from worker.jobs import (
     refresh_catalog_fundamentals_job,
     refresh_distributions_job,

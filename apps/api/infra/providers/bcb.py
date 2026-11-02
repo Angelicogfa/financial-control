@@ -6,8 +6,8 @@ from datetime import date, datetime, timedelta
 
 import httpx
 
-from core.helpers.units import BCB_SERIES_UNITS, rate_fraction
 from domain.shared.entities import MarketSeriesPoint
+from domain.shared.units import BCB_SERIES_UNITS, rate_fraction
 from infra.providers.error_tracker import report_provider_error
 
 BCB_SERIES_CDI_DAILY = 12

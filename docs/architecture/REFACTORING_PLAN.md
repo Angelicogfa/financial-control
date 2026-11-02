@@ -34,6 +34,8 @@ infra/providers, infra/mcp    inalterados; MCP passa a serializar read models co
 worker/                       inalterado + jobs dos novos read models
 ```
 
+> **Decisão da R1 (2026-11-01, [ADR 0010](./adr/0010-contracts-package-and-domain-ports.md)):** os schemas Pydantic e os serializadores saíram de `controllers` para `contracts/<context>/`, que controllers, handlers e MCP compartilham. Read models em dataclass só para as formas novas (`InstrumentView`, `PortfolioHub`…) e quando um handler for reescrito. A tabela de imports valendo é a do ADR 0010.
+
 **Regras novas, verificadas por teste de arquitetura** (`tests/test_architecture_contracts.py`, sobre o grafo de imports que `test_import_graph.py` já percorre):
 
 | De | Pode importar | Não pode importar |

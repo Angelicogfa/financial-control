@@ -7,12 +7,11 @@ indicators of the last delivery at today's price.
 
 from __future__ import annotations
 
-from controllers.disclosures.responses import (
+from contracts.disclosures.responses import (
     AssetStatementsDTO,
     StatementDeliveryDTO,
     StatementValuationDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError
 from domain.disclosures.services.sync import base_ticker, company_assets
 from domain.disclosures.statements import (
@@ -27,6 +26,7 @@ from domain.disclosures.statements import (
     delivery_history,
 )
 from domain.forecast.valuation_pit import valuation
+from domain.shared.unit_of_work import UoWFactory
 
 MAX_DELIVERIES = 40  # ten years of quarters
 

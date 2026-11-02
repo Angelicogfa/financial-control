@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -17,8 +17,9 @@ from tests.conftest import offline_gateway
 from tests.test_mining_signals import seed_panel
 from worker.jobs import refresh_asset_lenses_job, run_mining_job
 
-TODAY = date.today()
 NOW = datetime.now(UTC)
+# The run is dated in UTC: date.today() (local) differs from 21h to midnight in Brasília.
+TODAY = NOW.date()
 
 
 def _prepare(api: SimpleNamespace) -> int:

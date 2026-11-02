@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from controllers.simulation.dependencies import get_study_handler
-from controllers.simulation.requests import StudyRequest, StudyVariationRequest
-from controllers.simulation.responses import (
+from contracts.simulation.requests import StudyRequest, StudyVariationRequest
+from contracts.simulation.responses import (
     StudyComparisonDTO,
     StudyDTO,
     StudySummaryDTO,
     StudyVersionDTO,
 )
+from controllers.simulation.dependencies import get_study_handler
 from domain.simulation.services.studies import StudyHandler
 
 study_router = APIRouter(prefix="/studies", tags=["Simulation studies"])

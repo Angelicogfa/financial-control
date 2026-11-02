@@ -145,7 +145,7 @@ def test_custom_executions_and_discard(client) -> None:  # type: ignore[no-untyp
 def test_foreign_execution_without_fx_is_read_in_brl() -> None:
     from decimal import Decimal
 
-    from controllers.contributions.requests import ExecutionDTO
+    from contracts.contributions.requests import ExecutionDTO
     from domain.contributions.services.use_cases import _execution
 
     brl_priced = _execution(

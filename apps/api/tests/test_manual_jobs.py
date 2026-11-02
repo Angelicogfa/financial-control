@@ -13,9 +13,10 @@ from domain.agentic.services.catalog import CATALOG_BY_NAME, AgenticRuntimeHandl
 from domain.market.services.use_cases import MANUAL_JOBS
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.enums import JobRunStatus
+from infra.cache.job_lock import LocalJobLock
 from tests.conftest import offline_gateway
 from worker import run_now as cli
-from worker.runner import LocalJobLock, RetryPolicy, run_requested
+from worker.runner import RetryPolicy, run_requested
 from worker.scheduler import manual_jobs
 
 NAME = "sync_simulation_history"

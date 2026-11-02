@@ -9,9 +9,8 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.portfolio.dependencies import get_portfolio_handler
-from controllers.portfolio.requests import ContributionSimulationRequest
-from controllers.portfolio.responses import (
+from contracts.portfolio.requests import ContributionSimulationRequest
+from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
     PortfolioAnalyticsResponseDTO,
@@ -21,6 +20,7 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
+from controllers.portfolio.dependencies import get_portfolio_handler
 from domain.portfolio.services.use_cases import PortfolioHandler
 
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])

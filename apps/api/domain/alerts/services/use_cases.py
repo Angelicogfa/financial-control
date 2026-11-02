@@ -8,9 +8,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 
-from controllers.alerts.requests import AlertDismissRequest
-from controllers.alerts.responses import AlertDTO, AlertsResponseDTO
-from controllers.shared.dependencies import UoWFactory
+from contracts.alerts.requests import AlertDismissRequest
+from contracts.alerts.responses import AlertDTO, AlertsResponseDTO
 from core.settings import get_settings
 from domain.alerts.services.evaluator import (
     RELEVANT_FACT_WINDOW_DAYS,
@@ -33,13 +32,13 @@ from domain.alerts.services.evaluator import (
 from domain.disclosures.entities import RELEVANT_FACT
 from domain.disclosures.services.sync import base_ticker, company_assets
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
+from domain.market.services.stored import stored_market_data
 from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import AssetLifecycle
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 from domain.tax.services.status import asset_tax_status
-from infra.providers.stored import stored_market_data
 
 VALUED_STATUSES = frozenset({AssetLifecycle.HELD, AssetLifecycle.ELIGIBLE})
 

@@ -19,7 +19,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 from sqlalchemy import create_engine, inspect
 
-from controllers.agentic.requests import (
+from contracts.agentic.requests import (
     AgentKeyCreateRequest,
     AgentKeyRenewRequest,
     AgentKeyUpdateRequest,

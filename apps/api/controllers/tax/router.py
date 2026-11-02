@@ -9,9 +9,9 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
+from contracts.tax.requests import FixedIncomeCompareRequest
+from contracts.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from controllers.tax.dependencies import get_tax_handler
-from controllers.tax.requests import FixedIncomeCompareRequest
-from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
 from domain.tax.services.use_cases import TaxHandler
 
 tax_router = APIRouter(prefix="/tax", tags=["Tax"])

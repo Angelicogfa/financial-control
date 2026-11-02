@@ -8,22 +8,22 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 
-from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
-from controllers.research.responses import (
+from contracts.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
+from contracts.research.responses import (
     AssetComparisonDTO,
     ScreenerResponseDTO,
     TreasurySearchResponseDTO,
     WatchlistItemDTO,
 )
-from controllers.research.serializers import (
+from contracts.research.serializers import (
     to_asset_comparison_dto,
     to_screener_item_dto,
     to_treasury_bond_dto,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import ConflictError, NotFoundError, ValidationError
 from domain.assets.services.history import historical_metrics
 from domain.market.entities import TreasuryBond
+from domain.market.services.stored import stored_histories, stored_market_data
 from domain.policy.services.lifecycle import has_position
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.research.services.comparison import (
@@ -43,8 +43,7 @@ from domain.shared.enums import (
     FixedIncomeIndexer,
     Market,
 )
-from domain.shared.unit_of_work import AbstractUnitOfWork
-from infra.providers.stored import stored_histories, stored_market_data
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 logger = logging.getLogger("fincontrol_api.research")
 

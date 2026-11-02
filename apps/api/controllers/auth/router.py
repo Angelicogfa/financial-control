@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
 
+from contracts.auth.requests import LoginRequest
+from contracts.auth.responses import CurrentUserDTO
 from controllers.auth.dependencies import get_auth_handler, require_user
-from controllers.auth.requests import LoginRequest
-from controllers.auth.responses import CurrentUserDTO
 from core.security import SESSION_COOKIE
 from domain.auth.services.use_cases import AuthHandler
 

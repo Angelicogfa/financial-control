@@ -6,7 +6,7 @@ from collections import Counter
 from dataclasses import asdict
 from datetime import date
 
-from controllers.recommendation.responses import (
+from contracts.recommendation.responses import (
     AssetLensesDTO,
     BacktestDTO,
     BacktestYearDTO,
@@ -35,7 +35,6 @@ from controllers.recommendation.responses import (
     SelectedAssetDTO,
     SkippedAssetDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from domain.comparison.board import build_board
 from domain.policy.services.policy import current_policy
 from domain.portfolio.services.consolidation import AssetContributionOrder, plan_contribution
@@ -54,6 +53,7 @@ from domain.recommendation.lenses import AssetLenses
 from domain.recommendation.optimizer import optimized_of, optimizer_passed
 from domain.recommendation.switch import recommended_classes
 from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
+from domain.shared.unit_of_work import UoWFactory
 
 
 def _asset_dto(item: AssetLenses, gates: AssetGates | None) -> AssetLensesDTO:

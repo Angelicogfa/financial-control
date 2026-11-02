@@ -12,6 +12,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from core.logging import configure_logging
 from core.settings import Settings, get_settings
 from domain.market.services.use_cases import MANUAL_JOBS
+from infra.cache.job_lock import JobLock, build_job_lock
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
 from infra.providers.factory import build_market_gateway
 from infra.providers.gateway import CachedMarketGateway
@@ -48,7 +49,7 @@ from worker.jobs import (
     warm_portfolio_quotes_job,
 )
 from worker.roles import runs_here
-from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job, run_requested
+from worker.runner import RetryPolicy, run_job, run_requested
 
 logger = logging.getLogger("fincontrol_worker")
 

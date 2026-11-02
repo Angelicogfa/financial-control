@@ -17,8 +17,9 @@ API_DIR = Path(__file__).resolve().parents[1]
 
 # layer -> package prefixes it must never import.
 FORBIDDEN: dict[str, tuple[str, ...]] = {
-    "core": ("domain", "infra", "controllers", "worker"),
-    "domain": ("controllers", "infra", "worker"),
+    "core": ("contracts", "domain", "infra", "controllers", "worker"),
+    "contracts": ("controllers", "infra", "worker", "fastapi"),
+    "domain": ("controllers", "infra", "worker", "fastapi"),
     "controllers": ("infra.data", "worker"),
     "infra": ("controllers", "worker"),
     "worker": ("controllers",),
@@ -91,7 +92,7 @@ def test_detects_forbidden_imports(tmp_path: Path) -> None:
         "from domain.shared import entities\n"
         "from controllers.sample.responses import SampleDTO\n"
         "def lazy():\n"
-        "    import infra.providers.stored\n"
+        "    import infra.providers.gateway\n"
         "from . import sibling\n",
         encoding="utf-8",
     )
@@ -102,7 +103,7 @@ def test_detects_forbidden_imports(tmp_path: Path) -> None:
     )
 
     assert find_violations(tmp_path) == {
-        "domain.sample.service": {"controllers.sample.responses", "infra.providers.stored"},
+        "domain.sample.service": {"controllers.sample.responses", "infra.providers.gateway"},
         "controllers.router": {"infra.data.unit_of_work"},
     }
 
@@ -111,3 +112,15 @@ def test_prefix_match_is_by_package_not_by_text() -> None:
     assert _is_under("infra.data", "infra.data")
     assert _is_under("infra.data.health", "infra.data")
     assert not _is_under("infra.database_tools", "infra.data")
+
+
+def test_contracts_never_import_the_web_framework(tmp_path: Path) -> None:
+    (tmp_path / "contracts").mkdir()
+    (tmp_path / "contracts" / "responses.py").write_text(
+        "from fastapi import Query\n"
+        "from pydantic import BaseModel\n"
+        "from domain.shared import enums\n",
+        encoding="utf-8",
+    )
+
+    assert find_violations(tmp_path) == {"contracts.responses": {"fastapi"}}

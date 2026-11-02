@@ -10,10 +10,10 @@ import pytest
 
 from domain.agentic.services.catalog import OPERATIONS, JobRequestInput
 from domain.market.entities import Fundamentals, Quote, QuoteFreshness
+from domain.market.services.stored import FX_SYMBOL, stored_market_data, stored_usd_brl
 from domain.shared.entities import AssetEntity, TransactionEntity
 from domain.shared.enums import ArcaClass, AssetType, TransactionKind
 from infra.providers.gateway import CachedMarketGateway
-from infra.providers.stored import FX_SYMBOL, stored_market_data, stored_usd_brl
 from worker.jobs import refresh_watchlist_quotes_job, warm_portfolio_quotes_job
 
 NOW = datetime(2026, 10, 29, 15, 0, tzinfo=UTC)

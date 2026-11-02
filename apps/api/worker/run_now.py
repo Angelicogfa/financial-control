@@ -18,10 +18,11 @@ from core.logging import configure_logging
 from core.settings import Settings, get_settings
 from domain.market.services.use_cases import MANUAL_JOBS
 from domain.shared.enums import JobRunStatus
+from infra.cache.job_lock import JobLock, build_job_lock
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
 from infra.providers.gateway import CachedMarketGateway
 from worker.jobs import UoWFactory
-from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job
+from worker.runner import RetryPolicy, run_job
 from worker.scheduler import build_worker_gateway, manual_jobs
 
 

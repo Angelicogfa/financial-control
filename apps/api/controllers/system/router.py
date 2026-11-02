@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
 
+from contracts.system.responses import ReadinessDTO
 from controllers.system.dependencies import get_system_handler
-from controllers.system.responses import ReadinessDTO
 from domain.system.services.use_cases import SystemHandler
 
 health_router = APIRouter(tags=["Health"])

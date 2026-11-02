@@ -9,11 +9,10 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from controllers.contributions.requests import ContributionConfirmRequest, ExecutionDTO
-from controllers.contributions.responses import SavedContributionPlanDTO
-from controllers.portfolio.requests import ContributionSimulationRequest
-from controllers.portfolio.serializers import to_contribution_plan_dto
-from controllers.shared.dependencies import UoWFactory
+from contracts.contributions.requests import ContributionConfirmRequest, ExecutionDTO
+from contracts.contributions.responses import SavedContributionPlanDTO
+from contracts.portfolio.requests import ContributionSimulationRequest
+from contracts.portfolio.serializers import to_contribution_plan_dto
 from core.errors import NotFoundError
 from domain.accounts.services.use_cases import resolve_account_id
 from domain.contributions.services.contribution_plans import (
@@ -25,14 +24,14 @@ from domain.contributions.services.contribution_plans import (
     discard_plan,
 )
 from domain.ledger.services.ledger import require_fx_rate, validate_ledger
+from domain.market.services.stored import stored_usd_brl
 from domain.portfolio.services.consolidation import ContributionPlan
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.research.services.service import register_researched_asset
 from domain.shared.entities import TransactionEntity
 from domain.shared.enums import ContributionPlanStatus, TransactionKind
-from domain.shared.unit_of_work import AbstractUnitOfWork
-from infra.providers.stored import stored_usd_brl
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 
 def to_saved_plan_dto(saved: SavedContributionPlan) -> SavedContributionPlanDTO:

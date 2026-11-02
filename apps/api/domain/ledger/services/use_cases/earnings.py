@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from controllers.ledger.requests import EarningCreateRequest, EarningUpdateRequest
-from controllers.ledger.responses import EarningResponseDTO
-from controllers.ledger.serializers import to_earning_dto
-from controllers.shared.dependencies import UoWFactory
-from controllers.shared.responses import PaginatedResponse
-from controllers.shared.serializers import to_page_meta_dto
+from contracts.ledger.requests import EarningCreateRequest, EarningUpdateRequest
+from contracts.ledger.responses import EarningResponseDTO
+from contracts.ledger.serializers import to_earning_dto
+from contracts.shared.responses import PaginatedResponse
+from contracts.shared.serializers import to_page_meta_dto
 from core.errors import NotFoundError
 from core.helpers.pagination import PaginationParams
 from domain.accounts.services.use_cases import resolve_account_id
@@ -24,6 +23,7 @@ from domain.shared.entities import (
 from domain.shared.enums import (
     EarningKind,
 )
+from domain.shared.unit_of_work import UoWFactory
 
 
 class EarningHandler:

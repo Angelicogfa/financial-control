@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import date
 
-from core.helpers.units import daily_rates, monthly_rates
 from domain.portfolio.services.fixed_income import RateCurves
 from domain.portfolio.services.treasury_rates import IPCA_HISTORY_START
 from domain.shared.entities import AssetEntity
 from domain.shared.repositories import AbstractMarketSeriesRepository
+from domain.shared.units import daily_rates, monthly_rates
 
 
 def earliest_fixed_income_start(assets: Iterable[AssetEntity]) -> date | None:

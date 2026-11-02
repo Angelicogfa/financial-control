@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
+from contracts.alerts.requests import AlertDismissRequest
+from contracts.alerts.responses import AlertsResponseDTO
 from controllers.alerts.dependencies import get_alert_handler
-from controllers.alerts.requests import AlertDismissRequest
-from controllers.alerts.responses import AlertsResponseDTO
 from domain.alerts.services.use_cases import AlertHandler
 
 alerts_router = APIRouter(prefix="/alerts", tags=["Alerts"])

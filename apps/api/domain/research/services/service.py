@@ -9,14 +9,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 
-from controllers.shared.dependencies import UoWFactory
 from core.errors import ValidationError
 from domain.assets.services.etf_exposure import suggest_arca_class
 from domain.assets.services.history import STATEMENT_TYPES
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import ArcaClass, AssetType
-from domain.shared.unit_of_work import AbstractUnitOfWork
-from infra.providers.gateway import CachedMarketGateway
+from domain.shared.gateways import MarketDataGateway
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 logger = logging.getLogger("fincontrol_api.research")
 
@@ -63,7 +62,7 @@ class StatementRefresher:
     left to the worker's weekly `refresh_fundamentals` job, never surfaced to the request.
     """
 
-    def __init__(self, uow_factory: UoWFactory, gateway: CachedMarketGateway) -> None:
+    def __init__(self, uow_factory: UoWFactory, gateway: MarketDataGateway) -> None:
         self.uow_factory = uow_factory
         self.gateway = gateway
 
