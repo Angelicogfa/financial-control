@@ -19,6 +19,7 @@ from domain.market.repositories import (
 )
 from domain.mining.repositories import AbstractMiningRepository
 from domain.recommendation.repositories import AbstractRecommendationRepository
+from domain.reconciliation.repositories import AbstractReconciliationRepository
 from domain.shared.repositories import (
     AbstractAccountRepository,
     AbstractAgentKeyRepository,
@@ -79,6 +80,7 @@ class AbstractUnitOfWork(ABC):
     mining: AbstractMiningRepository
     recommendation: AbstractRecommendationRepository
     comparison: AbstractComparisonRepository
+    reconciliations: AbstractReconciliationRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

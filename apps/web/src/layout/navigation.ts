@@ -60,7 +60,9 @@ export const DESTINATIONS: Destination[] = [
     sections: [
       { to: "/carteira", label: "Posições" },
       { to: "/carteira/rentabilidade", label: "Rentabilidade" },
+      { to: "/carteira/proventos", label: "Proventos" },
       { to: "/carteira/raio-x", label: "Raio-X" },
+      { to: "/carteira/conferir", label: "Conferir" },
     ],
   },
   {

@@ -48,6 +48,10 @@ from infra.data.models.recommendation import (
     RecommendationMatrixModel,
     RecommendationRunModel,
 )
+from infra.data.models.reconciliation import (
+    PositionReconciliationLineModel,
+    PositionReconciliationModel,
+)
 from infra.data.models.simulation import (
     SimulationResultModel,
     SimulationRunModel,
@@ -56,6 +60,8 @@ from infra.data.models.simulation import (
 from infra.data.models.tax import TaxRuleModel
 
 __all__ = [
+    "PositionReconciliationLineModel",
+    "PositionReconciliationModel",
     "AccountModel",
     "AssetGateModel",
     "AssetLensModel",

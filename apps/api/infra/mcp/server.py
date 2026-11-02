@@ -111,6 +111,12 @@ o Tesouro Direto; `instruments.get` abre qualquer um deles pela `key`, sem cadas
 guardada, indicadores, lentes, faixa da previsão e, se cadastrado, o `asset_id`); \
 `instruments.prices` traz os fechamentos guardados.
 
+Conferência de posição e proventos (Fase 48.R5):
+- `reconciliation.preview` confere o extrato de Posição da B3 contra o livro, por ticker e \
+conta, sem gravar; `reconciliation.commit` grava a conferência (nunca altera o livro); \
+`reconciliation.list` e `reconciliation.get` consultam as gravadas. `portfolio.income` traz os \
+proventos recebidos por mês e ano e o yield on cost.
+
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \
 `research.classify`, `research.unfollow`.

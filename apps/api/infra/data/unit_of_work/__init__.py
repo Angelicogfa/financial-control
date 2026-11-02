@@ -47,6 +47,7 @@ from infra.data.repositories.portfolio import (
     SqlAlchemyPortfolioSnapshotRepository,
 )
 from infra.data.repositories.recommendation import SqlAlchemyRecommendationRepository
+from infra.data.repositories.reconciliation import SqlAlchemyReconciliationRepository
 from infra.data.repositories.simulation import (
     SqlAlchemySimulationRepository,
     SqlAlchemySimulationStudyRepository,
@@ -93,6 +94,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.mining = SqlAlchemyMiningRepository(self.session)
         self.recommendation = SqlAlchemyRecommendationRepository(self.session)
         self.comparison = SqlAlchemyComparisonRepository(self.session)
+        self.reconciliations = SqlAlchemyReconciliationRepository(self.session)
         return self
 
     def __exit__(

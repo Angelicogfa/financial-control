@@ -13,6 +13,7 @@ from contracts.portfolio.requests import ContributionSimulationRequest
 from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
+    IncomeSummaryDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
@@ -20,7 +21,9 @@ from contracts.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from controllers.portfolio.dependencies import get_portfolio_handler
+from contracts.portfolio.serializers import to_income_summary_dto
+from controllers.portfolio.dependencies import get_income_handler, get_portfolio_handler
+from domain.portfolio.services.income import IncomeHandler
 from domain.portfolio.services.use_cases import PortfolioHandler
 
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
@@ -116,3 +119,11 @@ def get_earnings_agenda(
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> EarningsAgendaDTO:
     return handler.earnings_agenda(as_of_date=as_of_date)
+
+
+@portfolio_router.get("/income", response_model=IncomeSummaryDTO)
+def get_income(
+    months: int = Query(default=24, ge=1, le=120),
+    handler: IncomeHandler = Depends(get_income_handler),
+) -> IncomeSummaryDTO:
+    return to_income_summary_dto(handler.summary(months=months))

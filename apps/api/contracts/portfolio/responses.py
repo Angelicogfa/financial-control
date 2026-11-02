@@ -512,3 +512,30 @@ class EarningsAgendaDTO(BaseModel):
     declared_net_brl: float = 0.0
     declared_by_month: dict[str, float] = Field(default_factory=dict)
     covered_tickers: list[str] = Field(default_factory=list)
+
+
+class MonthIncomeDTO(BaseModel):
+    month: str = Field(description="YYYY-MM")
+    net_brl: float
+
+
+class AssetIncomeDTO(BaseModel):
+    asset_id: int
+    ticker: str
+    last_12m_brl: float
+    yield_on_cost: float | None = None
+
+
+class IncomeSummaryDTO(BaseModel):
+    """Earnings received, net and in BRL (Phase 48.R5, Carteira › Proventos)."""
+
+    as_of: date
+    last_12m_brl: float
+    previous_12m_brl: float
+    total_brl: float
+    yield_on_cost: float | None = Field(
+        default=None, description="Last 12 months over the cost of the assets that paid them"
+    )
+    months: list[MonthIncomeDTO]
+    by_year: dict[int, float]
+    assets: list[AssetIncomeDTO]

@@ -34,6 +34,8 @@ const last = (calls: Call[], method: string, path: string) =>
   [...calls].reverse().find((c) => c.method === method && c.path === path);
 
 describe("strategy", () => {
+  // The strategy form is the largest of the app: each label query walks the whole DOM, which
+  // took over 20 s twice in the full gate (coverage on, Docker building alongside).
   it("validates that targets sum 100% and saves fractions", async () => {
     let savedVersion = false;
     const { calls } = mockApi([
@@ -49,7 +51,7 @@ describe("strategy", () => {
         },
       },
     ]);
-    renderAt("/settings/strategy");
+    renderAt("/configuracoes/estrategia");
     const target = await screen.findByLabelText("Meta de Ações");
     fireEvent.change(target, { target: { value: "30" } });
     expect(screen.getByText(/105%.*precisa somar 100%/)).toBeInTheDocument();
@@ -80,7 +82,7 @@ describe("strategy", () => {
     const healthLimits = (last(calls, "PUT", "/policy")?.body as { health: Record<string, number> }).health;
     expect(healthLimits.max_asset_weight_warning).toBeCloseTo(0.2);
     expect(healthLimits.monthly_expenses_brl).toBe(5000);
-  }, 20_000);
+  }, 40_000);
 
   it("switches the Cerrado lens of the recommendation off, keeping the other premises", async () => {
     const premises = {
@@ -96,7 +98,7 @@ describe("strategy", () => {
       { path: "/policy/versions", reply: [withPremises] },
       { method: "PUT", path: "/policy", reply: { ...withPremises, version: 4 } },
     ]);
-    renderAt("/settings/strategy");
+    renderAt("/configuracoes/estrategia");
     const box = await screen.findByLabelText(/Usar o Cerrado na recomendação/);
     expect(box).toBeChecked();
     fireEvent.click(box);
@@ -111,7 +113,7 @@ describe("strategy", () => {
       { path: "/policy", reply: policy },
       { path: "/policy/versions", reply: [policy] },
     ]);
-    renderAt("/settings/strategy");
+    renderAt("/configuracoes/estrategia");
     const treasury = (await screen.findByText("Tesouro Direto")).closest("fieldset") as HTMLElement;
     const inside = within(treasury);
     expect(inside.getByLabelText(/Pesar o Tesouro Direto pelo preço de mercado/)).toBeInTheDocument();
@@ -139,7 +141,7 @@ describe("accounts", () => {
       { method: "POST", path: "/accounts", reply: { status: 201, json: { id: 2, name: "Inter" } } },
       { method: "PUT", path: "/accounts/1", reply: { id: 1, name: "XP Investimentos" } },
     ]);
-    renderAt("/settings/accounts");
+    renderAt("/configuracoes/contas");
     expect(await screen.findByText("XP")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Inter" } });
     pick(screen.getByLabelText("Tipo"), "Banco");
@@ -222,7 +224,7 @@ describe("market data", () => {
         },
       },
     ]);
-    renderAt("/settings/market-data");
+    renderAt("/configuracoes/dados-de-mercado");
     expect(await screen.findByText("Desatualizada")).toBeInTheDocument();
     expect(screen.getByText("Em dia")).toBeInTheDocument();
     expect(await screen.findByText("Catálogo de ativos B3")).toBeInTheDocument();
@@ -269,7 +271,7 @@ describe("manual job runs", () => {
         },
       },
     ]);
-    renderAt("/settings/market-data");
+    renderAt("/configuracoes/dados-de-mercado");
     expect((await screen.findAllByText("Concluída")).length).toBeGreaterThan(0);
     expect(screen.getByText(/Última vez:/)).toBeInTheDocument();
     expect(screen.getAllByText("Histórico longo da simulação").length).toBeGreaterThan(0);
@@ -293,7 +295,7 @@ describe("manual job runs", () => {
         reply: { status: 400, json: { detail: "job cannot be run by hand", code: "JOB_NOT_MANUAL" } },
       },
     ]);
-    renderAt("/settings/market-data");
+    renderAt("/configuracoes/dados-de-mercado");
     fireEvent.click(await screen.findByRole("button", { name: "Carregar o histórico da simulação" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("job cannot be run by hand");
   });

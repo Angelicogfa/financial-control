@@ -28,7 +28,12 @@ import type {
   AssetCreateRequest,
   AssetResponseDTO,
   AssetTaxStatusDTO,
+  IncomeSummaryDTO,
   InstrumentViewDTO,
+  LineResolutionRequest,
+  ReconciliationDTO,
+  ReconciliationLineDTO,
+  ReconciliationSummaryDTO,
   SearchResultDTO,
   AssetType,
   AssetUpdateRequest,
@@ -171,6 +176,8 @@ async function listAllAssets(activeOnly: boolean): Promise<PaginatedResponse_Ass
 
 export const api = {
   portfolio: {
+    /** Earnings received by month and year, net in BRL (Phase 48.R5). */
+    income: (months = 24) => request<IncomeSummaryDTO>("/portfolio/income", { query: { months } }),
     report: (accountId?: number) =>
       request<PortfolioReportResponseDTO>("/portfolio/consolidated", {
         query: { account_id: accountId },
@@ -406,4 +413,23 @@ export const api = {
   },
   search: (q: string, limit = 8, signal?: AbortSignal) =>
     request<SearchResultDTO>("/search", { query: { q, limit }, signal }),
+  /** Ledger x the B3 Posição statement (Phase 48.R5); never writes to the ledger. */
+  reconciliation: {
+    preview: (file: File, referenceDate?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (referenceDate) form.append("reference_date", referenceDate);
+      return request<ReconciliationDTO>("/reconciliation/b3/preview", { method: "POST", form });
+    },
+    commit: (file: File, referenceDate?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (referenceDate) form.append("reference_date", referenceDate);
+      return request<ReconciliationDTO>("/reconciliation/b3/commit", { method: "POST", form });
+    },
+    list: (limit = 20) => request<ReconciliationSummaryDTO[]>("/reconciliation", { query: { limit } }),
+    get: (id: number) => request<ReconciliationDTO>(`/reconciliation/${id}`),
+    resolve: (id: number, lineId: number, body: LineResolutionRequest) =>
+      request<ReconciliationLineDTO>(`/reconciliation/${id}/lines/${lineId}`, { method: "PUT", body }),
+  },
 };

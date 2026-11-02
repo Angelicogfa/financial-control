@@ -24,6 +24,7 @@ from domain.alerts.services.evaluator import (
     maturity_alerts,
     mining_alerts,
     portfolio_alerts,
+    position_check_alerts,
     relevant_fact_alerts,
     tax_bracket_alerts,
     valuation_alerts,
@@ -36,7 +37,7 @@ from domain.market.services.stored import stored_market_data
 from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AssetEntity
-from domain.shared.enums import AssetLifecycle
+from domain.shared.enums import AssetLifecycle, Market
 from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 from domain.tax.services.status import asset_tax_status
 
@@ -129,6 +130,19 @@ class AlertHandler:
                 ),
             ]
             alerts.extend(self._calendar_alerts(uow, report, assets, reference))
+            checks = uow.reconciliations.list_recent(1)
+            alerts.extend(
+                position_check_alerts(
+                    checks[0].reference_date if checks else None,
+                    checks[0].open_issues if checks else 0,
+                    has_b3_positions=any(
+                        p.quantity > 0 and t.market == Market.B3
+                        for p in report.positions
+                        if (t := assets.get(p.ticker)) is not None
+                    ),
+                    today=reference,
+                )
+            )
             alerts.extend(_disclosure_alerts(uow, assets, reference))
             if self.mining_alerts:
                 alerts.extend(mining_alerts(uow.mining.findings(), assets))

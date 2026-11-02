@@ -1385,6 +1385,40 @@
         "title": "AssetHistoryDTO",
         "type": "object"
       },
+      "AssetIncomeDTO": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "integer"
+          },
+          "last_12m_brl": {
+            "title": "Last 12M Brl",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "yield_on_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield On Cost"
+          }
+        },
+        "required": [
+          "asset_id",
+          "ticker",
+          "last_12m_brl"
+        ],
+        "title": "AssetIncomeDTO",
+        "type": "object"
+      },
       "AssetLensesDTO": {
         "properties": {
           "arca_class": {
@@ -2732,6 +2766,33 @@
         "title": "Body_commit_b3_import_api_v1_imports_b3_commit_post",
         "type": "object"
       },
+      "Body_commit_reconciliation_api_v1_reconciliation_b3_commit_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "reference_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Data-base of the statement; taken from the B3 file name when omitted",
+            "title": "Reference Date"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_commit_reconciliation_api_v1_reconciliation_b3_commit_post",
+        "type": "object"
+      },
       "Body_preview_b3_import_api_v1_imports_b3_preview_post": {
         "properties": {
           "file": {
@@ -2750,6 +2811,33 @@
           "file"
         ],
         "title": "Body_preview_b3_import_api_v1_imports_b3_preview_post",
+        "type": "object"
+      },
+      "Body_preview_reconciliation_api_v1_reconciliation_b3_preview_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "reference_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Data-base of the statement; taken from the B3 file name when omitted",
+            "title": "Reference Date"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_reconciliation_api_v1_reconciliation_b3_preview_post",
         "type": "object"
       },
       "BracketLotDTO": {
@@ -8683,6 +8771,72 @@
         "title": "ImportPreviewDTO",
         "type": "object"
       },
+      "IncomeSummaryDTO": {
+        "description": "Earnings received, net and in BRL (Phase 48.R5, Carteira › Proventos).",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetIncomeDTO"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "by_year": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "By Year",
+            "type": "object"
+          },
+          "last_12m_brl": {
+            "title": "Last 12M Brl",
+            "type": "number"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/MonthIncomeDTO"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "previous_12m_brl": {
+            "title": "Previous 12M Brl",
+            "type": "number"
+          },
+          "total_brl": {
+            "title": "Total Brl",
+            "type": "number"
+          },
+          "yield_on_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last 12 months over the cost of the assets that paid them",
+            "title": "Yield On Cost"
+          }
+        },
+        "required": [
+          "as_of",
+          "last_12m_brl",
+          "previous_12m_brl",
+          "total_brl",
+          "months",
+          "by_year",
+          "assets"
+        ],
+        "title": "IncomeSummaryDTO",
+        "type": "object"
+      },
       "IndicatorGroup": {
         "enum": [
           "VALUATION",
@@ -9887,6 +10041,49 @@
         ],
         "title": "LensWeightsDTO",
         "type": "object"
+      },
+      "LineResolution": {
+        "enum": [
+          "OPEN",
+          "RESOLVED"
+        ],
+        "title": "LineResolution",
+        "type": "string"
+      },
+      "LineResolutionRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/LineResolution"
+          }
+        },
+        "required": [
+          "resolution"
+        ],
+        "title": "LineResolutionRequest",
+        "type": "object"
+      },
+      "LineStatus": {
+        "enum": [
+          "MATCH",
+          "DIVERGENT",
+          "ONLY_B3",
+          "ONLY_LEDGER",
+          "NOT_COMPARED"
+        ],
+        "title": "LineStatus",
+        "type": "string"
       },
       "LiquidityDetailDTO": {
         "properties": {
@@ -11467,6 +11664,25 @@
           "status"
         ],
         "title": "MiningWhyDTO",
+        "type": "object"
+      },
+      "MonthIncomeDTO": {
+        "properties": {
+          "month": {
+            "description": "YYYY-MM",
+            "title": "Month",
+            "type": "string"
+          },
+          "net_brl": {
+            "title": "Net Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "net_brl"
+        ],
+        "title": "MonthIncomeDTO",
         "type": "object"
       },
       "OfferIndexer": {
@@ -13337,6 +13553,259 @@
           "eligible"
         ],
         "title": "RecommendationRunDTO",
+        "type": "object"
+      },
+      "ReconciliationCountsDTO": {
+        "properties": {
+          "divergent": {
+            "title": "Divergent",
+            "type": "integer"
+          },
+          "match": {
+            "title": "Match",
+            "type": "integer"
+          },
+          "not_compared": {
+            "title": "Not Compared",
+            "type": "integer"
+          },
+          "only_b3": {
+            "title": "Only B3",
+            "type": "integer"
+          },
+          "only_ledger": {
+            "title": "Only Ledger",
+            "type": "integer"
+          },
+          "open_issues": {
+            "title": "Open Issues",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "match",
+          "divergent",
+          "only_b3",
+          "only_ledger",
+          "not_compared",
+          "open_issues"
+        ],
+        "title": "ReconciliationCountsDTO",
+        "type": "object"
+      },
+      "ReconciliationDTO": {
+        "description": "A check of the Posição statement against the ledger; `id` is null in the preview.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ReconciliationCountsDTO"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationLineDTO"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "reference_date": {
+            "format": "date",
+            "title": "Reference Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference_date",
+          "file_name",
+          "counts",
+          "lines"
+        ],
+        "title": "ReconciliationDTO",
+        "type": "object"
+      },
+      "ReconciliationLineDTO": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "b3_quantity": {
+            "title": "B3 Quantity",
+            "type": "number"
+          },
+          "difference": {
+            "description": "Statement minus ledger",
+            "title": "Difference",
+            "type": "number"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution"
+          },
+          "ledger_quantity": {
+            "title": "Ledger Quantity",
+            "type": "number"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/LineResolution",
+            "default": "OPEN"
+          },
+          "resolution_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Note"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LineStatus"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "product",
+          "b3_quantity",
+          "ledger_quantity",
+          "difference",
+          "status"
+        ],
+        "title": "ReconciliationLineDTO",
+        "type": "object"
+      },
+      "ReconciliationSummaryDTO": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ReconciliationCountsDTO"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "reference_date": {
+            "format": "date",
+            "title": "Reference Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference_date",
+          "file_name",
+          "counts"
+        ],
+        "title": "ReconciliationSummaryDTO",
         "type": "object"
       },
       "RegimePointDTO": {
@@ -21058,6 +21527,51 @@
         ]
       }
     },
+    "/api/v1/portfolio/income": {
+      "get": {
+        "operationId": "get_income_api_v1_portfolio_income_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "months",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 120,
+              "minimum": 1,
+              "title": "Months",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomeSummaryDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Income",
+        "tags": [
+          "Portfolio & ARCA"
+        ]
+      }
+    },
     "/api/v1/portfolio/snapshots": {
       "get": {
         "operationId": "list_portfolio_snapshots_api_v1_portfolio_snapshots_get",
@@ -21665,6 +22179,240 @@
         "summary": "Get Weights",
         "tags": [
           "Recommendation"
+        ]
+      }
+    },
+    "/api/v1/reconciliation": {
+      "get": {
+        "operationId": "list_reconciliations_api_v1_reconciliation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReconciliationSummaryDTO"
+                  },
+                  "title": "Response List Reconciliations Api V1 Reconciliation Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reconciliations",
+        "tags": [
+          "Reconciliation"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/b3/commit": {
+      "post": {
+        "operationId": "commit_reconciliation_api_v1_reconciliation_b3_commit_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_commit_reconciliation_api_v1_reconciliation_b3_commit_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit Reconciliation",
+        "tags": [
+          "Reconciliation"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/b3/preview": {
+      "post": {
+        "operationId": "preview_reconciliation_api_v1_reconciliation_b3_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_reconciliation_api_v1_reconciliation_b3_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Reconciliation",
+        "tags": [
+          "Reconciliation"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/{reconciliation_id}": {
+      "get": {
+        "operationId": "get_reconciliation_api_v1_reconciliation__reconciliation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reconciliation_id",
+            "required": true,
+            "schema": {
+              "title": "Reconciliation Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reconciliation",
+        "tags": [
+          "Reconciliation"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/{reconciliation_id}/lines/{line_id}": {
+      "put": {
+        "operationId": "resolve_reconciliation_line_api_v1_reconciliation__reconciliation_id__lines__line_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reconciliation_id",
+            "required": true,
+            "schema": {
+              "title": "Reconciliation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "title": "Line Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LineResolutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationLineDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Reconciliation Line",
+        "tags": [
+          "Reconciliation"
         ]
       }
     },

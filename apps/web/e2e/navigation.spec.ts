@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { login, navigate } from "./helpers";
+import path from "node:path";
+
+import { FIXTURES, login, navigate } from "./helpers";
 import { CURRENT_ROUTES, NEW_ROUTES } from "./routes";
 
 /** Smoke of every current screen (Phase 48.R0): it opens with a title, is not the "page not
@@ -64,6 +66,22 @@ test("the portfolio links the asset by ticker and a chapter opens its details (P
   await page.goto("/ativo/ITSA4");
   await page.getByRole("button", { name: "Ver detalhes: Está barato?" }).click();
   await expect(page.getByRole("button", { name: "Ocultar detalhes: Está barato?" })).toBeVisible();
+});
+
+test("the position check compares the B3 statement and saves it (Phase 48.R5)", async ({ page }) => {
+  await login(page);
+  await navigate(page, "Carteira");
+  await page.getByRole("navigation", { name: "Seções de Carteira" }).getByRole("link", { name: "Conferir" }).click();
+  await page
+    .getByLabel("Extrato de Posição (.xlsx ou .csv)", { exact: true })
+    .setInputFiles(path.join(FIXTURES, "b3_posicao-2026-10-31.csv"));
+  await page.getByRole("button", { name: "Conferir", exact: true }).click();
+  const table = page.getByRole("table", { name: "Linhas da conferência" });
+  await expect(table.getByRole("row").filter({ hasText: "ZZZZ3" })).toContainText("Só na B3");
+  await expect(table.getByRole("row").filter({ hasText: "ITSA4" })).toContainText("Só no livro");
+  await page.getByRole("button", { name: "Gravar conferência" }).click();
+  await expect(page.getByRole("heading", { name: "Conferência de 31/10/2026" })).toBeVisible();
+  await expect(page.getByText(/diferença\(s\) em aberto/)).toBeVisible();
 });
 
 test("an unknown address shows the not-found screen", async ({ page }) => {

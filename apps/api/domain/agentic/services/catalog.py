@@ -79,6 +79,7 @@ from contracts.portfolio.requests import ContributionSimulationRequest
 from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
+    IncomeSummaryDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
@@ -86,6 +87,7 @@ from contracts.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
+from contracts.portfolio.serializers import to_income_summary_dto
 from contracts.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
@@ -96,6 +98,8 @@ from contracts.recommendation.responses import (
     RecommendationRunDTO,
     RowComparisonDTO,
 )
+from contracts.reconciliation.responses import ReconciliationDTO, ReconciliationSummaryDTO
+from contracts.reconciliation.serializers import to_reconciliation_dto, to_summary_dto
 from contracts.research.requests import WatchlistAddRequest
 from contracts.research.responses import (
     AssetComparisonDTO,
@@ -147,9 +151,11 @@ from domain.market.services.stored import distribution_lookup
 from domain.market.services.use_cases import MarketDataHandler
 from domain.mining.services import MiningHandler
 from domain.policy.services.use_cases import PolicyHandler
+from domain.portfolio.services.income import IncomeHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.use_cases import PortfolioHandler
 from domain.recommendation.services import RecommendationHandler
+from domain.reconciliation.services import ReconciliationHandler
 from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
@@ -181,6 +187,7 @@ CONTEXT_LABELS: dict[str, str] = {
     "disclosures": "Comunicados da CVM",
     "recommendation": "Recomendação",
     "instruments": "Instrumentos & Busca",
+    "reconciliation": "Conferência de posição (B3)",
 }
 
 
@@ -451,6 +458,20 @@ class B3ImportPreviewToolInput(BaseModel):
     )
 
 
+class ReconciliationToolInput(B3ImportPreviewToolInput):
+    """The B3 Posição statement and its data-base (taken from the B3 file name if omitted)."""
+
+    reference_date: date | None = None
+
+
+class ReconciliationIdInput(BaseModel):
+    reconciliation_id: int
+
+
+class IncomeInput(BaseModel):
+    months: int = Field(default=24, ge=1, le=120)
+
+
 class B3ImportCommitToolInput(B3ImportPreviewToolInput):
     account_id: int | None = None
     create_tickers: list[str] = Field(default_factory=list)
@@ -600,6 +621,14 @@ class AgenticRuntimeHandlers:
     @property
     def mining(self) -> MiningHandler:
         return MiningHandler(uow_factory=self.uow_factory)
+
+    @property
+    def reconciliation(self) -> ReconciliationHandler:
+        return ReconciliationHandler(uow_factory=self.uow_factory)
+
+    @property
+    def income(self) -> IncomeHandler:
+        return IncomeHandler(uow_factory=self.uow_factory)
 
     @property
     def instruments(self) -> InstrumentHandler:
@@ -1933,6 +1962,67 @@ OPERATIONS = (
         input_model=InstrumentPricesInput,
         output_type=AssetPriceHistoryDTO,
         invoke=lambda h, p: to_price_history_dto(h.instruments.prices(p.key, p.range)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 17. Position check and earnings received (Phase 48.R5)
+    OperationSpec(
+        name="reconciliation.preview",
+        kind="query",
+        description=(
+            "Confere o extrato de POSIÇÃO da Área do Investidor da B3 (.xlsx com uma aba por "
+            "produto, ou .csv) contra a posição do livro na data-base, por ticker e conta: "
+            "MATCH, DIVERGENT, ONLY_B3, ONLY_LEDGER ou NOT_COMPARED (Tesouro e renda fixa, "
+            "sem código de negociação), com a diferença. Não grava nada e nunca altera o livro."
+        ),
+        input_model=ReconciliationToolInput,
+        output_type=ReconciliationDTO,
+        invoke=lambda h, p: to_reconciliation_dto(
+            h.reconciliation.preview(p.filename, _decode_statement_bytes(p), p.reference_date)
+        ),
+    ),
+    OperationSpec(
+        name="reconciliation.commit",
+        kind="command",
+        description=(
+            "Grava a conferência do extrato de Posição (o mesmo arquivo na mesma data-base não "
+            "duplica). Não altera o livro: para corrigir, lance em ledger.trades.create."
+        ),
+        input_model=ReconciliationToolInput,
+        output_type=ReconciliationDTO,
+        invoke=lambda h, p: to_reconciliation_dto(
+            h.reconciliation.commit(p.filename, _decode_statement_bytes(p), p.reference_date)
+        ),
+    ),
+    OperationSpec(
+        name="reconciliation.list",
+        kind="query",
+        description="Conferências de posição gravadas, da mais recente: data-base e contagens.",
+        input_model=EmptyInput,
+        output_type=list[ReconciliationSummaryDTO],
+        invoke=lambda h, p: [to_summary_dto(r) for r in h.reconciliation.list_recent()],
+    ),
+    OperationSpec(
+        name="reconciliation.get",
+        kind="query",
+        description="Uma conferência de posição gravada, com todas as linhas e resoluções.",
+        input_model=ReconciliationIdInput,
+        output_type=ReconciliationDTO,
+        invoke=lambda h, p: to_reconciliation_dto(h.reconciliation.get(p.reconciliation_id)),
+    ),
+    OperationSpec(
+        name="portfolio.income",
+        kind="query",
+        description=(
+            "Proventos recebidos, líquidos e em R$: por mês (últimos `months`), por ano, total "
+            "dos últimos 12 meses contra os 12 anteriores, yield on cost e quanto cada ativo "
+            "pagou. Para os anunciados e ainda não pagos, use portfolio.earnings_agenda."
+        ),
+        input_model=IncomeInput,
+        output_type=IncomeSummaryDTO,
+        invoke=lambda h, p: to_income_summary_dto(h.income.summary(months=p.months)),
     ),
 )
 

@@ -383,3 +383,7 @@ O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Car
 ### Página do ativo em capítulos (Fase 48.R4)
 
 `/ativo/:ticker` conta a história do ativo em capítulos, com um índice lateral: Em resumo (lentes), Na minha carteira (ou Como entraria), Preço, Vale a pena?, Está barato?, Resultados, Proventos, O que pode acontecer, Notícias e eventos, Imposto e lançamentos. Cada capítulo abre com a conclusão; "Ver detalhes" monta a tabela, que só busca seus dados quando é aberta. Os links do app usam o ticker, e `/asset/:id` redireciona.
+
+### Hub da carteira e conferência com a B3 (Fase 48.R5)
+
+A Carteira tem as abas Posições, Rentabilidade, Proventos, Raio-X e Conferir. Proventos lê `GET /portfolio/income` (recebidos por mês e ano e yield on cost) e a agenda declarada. Conferir envia o extrato de **Posição** da Área do Investidor: `domain/reconciliation` lê as abas por produto e compara cada ticker e conta com a posição do livro na data-base. A conferência gravada (`position_reconciliations`, `position_reconciliation_lines`) **nunca altera o livro**: cada diferença leva ao lançamento pré-preenchido ou é marcada como explicada. O alerta `POSITION_NOT_CHECKED` lembra de conferir todo mês.

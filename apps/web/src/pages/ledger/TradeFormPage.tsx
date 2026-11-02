@@ -18,17 +18,30 @@ function brlTotal(qty: number | null, price: number | null, fees: number, fx: nu
   return Math.round((qty * price + fees) * fx * 100) / 100;
 }
 
-function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponseDTO | null; presetAsset: number | null }>) {
+/** A new trade prefilled from the address (the position check of Phase 48.R5 sends the missing
+ *  difference: `?asset=&kind=&quantity=&date=&account=`). */
+export interface TradePreset {
+  kind?: TransactionKind;
+  quantity?: string;
+  date?: string;
+  account?: number;
+}
+
+function TradeForm({
+  trade,
+  presetAsset,
+  preset = {},
+}: Readonly<{ trade: TransactionResponseDTO | null; presetAsset: number | null; preset?: TradePreset }>) {
   const navigate = useNavigate();
   const [assetId, setAssetId] = useState<number | "">(trade?.asset_id ?? presetAsset ?? "");
   const [currency, setCurrency] = useState("BRL");
-  const [kind, setKind] = useState<TransactionKind>(trade?.kind ?? "BUY");
-  const [tradeDate, setTradeDate] = useState(trade?.trade_date ?? today());
-  const [qty, setQty] = useState(trade ? String(trade.quantity).replace(".", ",") : "");
+  const [kind, setKind] = useState<TransactionKind>(trade?.kind ?? preset.kind ?? "BUY");
+  const [tradeDate, setTradeDate] = useState(trade?.trade_date ?? preset.date ?? today());
+  const [qty, setQty] = useState(trade ? String(trade.quantity).replace(".", ",") : (preset.quantity ?? "").replace(".", ","));
   const [price, setPrice] = useState(trade ? String(trade.unit_price).replace(".", ",") : "");
   const [fees, setFees] = useState(trade ? String(trade.fees).replace(".", ",") : "0");
   const [fx, setFx] = useState(trade ? String(trade.fx_rate).replace(".", ",") : "1");
-  const [accountId, setAccountId] = useState<number | null>(trade?.account_id ?? null);
+  const [accountId, setAccountId] = useState<number | null>(trade?.account_id ?? preset.account ?? null);
   const [notes, setNotes] = useState(trade?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -149,7 +162,15 @@ function TradeForm({ trade, presetAsset }: Readonly<{ trade: TransactionResponse
 export function TradeFormPage() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const preset = params.get("asset");
+  const presetAsset = params.get("asset");
+  const kind = params.get("kind");
+  const account = params.get("account");
+  const preset: TradePreset = {
+    kind: kind === "BUY" || kind === "SELL" ? kind : undefined,
+    quantity: params.get("quantity") ?? undefined,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "") ? (params.get("date") as string) : undefined,
+    account: account && /^\d+$/.test(account) ? Number(account) : undefined,
+  };
   const trade = useApi(`trade-${id ?? "new"}`, () => (id ? api.ledger.trade(Number(id)) : Promise.resolve(null)));
   return (
     <div className="app-page" style={{ maxWidth: 860 }}>
@@ -160,7 +181,7 @@ export function TradeFormPage() {
       {id ? (
         <Async state={trade}>{(data) => <TradeForm trade={data} presetAsset={null} />}</Async>
       ) : (
-        <TradeForm trade={null} presetAsset={preset ? Number(preset) : null} />
+        <TradeForm trade={null} presetAsset={presetAsset ? Number(presetAsset) : null} preset={preset} />
       )}
     </div>
   );

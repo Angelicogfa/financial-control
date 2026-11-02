@@ -230,6 +230,13 @@ export interface AssetHistoryDTO {
   points?: HistoryPointDTO[];
 }
 
+export interface AssetIncomeDTO {
+  asset_id: number;
+  ticker: string;
+  last_12m_brl: number;
+  yield_on_cost?: number | null;
+}
+
 export interface AssetLensesDTO {
   ticker: string;
   source: "PORTFOLIO" | "WATCHLIST" | "CATALOG";
@@ -1429,6 +1436,17 @@ export interface ImportPreviewDTO {
   lines: ImportLineDTO[];
 }
 
+export interface IncomeSummaryDTO {
+  as_of: string;
+  last_12m_brl: number;
+  previous_12m_brl: number;
+  total_brl: number;
+  yield_on_cost?: number | null;
+  months: MonthIncomeDTO[];
+  by_year: Record<string, number>;
+  assets: AssetIncomeDTO[];
+}
+
 export type IndicatorGroup = "VALUATION" | "DEBT" | "EFFICIENCY" | "PROFITABILITY" | "GROWTH";
 
 export interface IndicatorRatingDTO {
@@ -1625,6 +1643,15 @@ export interface LensWeightsDTO {
   probability?: number;
   lines?: LensWeightLineDTO[];
 }
+
+export type LineResolution = "OPEN" | "RESOLVED";
+
+export interface LineResolutionRequest {
+  resolution: LineResolution;
+  note?: string | null;
+}
+
+export type LineStatus = "MATCH" | "DIVERGENT" | "ONLY_B3" | "ONLY_LEDGER" | "NOT_COMPARED";
 
 export interface LiquidityDetailDTO {
   reserve_brl?: number;
@@ -1900,6 +1927,11 @@ export interface MiningWhyDTO {
   cutoff_annual?: number | null;
   signals?: Record<string, number>;
   reasons?: string[];
+}
+
+export interface MonthIncomeDTO {
+  month: string;
+  net_brl: number;
 }
 
 export type OfferIndexer = "CDI_PERCENT" | "CDI_SPREAD" | "IPCA_SPREAD" | "PRE";
@@ -2229,6 +2261,49 @@ export interface RecommendationRunDTO {
   assets: number;
   eligible: number;
   selected?: Record<string, string[]>;
+}
+
+export interface ReconciliationCountsDTO {
+  match: number;
+  divergent: number;
+  only_b3: number;
+  only_ledger: number;
+  not_compared: number;
+  open_issues: number;
+}
+
+export interface ReconciliationDTO {
+  id?: number | null;
+  reference_date: string;
+  file_name: string;
+  created_at?: string | null;
+  counts: ReconciliationCountsDTO;
+  lines: ReconciliationLineDTO[];
+}
+
+export interface ReconciliationLineDTO {
+  id?: number | null;
+  product: string;
+  ticker?: string | null;
+  asset_id?: number | null;
+  account_id?: number | null;
+  institution?: string | null;
+  b3_quantity: number;
+  ledger_quantity: number;
+  difference: number;
+  status: LineStatus;
+  note?: string;
+  resolution?: LineResolution;
+  resolution_note?: string | null;
+  resolved_at?: string | null;
+}
+
+export interface ReconciliationSummaryDTO {
+  id: number;
+  reference_date: string;
+  file_name: string;
+  created_at?: string | null;
+  counts: ReconciliationCountsDTO;
 }
 
 export interface RegimePointDTO {

@@ -34,6 +34,8 @@ const ROUTES: RouteSpec[] = [
   { test: (p) => p === HOME, label: "Início", parent: () => null },
   { test: (p) => p === "/carteira/rentabilidade", label: "Rentabilidade", parent: under("/carteira") },
   { test: (p) => p === "/carteira/raio-x", label: "Raio-X", parent: under("/carteira") },
+  { test: (p) => p === "/carteira/proventos", label: "Proventos", parent: under("/carteira") },
+  { test: (p) => p === "/carteira/conferir", label: "Conferir posição", parent: under("/carteira") },
   { test: (p) => p === "/carteira/novo-ativo", label: "Novo ativo", parent: under("/carteira"), detail: true },
   { test: (p) => p.startsWith("/carteira"), label: "Carteira", parent: under(HOME) },
   {

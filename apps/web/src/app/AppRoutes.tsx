@@ -4,6 +4,8 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { InstrumentRoute, LegacyAssetRedirect } from "../features/instrument/InstrumentRoute";
+import { IncomePage } from "../features/portfolio/IncomePage";
+import { ReconciliationPage } from "../features/portfolio/ReconciliationPage";
 import { WatchlistPage } from "../features/watchlist/WatchlistPage";
 import { AssetFormPage } from "../pages/asset/AssetFormPage";
 import { ContributePage } from "../pages/contribute/ContributePage";
@@ -48,7 +50,9 @@ export function AppRoutes() {
 
       <Route path="/carteira" element={<PortfolioPage />} />
       <Route path="/carteira/rentabilidade" element={<PerformancePage />} />
+      <Route path="/carteira/proventos" element={<IncomePage />} />
       <Route path="/carteira/raio-x" element={<HealthPage />} />
+      <Route path="/carteira/conferir" element={<ReconciliationPage />} />
       <Route path="/carteira/novo-ativo" element={<AssetFormPage />} />
 
       <Route path="/ativo/:ticker" element={<InstrumentRoute />} />

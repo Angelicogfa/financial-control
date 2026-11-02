@@ -52,6 +52,7 @@ class AlertKind(StrEnum):
     CHECKLIST_EXPIRED = "CHECKLIST_EXPIRED"
     RELEVANT_FACT = "RELEVANT_FACT"
     MINING_FINDING = "MINING_FINDING"
+    POSITION_NOT_CHECKED = "POSITION_NOT_CHECKED"
 
 
 SEVERITY_ORDER = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}
@@ -480,3 +481,63 @@ def visible_alerts(
         (a for a in alerts if a.key not in hidden),
         key=lambda a: (SEVERITY_ORDER[a.severity], a.kind.value, a.subject or ""),
     )
+
+
+POSITION_CHECK_MAX_DAYS = 35
+
+
+def position_check_alerts(
+    last_reference: date | None,
+    open_issues: int,
+    *,
+    has_b3_positions: bool,
+    today: date,
+    max_days: int = POSITION_CHECK_MAX_DAYS,
+) -> list[Alert]:
+    """The ledger was never (or not recently) checked against the B3 Posição statement, or the
+    last check left differences open (Phase 48.R5)."""
+    if not has_b3_positions:
+        return []
+    route = "/carteira/conferir"
+    if last_reference is None:
+        return [
+            Alert(
+                "position-check:never",
+                AlertKind.POSITION_NOT_CHECKED,
+                AlertSeverity.INFO,
+                "Posição nunca conferida com a B3",
+                "Envie o extrato de Posição da Área do Investidor para confirmar que o livro bate "
+                "com a custódia, ativo por ativo.",
+                None,
+                route,
+            )
+        ]
+    alerts = []
+    if open_issues > 0:
+        alerts.append(
+            Alert(
+                f"position-check:open:{last_reference.isoformat()}",
+                AlertKind.POSITION_NOT_CHECKED,
+                AlertSeverity.WARNING,
+                f"{open_issues} diferença(s) com a B3 em aberto",
+                f"A conferência de {last_reference.strftime('%d/%m/%Y')} encontrou posições que "
+                "não batem com o livro; corrija os lançamentos ou marque como explicadas.",
+                None,
+                route,
+            )
+        )
+    age = (today - last_reference).days
+    if age > max_days:
+        alerts.append(
+            Alert(
+                f"position-check:stale:{last_reference.isoformat()}",
+                AlertKind.POSITION_NOT_CHECKED,
+                AlertSeverity.INFO,
+                f"Posição não conferida há {age} dias",
+                f"A última conferência com a B3 tem data-base de "
+                f"{last_reference.strftime('%d/%m/%Y')}; confira o extrato do mês.",
+                None,
+                route,
+            )
+        )
+    return alerts
