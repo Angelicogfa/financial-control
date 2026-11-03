@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api, type LedgerFilters } from "../../api/endpoints";
 import { errorMessage } from "../../api/http";
@@ -336,6 +336,22 @@ const NEW_LINKS: Record<TabKey, { to: string; label: string }> = {
 export function LedgerPage() {
   const [tab, setTab] = useTab(TABS, "trades");
   const [filters, setFilters] = useStoredState<LedgerFilters>("ledger:filters", {});
+  const [params, setParams] = useSearchParams();
+  const linkedAsset = Number(params.get("asset"));
+  // A link to one asset (the alert of an invalid ledger) opens filtered by it; the filter then
+  // lives with the others, and clearing it does not bring it back.
+  useEffect(() => {
+    if (!params.has("asset")) return;
+    if (linkedAsset > 0) setFilters({ asset_id: linkedAsset });
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("asset");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [params, linkedAsset, setFilters, setParams]);
   return (
     <div className="app-page">
       <PageHeader

@@ -243,6 +243,17 @@ def test_payback_compares_the_cost_with_the_expected_gain() -> None:
     assert no_gain.payback_months is None and not no_gain.pays_off
 
 
+def test_within_the_tolerance_nothing_is_sold() -> None:
+    # 3% out of place (the real Internacional): the contributions path says there is nothing to
+    # change, so the sales path cannot offer a sale.
+    plan = _plan(
+        [_holding("A", 100, 5_300, 4_000), _holding("B", 100, 4_700, 4_000)],
+        {"A": 0.5, "B": 0.5},
+    )
+    assert plan.months == 0 and plan.distance == pytest.approx(0.03)
+    assert plan.sales == [] and plan.tax_brl == 0 and plan.cost_brl == 0
+
+
 def test_a_class_on_target_needs_nothing() -> None:
     plan = _plan(
         [_holding("A", 100, 5_000, 4_000), _holding("B", 100, 5_000, 4_000)],

@@ -43,7 +43,7 @@ class ReportEarning:
 class ReportClass:
     arca_class: str
     value_brl: float
-    current_pct: float
+    current_pct: float  # fraction; the snapshot keeps it from 0 to 100
     target_pct: float | None
 
 
@@ -91,8 +91,8 @@ def month_end(month: date) -> date:
 
 
 def _trade_value(qty: Decimal, price: Decimal, fx: Decimal, fees: Decimal, buy: bool) -> float:
-    gross = qty * price * fx
-    return float(gross + fees if buy else gross - fees)
+    # The fees are in the asset's currency, as in the tax assessment and the snapshots.
+    return float((qty * price + fees) * fx if buy else (qty * price - fees) * fx)
 
 
 def build_report(
@@ -158,9 +158,11 @@ def build_report(
         ReportClass(
             arca_class=name,
             value_brl=round(float(values.get("current_value") or 0.0), 2),
-            current_pct=float(values.get("current_pct") or 0.0),
+            current_pct=float(values.get("current_pct") or 0.0) / 100.0,
             target_pct=(
-                float(values["target_pct"]) if values.get("target_pct") is not None else None
+                float(values["target_pct"]) / 100.0
+                if values.get("target_pct") is not None
+                else None
             ),
         )
         for name, values in (closing.by_class if closing else {}).items()

@@ -217,8 +217,9 @@ def plan_transition(
     total = sum(values.values())
     months, first = contribution_path(values, targets, monthly_brl)
 
+    # Within the tolerance there is nothing to change: no sale, as in the contributions path.
     sales: list[Sale] = []
-    for h in holdings:
+    for h in holdings if distance_to(values, targets) > TOLERANCE else ():
         excess = h.value_brl - targets.get(h.ticker, 0.0) * total
         unit_value = h.value_brl / h.quantity if h.quantity > 0 else 0.0
         units = min(excess / unit_value, h.quantity) if unit_value > 0 else 0.0

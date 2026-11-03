@@ -17,7 +17,7 @@ from domain.shared.entities import (
     PortfolioSnapshotEntity,
     TransactionEntity,
 )
-from domain.shared.enums import AssetType, EarningKind, TransactionKind
+from domain.shared.enums import ArcaClass, AssetType, EarningKind, TransactionKind
 from domain.views.services import MAX_VIEWS_PER_SCOPE, clean_name
 
 D = Decimal
@@ -120,7 +120,7 @@ def test_report_measures_the_month_with_flows_and_income() -> None:
             flow=-219.5,
             earnings=11,
             by_class={
-                "REAL_ESTATE": {"current_value": 1900, "current_pct": 1.0, "target_pct": 0.3}
+                "REAL_ESTATE": {"current_value": 1900, "current_pct": 100.0, "target_pct": 30.0}
             },
         ),
     ]
@@ -140,6 +140,60 @@ def test_report_measures_the_month_with_flows_and_income() -> None:
     assert r.allocation[0].arca_class == "REAL_ESTATE" and r.allocation[0].target_pct == 0.3
     assert [g.name for g in r.goals] == ["Meta"]
     assert r.data_gaps == []
+
+
+def test_report_converts_the_fees_of_a_foreign_trade() -> None:
+    # The real SGOV purchase: US$ 2.50 of fee at 5.00 is R$ 12.50, as in the snapshot's flow.
+    asset = AssetEntity(
+        id=2,
+        ticker="SGOV",
+        name="iShares",
+        asset_type=AssetType.ETF_INTL,
+        transactions=(
+            TransactionEntity(
+                2,
+                TransactionKind.BUY,
+                date(2026, 10, 6),
+                D("1"),
+                D("103.726"),
+                fees=D("2.5"),
+                fx_rate=D("5"),
+            ),
+        ),
+    )
+    r = build_report(NOV, opening=None, in_month=[], assets=[asset])
+    assert r.bought_brl == 531.13
+
+
+def test_report_reads_the_allocation_in_the_scale_of_a_real_snapshot() -> None:
+    allocation = report_allocation_of_real_snapshot()
+    assert allocation.current_pct == pytest.approx(0.4907)
+    assert allocation.target_pct == pytest.approx(0.35)
+
+
+def report_allocation_of_real_snapshot():
+    from domain.portfolio.services.snapshots import snapshot_from_report
+
+    report = SimpleNamespace(
+        as_of_date=date(2026, 10, 30),
+        total_invested_brl=1000.0,
+        total_current_value_brl=1000.0,
+        total_unrealized_pnl_brl=0.0,
+        total_realized_pnl_brl=0.0,
+        total_received_earnings_brl=0.0,
+        total_consolidated_pnl_brl=0.0,
+        allocations=[
+            SimpleNamespace(
+                arca_class=ArcaClass.ATIVOS_INTERNACIONAIS,
+                invested_value=490.7,
+                current_value=490.7,
+                current_pct=49.07,
+                target_pct=35.0,
+            )
+        ],
+    )
+    snapshot = snapshot_from_report(report, net_flow=0.0)
+    return build_report(NOV, opening=None, in_month=[snapshot], assets=[]).allocation[0]
 
 
 def test_report_without_snapshots_says_what_is_missing() -> None:

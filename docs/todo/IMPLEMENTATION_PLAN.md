@@ -60,6 +60,7 @@
 | **Fase 45** | Hierarquia de Recomendação (motor analítico do aporte) | `[x]` Concluída (45.0 a 45.8) | 100% |
 | **Fase 47** | Recomendações Externas: Engenharia Reversa | `[ ]` Proposta — aguarda a decisão 47.0 | 0% |
 | **Fase 48** | Reconstrução da Experiência e Unificação das Camadas | `[x]` Concluída (48.0 e R0 a R9) | 100% |
+| **Fase 49** | Depois da Reconstrução: Validação, Decisões e Lacunas | `[ ]` Pendente (achados da revisão de 2026-11-03) | 0% |
 
 > **Pausa 2026-10-30:** a pedido, nenhuma fase nova avança (42.6, 42.7, 43.6, 34 e 36 incluídas) até a revisão da hierarquia de recomendação ser aprovada. Inventário dos mecanismos e proposta em [RECOMMENDATION_HIERARCHY_DESIGN.md](../features/RECOMMENDATION_HIERARCHY_DESIGN.md) (Fase 45).
 
@@ -922,3 +923,43 @@ Análise: [REBUILD_ANALYSIS.md](../architecture/REBUILD_ANALYSIS.md). Plano: [RE
 - `[x]` **48.R7** Imposto mensal (fecha a TD-04): motor puro `domain/tax/assessment.py` — vendas pelo custo médio em R$ com eventos corporativos, day trade (compra e venda no mesmo dia, quantidade casada) separado do swing; categorias com prejuízo próprio: operações comuns (ações, ETF, BDR a 15%; isenção de R$ 20 mil em vendas de ações no mês, só para ações), day trade (20%) e FII (20%); IRRF estimado (0,005% e 1%) descontado com crédito acumulado; DARF 6015 abaixo de R$ 10 acumula; vencimento no último dia útil do mês seguinte; exterior apurado por ano (15%, Lei 14.754/2023, a partir de 2024). Alíquotas da tabela `tax_rules` (o day trade a 20% é constante com a base legal). `script_00043_monthly_tax_assessments` (só aditiva, ensaiada na cópia real: OK) guarda os valores e a data do pagamento. Rotas `GET /tax/monthly?year=`, `GET /tax/monthly/{yyyy-mm}`, `PUT /tax/monthly/{yyyy-mm}/darf`; MCP `tax.monthly_year`, `tax.monthly_month`, `tax.darf_paid`; aba Carteira › Imposto; alerta `DARF_DUE` (a pagar, vencido e isenção do mês já perdida). Fora do escopo: cripto, opções, feriados no vencimento e o informe de bens e direitos.
 - `[x]` **48.R8** Planejar com as abas Metas, Renda futura, Simulações, Comparar renda fixa, Modelo e Qualidade. **Metas:** `script_00044_goals` (patrimônio ou renda passiva por mês, prazo, aporte planejado e as premissas de retorno real e de yield, editáveis), `domain/planning/goals.py` (progresso pelo último retrato e pela renda dos últimos 12 meses, projeção na data, aporte mensal necessário, status REACHED / ON_TRACK / OFF_TRACK / MISSED), rotas `/goals`; o Aportar sugere o valor pela meta que mais pede (o mesmo patrimônio serve a todas, então não se somam). **Renda futura:** `GET /portfolio/income-forecast?months=12|24|36` (anunciados + a estimativa pelo histórico de 12 meses de cada ativo, na quantidade de hoje e na mesma sazonalidade, sem contar duas vezes). MCP `planning.goals_list`, `planning.goals_create`, `planning.income_forecast`. Migration ensaiada na cópia real (OK). Guarda nova: `test_schema_names_are_unique_across_contexts` (pegou um `AssetForecastDTO` repetido antes de ir ao ar). **Propostas 34, 36 e 47 (corrigido em 2026-11-03):** **não fazem parte do fechamento da refatoração**. As decisões 34.0 e 36.0 já estavam tomadas na seção 10.1 da hierarquia, e a Fase 45 entregou parte das duas (45.8b otimizador com `scipy` ≈ 34.4; 45.8a placar ao vivo com `comparison_portfolios`, fluxo espelhado e estratégias ≈ 36.1–36.5). Só a decisão 47.0 segue em aberto; o restante entra já sobre `features/planning`.
 - `[x]` **48.R9** Remoção do legado, visões salvas e relatório mensal. **Legado:** os 57 arquivos de `pages/` foram para `features/<área>/` (login e página não encontrada em `app/`), e nada importa mais de `pages/`; o `useApi` deu lugar a `useScreenData` (`api/query.ts`), sobre o cache do TanStack Query (chave `["screen", key]`, sempre revalidado ao abrir, sem nova tentativa, o dado anterior fica enquanto a chave nova carrega), então duas telas com a mesma chave dividem uma requisição; os redirecionamentos da navegação antiga (`app/legacyRoutes.ts` e `/asset/:id`) saíram, com `/` levando a `/inicio`. Os links internos e os `route` dos alertas (`domain/alerts/services/evaluator.py`) usam os endereços novos (`/ativo/{ticker}?capitulo=...`), e uma guarda (`src/test/links.ts`) falha se algum link do código apontar para uma rota que não existe. O `?tab=` antigo continua abrindo o capítulo certo na página do ativo. **Visões salvas:** `script_00045_saved_views` (só aditiva, ensaiada na cópia real), `domain/views`, rotas `GET/PUT /saved-views` e `DELETE /saved-views/{id}` (o mesmo nome na mesma tela substitui os filtros; até 30 por tela; filtros até 4 mil caracteres) e o componente `features/views/SavedViews.tsx` no Screener, em Lançamentos e na Carteira (conta e classe). **Relatório mensal:** `GET /portfolio/monthly-report?month=YYYY-MM` (`domain/portfolio/services/monthly_report.py`: patrimônio no início e no fim pelos retratos, compras, vendas, fluxo líquido, proventos recebidos, resultado e TWR do mês com proventos, negociações, alocação ARCA no fim do mês, imposto do mês e metas, com as lacunas dos dados), MCP `portfolio.monthly_report` e a aba Carteira › Relatório (`/carteira/relatorio?mes=`), com "Salvar em PDF" pela impressão do navegador (menu, abas e botões ficam de fora). Escolha: o PDF sai do navegador, sem biblioteca nova no backend.
+
+## Fase 49 — Depois da Reconstrução: Validação, Decisões e Lacunas (`[ ]` Pendente)
+
+**Origem:** revisão sistêmica de 2026-11-03, antes do merge da Fase 48, com a versão nova rodando sobre uma cópia da base real. A migração em si passou: rotas, links, alertas e migrações sem falha. O que segue é o que ficou de fora.
+
+**Validação do usuário**
+
+- `[ ]` **49.1** Validar a aplicação no novo formato no ambiente local.
+- `[ ]` **49.2** Validar a conferência de posição com um extrato de Posição real da B3 (critério de pronto da R5, em aberto).
+
+**Decisões do usuário**
+
+- `[ ]` **49.3** O aporte segue a recomendação (45.6b), pedida antes de o teste rodar com dados reais. O teste de 2026-11-01 deu -9,2% ao ano contra os pesos iguais, com 4% de chance de ser positivo em 247 meses (Ações; sem custos; com viés de sobrevivência). Decidir se o aporte continua nela. O otimizador ainda não tem veredito com dados reais: conferir depois da próxima rodada semanal.
+- `[ ]` **49.4** Reconhecer ou limpar os 2.388 ativos criados em 2026-10-29 (2.414 dos 2.437 cadastrados não têm lançamentos): causam 295 alertas (174 de preço, 102 de dado suspeito) e pesam nas telas.
+- `[ ]` **49.5** Decisão 47.0 (recomendações externas), seção 10 do desenho.
+
+**Correções**
+
+- `[ ]` **49.6** Classificação de ETFs: todo `ETF_BR` entra em Ações por padrão (213 ativos), e fundos de renda fixa ou de CRI, como BLFT11 e VGIP11, foram escolhidos na classe Ações. Afeta os alvos do aporte.
+- `[ ]` **49.7** Desempenho: `service.value` relê a política a cada ativo (1.029 vezes em `/alerts`), e a lista de observação faz 4.863 consultas. Medido na cópia real: `/alerts` 12 s, `/portfolio/health` 17 s, `/research/watchlist` 20 s, `/simulations/coverage` 66 s.
+- `[ ]` **49.8** Conferir um a um os itens 36.1 a 36.8 contra o placar ao vivo da 45.8a.
+- `[ ]` **49.9** Testes de ida e volta para as migrações 40 a 45 (hoje só no ensaio manual).
+
+**Lacunas da experiência em relação ao plano (§3 do REFACTORING_PLAN)**
+
+- `[ ]` **49.10** Início: "o que mudou desde a última visita", próximo passo e a última conferência.
+- `[ ]` **49.11** Títulos iguais aos das abas (hoje "Desempenho", "Saúde da carteira", "Simular carteira" e "Recomendação" sob Rentabilidade, Raio-X, Simulações e Modelo).
+- `[ ]` **49.12** Celular: barra inferior com 5 itens (hoje menu lateral).
+- `[ ]` **49.13** Página do ativo: radar das lentes, "o que mudou", quanto um aporte típico compraria, proventos e fatos marcados no gráfico, regularidade dos proventos e indicadores nos 5 grupos do mercado.
+- `[ ]` **49.14** Aportar: "por que este e não aquele", botão para trocar o ativo e a posição esperada na etapa Conferir.
+- `[ ]` **49.15** Carteira: cotações velhas e livro inválido em Conferir, filtro por meta em Posições, patrimônio por conta em Posições e Tesouro a mercado no Raio-X.
+- `[ ]` **49.16** Estrutura do web: `features/` por tarefa, `shared/` e telas grandes divididas em seções (`simulation/views.tsx` 1.369 linhas, `RecommendationPage` 872, `AssetDetailPage` 863).
+
+**Comparativo com o mercado (em ordem de ganho)**
+
+- `[ ]` **49.17** Rentabilidade separando valorização, proventos e câmbio, com a contribuição de cada ativo (Sharesight); o backend já calcula o câmbio.
+- `[ ]` **49.18** Informe de IRPF, bens e direitos (Investidor10, myProfit).
+- `[ ]` **49.19** Exposição dentro dos ETFs no Raio-X (Morningstar); o dado já existe no backend.
+- `[ ]` **49.20** Rentabilidade por classe com TWR próprio (TD-07).
+- `[ ]` **49.21** Subcarteiras livres por objetivo (Status Invest, Kinvo) e calendário de proventos (Snowball).

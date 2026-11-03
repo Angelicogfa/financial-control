@@ -182,6 +182,16 @@ const trade = (id: number) => ({
 });
 
 describe("paged ledger", () => {
+  it("opens filtered by the asset of an alert's link", async () => {
+    const { calls } = mockApi([
+      { path: "/transactions", reply: { items: [], meta: meta(1, 10, 0) } },
+      { path: "/assets", reply: { items: [asset()], meta: meta(1, 200, 1) } },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/lancamentos?asset=7");
+    await waitFor(() => expect(last(calls, "GET", "/transactions")?.query.get("asset_id")).toBe("7"));
+  });
+
   it("asks the API for one page of trades at a time and starts over on a new filter", async () => {
     const { calls } = mockApi([
       {
