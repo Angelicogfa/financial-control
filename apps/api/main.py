@@ -34,6 +34,7 @@ from controllers.simulation.router import simulation_router
 from controllers.simulation.study_router import study_router
 from controllers.system.router import health_router
 from controllers.tax.router import tax_router
+from controllers.views.router import saved_views_router
 from controllers.watch.router import alert_rules_router, notes_router
 from core.http_errors import install_error_handlers
 from core.logging import configure_logging
@@ -72,6 +73,7 @@ PROTECTED_ROUTERS = (
     notes_router,
     goals_router,
     income_forecast_router,
+    saved_views_router,
 )
 
 

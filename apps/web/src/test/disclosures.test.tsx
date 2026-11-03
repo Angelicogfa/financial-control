@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { render } from "./render";
 import { describe, expect, it } from "vitest";
 
 import type { CvmDocumentDTO, DisclosureFeedDTO } from "../api/types";
-import { DisclosureFeed } from "../pages/disclosures/DisclosureFeed";
+import { DisclosureFeed } from "../features/disclosures/DisclosureFeed";
 import { optionLabels, pick } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 

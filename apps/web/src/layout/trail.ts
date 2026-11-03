@@ -37,6 +37,7 @@ const ROUTES: RouteSpec[] = [
   { test: (p) => p === "/carteira/proventos", label: "Proventos", parent: under("/carteira") },
   { test: (p) => p === "/carteira/conferir", label: "Conferir posição", parent: under("/carteira") },
   { test: (p) => p === "/carteira/imposto", label: "Imposto", parent: under("/carteira") },
+  { test: (p) => p === "/carteira/relatorio", label: "Relatório do mês", parent: under("/carteira") },
   { test: (p) => p === "/carteira/novo-ativo", label: "Novo ativo", parent: under("/carteira"), detail: true },
   { test: (p) => p.startsWith("/carteira"), label: "Carteira", parent: under(HOME) },
   {
@@ -45,12 +46,6 @@ const ROUTES: RouteSpec[] = [
     parent: (p) => p.replace(/\/editar$/, ""),
   },
   { test: (p) => p.startsWith("/ativo/"), label: "Ativo", parent: under("/explorar"), detail: true },
-  {
-    test: (p) => /^\/asset\/[^/]+\/edit$/.test(p),
-    label: "Editar ativo",
-    parent: (p) => p.replace(/\/edit$/, ""),
-  },
-  { test: (p) => p.startsWith("/asset/"), label: "Ativo", parent: under("/carteira"), detail: true },
   { test: (p) => p === "/explorar/garimpo", label: "Garimpo", parent: under("/explorar") },
   { test: (p) => p === "/explorar/comparar", label: "Comparar ativos", parent: under("/explorar") },
   { test: (p) => p === "/explorar/fatos-relevantes", label: "Fatos relevantes", parent: under("/explorar") },

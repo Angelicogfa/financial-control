@@ -3284,10 +3284,16 @@ details[open] > summary {
 @media print {
   .app-sidebar,
   .app-topbar,
+  .app-destination-tabs,
   .study-index,
   .app-button-row,
   .app-backdrop {
     display: none !important;
+  }
+
+  .app-report .app-card,
+  .app-report .app-table-wrap {
+    break-inside: avoid-page;
   }
 
   .app-main {
@@ -3742,4 +3748,16 @@ details[open] > summary {
 .app-goal-track {
   display: block;
   margin: var(--space-3) 0 var(--space-2);
+}
+
+/* Monthly report (Phase 48.R9) ------------------------------------------------------------ */
+.app-report-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.app-saved-views {
+  align-items: flex-end;
 }

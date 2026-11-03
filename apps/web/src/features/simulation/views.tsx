@@ -1,0 +1,1369 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+
+import { api } from "../../api/endpoints";
+import { errorMessage } from "../../api/http";
+import type {
+  BacktestRequest,
+  BacktestSummaryDTO,
+  CalibrationDTO,
+  CandidatesDTO,
+  LabDTO,
+  EventOutcomeDTO,
+  GeneratorCalibrationDTO,
+  GoalOutcomeDTO,
+  PercentilesDTO,
+  ProjectionDTO,
+  RobustnessDTO,
+  SimulationResultDTO,
+  SimulationRunDetailDTO,
+  SimulationRunDTO,
+  SimulationStatus,
+  VariantValidationDTO,
+  WindowOutcomeDTO,
+} from "../../api/types";
+import { useScreenData } from "../../api/query";
+import { Badge, Signed } from "../../components/Badge";
+import { KpiGrid, Lead, Notes, Section, Segmented, type KpiSpec, type Tone } from "../../components/Section";
+import { Async, Empty, Spinner } from "../../components/States";
+import { brl, brlCompact, day, dateTime, num, pct, plural, points } from "../../utils/format";
+import { ARCA_LABELS } from "../../utils/labels";
+import { BarList } from "../../viz/BarList";
+import { ColumnChart } from "../../viz/ColumnChart";
+import { compareLink } from "../tools/AssetComparePage";
+import { TrendChart, type TrendSeries } from "../../viz/TrendChart";
+
+type Benchmark = NonNullable<BacktestRequest["benchmarks"]>[number];
+export const BENCHMARK_LABELS: Record<Benchmark, string> = {
+  CDI: "CDI",
+  IBOV: "Ibovespa",
+  IFIX: "IFIX",
+  SP500_BRL: "S&P 500 (R$)",
+};
+
+const STATUS_LABELS: Record<SimulationStatus, { label: string; tone: string }> = {
+  PENDING: { label: "Na fila", tone: "info" },
+  RUNNING: { label: "Rodando", tone: "info" },
+  DONE: { label: "Concluída", tone: "success" },
+  FAILED: { label: "Falhou", tone: "danger" },
+  TIMEOUT: { label: "Tempo esgotado", tone: "warning" },
+};
+
+const SERIES_COLORS = ["var(--viz-serie-1)", "var(--viz-serie-2)", "var(--viz-serie-3)", "var(--viz-serie-4)"];
+const POLL_MS = 3000;
+
+export function isActive(status: SimulationStatus): boolean {
+  return status === "PENDING" || status === "RUNNING";
+}
+
+export function StatusBadge({ status }: Readonly<{ status: SimulationStatus }>) {
+  const spec = STATUS_LABELS[status];
+  return <Badge tone={spec.tone}>{spec.label}</Badge>;
+}
+
+// --- past -------------------------------------------------------------------------------------
+
+export function seriesOf(results: SimulationResultDTO[]): SimulationResultDTO[] {
+  return results.filter((r) => !r.key.startsWith("variant:"));
+}
+
+function SummaryTable({ results }: Readonly<{ results: SimulationResultDTO[] }>) {
+  const rows: Array<[string, (s: BacktestSummaryDTO) => string]> = [
+    ["Valor final", (s) => brl(s.final_value)],
+    ["Investido", (s) => brl(s.contributed)],
+    ["Ganho", (s) => brl(s.gain)],
+    ["TIR a.a. (dos aportes)", (s) => pct(s.money_weighted_return, 2)],
+    ["Rentabilidade a.a. (TWR)", (s) => pct(s.annual_twr, 2)],
+    ["Volatilidade a.a.", (s) => pct(s.volatility, 1)],
+    ["Queda máxima", (s) => pct(s.max_drawdown, 1)],
+    ["Custos", (s) => brl(s.fees)],
+    ["IR pago", (s) => brl(s.taxes)],
+    ["Operações", (s) => String(s.trades)],
+  ];
+  return (
+    <div className="app-table-wrap">
+      <table className="app-table" aria-label="Resumo">
+        <thead>
+          <tr>
+            <th>Métrica</th>
+            {results.map((r) => (
+              <th key={r.key} className="app-numeric">
+                {r.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, value]) => (
+            <tr key={label}>
+              <td>{label}</td>
+              {results.map((r) => (
+                <td key={r.key} className="app-numeric">
+                  {value(r.summary)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function Reproducibility({ run }: Readonly<{ run: SimulationRunDTO }>) {
+  return (
+    <p className="app-muted">
+      Motor {run.code_version} · semente {run.seed} · dados {run.data_hash?.slice(0, 12) ?? "—"} · parâmetros{" "}
+      {run.params_hash.slice(0, 12)}
+      {run.reused_from ? ` · resultado reaproveitado da simulação #${run.reused_from} (mesmos dados e regras)` : ""}
+    </p>
+  );
+}
+
+export function RunProblem({ run }: Readonly<{ run: SimulationRunDTO }>) {
+  if (isActive(run.status)) {
+    return (
+      <p className="app-muted" role="status">
+        <Spinner size="sm" /> {run.status === "PENDING" ? "Na fila do worker…" : "Rodando…"} A página atualiza sozinha.
+      </p>
+    );
+  }
+  return (
+    <p className="app-error-banner" role="alert">
+      {run.status === "TIMEOUT" ? "A simulação passou do tempo limite." : "A simulação falhou."} {run.error}
+      {run.error?.includes("InsufficientHistory") && (
+        <>
+          {" "}
+          <Link className="app-link" to="/configuracoes/dados-de-mercado">
+            Carregar o histórico em Dados de mercado
+          </Link>
+        </>
+      )}
+    </p>
+  );
+}
+
+/** What the past says, in words: where the money ended against the same flow in the CDI. */
+export function pastStory(series: SimulationResultDTO[]): { tone: Tone; lines: string[]; cashShare: number } {
+  const strategy = series.find((r) => r.key === "strategy");
+  const points = strategy?.points ?? [];
+  const last = points[points.length - 1];
+  if (!strategy || !last) return { tone: "neutral", lines: [], cashShare: 0 };
+  const s = strategy.summary;
+  const cdi = series.find((r) => r.key === "benchmark:CDI");
+  const cashShare = last.market_value > 0 ? ((last.by_class?.CAIXA ?? 0) + last.cash) / last.market_value : 0;
+  const lines = [
+    `De ${day(points[0].day)} a ${day(last.day)}, com ${brl(s.contributed)} aportados no total, a estratégia ` +
+      `chegou a ${brl(s.final_value)}` +
+      (cdi
+        ? `, ${brl(Math.abs(s.final_value - cdi.summary.final_value))} ${
+            s.final_value >= cdi.summary.final_value ? "acima" : "abaixo"
+          } do mesmo fluxo aplicado no CDI.`
+        : "."),
+  ];
+  const others = series.filter((r) => r.key !== "strategy");
+  const best = [...others].sort((a, b) => b.summary.final_value - a.summary.final_value)[0];
+  const facts = [`TIR de ${pct(s.money_weighted_return, 2)} a.a.`, `queda máxima de ${pct(s.max_drawdown, 1)}`];
+  if (best && best.summary.final_value > s.final_value) {
+    facts.push(`a melhor referência foi ${best.label} (${brlCompact(best.summary.final_value)})`);
+  }
+  lines.push(`${facts.join(", ").replace(/^./, (c) => c.toUpperCase())}.`);
+  if (cashShare > 0.9) {
+    lines.push(
+      `${pct(cashShare, 0)} do patrimônio terminou em Caixa: os aportes quase não foram para ações, FIIs ou ` +
+        "exterior. Isso costuma acontecer quando os ativos não passam na elegibilidade nas datas simuladas; " +
+        "um checklist respondido há pouco só vale a partir da data da resposta.",
+    );
+  }
+  const tone: Tone = cashShare > 0.9 ? "caution" : cdi ? (s.final_value >= cdi.summary.final_value ? "positive" : "negative") : "neutral";
+  return { tone, lines, cashShare };
+}
+
+export function PastTab({ detail }: Readonly<{ detail: SimulationRunDetailDTO }>) {
+  if (detail.status !== "DONE") return <RunProblem run={detail} />;
+  const series = seriesOf(detail.results ?? []);
+  const strategy = series.find((r) => r.key === "strategy");
+  const points = strategy?.points ?? [];
+  if (!strategy || points.length < 2) {
+    return <Empty title="Sem pontos suficientes" hint="O período não tem dois fins de mês com preço." />;
+  }
+  const unavailable = strategy.unavailable ?? [];
+  const labels = points.map((p) => day(p.day));
+  const lines: TrendSeries[] = [
+    ...series.map((r, i) => ({
+      key: r.key,
+      label: r.label,
+      color: SERIES_COLORS[i % SERIES_COLORS.length],
+      values: (r.points ?? []).map((p) => p.market_value),
+    })),
+    { key: "contributed", label: "Investido", color: "var(--app-text-subtle)", values: points.map((p) => p.contributed) },
+  ];
+  const last = points[points.length - 1];
+  const story = pastStory(series);
+  const s = strategy.summary;
+  const kpis: KpiSpec[] = [
+    { label: "Patrimônio final", value: brlCompact(s.final_value), note: `${brlCompact(s.contributed)} aportados` },
+    {
+      label: "Ganho",
+      value: brlCompact(s.gain),
+      tone: s.gain >= 0 ? "positive" : "negative",
+      note: `${pct(s.contributed > 0 ? s.gain / s.contributed : 0, 1, true)} sobre o aportado`,
+    },
+    { label: "TIR dos aportes", value: `${pct(s.money_weighted_return, 2)} a.a.`, note: `TWR ${pct(s.annual_twr, 2)} a.a.` },
+    { label: "Queda máxima", value: pct(s.max_drawdown, 1), note: `volatilidade ${pct(s.volatility, 1)} a.a.` },
+    { label: "Custos e IR", value: brlCompact(s.fees + (s.taxes ?? 0)), note: plural(s.trades, "operação", "operações") },
+  ];
+  const notes = [
+    ...(strategy.survivorship_bias
+      ? [
+          "Inclui ativos do catálogo atual da B3: só as empresas que sobreviveram até hoje aparecem, e o passado " +
+            "parece melhor do que foi (viés de sobrevivência).",
+        ]
+      : []),
+    ...(unavailable.length > 0 ? [`Sem preço no período, ficaram de fora: ${unavailable.join(", ")}.`] : []),
+    "Todas as linhas recebem os mesmos aportes nas mesmas datas; a diferença é só onde o dinheiro foi aplicado.",
+    "Descreve o que teria acontecido com as regras escolhidas; não diz nada sobre o futuro.",
+  ];
+  return (
+    <div className="app-page-stack">
+      <Lead tone={story.tone}>
+        {story.lines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </Lead>
+      <KpiGrid items={kpis} label="Indicadores da estratégia" />
+      <Section title="Patrimônio com o mesmo fluxo de aportes" subtitle="Mês a mês, estratégia e referências.">
+        <TrendChart
+          title="Patrimônio da estratégia e das referências mês a mês"
+          labels={labels}
+          series={lines}
+          hint="Passe o mouse para ler o patrimônio de cada linha no mês."
+          format={(v) => brl(v)}
+          compact={brlCompact}
+        />
+      </Section>
+      <Section title="Estratégia contra as referências" subtitle="As mesmas métricas para cada destino do mesmo fluxo de aportes.">
+        <SummaryTable results={series} />
+      </Section>
+      <Section title="Onde o dinheiro terminou" subtitle={`Alocação por classe em ${day(last.day)}.`}>
+        <BarList
+          label="Alocação final por classe"
+          bars={Object.entries(last.by_class ?? {}).map(([cls, value]) => ({
+            id: cls,
+            label: ARCA_LABELS[cls as keyof typeof ARCA_LABELS] ?? cls,
+            share: last.market_value > 0 ? value / last.market_value : 0,
+            value: `${brl(value)} · ${pct(last.market_value > 0 ? value / last.market_value : 0, 0)}`,
+          }))}
+        />
+      </Section>
+      <Notes items={notes} tone={strategy.survivorship_bias ? "caution" : "neutral"} />
+      <Reproducibility run={detail} />
+    </div>
+  );
+}
+
+// --- robustness -------------------------------------------------------------------------------
+
+function Outcome({ outcome }: Readonly<{ outcome: WindowOutcomeDTO | undefined }>) {
+  if (!outcome?.covered) return <span className="app-muted">fora do período</span>;
+  return (
+    <>
+      <Signed value={outcome.return_rate}>{pct(outcome.return_rate, 1, true)}</Signed>
+      <div className="app-muted">queda máx. {pct(outcome.max_drawdown, 1)}</div>
+    </>
+  );
+}
+
+export function RobustnessView({ data }: Readonly<{ data: RobustnessDTO }>) {
+  if (data.status !== "DONE") return <Empty title="A robustez aparece quando a simulação terminar" />;
+  const { series = [], crises = [], shocks = [], variants = [], warnings = [] } = data;
+  const twr = variants.map((v) => v.summary.annual_twr);
+  const top = Math.max(...twr.map((v) => Math.abs(v)), 0.0001);
+  const worst = crises
+    .map((c) => ({ c, o: c.outcomes?.strategy }))
+    .filter((x) => x.o?.covered)
+    .sort((a, b) => (a.o?.return_rate ?? 0) - (b.o?.return_rate ?? 0))[0];
+  const spread = variants.length > 1 ? (data.annual_twr_distribution.maximum ?? 0) - (data.annual_twr_distribution.minimum ?? 0) : null;
+  return (
+    <div className="app-page-stack">
+      <Lead tone={data.validation ? (data.validation.passed ? "positive" : "neutral") : "neutral"}>
+        <p>
+          {worst
+            ? `A pior crise dentro do período foi ${worst.c.label}, com ${pct(worst.o?.return_rate, 1, true)} para a estratégia e queda máxima de ${pct(worst.o?.max_drawdown, 1)}.`
+            : "Nenhuma crise histórica conhecida cai dentro do período simulado."}
+        </p>
+        <p>
+          {spread !== null
+            ? `As ${variants.length} variantes de regra ficaram entre ${pct(data.annual_twr_distribution.minimum, 2)} e ${pct(data.annual_twr_distribution.maximum, 2)} a.a. (${pct(spread, 2)} de diferença). `
+            : ""}
+          {data.validation
+            ? data.validation.passed
+              ? "A melhor variante passou nos testes contra a sorte."
+              : "Não há evidência de que a melhor variante seja melhor por mérito, e não por sorte."
+            : ""}
+        </p>
+      </Lead>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Crises históricas</h2>
+        <p className="app-card-hint">Rentabilidade dentro da janela, sem contar os aportes, e a maior queda nela.</p>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Crises históricas">
+            <thead>
+              <tr>
+                <th>Crise</th>
+                {series.map((s) => (
+                  <th key={s.key} className="app-numeric">
+                    {s.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {crises.map((c) => (
+                <tr key={c.key}>
+                  <td>
+                    {c.label}
+                    <div className="app-muted">
+                      {day(c.start)} a {day(c.end)}
+                    </div>
+                  </td>
+                  {series.map((s) => (
+                    <td key={s.key} className="app-numeric">
+                      <Outcome outcome={c.outcomes?.[s.key]} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Choques sobre a alocação final</h2>
+        <p className="app-card-hint">Efeito imediato de primeira ordem; não inclui reações em cadeia entre as classes.</p>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Choques sintéticos">
+            <thead>
+              <tr>
+                <th>Choque</th>
+                <th className="app-numeric">Antes</th>
+                <th className="app-numeric">Depois</th>
+                <th className="app-numeric">Variação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shocks.map((s) => (
+                <tr key={s.key}>
+                  <td>
+                    {s.label}
+                    {s.note && <div className="app-muted">{s.note}</div>}
+                  </td>
+                  <td className="app-numeric">{brl(s.before)}</td>
+                  <td className="app-numeric">{brl(s.after)}</td>
+                  <td className="app-numeric">
+                    <Signed value={s.change}>
+                      {brl(s.change)} ({pct(s.change_rate, 1, true)})
+                    </Signed>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Variantes das regras</h2>
+        {variants.length === 0 ? (
+          <Empty title="Esta simulação não testou variantes" hint="Rode de novo marcando “Testar variantes de banda e rebalanceamento”." />
+        ) : (
+          <>
+            <p>
+              {data.trials_in_run} variantes nesta simulação · {data.trials_total} testadas ao todo. Rentabilidade a.a. entre{" "}
+              {pct(data.annual_twr_distribution.minimum, 2)} e {pct(data.annual_twr_distribution.maximum, 2)} (mediana{" "}
+              {pct(data.annual_twr_distribution.median, 2)}).
+            </p>
+            <p className="app-card-hint">
+              Todas as variantes aparecem, não só a melhor: escolher a melhor entre muitas tentativas é ajustar ao ruído. Quanto
+              mais tentativas, maior a chance de a melhor ser sorte.
+            </p>
+            <BarList
+              label="Rentabilidade a.a. de cada variante"
+              bars={variants.map((v) => ({
+                id: v.key,
+                label: v.label,
+                share: Math.abs(v.summary.annual_twr) / top,
+                tone: v.summary.annual_twr < 0 ? "is-negative" : undefined,
+                value: pct(v.summary.annual_twr, 2),
+              }))}
+            />
+            <div className="app-table-wrap">
+              <table className="app-table" aria-label="Variantes">
+                <thead>
+                  <tr>
+                    <th>Variante</th>
+                    <th className="app-numeric">Valor final</th>
+                    <th className="app-numeric">Queda máxima</th>
+                    <th className="app-numeric">IR + custos</th>
+                    <th className="app-numeric">Até {data.holdout_start ? day(data.holdout_start) : "—"}</th>
+                    <th className="app-numeric">Janela reservada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map((v) => (
+                    <tr key={v.key}>
+                      <td>{v.label}</td>
+                      <td className="app-numeric">{brl(v.summary.final_value)}</td>
+                      <td className="app-numeric">{pct(v.summary.max_drawdown, 1)}</td>
+                      <td className="app-numeric">{brl((v.summary.taxes ?? 0) + v.summary.fees)}</td>
+                      <td className="app-numeric">
+                        <Outcome outcome={v.selection} />
+                      </td>
+                      <td className="app-numeric">
+                        <Outcome outcome={v.holdout} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="app-card-hint">
+              Os últimos 36 meses ficam reservados para validar: escolha uma regra olhando só o período anterior e use a janela
+              reservada para conferir se a vantagem se mantém.
+            </p>
+          </>
+        )}
+      </section>
+      <Notes items={warnings} label="Avisos de amostra" tone="neutral" />
+      {data.validation && <VariantValidation validation={data.validation} />}
+    </div>
+  );
+}
+
+/** Phase 33.8: the best rule variant against the luck of the trials. */
+function VariantValidation({ validation }: Readonly<{ validation: VariantValidationDTO }>) {
+  return (
+    <section className="app-card app-card-padded" aria-label="Validação estatística">
+      <div className="health-pillar-head">
+        <h2 className="app-card-heading">Validação estatística da melhor variante</h2>
+        <Badge tone={validation.passed ? "success" : "warning"}>
+          {validation.passed ? "Passou nos três testes" : "Sem evidência"}
+        </Badge>
+      </div>
+      <p>{validation.verdict}</p>
+      <dl className="simulation-validation">
+        <div>
+          <dt>Melhor variante</dt>
+          <dd>{validation.best_label}</dd>
+        </div>
+        <div>
+          <dt>Sharpe a.a. (sobre o CDI)</dt>
+          <dd>
+            {num(validation.best_sharpe_annual, 2)}{" "}
+            <span className="app-muted">contra {num(validation.expected_max_sharpe_annual, 2)} esperado do acaso</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Sharpe deflacionado</dt>
+          <dd>
+            {pct(validation.deflated_probability, 0)} <span className="app-muted">({validation.trials} tentativas, ≥ 95% para passar)</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Probabilidade de ajuste ao ruído (PBO)</dt>
+          <dd>
+            {validation.pbo == null ? "—" : pct(validation.pbo, 0)}{" "}
+            <span className="app-muted">(abaixo de 50% para passar; {validation.pbo_combinations} divisões)</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Chance de superar a regra atual</dt>
+          <dd>
+            {validation.gate_probability == null ? "—" : pct(validation.gate_probability, 0)}{" "}
+            <span className="app-muted">(≥ 95% para passar)</span>
+          </dd>
+        </div>
+      </dl>
+      <p className="app-card-hint">
+        Todas as variantes testadas até hoje entram na conta: quanto mais tentativas, maior o Sharpe que o acaso sozinho
+        produziria. Retornos mensais sem os aportes, acima do CDI, em {validation.observations} meses.
+      </p>
+    </section>
+  );
+}
+
+export function RobustnessTab({ run }: Readonly<{ run: SimulationRunDTO }>) {
+  const state = useScreenData(`simulation-robustness-${run.id}-${run.status}`, () => api.simulations.robustness(run.id));
+  if (run.status !== "DONE") return <RunProblem run={run} />;
+  return <Async state={state}>{(data) => <RobustnessView data={data} />}</Async>;
+}
+
+// --- future -----------------------------------------------------------------------------------
+
+const PERCENTILE_COLUMNS: Array<[keyof PercentilesDTO, string]> = [
+  ["p5", "5% (pessimista)"],
+  ["p25", "25%"],
+  ["p50", "Mediana"],
+  ["p75", "75%"],
+  ["p95", "95% (otimista)"],
+];
+
+function yearsLabel(months: number): string {
+  if (months === 0) return "Hoje";
+  const years = months / 12;
+  return Number.isInteger(years) ? `${years} ${years === 1 ? "ano" : "anos"}` : `${months} meses`;
+}
+
+const GENERATOR_NAMES: Record<string, string> = {
+  BOOTSTRAP: "Bootstrap em blocos",
+  BAYESIAN_BOOTSTRAP: "Bootstrap bayesiano",
+  BAYESIAN_NORMAL: "Normal bayesiana",
+  STACKED: "Combinação",
+};
+
+/** How the interval was built: the disagreement between generators, if any. */
+function ChanceDetail({ chance }: Readonly<{ chance: { by_generator?: Record<string, number> } }>) {
+  const shares = Object.entries(chance.by_generator ?? {});
+  if (shares.length < 2) return null;
+  return (
+    <p className="app-muted">
+      Por gerador: {shares.map(([g, p]) => `${GENERATOR_NAMES[g] ?? g} ${pct(p, 0)}`).join(" · ")}. O intervalo de 90%
+      cobre essa divergência, o número finito de trajetórias e a incerteza dos parâmetros.
+    </p>
+  );
+}
+
+function EventList({ events }: Readonly<{ events: EventOutcomeDTO[] }>) {
+  if (events.length === 0) return null;
+  return (
+    <section className="app-card app-card-padded">
+      <h2 className="app-card-heading">Outras chances da estratégia</h2>
+      <ul aria-label="Outras chances">
+        {events.map((e) => (
+          <li key={e.key}>
+            {e.label}: <strong>{pct(e.probability, 0)}</strong> ({pct(e.low, 0)} a {pct(e.high, 0)})
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function GoalLine({ title, goal, money }: Readonly<{ title: string; goal: GoalOutcomeDTO; money: string }>) {
+  return (
+    <div className="app-card app-card-padded">
+      <h3 className="app-card-heading">
+        {title}: {money}
+      </h3>
+      <p>
+        <strong>{pct(goal.probability, 0)}</strong> de chance de chegar lá no horizonte{" "}
+        <span>
+          ({pct(goal.low, 0)} a {pct(goal.high, 0)})
+        </span>
+      </p>
+      <ChanceDetail chance={goal} />
+      {goal.months ? (
+        <p className="app-muted">
+          Quando chegam: em {yearsLabel(Math.round(goal.months.p50))} na mediana, entre {yearsLabel(Math.round(goal.months.p25))} e{" "}
+          {yearsLabel(Math.round(goal.months.p75))} na metade central.
+        </p>
+      ) : (
+        <p className="app-muted">Nenhuma trajetória chega à meta no horizonte.</p>
+      )}
+    </div>
+  );
+}
+
+export function ProjectionView({ data, run }: Readonly<{ data: ProjectionDTO; run: SimulationRunDTO }>) {
+  const scenarios = data.scenarios ?? [];
+  const [key, setKey] = useState(scenarios.find((s) => s.scenario.name === "BASE")?.key ?? scenarios[0]?.key);
+  const current = scenarios.find((s) => s.key === key);
+  if (data.status !== "DONE" || !current) return <Empty title="A projeção aparece quando a simulação terminar" />;
+  const pointsList = current.points ?? [];
+  const labels = pointsList.map((p) => yearsLabel(p.month));
+  const premises = current.premises ?? [];
+  const block = Number(run.params?.mean_block_months ?? 0);
+  const horizon = yearsLabel(current.horizon_months);
+  const kpis: KpiSpec[] = [
+    {
+      label: `Patrimônio em ${horizon} (mediana)`,
+      value: brlCompact(current.final_wealth.p50),
+      note: `em R$ de hoje; ${brlCompact(current.contributed)} aportados`,
+    },
+    {
+      label: "Faixa de 90%",
+      value: `${brlCompact(current.final_wealth.p5)} a ${brlCompact(current.final_wealth.p95)}`,
+      note: "5% das trajetórias ficam abaixo",
+    },
+    { label: "Renda passiva mensal (mediana)", value: brlCompact(current.final_income.p50), note: "ao fim do horizonte" },
+    ...(current.wealth_goal
+      ? [
+          {
+            label: "Chance da meta de patrimônio",
+            value: pct(current.wealth_goal.probability, 0),
+            note: `${pct(current.wealth_goal.low, 0)} a ${pct(current.wealth_goal.high, 0)} · meta ${brlCompact(current.wealth_goal.target)}`,
+            tone: (current.wealth_goal.probability >= 0.7 ? "positive" : current.wealth_goal.probability < 0.4 ? "negative" : "caution") as Tone,
+          },
+        ]
+      : []),
+    { label: "Pior queda (5% dos casos)", value: pct(current.max_drawdown.p5, 1), note: "queda máxima no caminho" },
+  ];
+
+  return (
+    <div className="app-page-stack">
+      <Lead>
+        <p>
+          No cenário {current.label.toLowerCase()}, a carteira chega a <strong>{brlCompact(current.final_wealth.p50)}</strong>{" "}
+          em {horizon} na mediana, em reais de hoje, com 90% das trajetórias entre {brlCompact(current.final_wealth.p5)} e{" "}
+          {brlCompact(current.final_wealth.p95)}.
+        </p>
+        <p>
+          {current.wealth_goal
+            ? `A chance de chegar à meta de ${brlCompact(current.wealth_goal.target)} é de ${pct(current.wealth_goal.probability, 0)} (entre ${pct(current.wealth_goal.low, 0)} e ${pct(current.wealth_goal.high, 0)}). `
+            : ""}
+          Faixas, não promessa: o futuro pode ter prêmios menores e crises mais longas que o histórico amostrado.
+        </p>
+      </Lead>
+      <KpiGrid items={kpis} label="Indicadores da projeção" />
+
+      <Section
+        title="Cenário de juros"
+        subtitle="Os três cenários usam as mesmas trajetórias de prêmio; muda só o CDI e o IPCA."
+        actions={
+          <Segmented
+            options={scenarios.map((s) => [s.key, s.label] as [string, string])}
+            value={key ?? ""}
+            onChange={setKey}
+            label="Cenários de juros"
+          />
+        }
+      >
+        <p className="app-muted">
+          CDI {pct(current.scenario.annual_cdi_rate, 2)} a.a. · IPCA {pct(current.scenario.annual_ipca_rate, 2)} a.a. ·{" "}
+          {current.paths} trajetórias de {yearsLabel(current.horizon_months)}
+        </p>
+        {(current.generators ?? []).length > 0 && (
+          <p className="app-muted">
+            Geradores:{" "}
+            {(current.generators ?? []).map((g) => `${g.label} ${pct(g.weight, 0)}`).join(" · ")}
+            {data.calibration_run ? ` (pesos da calibração #${data.calibration_run})` : ""}.
+            {current.prior_months != null &&
+              ` O prior conservador pesa o equivalente a ${num(current.prior_months, 0)} meses de dados.`}
+          </p>
+        )}
+      </Section>
+
+      {(current.wealth_goal || current.income_goal) && (
+        <div className="app-page-stack">
+          {current.wealth_goal && (
+            <GoalLine title="Meta de patrimônio (líquido de IR)" goal={current.wealth_goal} money={brl(current.wealth_goal.target)} />
+          )}
+          {current.income_goal && (
+            <GoalLine title="Meta de renda passiva" goal={current.income_goal} money={`${brl(current.income_goal.target)}/mês`} />
+          )}
+        </div>
+      )}
+
+      <EventList events={current.events ?? []} />
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Patrimônio em R$ de hoje</h2>
+        <TrendChart
+          title="Faixas prováveis do patrimônio ano a ano"
+          labels={labels}
+          series={[
+            { key: "p50", label: "Mediana", color: "var(--viz-serie-1)", values: pointsList.map((p) => p.wealth.p50) },
+            { key: "contributed", label: "Investido", color: "var(--app-text-subtle)", values: pointsList.map((p) => p.contributed) },
+          ]}
+          bands={[
+            {
+              key: "p5-p95",
+              color: "var(--viz-serie-1)",
+              low: pointsList.map((p) => p.wealth.p5),
+              high: pointsList.map((p) => p.wealth.p95),
+            },
+            {
+              key: "p25-p75",
+              color: "var(--viz-serie-1)",
+              low: pointsList.map((p) => p.wealth.p25),
+              high: pointsList.map((p) => p.wealth.p75),
+            },
+          ]}
+          hint="Faixa clara: 90% das trajetórias; faixa escura: a metade central. A linha é a mediana."
+          format={(v) => brl(v)}
+          compact={brlCompact}
+        />
+      </section>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Ao fim de {yearsLabel(current.horizon_months)}</h2>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Percentis ao fim do horizonte">
+            <thead>
+              <tr>
+                <th>Medida</th>
+                {PERCENTILE_COLUMNS.map(([k, label]) => (
+                  <th key={k} className="app-numeric">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  ["Patrimônio", current.final_wealth, brl],
+                  ["Patrimônio líquido de IR (vendendo tudo)", current.final_net_wealth, brl],
+                  ["Renda passiva mensal", current.final_income, brl],
+                  ["Queda máxima da estratégia", current.max_drawdown, (v: number) => pct(v, 1)],
+                ] as Array<[string, PercentilesDTO, (v: number) => string]>
+              ).map(([label, values, fmt]) => (
+                <tr key={label}>
+                  <td>{label}</td>
+                  {PERCENTILE_COLUMNS.map(([k]) => (
+                    <td key={k} className="app-numeric">
+                      {fmt(values[k])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-muted">
+          Investido no período: {brl(current.contributed)} · custos medianos {brl(current.fees)} · IR mediano de
+          rebalanceamento {brl(current.taxes)}. Na queda máxima, 5% é o pior caso.
+        </p>
+      </section>
+
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Premissas por classe</h2>
+        <p className="app-card-hint">
+          Prêmio e volatilidade medidos de {day(data.sample_start)} a {day(data.sample_end)} ({data.sample_months} meses), sorteados
+          em blocos de {num(block, 0)} meses em média e somados ao CDI do cenário.
+        </p>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Premissas por classe">
+            <thead>
+              <tr>
+                <th>Classe</th>
+                <th>Referência</th>
+                <th className="app-numeric">Meta</th>
+                <th className="app-numeric">Prêmio histórico sobre o CDI a.a.</th>
+                <th className="app-numeric">Alvo do prior</th>
+                <th className="app-numeric">Prêmio a posteriori</th>
+                <th className="app-numeric">Volatilidade a.a.</th>
+                <th className="app-numeric">Retorno no cenário a.a.</th>
+                <th className="app-numeric">Renda (DY)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {premises.map((p) => (
+                <tr key={p.arca_class}>
+                  <td>{ARCA_LABELS[p.arca_class as keyof typeof ARCA_LABELS] ?? p.arca_class}</td>
+                  <td>{p.arca_class === "CAIXA" ? "CDI líquido de IR" : p.proxy}</td>
+                  <td className="app-numeric">{points(data.targets?.[p.arca_class], 0)}</td>
+                  <td className="app-numeric">{p.arca_class === "CAIXA" ? "—" : pct(p.excess_annual, 1, true)}</td>
+                  <td className="app-numeric">{p.prior_excess_annual == null ? "—" : pct(p.prior_excess_annual, 1, true)}</td>
+                  <td className="app-numeric">
+                    {p.posterior_excess_annual == null ? "—" : pct(p.posterior_excess_annual, 1, true)}
+                  </td>
+                  <td className="app-numeric">{p.arca_class === "CAIXA" ? "—" : pct(p.volatility, 1)}</td>
+                  <td className="app-numeric">{pct(p.expected_annual, 1)}</td>
+                  <td className="app-numeric">{pct(p.income_yield, 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-card-hint">
+          A renda do Caixa conta só o rendimento acima da inflação. O prêmio a posteriori é o histórico puxado para o alvo
+          conservador (CDI + 3% em ações, CDI + 2% em FIIs) na medida em que os dados não o sustentam; a normal bayesiana
+          sorteia os prêmios em torno dele em cada trajetória.
+        </p>
+      </section>
+      <Notes items={(data.warnings ?? [])} label="Avisos da projeção" tone="neutral" />
+      <Reproducibility run={run} />
+    </div>
+  );
+}
+
+export function ProjectionTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
+  const state = useScreenData(`simulation-projection-${run.id}-${run.status}`, () => api.simulations.projection(run.id));
+  if (run.status !== "DONE") return <RunProblem run={run} />;
+  return <Async state={state}>{(data) => <ProjectionView data={data} run={run} />}</Async>;
+}
+
+// --- confidence -------------------------------------------------------------------------------
+
+const CALIBRATION_STATUS: Record<GeneratorCalibrationDTO["status"], { label: string; tone: string }> = {
+  CALIBRATED: { label: "Calibrado", tone: "success" },
+  MISCALIBRATED: { label: "Mal calibrado", tone: "danger" },
+  INCONCLUSIVE: { label: "Inconclusivo", tone: "warning" },
+};
+
+export function CalibrationView({ data }: Readonly<{ data: CalibrationDTO }>) {
+  const generators = data.generators ?? [];
+  const stacked = generators.find((g) => g.key === "STACKED");
+  const origins = data.origins ?? [];
+  const calibrated = generators.filter((g) => g.key !== "STACKED" && g.status === "CALIBRATED").length;
+  const total = generators.filter((g) => g.key !== "STACKED").length;
+  return (
+    <div className="app-page-stack">
+      <Lead tone={stacked?.status === "CALIBRATED" ? "positive" : stacked?.status === "MISCALIBRATED" ? "negative" : "caution"}>
+        <p>
+          {stacked
+            ? `O intervalo de 90% da combinação conteve o realizado em ${pct(stacked.coverage, 0)} das ${data.windows} previsões de 12 meses (o esperado é 90%): ${CALIBRATION_STATUS[stacked.status].label.toLowerCase()}.`
+            : `${data.windows} previsões de 12 meses comparadas com o realizado.`}
+        </p>
+        <p>
+          {`${plural(calibrated, "gerador calibrado", "geradores calibrados")} de ${total}. `}
+          {stacked?.status === "INCONCLUSIVE"
+            ? "Com cerca de " + num(data.effective_windows, 0) + " janelas independentes, o histórico ainda não separa um gerador bom de um ruim; use as chances do Futuro com folga."
+            : "As chances do Futuro herdam essa calibração."}
+        </p>
+      </Lead>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Geradores de cenário</h2>
+        <p className="app-card-hint">
+          {data.windows} previsões de 12 meses, de {day(data.first_origin)} a {day(data.last_origin)} (cerca de{" "}
+          {num(data.effective_windows, 0)} janelas independentes). Um intervalo de 90% bem calibrado contém o realizado em
+          cerca de 90% das vezes.
+        </p>
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Calibração dos geradores">
+            <thead>
+              <tr>
+                <th>Gerador</th>
+                <th className="app-numeric">Peso na combinação</th>
+                <th className="app-numeric">Cobertura do intervalo de 90%</th>
+                <th>Situação</th>
+                <th className="app-numeric">PIT médio</th>
+                <th className="app-numeric">Brier: perder 10%</th>
+                <th className="app-numeric">Brier: bater o CDI</th>
+                <th className="app-numeric">Log score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {generators.map((g) => (
+                <tr key={g.key}>
+                  <td>{g.label}</td>
+                  <td className="app-numeric">{g.key === "STACKED" ? "—" : pct(g.weight, 0)}</td>
+                  <td className="app-numeric">
+                    {pct(g.coverage, 0)}
+                    <div className="app-muted">
+                      {pct(g.coverage_low, 0)} a {pct(g.coverage_high, 0)}
+                    </div>
+                  </td>
+                  <td>
+                    <Badge tone={CALIBRATION_STATUS[g.status].tone}>{CALIBRATION_STATUS[g.status].label}</Badge>
+                  </td>
+                  <td className="app-numeric">{num(g.mean_pit, 2)}</td>
+                  <td className="app-numeric">{num(g.brier_loss, 3)}</td>
+                  <td className="app-numeric">{num(g.brier_beat_cdi, 3)}</td>
+                  <td className="app-numeric">{num(g.log_score, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="app-card-hint">
+          PIT médio perto de 0,5 = sem viés; Brier menor e log score maior = melhor. O intervalo da cobertura leva em
+          conta que as janelas se sobrepõem; quando ele é largo demais, a situação é inconclusiva, e isso é um resultado,
+          não um erro.
+        </p>
+      </section>
+      {stacked && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Onde o realizado caiu na previsão da combinação</h2>
+          <ColumnChart
+            title="Histograma do PIT da combinação"
+            columns={(stacked.pit_histogram ?? []).map((value, i) => ({ label: `${i * 10}–${i * 10 + 10}%`, value }))}
+            hint="Colunas parecidas = bem calibrado. Concentração nas pontas = intervalos estreitos demais; no meio = largos demais."
+            format={(v) => `${v} janelas`}
+          />
+        </section>
+      )}
+      {origins.length > 1 && (
+        <section className="app-card app-card-padded">
+          <h2 className="app-card-heading">Previsto contra realizado (12 meses)</h2>
+          <TrendChart
+            title="Retorno de 12 meses previsto pela combinação e realizado, por origem"
+            labels={origins.map((o) => day(o.origin))}
+            series={[
+              {
+                key: "realized",
+                label: "Realizado",
+                color: "var(--viz-serie-2)",
+                values: origins.map((o) => o.realized),
+              },
+              {
+                key: "p50",
+                label: "Mediana prevista",
+                color: "var(--viz-serie-1)",
+                values: origins.map((o) => o.forecasts?.STACKED?.p50 ?? null),
+              },
+            ]}
+            bands={[
+              {
+                key: "p5-p95",
+                color: "var(--viz-serie-1)",
+                low: origins.map((o) => o.forecasts?.STACKED?.p5 ?? 0),
+                high: origins.map((o) => o.forecasts?.STACKED?.p95 ?? 0),
+              },
+            ]}
+            hint="Faixa: intervalo de 90% previsto em cada origem; linha: o que aconteceu nos 12 meses seguintes."
+            format={(v) => pct(v, 0)}
+          />
+        </section>
+      )}
+      <Notes items={(data.warnings ?? [])} label="Avisos da calibração" tone="neutral" />
+    </div>
+  );
+}
+
+export function ConfidencePanel() {
+  const [tick, setTick] = useState(0);
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const state = useScreenData(`simulation-calibration-${tick}`, () => api.simulations.calibration());
+  const pending = state.data?.pending_run_id ?? null;
+
+  useEffect(() => {
+    if (pending === null) return undefined;
+    const timer = setTimeout(() => setTick((t) => t + 1), POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pending, tick]);
+
+  const recalibrate = async () => {
+    setRequesting(true);
+    setError(null);
+    try {
+      await api.simulations.submitCalibration();
+      setTick((t) => t + 1);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <>
+      <Section
+        title="Calibração"
+        subtitle={
+          pending !== null
+            ? "Na fila do worker; a página atualiza sozinha."
+            : state.data?.finished_at
+              ? `Calculada em ${dateTime(state.data.finished_at)}. Roda sozinha toda semana e após cada carga do histórico.`
+              : "Roda sozinha toda semana e após cada carga do histórico."
+        }
+        actions={
+          <button
+            type="button"
+            className="app-primary-button"
+            disabled={requesting || pending !== null}
+            onClick={recalibrate}
+          >
+            {(requesting || pending !== null) && <Spinner size="sm" />}
+            <span>Recalcular agora</span>
+          </button>
+        }
+      >
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
+      </Section>
+      <Async state={state}>
+        {(data) =>
+          data.run_id === null || data.run_id === undefined ? (
+            <Empty
+              title="Ainda não há calibração"
+              hint="Ela roda depois de cada carga do histórico; clique em Recalcular agora para rodar já."
+            />
+          ) : (
+            <CalibrationView data={data} />
+          )
+        }
+      </Async>
+    </>
+  );
+}
+
+export function SelectedRun({
+  runId,
+  onStatus,
+  children,
+}: Readonly<{ runId: number; onStatus: () => void; children: (detail: SimulationRunDetailDTO) => ReactNode }>) {
+  const [tick, setTick] = useState(0);
+  const state = useScreenData(`simulation-${runId}-${tick}`, () => api.simulations.get(runId));
+  const status = state.data?.status;
+
+  useEffect(() => {
+    if (!status || !isActive(status)) return undefined;
+    const timer = setTimeout(() => {
+      setTick((t) => t + 1);
+      onStatus();
+    }, POLL_MS);
+    return () => clearTimeout(timer);
+  }, [status, tick, onStatus]);
+
+  return (
+    <Async state={state} lines={6}>
+      {children}
+    </Async>
+  );
+}
+
+/** The run chosen in the URL (`param`), or the newest one. */
+// --- laboratory -------------------------------------------------------------------------------
+
+/** The verdict in decision terms (Phase 41.1); the technical one stays in the notes. */
+export function labVerdict(data: LabDTO): string {
+  const models = data.models ?? [];
+  const passed = models.filter((m) => m.passed);
+  if (passed.length === 0) {
+    return "Nenhum modelo de regime ou de risco previu o mês seguinte melhor que a regra simples (média e volatilidade históricas). A simulação continua sem eles, e isso é um resultado válido.";
+  }
+  const names = passed.map((m) => m.label).join(", ");
+  return `${names} ${passed.length > 1 ? "previram" : "previu"} o mês seguinte melhor que a regra simples e ${passed.length > 1 ? "passaram" : "passou"} em todos os testes, mesmo descontando as tentativas.`;
+}
+
+/** The model the chart shows: the one picked in the table, else the first that passed, else the first. */
+export function labChartModel(data: LabDTO, picked: string | null): string | null {
+  const models = data.models ?? [];
+  if (picked && models.some((m) => m.key === picked)) return picked;
+  return models.find((m) => m.passed)?.key ?? models[0]?.key ?? null;
+}
+
+export function LabView({ data }: Readonly<{ data: LabDTO }>) {
+  const models = data.models ?? [];
+  const regime = data.regime ?? [];
+  const approved = data.approved ?? [];
+  const [picked, setPicked] = useState<string | null>(null);
+  const shownKey = labChartModel(data, picked);
+  const shown = models.find((m) => m.key === shownKey) ?? null;
+  const curve = shown?.cumulative_gain ?? [];
+  return (
+    <div className="app-page-stack">
+      <Lead eyebrow="Veredito" tone={approved.length ? "positive" : "neutral"}>
+        <p>{labVerdict(data)}</p>
+      </Lead>
+      <Section
+        title="Algum modelo prevê o mês seguinte melhor que a regra simples?"
+        subtitle={`Previsões de ${day(data.first_forecast)} a ${day(data.last_forecast)} · ${plural(data.trials ?? 0, "tentativa registrada", "tentativas registradas")}. Escolha um modelo para vê-lo no gráfico.`}
+        actions={
+          <Badge tone={approved.length ? "success" : "neutral"}>
+            {approved.length ? plural(approved.length, "modelo passou", "modelos passaram") : "Nenhum modelo passou"}
+          </Badge>
+        }
+      >
+        <div className="app-table-wrap">
+          <table className="app-table" aria-label="Modelos do laboratório">
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th className="app-numeric" title="Ganho de log score por mês sobre a normal com a média e a volatilidade históricas">
+                  Acerto a mais que a regra simples
+                </th>
+                <th className="app-numeric" title="Probabilidade de superar a referência (portão bayesiano de 95%)">
+                  Chance de ser melhor de verdade
+                </th>
+                <th title={`Sharpe deflacionado de 95% ou mais e PBO do conjunto abaixo de 20% (PBO ${data.pbo == null ? "—" : pct(data.pbo, 0)})`}>
+                  Continua melhor descontando as tentativas?
+                </th>
+                <th>Estável com outro corte?</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((m) => (
+                <tr key={m.key} aria-selected={m.key === shownKey}>
+                  <td>
+                    <button
+                      type="button"
+                      className="app-link-button"
+                      aria-pressed={m.key === shownKey}
+                      onClick={() => setPicked(m.key)}
+                    >
+                      {m.label}
+                    </button>
+                    {m.key === shownKey && <span className="app-muted"> · no gráfico</span>}
+                  </td>
+                  <td className="app-numeric">{num(m.mean_gain, 4)}</td>
+                  <td className="app-numeric">{pct(m.gate_probability, 0)}</td>
+                  <td title={`Sharpe deflacionado ${pct(m.deflated_probability, 0)}`}>
+                    {m.deflated_probability >= 0.95 ? "Sim" : "Não"}
+                  </td>
+                  <td>{m.stable ? "Sim" : "Não"}</td>
+                  <td>
+                    <Badge tone={m.passed ? "success" : "neutral"}>{m.passed ? "Passou" : "Não passou"}</Badge>
+                    {(m.reasons ?? []).length > 0 && <div className="app-muted">{(m.reasons ?? []).join("; ")}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+      {shown && (
+        <Section
+          title={`${shown.label} · acerto acumulado sobre a regra simples`}
+          subtitle={
+            shown.passed
+              ? "Passou: a linha subindo mostra que o modelo acerta mais que a regra simples ao longo do tempo."
+              : "Não passou: o gráfico aparece só para ilustrar. Uma linha que não sobe de forma constante não supera a regra simples."
+          }
+          actions={<Badge tone={shown.passed ? "success" : "neutral"}>{shown.passed ? "Passou" : "Não passou"}</Badge>}
+        >
+          {curve.length > 1 ? (
+            <TrendChart
+              title={`Acerto acumulado do ${shown.label} sobre a regra simples`}
+              labels={curve.map((p) => day(p.month))}
+              baseline={0}
+              series={[{ key: shown.key, label: shown.label, color: "var(--viz-serie-1)", values: curve.map((p) => p.value) }]}
+              hint="Soma, mês a mês, do acerto a mais que a regra simples (log score); acima de zero, o modelo acertou mais."
+              format={(v) => num(v, 2)}
+            />
+          ) : (
+            <p className="app-muted">Esta rodada é anterior ao registro mês a mês; rode o laboratório de novo para ver o gráfico.</p>
+          )}
+          {shown.key === "HMM2" && regime.length > 1 && (
+            <TrendChart
+              title="Probabilidade do regime de estresse mês a mês (HMM de 2 estados)"
+              labels={regime.map((p) => day(p.month))}
+              series={[
+                { key: "stress", label: "Estresse", color: "var(--viz-serie-2)", values: regime.map((p) => p.stress_probability) },
+              ]}
+              hint="Probabilidade filtrada: usa só os meses até cada data. Descreve o passado; não é previsão de queda."
+              format={(v) => pct(v, 0)}
+            />
+          )}
+        </Section>
+      )}
+      <Notes
+        items={[
+          ...(data.warnings ?? []),
+          ...(data.verdict ? [`Veredito técnico: ${data.verdict}`] : []),
+          `Escolhido perde para a referência fora da amostra em ${data.loss_probability == null ? "—" : pct(data.loss_probability, 0)} das divisões.`,
+        ]}
+        label="Avisos do laboratório"
+        tone="neutral"
+      />
+    </div>
+  );
+}
+
+export function LabPanel() {
+  const [tick, setTick] = useState(0);
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const state = useScreenData(`simulation-lab-${tick}`, () => api.simulations.lab());
+  const pending = state.data?.pending_run_id ?? null;
+
+  useEffect(() => {
+    if (pending === null) return undefined;
+    const timer = setTimeout(() => setTick((t) => t + 1), POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pending, tick]);
+
+  const run = async () => {
+    setRequesting(true);
+    setError(null);
+    try {
+      await api.simulations.submitLab();
+      setTick((t) => t + 1);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <>
+      <Section
+        title="Laboratório de ML"
+        subtitle={
+          pending !== null
+            ? "Na fila do worker; a página atualiza sozinha."
+            : state.data?.finished_at
+              ? `Última rodada em ${dateTime(state.data.finished_at)}. Leva alguns segundos.`
+              : "Leva alguns segundos."
+        }
+        actions={
+          <button type="button" className="app-primary-button" disabled={requesting || pending !== null} onClick={run}>
+            {(requesting || pending !== null) && <Spinner size="sm" />}
+            <span>Rodar o laboratório</span>
+          </button>
+        }
+      >
+        {error && (
+          <p className="app-error-banner" role="alert">
+            {error}
+          </p>
+        )}
+      </Section>
+      <Async state={state}>
+        {(data) =>
+          data.run_id === null || data.run_id === undefined ? (
+            <Empty title="O laboratório ainda não rodou" hint="Clique em Rodar o laboratório (leva alguns segundos)." />
+          ) : (
+            <LabView data={data} />
+          )
+        }
+      </Async>
+    </>
+  );
+}
+
+// --- candidates -------------------------------------------------------------------------------
+
+function signedBrl(value: number): string {
+  return `${value > 0 ? "+" : ""}${brl(value)}`;
+}
+
+export function CandidatesView({ data, run }: Readonly<{ data: CandidatesDTO; run: SimulationRunDTO }>) {
+  if (data.status !== "DONE") return <Empty title="Os candidatos aparecem quando a avaliação terminar" />;
+  const candidates = data.candidates ?? [];
+  const excluded = data.excluded ?? [];
+  const base = data.base;
+  const top = candidates[0];
+  const byReason = excluded.reduce<Record<string, string[]>>((groups, e) => {
+    (groups[e.reason] ??= []).push(e.ticker);
+    return groups;
+  }, {});
+  return (
+    <div className="app-page-stack">
+      <Lead tone={top && top.effect.p_improve >= 0.7 ? "positive" : "neutral"}>
+        <p>
+          {top
+            ? `Entre ${plural(data.evaluated ?? candidates.length, "candidato avaliado", "candidatos avaliados")}, ${top.ticker} é o mais promissor: ${pct(top.effect.p_improve, 0)} de chance de melhorar o patrimônio final (${pct(top.effect.p_improve_low, 0)} a ${pct(top.effect.p_improve_high, 0)}), ${signedBrl(top.effect.delta_final_wealth)} na mediana.`
+            : "Nenhum candidato tinha histórico suficiente para a avaliação."}
+        </p>
+        {excluded.length > 0 && (
+          <p>
+            {`${plural(excluded.length, "ativo ficou", "ativos ficaram")} de fora; o motivo de cada um está no fim da página.`}
+          </p>
+        )}
+      </Lead>
+      <section className="app-card app-card-padded">
+        <h2 className="app-card-heading">Candidatos para investigar</h2>
+        <p className="app-card-hint">
+          {data.evaluated} de {data.tested} avaliados em {yearsLabel(data.horizon_months ?? 0)}, {data.paths} trajetórias.
+          {base
+            ? ` Carteira de hoje: patrimônio mediano de ${brl(base.final_net_wealth_p50)}, CVaR de 12 meses de ${pct(base.cvar_12m, 1)}${
+                base.goal_probability != null ? `, chance de meta de ${pct(base.goal_probability, 0)}` : ""
+              }.`
+            : ""}
+        </p>
+        {candidates.length === 0 ? (
+          <Empty title="Nenhum candidato com histórico suficiente" hint="Veja os excluídos abaixo." />
+        ) : (
+          <div className="app-table-wrap">
+            <table className="app-table" aria-label="Candidatos">
+              <thead>
+                <tr>
+                  <th className="app-numeric">#</th>
+                  <th>Ativo</th>
+                  <th className="app-numeric">Chance de a melhora ser real</th>
+                  <th className="app-numeric">Patrimônio final</th>
+                  <th className="app-numeric">Chance de meta</th>
+                  <th className="app-numeric">CVaR 12 meses</th>
+                  <th className="app-numeric">Diversificação</th>
+                  <th className="app-numeric">Renda (DY)</th>
+                  <th className="app-numeric">Entre os 5 primeiros</th>
+                  <th className="app-numeric">α a.a. (histórico → encolhido)</th>
+                  <th className="app-numeric">β</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidates.map((c) => (
+                  <tr key={c.ticker}>
+                    <td className="app-numeric">{c.effect.rank}</td>
+                    <td>
+                      <Link className="app-link" to={compareLink(c.ticker)}>
+                        {c.ticker}
+                      </Link>
+                      <div className="app-muted">
+                        {ARCA_LABELS[c.arca_class as keyof typeof ARCA_LABELS] ?? c.arca_class} ·{" "}
+                        {c.source === "WATCHLIST" ? "watchlist" : "screener"} · {pct(c.effect.weight, 1)} da carteira
+                        {c.eligible === false ? " · fora da elegibilidade" : ""}
+                        {c.suspicious ? " · dado suspeito" : ""}
+                      </div>
+                    </td>
+                    <td className="app-numeric">
+                      <strong>{pct(c.effect.p_improve, 0)}</strong>
+                      <div className="app-muted">
+                        {pct(c.effect.p_improve_low, 0)} a {pct(c.effect.p_improve_high, 0)}
+                      </div>
+                    </td>
+                    <td className="app-numeric">
+                      <Signed value={c.effect.delta_final_wealth}>{signedBrl(c.effect.delta_final_wealth)}</Signed>
+                    </td>
+                    <td className="app-numeric">
+                      {c.effect.delta_goal_probability == null ? "—" : points(c.effect.delta_goal_probability * 100, 1, true) + " p.p."}
+                    </td>
+                    <td className="app-numeric">
+                      <Signed value={c.effect.delta_cvar_12m}>{points(c.effect.delta_cvar_12m * 100, 2, true)} p.p.</Signed>
+                    </td>
+                    <td className="app-numeric">{num(c.effect.delta_diversification, 3)}</td>
+                    <td className="app-numeric">{points(c.effect.delta_income_yield * 100, 2, true)} p.p.</td>
+                    <td className="app-numeric">{pct(c.effect.top_k_share, 0)}</td>
+                    <td className="app-numeric">
+                      {pct(c.fit.alpha_annual, 1, true)} → {pct(c.fit.alpha_post_annual, 1, true)}
+                      <div className="app-muted">{c.fit.months} meses</div>
+                    </td>
+                    <td className="app-numeric">
+                      {num(c.fit.beta, 2)} → {num(c.fit.beta_post, 2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="app-card-hint">
+          Melhora = patrimônio final maior nas mesmas trajetórias com o candidato. Variações positivas de CVaR significam
+          perdas menores na cauda. "Entre os 5 primeiros" mede se a posição no ranking resiste a outro sorteio das trajetórias.
+        </p>
+      </section>
+      {excluded.length > 0 && (
+        <Section
+          title="Fora da avaliação"
+          subtitle="Os filtros são os mesmos do aporte real; marque “Incluir os fora da elegibilidade” para avaliá-los mesmo assim."
+        >
+          <dl className="app-tag-groups" aria-label="Candidatos excluídos">
+            {Object.entries(byReason).map(([reason, tickers]) => (
+              <div key={reason}>
+                <dt>
+                  {reason} ({tickers.length})
+                </dt>
+                <dd>
+                  {tickers.map((t) => (
+                    <span key={t} className="app-tag">
+                      {t}
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      )}
+      <Notes items={(data.warnings ?? [])} label="Avisos dos candidatos" tone="neutral" />
+      <Reproducibility run={run} />
+    </div>
+  );
+}
+
+export function CandidatesTab({ run }: Readonly<{ run: SimulationRunDetailDTO }>) {
+  const state = useScreenData(`simulation-candidates-${run.id}-${run.status}`, () => api.simulations.candidates(run.id));
+  if (run.status !== "DONE") return <RunProblem run={run} />;
+  return <Async state={state}>{(data) => <CandidatesView data={data} run={run} />}</Async>;
+}

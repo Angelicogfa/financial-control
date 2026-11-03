@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetForecastDTO, ForecastHorizonDTO } from "../api/types";
-import { chanceAbove } from "../pages/asset/ForecastTab";
+import { chanceAbove } from "../features/asset/ForecastTab";
 import { analysis, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";

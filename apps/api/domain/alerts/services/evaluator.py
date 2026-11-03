@@ -98,7 +98,7 @@ def portfolio_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                     f"{position.ticker}: lançamentos inconsistentes",
                     position.ledger_message or "A posição não pode ser calculada.",
                     position.ticker,
-                    f"/ledger?asset={position.asset_id}",
+                    f"/lancamentos?asset={position.asset_id}",
                 )
             )
         elif position.lifecycle_status == AssetLifecycle.REVIEW:
@@ -111,7 +111,7 @@ def portfolio_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                     "Você tem posição, mas o ativo não atende mais à política. "
                     "Não recebe aportes até ser revisado.",
                     position.ticker,
-                    f"/asset/{position.asset_id}",
+                    f"/ativo/{position.ticker}",
                 )
             )
         if (
@@ -128,7 +128,7 @@ def portfolio_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                     "O valor usa o preço médio de compra; informe um preço manual ou aguarde "
                     "o provedor de cotações.",
                     position.ticker,
-                    f"/asset/{position.asset_id}",
+                    f"/ativo/{position.ticker}",
                 )
             )
     for allocation in report.allocations:
@@ -145,7 +145,7 @@ def portfolio_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                 f"{_pct(allocation.target_pct)} ± {_pct(allocation.band_pct)}."
                 + (" Priorize a classe no próximo aporte." if below else ""),
                 allocation.arca_class.value,
-                "/contribute" if below else "/portfolio",
+                "/aportar" if below else "/carteira",
             )
         )
     return alerts
@@ -178,7 +178,7 @@ def valuation_alerts(
                     ".", ",", 1
                 ),
                 ticker,
-                f"/asset/{asset_ids.get(ticker, 0)}",
+                f"/ativo/{ticker}",
             )
         )
     return alerts
@@ -206,7 +206,7 @@ def data_alerts(
                 f"Último ponto: {last}. Cálculos de renda fixa e comparativos podem estar "
                 "defasados.",
                 status.symbol,
-                "/settings/market-data",
+                "/configuracoes/dados-de-mercado",
             )
         )
     expected = previous_business_day(today)
@@ -220,7 +220,7 @@ def data_alerts(
                 "Histórico diário incompleto",
                 f"Último retrato da carteira: {last}. O worker grava um por dia útil.",
                 None,
-                "/settings/market-data",
+                "/configuracoes/dados-de-mercado",
             )
         )
     for run in job_runs:
@@ -234,7 +234,7 @@ def data_alerts(
                 f"Rotina {run.job_name} falhou",
                 (run.error or "Sem detalhes.")[:300],
                 run.job_name,
-                "/settings/market-data",
+                "/configuracoes/dados-de-mercado",
             )
         )
     return alerts
@@ -263,7 +263,7 @@ def data_quality_alerts(
                 f"{ticker}: dado suspeito do provedor",
                 " ".join(reasons[:2]) + more + " Confira antes de confiar no valuation.",
                 ticker,
-                f"/asset/{asset_ids.get(ticker, 0)}?tab=valuation",
+                f"/ativo/{ticker}?capitulo=valuation",
             )
         )
     return alerts
@@ -292,7 +292,7 @@ def checklist_alerts(report: ConsolidatedPortfolioReport) -> list[Alert]:
                 f" {' e '.join(why)}. "
                 "Revise o checklist para manter o ativo elegível a aportes.",
                 position.ticker,
-                f"/asset/{position.asset_id}?tab=checklist",
+                f"/ativo/{position.ticker}?capitulo=checklist",
             )
         )
     return alerts
@@ -346,7 +346,7 @@ def agenda_alerts(agenda: EarningsAgenda, *, today: date) -> list[Alert]:
                 f"de {_day(item.com_date)} recebe; a partir de "
                 f"{_day(item.ex_date or item.com_date)} ela é negociada sem o direito.{amount}",
                 item.ticker,
-                f"/asset/{item.asset_id}" if item.asset_id else "/research",
+                f"/ativo/{item.ticker}",
             )
         )
     return alerts
@@ -369,7 +369,7 @@ def maturity_alerts(items: Iterable[MaturityItem], *, today: date) -> list[Alert
                 f"Vencimento em {_day(item.maturity_date)}, com cerca de {_brl(item.value_brl)}. "
                 "Planeje o reinvestimento para o dinheiro não ficar parado.",
                 item.ticker,
-                f"/asset/{item.asset_id}",
+                f"/ativo/{item.ticker}",
             )
         )
     return alerts
@@ -399,7 +399,7 @@ def tax_bracket_alerts(
                     f"{_day(lot.next_bracket_date)}; esperar economiza cerca de "
                     f"{_brl(lot.tax_saving_by_waiting or 0)} se for resgatar.",
                     status.ticker,
-                    f"/asset/{status.asset_id}?tab=tax" if status.asset_id else None,
+                    f"/ativo/{status.ticker}?capitulo=imposto" if status.asset_id else None,
                 )
             )
     return alerts
@@ -419,7 +419,7 @@ def early_sale_alerts(valuations: Iterable[TreasuryMarketValuation]) -> list[Ale
                 f"{valuation.ticker}: venda antecipada pode compensar",
                 valuation.explanation,
                 valuation.ticker,
-                f"/asset/{valuation.asset_id}?tab=market" if valuation.asset_id else None,
+                f"/ativo/{valuation.ticker}?capitulo=preco" if valuation.asset_id else None,
             )
         )
     return alerts
@@ -451,7 +451,7 @@ def relevant_fact_alerts(
                 (doc.subject or doc.company_name)
                 + ". Leia o documento na CVM e reveja a tese do ativo, se for o caso.",
                 subject,
-                f"/asset/{asset_id}?tab=disclosures" if asset_id else "/disclosures",
+                f"/ativo/{subject}?capitulo=noticias" if asset_id else "/explorar/fatos-relevantes",
             )
         )
     return alerts
@@ -468,7 +468,7 @@ def mining_alerts(findings: Iterable[MiningFinding], followed: Iterable[str]) ->
             f"Garimpo: {f.ticker} entre os achados da semana",
             f"{f.reason}. Veja os sinais e, se fizer sentido, siga o ativo.",
             f.ticker,
-            "/research/mining",
+            "/explorar/garimpo",
         )
         for f in findings
         if f.trusted and f.ticker.upper() not in known

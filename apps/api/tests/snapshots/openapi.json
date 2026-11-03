@@ -12475,6 +12475,149 @@
         "title": "MonthIncomeDTO",
         "type": "object"
       },
+      "MonthlyReportDTO": {
+        "description": "One month of the portfolio on one page (Phase 48.R9), printed or saved as PDF.",
+        "properties": {
+          "allocation": {
+            "items": {
+              "$ref": "#/components/schemas/ReportClassDTO"
+            },
+            "title": "Allocation",
+            "type": "array"
+          },
+          "bought_brl": {
+            "title": "Bought Brl",
+            "type": "number"
+          },
+          "data_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Gaps",
+            "type": "array"
+          },
+          "earnings": {
+            "items": {
+              "$ref": "#/components/schemas/ReportEarningDTO"
+            },
+            "title": "Earnings",
+            "type": "array"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last snapshot inside the month",
+            "title": "End Date"
+          },
+          "end_value_brl": {
+            "title": "End Value Brl",
+            "type": "number"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/ReportGoalDTO"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "income_brl": {
+            "title": "Income Brl",
+            "type": "number"
+          },
+          "month": {
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "month_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Time-weighted fraction, with the income",
+            "title": "Month Return"
+          },
+          "net_flow_brl": {
+            "title": "Net Flow Brl",
+            "type": "number"
+          },
+          "result_brl": {
+            "description": "Change in wealth minus the net flow plus the income",
+            "title": "Result Brl",
+            "type": "number"
+          },
+          "sold_brl": {
+            "title": "Sold Brl",
+            "type": "number"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last snapshot before the month",
+            "title": "Start Date"
+          },
+          "start_value_brl": {
+            "title": "Start Value Brl",
+            "type": "number"
+          },
+          "tax": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportTaxDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/ReportTradeDTO"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "month",
+          "start_date",
+          "end_date",
+          "start_value_brl",
+          "end_value_brl",
+          "bought_brl",
+          "sold_brl",
+          "net_flow_brl",
+          "income_brl",
+          "result_brl",
+          "month_return",
+          "trades",
+          "earnings",
+          "allocation",
+          "tax",
+          "goals",
+          "data_gaps"
+        ],
+        "title": "MonthlyReportDTO",
+        "type": "object"
+      },
       "OfferIndexer": {
         "description": "How an offer's gross yield is quoted.",
         "enum": [
@@ -14617,6 +14760,179 @@
         "title": "RegimePointDTO",
         "type": "object"
       },
+      "ReportClassDTO": {
+        "properties": {
+          "arca_class": {
+            "title": "Arca Class",
+            "type": "string"
+          },
+          "current_pct": {
+            "title": "Current Pct",
+            "type": "number"
+          },
+          "target_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Pct"
+          },
+          "value_brl": {
+            "title": "Value Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "arca_class",
+          "value_brl",
+          "current_pct",
+          "target_pct"
+        ],
+        "title": "ReportClassDTO",
+        "type": "object"
+      },
+      "ReportEarningDTO": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "net_brl": {
+            "title": "Net Brl",
+            "type": "number"
+          },
+          "payment_date": {
+            "format": "date",
+            "title": "Payment Date",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_date",
+          "ticker",
+          "kind",
+          "net_brl"
+        ],
+        "title": "ReportEarningDTO",
+        "type": "object"
+      },
+      "ReportGoalDTO": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "required_monthly_brl": {
+            "title": "Required Monthly Brl",
+            "type": "number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "progress",
+          "required_monthly_brl"
+        ],
+        "title": "ReportGoalDTO",
+        "type": "object"
+      },
+      "ReportTaxDTO": {
+        "properties": {
+          "darf_brl": {
+            "title": "Darf Brl",
+            "type": "number"
+          },
+          "due_date": {
+            "format": "date",
+            "title": "Due Date",
+            "type": "string"
+          },
+          "exempt": {
+            "title": "Exempt",
+            "type": "boolean"
+          },
+          "paid_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid On"
+          },
+          "stock_sales_brl": {
+            "title": "Stock Sales Brl",
+            "type": "number"
+          },
+          "tax_brl": {
+            "title": "Tax Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tax_brl",
+          "darf_brl",
+          "due_date",
+          "paid_on",
+          "exempt",
+          "stock_sales_brl"
+        ],
+        "title": "ReportTaxDTO",
+        "type": "object"
+      },
+      "ReportTradeDTO": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          },
+          "value_brl": {
+            "title": "Value Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "trade_date",
+          "ticker",
+          "kind",
+          "quantity",
+          "value_brl"
+        ],
+        "title": "ReportTradeDTO",
+        "type": "object"
+      },
       "ResolvedOfferDTO": {
         "properties": {
           "asset_id": {
@@ -15162,6 +15478,84 @@
           "plan"
         ],
         "title": "SavedContributionPlanDTO",
+        "type": "object"
+      },
+      "SavedViewDTO": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "title": "Filters",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ViewScope"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "name",
+          "filters",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SavedViewDTO",
+        "type": "object"
+      },
+      "SavedViewRequest": {
+        "properties": {
+          "filters": {
+            "additionalProperties": true,
+            "title": "Filters",
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ViewScope"
+          }
+        },
+        "required": [
+          "scope",
+          "name"
+        ],
+        "title": "SavedViewRequest",
         "type": "object"
       },
       "ScoreLineDTO": {
@@ -19031,6 +19425,16 @@
         ],
         "title": "VariantValidationDTO",
         "type": "object"
+      },
+      "ViewScope": {
+        "description": "The screen whose filters a view keeps.",
+        "enum": [
+          "SCREENER",
+          "LEDGER",
+          "PORTFOLIO"
+        ],
+        "title": "ViewScope",
+        "type": "string"
       },
       "WatchlistAddRequest": {
         "properties": {
@@ -23265,6 +23669,51 @@
         ]
       }
     },
+    "/api/v1/portfolio/monthly-report": {
+      "get": {
+        "description": "One month of the portfolio on one page: wealth, flows, result, income, trades,\nallocation, tax and goals.",
+        "operationId": "get_monthly_report_api_v1_portfolio_monthly_report_get",
+        "parameters": [
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "description": "YYYY-MM",
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReportDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Monthly Report",
+        "tags": [
+          "Portfolio & ARCA"
+        ]
+      }
+    },
     "/api/v1/portfolio/snapshots": {
       "get": {
         "operationId": "list_portfolio_snapshots_api_v1_portfolio_snapshots_get",
@@ -24755,6 +25204,126 @@
         "summary": "Classify Watchlist Item",
         "tags": [
           "Research"
+        ]
+      }
+    },
+    "/api/v1/saved-views": {
+      "get": {
+        "operationId": "list_saved_views_api_v1_saved_views_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ViewScope"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedViewDTO"
+                  },
+                  "title": "Response List Saved Views Api V1 Saved Views Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Saved Views",
+        "tags": [
+          "Saved views"
+        ]
+      },
+      "put": {
+        "description": "Save the filters under a name; an existing name in the same screen is replaced.",
+        "operationId": "save_view_api_v1_saved_views_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedViewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedViewDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save View",
+        "tags": [
+          "Saved views"
+        ]
+      }
+    },
+    "/api/v1/saved-views/{view_id}": {
+      "delete": {
+        "operationId": "delete_view_api_v1_saved_views__view_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "view_id",
+            "required": true,
+            "schema": {
+              "title": "View Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete View",
+        "tags": [
+          "Saved views"
         ]
       }
     },

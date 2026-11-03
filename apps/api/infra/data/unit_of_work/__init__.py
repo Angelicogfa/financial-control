@@ -57,6 +57,7 @@ from infra.data.repositories.tax import (
     SqlAlchemyTaxAssessmentRepository,
     SqlAlchemyTaxRuleRepository,
 )
+from infra.data.repositories.views import SqlAlchemySavedViewRepository
 from infra.data.repositories.watch import (
     SqlAlchemyAlertRuleRepository,
     SqlAlchemyAssetNoteRepository,
@@ -107,6 +108,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.alert_rules = SqlAlchemyAlertRuleRepository(self.session)
         self.asset_notes = SqlAlchemyAssetNoteRepository(self.session)
         self.goals = SqlAlchemyGoalRepository(self.session)
+        self.saved_views = SqlAlchemySavedViewRepository(self.session)
         return self
 
     def __exit__(

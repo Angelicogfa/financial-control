@@ -281,7 +281,7 @@ def test_unread_relevant_facts_raise_an_alert_until_read(api: SimpleNamespace) -
     assert len(alerts) == 1
     alert = alerts[0]
     assert alert["key"] == "fact:W1" and alert["subject"] == "WEGE3"
-    assert alert["route"] == f"/asset/{ids['WEGE3']}?tab=disclosures"
+    assert alert["route"] == "/ativo/WEGE3?capitulo=noticias"
     assert "Aquisição" in alert["detail"]
 
     api.client.post("/api/v1/disclosures/read", json={"all": True, "asset_id": ids["WEGE3"]})
@@ -295,7 +295,7 @@ def test_relevant_fact_alerts_ignore_read_and_other_categories() -> None:
     fact = CvmDocument("F", WEG, "WEG", "Fato Relevante", TODAY)
     alerts = relevant_fact_alerts([read, notice, fact], {WEG: ["WEGE3"]}, {})
     assert [a.key for a in alerts] == ["fact:F"]
-    assert alerts[0].kind == AlertKind.RELEVANT_FACT and alerts[0].route == "/disclosures"
+    assert alerts[0].kind == AlertKind.RELEVANT_FACT and alerts[0].route == "/explorar/fatos-relevantes"
 
 
 def test_worker_job_and_mcp(api: SimpleNamespace) -> None:

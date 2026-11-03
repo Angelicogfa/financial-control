@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange } from "../pages/home/story";
+import { alignCurves, curveReturn, headline, lastMonths, patrimonyChange } from "../features/home/story";
 import { alerts, allocation, position, report } from "./fixtures";
 
 /** Intl uses non-breaking spaces. */

@@ -1,13 +1,13 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StudyChapterDTO, StudyComparisonDTO, StudyDTO, StudySummaryDTO } from "../api/types";
-import { LatestStudy } from "../pages/home/LatestStudy";
-import { INITIAL_STUDY, reviewItems, toStudyRequest } from "../pages/simulation/NewStudyPage";
-import { premisesLine } from "../pages/simulation/shared";
+import { LatestStudy } from "../features/home/LatestStudy";
+import { INITIAL_STUDY, reviewItems, toStudyRequest } from "../features/simulation/NewStudyPage";
+import { premisesLine } from "../features/simulation/shared";
 import { mockApi, type Call } from "./mockApi";
-import { renderAt } from "./render";
+import { render, renderAt } from "./render";
 
 const last = (calls: Call[], method: string, path: string) =>
   [...calls].reverse().find((c) => c.method === method && c.path === path);
@@ -108,7 +108,7 @@ describe("new study form", () => {
       { path: "/studies/5", reply: study({ status: "PENDING", conclusion: null }) },
       { path: "/studies/5/versions", reply: [] },
     ]);
-    renderAt("/tools/simulation/new");
+    renderAt("/planejar/estudos/novo");
     fireEvent.click(screen.getByRole("radio", { name: /Vou chegar à minha meta/ }));
     fireEvent.click(screen.getByRole("button", { name: "Premissas →" }));
     fireEvent.click(screen.getByRole("button", { name: "Revisar →" }));
@@ -127,17 +127,17 @@ describe("new study form", () => {
 describe("studies list", () => {
   it("leads with the latest study and its goal chance", async () => {
     mockApi([{ path: "/studies", reply: [summary(), summary({ id: 6, label: "Rodando", status: "RUNNING", chapters_done: 1, headline: null, goal_probability: null })] }]);
-    renderAt("/tools/simulation");
+    renderAt("/planejar");
     const highlight = await screen.findByRole("region", { name: "Estudo principal" });
     expect(highlight).toHaveTextContent("64%");
     expect(highlight).toHaveTextContent("+3 p.p. desde a versão anterior");
     expect(screen.getByRole("progressbar", { name: "Capítulos prontos" })).toHaveAttribute("aria-valuenow", "1");
-    expect(screen.getByRole("link", { name: "+ Novo estudo" })).toHaveAttribute("href", "/tools/simulation/new");
+    expect(screen.getByRole("link", { name: "+ Novo estudo" })).toHaveAttribute("href", "/planejar/estudos/novo");
   });
 
   it("explains how it works without studies", async () => {
     mockApi([{ path: "/studies", reply: [] }]);
-    renderAt("/tools/simulation");
+    renderAt("/planejar");
     expect(await screen.findByText("Nenhum estudo ainda")).toBeInTheDocument();
     expect(screen.getByRole("note", { name: "Como funciona" })).toBeInTheDocument();
   });
@@ -152,7 +152,7 @@ describe("study page", () => {
       { path: "/studies/7", reply: study({ id: 7, label: "Aposentadoria 2040 · aporte R$ 2 mil", variation_of: 5 }) },
       { path: "/studies/7/versions", reply: [] },
     ]);
-    renderAt("/tools/simulation/5");
+    renderAt("/planejar/estudos/5");
     const conclusion = await screen.findByRole("region", { name: "Conclusão do estudo" });
     expect(conclusion).toHaveTextContent("R$ 38 mil acima do CDI");
     expect(within(conclusion).getByRole("link", { name: "Estudar TAEE11 no comparador" })).toHaveAttribute("href", expect.stringContaining("TAEE11"));
@@ -160,7 +160,7 @@ describe("study page", () => {
     const past = screen.getByRole("region", { name: "Capítulo 1, De onde viemos" });
     expect(within(past).getByText("Este capítulo não rodou")).toBeInTheDocument();
     expect(await screen.findByText(/chance da meta 61%/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Comparar com a versão anterior" })).toHaveAttribute("href", "/tools/simulation/compare?a=4&b=5");
+    expect(screen.getByRole("link", { name: "Comparar com a versão anterior" })).toHaveAttribute("href", "/planejar/estudos/comparar?a=4&b=5");
 
     fireEvent.click(within(conclusion).getByRole("button", { name: "Simular aporte de R$ 2 mil/mês" }));
     await waitFor(() => expect(last(calls, "POST", "/studies/5/variations")?.body).toEqual({ changes: { monthly_contribution: 1800 } }));
@@ -176,11 +176,11 @@ describe("study page", () => {
       { path: "/studies/5/versions", reply: [] },
       { path: "/simulations/9", reply: { id: 9, kind: "PROJECTION", status: "PENDING", params: {}, params_hash: "h", code_version: "41", seed: 7, results: [] } },
     ]);
-    renderAt("/tools/simulation/5");
+    renderAt("/planejar/estudos/5");
     const seal = await screen.findByRole("complementary", { name: "Quanto confiar nestas chances?" });
     expect(seal).toHaveTextContent("●●●○");
     expect(seal).toHaveTextContent("aconteceu em 87%");
-    expect(within(seal).getByRole("link", { name: /qualidade dos modelos/ })).toHaveAttribute("href", "/tools/simulation/quality");
+    expect(within(seal).getByRole("link", { name: /qualidade dos modelos/ })).toHaveAttribute("href", "/planejar/qualidade");
   });
 
   it("deletes the study for good after asking", async () => {
@@ -191,7 +191,7 @@ describe("study page", () => {
       { method: "DELETE", path: "/studies/5", reply: { status: 204 } },
       { path: "/studies", reply: [] },
     ]);
-    renderAt("/tools/simulation/5");
+    renderAt("/planejar/estudos/5");
     fireEvent.click(await screen.findByRole("button", { name: "Excluir estudo" }));
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/não há como recuperar/));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/studies/5")).toBe(true));
@@ -215,7 +215,7 @@ describe("compare studies", () => {
       { path: "/studies", reply: [summary(), summary({ id: 7, label: "Aporte R$ 1.800" })] },
       { path: "/studies/compare", reply: comparison },
     ]);
-    renderAt("/tools/simulation/compare?a=5&b=7");
+    renderAt("/planejar/estudos/comparar?a=5&b=7");
     expect(await screen.findByRole("note", { name: "Em resumo" })).toHaveTextContent("de 64% para 71%");
     expect(screen.getByText(/aporte mensal 1500 → 1800/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Comparação dos estudos" });
@@ -234,6 +234,6 @@ describe("Home card", () => {
     );
     const card = await screen.findByRole("region", { name: "Último estudo" });
     expect(card).toHaveTextContent("64%de chance de chegar à meta");
-    expect(within(card).getByRole("link", { name: "Abrir o estudo →" })).toHaveAttribute("href", "/tools/simulation/5");
+    expect(within(card).getByRole("link", { name: "Abrir o estudo →" })).toHaveAttribute("href", "/planejar/estudos/5");
   });
 });

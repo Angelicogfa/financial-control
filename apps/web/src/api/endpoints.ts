@@ -35,6 +35,10 @@ import type {
   AssetNoteRequest,
   GoalCreateRequest,
   GoalDTO,
+  MonthlyReportDTO,
+  SavedViewDTO,
+  SavedViewRequest,
+  ViewScope,
   GoalUpdateRequest,
   IncomeForecastDTO,
   IncomeSummaryDTO,
@@ -192,6 +196,8 @@ export const api = {
     /** Declared plus estimated passive income, month by month (Phase 48.R8). */
     incomeForecast: (months: 12 | 24 | 36 = 12) =>
       request<IncomeForecastDTO>("/portfolio/income-forecast", { query: { months } }),
+    /** One month of the portfolio on one page, printed or saved as PDF (Phase 48.R9). */
+    monthlyReport: (month: string) => request<MonthlyReportDTO>("/portfolio/monthly-report", { query: { month } }),
     report: (accountId?: number) =>
       request<PortfolioReportResponseDTO>("/portfolio/consolidated", {
         query: { account_id: accountId },
@@ -474,5 +480,11 @@ export const api = {
     create: (body: GoalCreateRequest) => request<GoalDTO>("/goals", { method: "POST", body }),
     update: (id: number, body: GoalUpdateRequest) => request<GoalDTO>(`/goals/${id}`, { method: "PUT", body }),
     remove: (id: number) => request<void>(`/goals/${id}`, { method: "DELETE" }),
+  },
+  /** Named filters of a screen, kept in the database (Phase 48.R9). */
+  savedViews: {
+    list: (scope: ViewScope) => request<SavedViewDTO[]>("/saved-views", { query: { scope } }),
+    save: (body: SavedViewRequest) => request<SavedViewDTO>("/saved-views", { method: "PUT", body }),
+    remove: (id: number) => request<void>(`/saved-views/${id}`, { method: "DELETE" }),
   },
 };

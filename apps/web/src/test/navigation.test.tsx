@@ -126,11 +126,11 @@ describe("page state kept for the session", () => {
       { path: "/portfolio/consolidated", reply: report() },
       { path: "/accounts", reply: [] },
     ]);
-    const first = renderAt("/contribute/7");
+    const first = renderAt("/aportar/7");
     fireEvent.change(await screen.findByLabelText("Quantidade de HGLG11"), { target: { value: "5" } });
     expect(screen.getByRole("link", { name: "HGLG11" })).toHaveAttribute("href", "/ativo/HGLG11");
     first.unmount();
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     expect(await screen.findByLabelText("Quantidade de HGLG11")).toHaveValue("5");
   });
 });

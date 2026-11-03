@@ -66,12 +66,12 @@ def test_portfolio_alerts_cover_ledger_review_fallback_and_bands() -> None:
     alerts = {a.key: a for a in portfolio_alerts(report)}
     assert alerts["ledger:OVER3"].severity == AlertSeverity.CRITICAL
     assert alerts["review:REVW3"].kind == AlertKind.ASSET_IN_REVIEW
-    assert alerts["fallback:GOOD3"].route.startswith("/asset/")
+    assert alerts["fallback:GOOD3"].route == "/ativo/GOOD3"
     assert "fallback:OVER3" not in alerts
     below = [a for a in alerts.values() if a.kind == AlertKind.CLASS_OUT_OF_BAND]
     assert {a.subject for a in below} >= {"CAIXA", "REAL_ESTATE"}
     above = alerts["band:ACOES:ABOVE"]
-    assert above.route == "/portfolio" and "acima" in above.title
+    assert above.route == "/carteira" and "acima" in above.title
 
 
 def test_valuation_alerts_only_for_eligible_or_held_discounts() -> None:
@@ -87,7 +87,7 @@ def test_valuation_alerts_only_for_eligible_or_held_discounts() -> None:
         {"A3": AssetLifecycle.HELD, "B3": AssetLifecycle.WATCHLIST, "C3": AssetLifecycle.HELD},
         {"A3": 7},
     )
-    assert [(a.key, a.route) for a in alerts] == [("discount:A3", "/asset/7")]
+    assert [(a.key, a.route) for a in alerts] == [("discount:A3", "/ativo/A3")]
     assert alerts[0].detail == "Preço 30,00 abaixo do valor estimado (margem 25,0%)."
 
 

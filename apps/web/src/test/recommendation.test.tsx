@@ -135,7 +135,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/runs", reply: RUNS },
       { path: "/recommendation/backtest", reply: BACKTEST },
     ]);
-    renderAt("/recommendation");
+    renderAt("/planejar/modelo");
     expect(await screen.findByText(/a recomendação escolheu 2: WEGE3, ABCD3/)).toBeInTheDocument();
     expect(screen.getByText("Decide o aporte")).toBeInTheDocument();
 
@@ -181,7 +181,7 @@ describe("Recomendação (Phase 45.5)", () => {
         },
       },
     ]);
-    renderAt("/recommendation?tab=compare");
+    renderAt("/planejar/modelo?tab=compare");
     fireEvent.click(await screen.findByRole("button", { name: "Comparar" }));
     const table = await screen.findByRole("table", { name: "A e não B" });
     expect(within(table).getByText("Qualidade")).toBeInTheDocument();
@@ -219,7 +219,7 @@ describe("Recomendação (Phase 45.5)", () => {
         },
       },
     ]);
-    renderAt("/recommendation?tab=compare");
+    renderAt("/planejar/modelo?tab=compare");
     fireEvent.change(await screen.findByLabelText("Valor do aporte (R$)"), { target: { value: "5000" } });
     fireEvent.click(screen.getByRole("button", { name: "Comparar com a regra antiga" }));
     const recommended = await screen.findByRole("table", { name: "Aporte (recomendação)" });
@@ -235,7 +235,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/runs", reply: [] },
       { path: "/recommendation/backtest", reply: { status: "NOT_COMPUTED" } },
     ]);
-    renderAt("/recommendation");
+    renderAt("/planejar/modelo");
     expect(await screen.findByText("A recomendação ainda não rodou")).toBeInTheDocument();
     expect(screen.getByText(/dá para pedir agora na aba Rodadas/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Rodadas" }));
@@ -247,7 +247,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/runs", reply: RUNS },
       { path: "/recommendation/backtest", reply: BACKTEST },
     ]);
-    renderAt("/recommendation?tab=past");
+    renderAt("/planejar/modelo?tab=past");
     expect(await screen.findByText("Não passou")).toBeInTheDocument();
     expect(screen.getAllByText(/71% de chance de ser positiva/).length).toBeGreaterThan(0);
     const years = screen.getByRole("table", { name: "Teste no passado por ano" });
@@ -263,7 +263,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/backtest", reply: BACKTEST },
       { path: "/recommendation/weights", reply: WEIGHTS },
     ]);
-    renderAt("/recommendation?tab=past");
+    renderAt("/planejar/modelo?tab=past");
     expect(await screen.findByText("Ficam os seus pesos")).toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Pesos validados pelos dados" });
     expect(within(table).getByText("Qualidade")).toBeInTheDocument();
@@ -284,7 +284,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/backtest", reply: BACKTEST },
       { path: "/recommendation/weights", reply: WEIGHTS },
     ]);
-    renderAt("/recommendation?tab=matrix");
+    renderAt("/planejar/modelo?tab=matrix");
     const matrix = await screen.findByRole("table", { name: "Matriz de decisão" });
     expect(within(matrix).getByText("T003")).toBeInTheDocument();
     expect(within(matrix).queryByText("T113")).not.toBeInTheDocument();
@@ -356,7 +356,7 @@ describe("Recomendação (Phase 45.5)", () => {
         },
       },
     ]);
-    renderAt("/recommendation?tab=live");
+    renderAt("/planejar/modelo?tab=live");
     expect(await screen.findByText(/0 de 12 meses/)).toBeInTheDocument();
     expect(screen.getByText(/bateu 62% das 200 carteiras aleatórias/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Placar ao vivo" });
@@ -371,7 +371,7 @@ describe("Recomendação (Phase 45.5)", () => {
       { path: "/recommendation/matrix", reply: board() },
       { path: "/recommendation/live", reply: { status: "NOT_COMPUTED" } },
     ]);
-    renderAt("/recommendation?tab=live");
+    renderAt("/planejar/modelo?tab=live");
     expect(await screen.findByText("O placar ao vivo ainda não rodou")).toBeInTheDocument();
   });
 
@@ -415,7 +415,7 @@ describe("Recomendação (Phase 45.5)", () => {
       },
       { path: "/recommendation/weights", reply: WEIGHTS },
     ]);
-    renderAt("/recommendation");
+    renderAt("/planejar/modelo");
     const table = await screen.findByRole("table", { name: "Otimizador" });
     expect(within(table).getByText("60,0%")).toBeInTheDocument();
     expect(within(table).getByText("45% a 70%")).toBeInTheDocument();
@@ -445,13 +445,13 @@ describe("Recomendação (Phase 45.5)", () => {
         }),
       },
     ]);
-    renderAt("/recommendation");
+    renderAt("/planejar/modelo");
     expect(await screen.findByText("Em uso: decide o aporte")).toBeInTheDocument();
   });
 
   it("says when the Cerrado lens is off in the policy", async () => {
     mockApi([{ path: "/recommendation/matrix", reply: board({ classes: [acoes({ cerrado_in_use: false })] }) }]);
-    renderAt("/recommendation");
+    renderAt("/planejar/modelo");
     expect(await screen.findByText("Sem o Cerrado")).toBeInTheDocument();
   });
 });

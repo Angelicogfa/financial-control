@@ -7,7 +7,7 @@ import { api } from "../../api/endpoints";
 import { PageHeader } from "../../components/PageHeader";
 import { KpiGrid, Section } from "../../components/Section";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
-import { DeclaredEarnings } from "../../pages/home/DeclaredEarnings";
+import { DeclaredEarnings } from "../home/DeclaredEarnings";
 import { brl, monthLabel, pct } from "../../utils/format";
 import { ColumnChart } from "../../viz/ColumnChart";
 import { instrumentPath } from "../instrument/paths";

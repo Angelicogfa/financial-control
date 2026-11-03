@@ -1,36 +1,6 @@
-/** Every screen reachable before the rebuild (Phase 48.R0). They must keep working: since
- *  Phase 48.R3 each one redirects to its new place in NEW_ROUTES. */
-export const CURRENT_ROUTES: { path: string; screen: string }[] = [
-  { path: "/home", screen: "Início" },
-  { path: "/performance", screen: "Desempenho" },
-  { path: "/health", screen: "Saúde da carteira" },
-  { path: "/disclosures", screen: "Fatos relevantes" },
-  { path: "/portfolio", screen: "Carteira" },
-  { path: "/asset/new", screen: "Novo ativo" },
-  { path: "/research", screen: "Pesquisar" },
-  { path: "/research/mining", screen: "Garimpo" },
-  { path: "/recommendation", screen: "Recomendação" },
-  { path: "/contribute", screen: "Aportar" },
-  { path: "/ledger", screen: "Lançamentos" },
-  { path: "/ledger/import", screen: "Importar extrato B3" },
-  { path: "/ledger/trades/new", screen: "Nova negociação" },
-  { path: "/ledger/earnings/new", screen: "Novo provento" },
-  { path: "/ledger/events/new", screen: "Novo evento corporativo" },
-  { path: "/tools/compare", screen: "Comparar ativos" },
-  { path: "/tools/fixed-income", screen: "Comparar renda fixa" },
-  { path: "/tools/simulation", screen: "Simular carteira" },
-  { path: "/tools/simulation/new", screen: "Novo estudo" },
-  { path: "/tools/simulation/compare", screen: "Comparar estudos" },
-  { path: "/tools/simulation/quality", screen: "Qualidade das previsões" },
-  { path: "/settings/strategy", screen: "Estratégia" },
-  { path: "/settings/accounts", screen: "Contas" },
-  { path: "/settings/market-data", screen: "Dados de mercado" },
-  { path: "/settings/agentic", screen: "Acesso agêntico" },
-  { path: "/settings/agentic/new", screen: "Nova chave agêntica" },
-];
-
-/** The addresses of the seven destinations and the settings (Phase 48.R3). */
-export const NEW_ROUTES: { path: string; screen: string }[] = [
+/** The addresses of the seven destinations and the settings (Phase 48.R3); the old ones were
+ *  removed in Phase 48.R9. */
+export const ROUTES: { path: string; screen: string }[] = [
   { path: "/inicio", screen: "Início" },
   { path: "/carteira", screen: "Carteira › Posições" },
   { path: "/carteira/rentabilidade", screen: "Carteira › Rentabilidade" },
@@ -38,6 +8,7 @@ export const NEW_ROUTES: { path: string; screen: string }[] = [
   { path: "/carteira/raio-x", screen: "Carteira › Raio-X" },
   { path: "/carteira/conferir", screen: "Carteira › Conferir" },
   { path: "/carteira/imposto", screen: "Carteira › Imposto" },
+  { path: "/carteira/relatorio", screen: "Carteira › Relatório" },
   { path: "/carteira/novo-ativo", screen: "Novo ativo" },
   { path: "/explorar", screen: "Explorar" },
   { path: "/explorar/garimpo", screen: "Explorar › Garimpo" },

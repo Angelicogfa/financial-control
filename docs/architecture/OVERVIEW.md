@@ -378,7 +378,7 @@ A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, prem
 
 ### Navegação por tarefa e busca global (Fase 48.R3)
 
-O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Carteira (está tudo certo?), Explorar (o que existe por aí?), Acompanhar (o que estou vigiando?), Aportar (o que faço com o dinheiro?), Planejar (para onde vou?) e Lançamentos (o que eu fiz?), além de Configurações. As seções de cada destino aparecem como abas abaixo da barra superior. As rotas do web estão em pt-BR (`app/AppRoutes.tsx`); toda rota antiga redireciona para a nova, com a query preservada (`app/legacyRoutes.ts`), até a R9. `Ctrl+K` ou `/` abre a busca global (`features/search`), que usa `GET /search` e o cache do TanStack Query; `/ativo/:ticker` abre qualquer ativo.
+O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Carteira (está tudo certo?), Explorar (o que existe por aí?), Acompanhar (o que estou vigiando?), Aportar (o que faço com o dinheiro?), Planejar (para onde vou?) e Lançamentos (o que eu fiz?), além de Configurações. As seções de cada destino aparecem como abas abaixo da barra superior. As rotas do web estão em pt-BR (`app/AppRoutes.tsx`); os redirecionamentos das rotas antigas existiram da R3 à R9 e foram removidos (`/` leva a `/inicio`). `Ctrl+K` ou `/` abre a busca global (`features/search`), que usa `GET /search` e o cache do TanStack Query; `/ativo/:ticker` abre qualquer ativo.
 
 ### Página do ativo em capítulos (Fase 48.R4)
 
@@ -395,6 +395,10 @@ Acompanhar tem as abas Lista (watchlist), Alertas e Teses. As regras de alerta (
 ### Imposto mensal (Fase 48.R7)
 
 A aba Carteira › Imposto mostra o IR da renda variável apurado a partir do livro (`domain/tax/assessment.py`). Cada venda sai pelo custo médio em reais, e o day trade é separado do swing. A apuração é mensal por categoria (operações comuns com a isenção de R$ 20 mil para ações, day trade e FII), com o prejuízo compensado dentro de cada categoria, o IRRF estimado descontado e o DARF 6015 com o vencimento. As aplicações no exterior têm apuração anual. `monthly_tax_assessments` guarda os valores e a data em que cada DARF foi pago; o alerta `DARF_DUE` avisa no Início.
+
+### Fim do legado, visões salvas e relatório mensal (Fase 48.R9)
+
+As telas vivem em `apps/web/src/features/<área>/` (não há mais `pages/`), e os dados de tela vêm de `useScreenData` (`api/query.ts`) sobre o cache do TanStack Query. Os endereços da navegação antiga deixaram de existir; links e alertas usam os novos, e `src/test/links.ts` confere cada link do código contra as rotas. Visões salvas (`saved_views`, `/saved-views`) guardam os filtros do Screener, de Lançamentos e da Carteira com um nome. O relatório mensal (`GET /portfolio/monthly-report`, MCP `portfolio.monthly_report`, Carteira › Relatório) reúne o mês em uma página que o navegador salva em PDF.
 
 ### Planejar: metas e renda futura (Fase 48.R8)
 

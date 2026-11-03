@@ -46,6 +46,7 @@ from domain.simulation.repositories import (
     AbstractSimulationStudyRepository,
 )
 from domain.tax.repositories import AbstractTaxAssessmentRepository, AbstractTaxRuleRepository
+from domain.views.repositories import AbstractSavedViewRepository
 from domain.watch.repositories import AbstractAlertRuleRepository, AbstractAssetNoteRepository
 
 
@@ -87,6 +88,7 @@ class AbstractUnitOfWork(ABC):
     alert_rules: AbstractAlertRuleRepository
     asset_notes: AbstractAssetNoteRepository
     goals: AbstractGoalRepository
+    saved_views: AbstractSavedViewRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self

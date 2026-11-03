@@ -7,11 +7,11 @@ import type {
   PortfolioReportResponseDTO,
   SavedContributionPlanDTO,
 } from "../api/types";
-import { planStory } from "../pages/contribute/ContributePage";
-import { marketSplit } from "../pages/home/story";
-import { performanceStory } from "../pages/performance/PerformancePage";
-import { portfolioStory } from "../pages/portfolio/PortfolioPage";
-import { strategyStory } from "../pages/settings/StrategyPage";
+import { planStory } from "../features/contribute/ContributePage";
+import { marketSplit } from "../features/home/story";
+import { performanceStory } from "../features/performance/PerformancePage";
+import { portfolioStory } from "../features/portfolio/PortfolioPage";
+import { strategyStory } from "../features/settings/StrategyPage";
 
 function allocation(over: Partial<ClassAllocationDTO>): ClassAllocationDTO {
   return {

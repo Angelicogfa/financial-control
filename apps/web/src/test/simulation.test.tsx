@@ -11,7 +11,7 @@ import type {
   SimulationResultDTO,
   SimulationRunDTO,
 } from "../api/types";
-import { CalibrationView, ProjectionView, RobustnessView, isActive, seriesOf } from "../pages/simulation/views";
+import { CalibrationView, ProjectionView, RobustnessView, isActive, seriesOf } from "../features/simulation/views";
 
 function summary(overrides: Partial<BacktestSummaryDTO> = {}): BacktestSummaryDTO {
   return {

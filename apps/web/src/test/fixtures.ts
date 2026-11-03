@@ -204,7 +204,7 @@ export function alerts(overrides: Partial<AlertsResponseDTO> = {}): AlertsRespon
         title: "Real Estate abaixo da banda",
         detail: "Peso atual 0,0% contra meta 25,0% ± 5,0%.",
         subject: "REAL_ESTATE",
-        route: "/contribute",
+        route: "/aportar",
       },
     ],
     dismissed: 0,

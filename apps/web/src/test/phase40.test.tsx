@@ -1,11 +1,11 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WealthByAccountDTO } from "../api/types";
 import { DESTINATIONS } from "../layout/navigation";
-import { AccountsWealth } from "../pages/home/AccountsWealth";
+import { AccountsWealth } from "../features/home/AccountsWealth";
 import { mockApi } from "./mockApi";
-import { renderAt } from "./render";
+import { render, renderAt } from "./render";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -89,7 +89,7 @@ describe("relevant facts page", () => {
         reply: { items: [], unread_count: 0, categories: {}, unmapped: [], note: null, last_delivery: null },
       },
     ]);
-    renderAt("/disclosures");
+    renderAt("/explorar/fatos-relevantes");
     expect(screen.getByRole("heading", { name: "Fatos relevantes" })).toBeInTheDocument();
     expect(await screen.findByRole("complementary", { name: "Como ler este resultado" })).toHaveTextContent(
       /mais de 30 dias/,

@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
+import { render } from "./render";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AssetPriceHistoryDTO, SimulationResultDTO } from "../api/types";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../components/Section";
-import { PriceHistory } from "../pages/asset/PriceHistory";
-import { pastStory } from "../pages/simulation/views";
+import { PriceHistory } from "../features/asset/PriceHistory";
+import { pastStory } from "../features/simulation/views";
 import { plural } from "../utils/format";
 import { mockApi, type Call } from "./mockApi";
 

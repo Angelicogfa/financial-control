@@ -16,6 +16,7 @@ from contracts.portfolio.responses import (
     EarningsAgendaDTO,
     FixedIncomeValuationDTO,
     IncomeSummaryDTO,
+    MonthlyReportDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
     RiskReturnSummaryDTO,
@@ -33,6 +34,7 @@ from domain.portfolio.services.earnings_agenda import EarningsAgenda
 from domain.portfolio.services.health import HealthReport
 from domain.portfolio.services.income import IncomeSummary
 from domain.portfolio.services.mark_to_market import TreasuryMarketValuation
+from domain.portfolio.services.monthly_report import MonthlyReport
 
 
 def to_valued_position_dto(pos: ValuedAssetPosition) -> ValuedPositionDTO:
@@ -177,3 +179,7 @@ def to_earnings_agenda_dto(agenda: EarningsAgenda) -> EarningsAgendaDTO:
 
 def to_income_summary_dto(summary: IncomeSummary) -> IncomeSummaryDTO:
     return IncomeSummaryDTO.model_validate(asdict(summary))
+
+
+def to_monthly_report_dto(report: MonthlyReport) -> MonthlyReportDTO:
+    return MonthlyReportDTO.model_validate(asdict(report))

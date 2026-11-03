@@ -14,7 +14,7 @@ describe("job buttons on the screen of each subject", () => {
       { path: "/market/job-runs", reply: [] },
       { path: "/market/worker-errors", reply: { unresolved_count: 0, errors: [] } },
     ]);
-    renderAt("/settings/market-data");
+    renderAt("/configuracoes/dados-de-mercado");
     expect(await screen.findByRole("button", { name: "Carregar o histórico da simulação" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rodar o garimpo" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Calibrar a previsão de preço" })).not.toBeInTheDocument();
@@ -27,7 +27,7 @@ describe("job buttons on the screen of each subject", () => {
       { path: "/market/job-runs", reply: [] },
       { method: "POST", path: "/market/job-runs/run_mining/request", reply: { status: 202, json: {} } },
     ]);
-    renderAt("/research/mining");
+    renderAt("/explorar/garimpo");
     fireEvent.click(await screen.findByRole("button", { name: "Rodar o garimpo" }));
     await screen.findByRole("button", { name: "Rodar o garimpo" });
     expect(calls.some((c) => c.method === "POST" && c.path === "/market/job-runs/run_mining/request")).toBe(true);
@@ -40,7 +40,7 @@ describe("job buttons on the screen of each subject", () => {
       { path: "/recommendation/backtest", reply: { status: "NOT_COMPUTED" } },
       { path: "/market/job-runs", reply: [] },
     ]);
-    renderAt("/recommendation?tab=runs");
+    renderAt("/planejar/modelo?tab=runs");
     expect(await screen.findByRole("button", { name: "Rodar as lentes e os portões da recomendação" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rodar o teste no passado da recomendação" })).toBeInTheDocument();
   });
@@ -65,7 +65,7 @@ describe("job buttons on the screen of each subject", () => {
       },
       { path: "/market/job-runs", reply: [] },
     ]);
-    renderAt("/tools/simulation/quality");
+    renderAt("/planejar/qualidade");
     expect(await screen.findByRole("heading", { name: "Previsão de preço dos ativos" })).toBeInTheDocument();
     expect(await screen.findByText("88%")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Calibrar a previsão de preço" })).toBeInTheDocument();

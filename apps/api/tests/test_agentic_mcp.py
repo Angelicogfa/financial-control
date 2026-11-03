@@ -450,6 +450,7 @@ async def test_mcp_tools_list_call_scoping_and_idempotency(api: SimpleNamespace)
             "portfolio.earnings_agenda",
             "portfolio.by_account",
             "portfolio.income",
+            "portfolio.monthly_report",
             "assets.create",
             "assets.list",
         } == set(tool_map)

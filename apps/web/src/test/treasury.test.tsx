@@ -1,13 +1,13 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { EarningsAgendaDTO, TreasuryMarketDTO } from "../api/types";
-import { DeclaredEarnings } from "../pages/home/DeclaredEarnings";
-import { TreasuryMarketPanel } from "../pages/portfolio/TreasuryMarketPanel";
+import { DeclaredEarnings } from "../features/home/DeclaredEarnings";
+import { TreasuryMarketPanel } from "../features/portfolio/TreasuryMarketPanel";
 import { analysis, asset, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
-import { renderAt } from "./render";
+import { render, renderAt } from "./render";
 
 const market: TreasuryMarketDTO = {
   asset_id: 1,

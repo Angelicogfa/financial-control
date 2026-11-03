@@ -12,7 +12,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { Section } from "../../components/Section";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
 import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
-import { Watchlist } from "../../pages/research/ResearchPage";
+import { Watchlist } from "../research/ResearchPage";
 import { day, money, num, parseDecimal, pct } from "../../utils/format";
 import { instrumentPath } from "../instrument/paths";
 

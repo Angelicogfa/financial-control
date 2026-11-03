@@ -539,3 +539,63 @@ class IncomeSummaryDTO(BaseModel):
     months: list[MonthIncomeDTO]
     by_year: dict[int, float]
     assets: list[AssetIncomeDTO]
+
+
+class ReportTradeDTO(BaseModel):
+    trade_date: date
+    ticker: str
+    kind: str
+    quantity: float
+    value_brl: float
+
+
+class ReportEarningDTO(BaseModel):
+    payment_date: date
+    ticker: str
+    kind: str
+    net_brl: float
+
+
+class ReportClassDTO(BaseModel):
+    arca_class: str
+    value_brl: float
+    current_pct: float
+    target_pct: float | None
+
+
+class ReportTaxDTO(BaseModel):
+    tax_brl: float
+    darf_brl: float
+    due_date: date
+    paid_on: date | None
+    exempt: bool
+    stock_sales_brl: float
+
+
+class ReportGoalDTO(BaseModel):
+    name: str
+    status: str
+    progress: float
+    required_monthly_brl: float
+
+
+class MonthlyReportDTO(BaseModel):
+    """One month of the portfolio on one page (Phase 48.R9), printed or saved as PDF."""
+
+    month: date
+    start_date: date | None = Field(description="The last snapshot before the month")
+    end_date: date | None = Field(description="The last snapshot inside the month")
+    start_value_brl: float
+    end_value_brl: float
+    bought_brl: float
+    sold_brl: float
+    net_flow_brl: float
+    income_brl: float
+    result_brl: float = Field(description="Change in wealth minus the net flow plus the income")
+    month_return: float | None = Field(description="Time-weighted fraction, with the income")
+    trades: list[ReportTradeDTO]
+    earnings: list[ReportEarningDTO]
+    allocation: list[ReportClassDTO]
+    tax: ReportTaxDTO | None
+    goals: list[ReportGoalDTO]
+    data_gaps: list[str]

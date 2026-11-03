@@ -5,16 +5,16 @@
  *  chapters (Phase 48.R4). */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 
 import { api } from "../../api/endpoints";
 import { ApiError } from "../../api/http";
 import type { ArcaClass, AssetType, InstrumentViewDTO } from "../../api/types";
 import { PageHeader } from "../../components/PageHeader";
 import { Empty, ErrorBanner, Loading } from "../../components/States";
-import { AssetDetailPage } from "../../pages/asset/AssetDetailPage";
-import { AssetFormPage } from "../../pages/asset/AssetFormPage";
-import { PriceHistory } from "../../pages/asset/PriceHistory";
+import { AssetDetailPage } from "../asset/AssetDetailPage";
+import { AssetFormPage } from "../asset/AssetFormPage";
+import { PriceHistory } from "../asset/PriceHistory";
 import { ARCA_LABELS, ASSET_TYPE_LABELS } from "../../utils/labels";
 import { dateTime, day, money, num, pct } from "../../utils/format";
 import { Chapter, ChapterIndex, LensBars, lensHighlights, useOpenChapters, type ChapterKey } from "./chapters";
@@ -263,26 +263,4 @@ export function InstrumentSummary({ view }: Readonly<{ view: InstrumentViewDTO }
       </div>
     </div>
   );
-}
-
-/** `/asset/:id` and `/asset/:id/edit` of the old navigation: find the ticker and move on,
- *  query kept (an old `?tab=` opens its chapter). Until Phase 48.R9. */
-export function LegacyAssetRedirect({ edit = false }: Readonly<{ edit?: boolean }>) {
-  const { id = "" } = useParams();
-  const location = useLocation();
-  const asset = useQuery({
-    queryKey: ["asset-ticker", id],
-    queryFn: ({ signal }) => api.assets.get(Number(id), signal),
-    retry: false,
-  });
-  if (asset.isPending) {
-    return (
-      <div className="app-page">
-        <Loading lines={4} />
-      </div>
-    );
-  }
-  if (asset.isError) return <NotFound ticker={`o ativo ${id}`} />;
-  const to = `${instrumentPath(asset.data.ticker)}${edit ? "/editar" : ""}${location.search}`;
-  return <Navigate to={to} replace state={location.state} />;
 }

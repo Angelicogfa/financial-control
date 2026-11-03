@@ -64,6 +64,7 @@ export const DESTINATIONS: Destination[] = [
       { to: "/carteira/raio-x", label: "Raio-X" },
       { to: "/carteira/conferir", label: "Conferir" },
       { to: "/carteira/imposto", label: "Imposto" },
+      { to: "/carteira/relatorio", label: "Relatório" },
     ],
   },
   {
@@ -141,7 +142,7 @@ function under(path: string, to: string): boolean {
 
 /** The destination a path belongs to (the asset page sits under Explorar). */
 export function destinationOf(path: string): Destination | null {
-  if (path.startsWith("/ativo/") || path.startsWith("/asset/")) return DESTINATIONS.find((d) => d.to === "/explorar") ?? null;
+  if (path.startsWith("/ativo/")) return DESTINATIONS.find((d) => d.to === "/explorar") ?? null;
   return DESTINATIONS.find((d) => under(path, d.to)) ?? null;
 }
 

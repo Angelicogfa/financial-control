@@ -14,6 +14,7 @@ from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
     IncomeSummaryDTO,
+    MonthlyReportDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
@@ -21,9 +22,14 @@ from contracts.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from contracts.portfolio.serializers import to_income_summary_dto
-from controllers.portfolio.dependencies import get_income_handler, get_portfolio_handler
+from contracts.portfolio.serializers import to_income_summary_dto, to_monthly_report_dto
+from controllers.portfolio.dependencies import (
+    get_income_handler,
+    get_monthly_report_handler,
+    get_portfolio_handler,
+)
 from domain.portfolio.services.income import IncomeHandler
+from domain.portfolio.services.monthly_report import MonthlyReportHandler
 from domain.portfolio.services.use_cases import PortfolioHandler
 
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
@@ -127,3 +133,13 @@ def get_income(
     handler: IncomeHandler = Depends(get_income_handler),
 ) -> IncomeSummaryDTO:
     return to_income_summary_dto(handler.summary(months=months))
+
+
+@portfolio_router.get("/monthly-report", response_model=MonthlyReportDTO)
+def get_monthly_report(
+    month: str = Query(..., description="YYYY-MM"),
+    handler: MonthlyReportHandler = Depends(get_monthly_report_handler),
+) -> MonthlyReportDTO:
+    """One month of the portfolio on one page: wealth, flows, result, income, trades,
+    allocation, tax and goals."""
+    return to_monthly_report_dto(handler.report(month))

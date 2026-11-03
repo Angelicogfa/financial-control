@@ -6,7 +6,7 @@ import { UNAUTHORIZED_EVENT } from "./api/http";
 import { AppShell } from "./layout/AppShell";
 import { AppProviders } from "./app/AppProviders";
 import { AppRoutes } from "./app/AppRoutes";
-import { LoginPage } from "./pages/LoginPage";
+import { LoginPage } from "./app/LoginPage";
 
 export { AppRoutes };
 

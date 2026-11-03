@@ -235,6 +235,8 @@ Cada fase termina com: testes de unidade e integração (`uv run pytest`, `npm t
 | **R8** | Planejar | `script_00044`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima), **36** (carteiras de comparação) e **47** (recomendações externas) | meta mostra progresso e aporte necessário | R5 |
 | **R9** | Remoção do legado | apaga `pages/` antigas, `useApi`, rotas de redirecionamento com mais de 2 fases; `saved_views` (`script_00045`); relatório mensal em PDF | nenhum import de `pages/`; docs atualizados | R4–R8 |
 
+**Estado (2026-11-02):** R0 a R9 concluídas; a refatoração está fechada. O relatório mensal sai em PDF pela impressão do navegador (sem biblioteca de PDF no backend).
+
 Ordem decidida: **R4** antes de **R5** (§7). Paralelismo possível: depois de R3, R4 (ativo) e R5 (carteira) não tocam os mesmos arquivos; **R7** e **R8** são independentes entre si.
 
 ---

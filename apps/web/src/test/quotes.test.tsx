@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
+import { render } from "./render";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { QuoteStatusDTO } from "../api/types";
-import { QuoteClock } from "../pages/home/QuoteClock";
+import { QuoteClock } from "../features/home/QuoteClock";
 import { mockApi } from "./mockApi";
 
 afterEach(() => {

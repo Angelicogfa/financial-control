@@ -1,54 +1,49 @@
 /** Routes of the app by user task (Phase 48.R3): pt-BR addresses in the web, English in the
- *  API. Every old address redirects to its new place (`legacyRoutes.ts`). */
+ *  API. The redirects of the old navigation were removed in Phase 48.R9. */
 
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { InstrumentRoute, LegacyAssetRedirect } from "../features/instrument/InstrumentRoute";
+import { InstrumentRoute } from "../features/instrument/InstrumentRoute";
 import { IncomePage } from "../features/portfolio/IncomePage";
 import { ReconciliationPage } from "../features/portfolio/ReconciliationPage";
+import { MonthlyReportPage } from "../features/portfolio/MonthlyReportPage";
 import { TaxPage } from "../features/portfolio/TaxPage";
 import { GoalsPage } from "../features/planning/GoalsPage";
 import { IncomeForecastPage } from "../features/planning/IncomeForecastPage";
 import { WatchlistPage } from "../features/watchlist/WatchlistPage";
-import { AssetFormPage } from "../pages/asset/AssetFormPage";
-import { ContributePage } from "../pages/contribute/ContributePage";
-import { DisclosuresPage } from "../pages/disclosures/DisclosuresPage";
-import { HealthPage } from "../pages/health/HealthPage";
-import { HomePage } from "../pages/home/HomePage";
-import { EarningFormPage } from "../pages/ledger/EarningFormPage";
-import { EventFormPage } from "../pages/ledger/EventFormPage";
-import { ImportPage } from "../pages/ledger/ImportPage";
-import { LedgerPage } from "../pages/ledger/LedgerPage";
-import { TradeFormPage } from "../pages/ledger/TradeFormPage";
-import { NotFoundPage } from "../pages/NotFoundPage";
-import { PerformancePage } from "../pages/performance/PerformancePage";
-import { PortfolioPage } from "../pages/portfolio/PortfolioPage";
-import { RecommendationPage } from "../pages/recommendation/RecommendationPage";
-import { MiningPage } from "../pages/research/MiningPage";
-import { ResearchPage } from "../pages/research/ResearchPage";
-import { AccountsPage } from "../pages/settings/AccountsPage";
-import { AgenticPage } from "../pages/settings/agentic/AgenticPage";
-import { AgentKeyFormPage } from "../pages/settings/agentic/AgentKeyFormPage";
-import { MarketDataPage } from "../pages/settings/MarketDataPage";
-import { StrategyPage } from "../pages/settings/StrategyPage";
-import { CompareStudiesPage } from "../pages/simulation/CompareStudiesPage";
-import { NewStudyPage } from "../pages/simulation/NewStudyPage";
-import { QualityPage } from "../pages/simulation/QualityPage";
-import { StudiesPage } from "../pages/simulation/StudiesPage";
-import { StudyPage } from "../pages/simulation/StudyPage";
-import { AssetComparePage } from "../pages/tools/AssetComparePage";
-import { FixedIncomeComparePage } from "../pages/tools/FixedIncomeComparePage";
-import { LEGACY_PATTERNS, legacyTarget } from "./legacyRoutes";
-
-function LegacyRedirect() {
-  const location = useLocation();
-  const to = legacyTarget(location.pathname, location.search);
-  return to ? <Navigate to={to} replace state={location.state} /> : <NotFoundPage />;
-}
+import { AssetFormPage } from "../features/asset/AssetFormPage";
+import { ContributePage } from "../features/contribute/ContributePage";
+import { DisclosuresPage } from "../features/disclosures/DisclosuresPage";
+import { HealthPage } from "../features/health/HealthPage";
+import { HomePage } from "../features/home/HomePage";
+import { EarningFormPage } from "../features/ledger/EarningFormPage";
+import { EventFormPage } from "../features/ledger/EventFormPage";
+import { ImportPage } from "../features/ledger/ImportPage";
+import { LedgerPage } from "../features/ledger/LedgerPage";
+import { TradeFormPage } from "../features/ledger/TradeFormPage";
+import { NotFoundPage } from "./NotFoundPage";
+import { PerformancePage } from "../features/performance/PerformancePage";
+import { PortfolioPage } from "../features/portfolio/PortfolioPage";
+import { RecommendationPage } from "../features/recommendation/RecommendationPage";
+import { MiningPage } from "../features/research/MiningPage";
+import { ResearchPage } from "../features/research/ResearchPage";
+import { AccountsPage } from "../features/settings/AccountsPage";
+import { AgenticPage } from "../features/settings/agentic/AgenticPage";
+import { AgentKeyFormPage } from "../features/settings/agentic/AgentKeyFormPage";
+import { MarketDataPage } from "../features/settings/MarketDataPage";
+import { StrategyPage } from "../features/settings/StrategyPage";
+import { CompareStudiesPage } from "../features/simulation/CompareStudiesPage";
+import { NewStudyPage } from "../features/simulation/NewStudyPage";
+import { QualityPage } from "../features/simulation/QualityPage";
+import { StudiesPage } from "../features/simulation/StudiesPage";
+import { StudyPage } from "../features/simulation/StudyPage";
+import { AssetComparePage } from "../features/tools/AssetComparePage";
+import { FixedIncomeComparePage } from "../features/tools/FixedIncomeComparePage";
 
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/inicio" replace />} />
       <Route path="/inicio" element={<HomePage />} />
 
       <Route path="/carteira" element={<PortfolioPage />} />
@@ -57,6 +52,7 @@ export function AppRoutes() {
       <Route path="/carteira/raio-x" element={<HealthPage />} />
       <Route path="/carteira/conferir" element={<ReconciliationPage />} />
       <Route path="/carteira/imposto" element={<TaxPage />} />
+      <Route path="/carteira/relatorio" element={<MonthlyReportPage />} />
       <Route path="/carteira/novo-ativo" element={<AssetFormPage />} />
 
       <Route path="/ativo/:ticker" element={<InstrumentRoute />} />
@@ -96,13 +92,6 @@ export function AppRoutes() {
       <Route path="/configuracoes/acesso-agentico" element={<AgenticPage />} />
       <Route path="/configuracoes/acesso-agentico/nova" element={<AgentKeyFormPage />} />
       <Route path="/configuracoes/acesso-agentico/:keyId" element={<AgentKeyFormPage />} />
-
-      {/* Old navigation (until Phase 48.R9); the asset by id needs its ticker first. */}
-      <Route path="/asset/:id" element={<LegacyAssetRedirect />} />
-      <Route path="/asset/:id/edit" element={<LegacyAssetRedirect edit />} />
-      {LEGACY_PATTERNS.map((pattern) => (
-        <Route key={pattern} path={pattern} element={<LegacyRedirect />} />
-      ))}
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

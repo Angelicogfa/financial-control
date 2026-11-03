@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetContributionOrderDTO, ClassContributionRationaleDTO } from "../api/types";
-import { classReasonText, orderReasonText, orderWeightText } from "../pages/contribute/Rationale";
+import { classReasonText, orderReasonText, orderWeightText } from "../features/contribute/Rationale";
 import { report, savedPlan } from "./fixtures";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
@@ -52,7 +52,7 @@ describe("contribution rationale on the page", () => {
 
   it("shows the rule of each class and why each asset is bought", async () => {
     mockApi(routes());
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     const table = await screen.findByRole("table", { name: "Regra aplicada a cada classe" });
     const realEstate = within(table).getByRole("row", { name: /Real Estate/ });
     expect(realEstate).toHaveTextContent(/recompõe primeiro/);
@@ -75,7 +75,7 @@ describe("contribution rationale on the page", () => {
       { ...plan.plan.orders[0], asset_id: null, ticker: "SKIP3", recommended_quantity: 0, reason: "BELOW_MIN_LOT" },
     ];
     mockApi(routes(plan));
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     const table = await screen.findByRole("table", { name: "Regra aplicada a cada classe" });
     const realEstate = within(table).getByRole("row", { name: /Real Estate/ });
     expect(realEstate).toHaveTextContent("Recomendação");
@@ -90,7 +90,7 @@ describe("contribution rationale on the page", () => {
     legacy.plan.class_rationale = undefined;
     legacy.plan.orders = legacy.plan.orders.map((o) => ({ ...o, reason: undefined }));
     mockApi(routes(legacy));
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     expect(await screen.findByText(/Plano salvo antes da justificativa/)).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Regra aplicada a cada classe" })).not.toBeInTheDocument();
   });

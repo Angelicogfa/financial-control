@@ -3,9 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
 import { FIXTURES, login, navigate } from "./helpers";
-import { CURRENT_ROUTES, NEW_ROUTES } from "./routes";
+import { ROUTES } from "./routes";
 
-/** Smoke of every current screen (Phase 48.R0): it opens with a title, is not the "page not
+/** Smoke of every screen (Phase 48.R0): it opens with a title, is not the "page not
  *  found" screen and throws no uncaught error. Runs after the journey (scripts/e2e.sh), so the
  *  portfolio has assets and the asset page can be opened from it. */
 
@@ -15,35 +15,24 @@ async function expectScreen(page: Page, errors: string[], where: string): Promis
   expect(errors, `${where}: uncaught errors`).toEqual([]);
 }
 
-test("every current screen opens", async ({ page }) => {
+test("every address opens its screen (Phase 48.R3)", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await login(page);
 
-  for (const route of CURRENT_ROUTES) {
-    await page.goto(route.path);
-    await expectScreen(page, errors, `${route.screen} (${route.path})`);
-  }
-});
-
-test("every new address opens its screen (Phase 48.R3)", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await login(page);
-
-  for (const route of NEW_ROUTES) {
+  for (const route of ROUTES) {
     await page.goto(route.path);
     await expect(page, route.path).toHaveURL(new RegExp(`${route.path}$`));
     await expectScreen(page, errors, `${route.screen} (${route.path})`);
   }
 });
 
-test("an old address lands on its new place, filters included", async ({ page }) => {
+test("the root opens Início and an old address is gone (Phase 48.R9)", async ({ page }) => {
   await login(page);
-  await page.goto("/tools/compare?tickers=ITSA4,WEGE3");
-  await expect(page).toHaveURL(/\/explorar\/comparar\?tickers=ITSA4%2CWEGE3$/);
-  await page.goto("/research?tab=watchlist");
-  await expect(page).toHaveURL(/\/acompanhar$/);
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/inicio$/);
+  await page.goto("/portfolio");
+  await expect(page.getByText("Página não encontrada").first()).toBeVisible();
 });
 
 test("an asset opens from the portfolio, in chapters", async ({ page }) => {

@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetTaxStatusDTO, FixedIncomeComparisonDTO, OfferOutcomeDTO, OfferProjectionDTO } from "../api/types";
-import { toOfferRequest } from "../pages/tools/FixedIncomeComparePage";
+import { toOfferRequest } from "../features/tools/FixedIncomeComparePage";
 import { analysis, asset, trackedInstrument } from "./fixtures";
 import { optionLabels } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
@@ -146,7 +146,7 @@ describe("asset tax tab", () => {
     expect(within(table).getByText("em 1 dias")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Comparar com outro título" })).toHaveAttribute(
       "href",
-      "/tools/fixed-income?asset=1",
+      "/planejar/renda-fixa?asset=1",
     );
   });
 
@@ -228,7 +228,7 @@ describe("fixed income comparator", () => {
       { path: "/assets", reply: page([]) },
       { method: "POST", path: "/tax/fixed-income/compare", reply: comparison() },
     ]);
-    renderAt("/tools/fixed-income");
+    renderAt("/planejar/renda-fixa");
     expect(await screen.findByRole("heading", { name: "Comparar renda fixa" })).toBeInTheDocument();
     fireEvent.change(screen.getAllByLabelText("Nome")[0], { target: { value: "CDB" } });
     fireEvent.change(screen.getAllByLabelText("Nome")[1], { target: { value: "LCA" } });
@@ -272,7 +272,7 @@ describe("fixed income comparator", () => {
         reply: { status: 400, json: { code: "INCOMPLETE_OFFER", detail: "Offer 3 needs indexer" } },
       },
     ]);
-    renderAt("/tools/fixed-income?asset=7");
+    renderAt("/planejar/renda-fixa?asset=7");
     const origin = (await screen.findAllByLabelText("Origem"))[0];
     await waitFor(() => expect(origin).toHaveValue("CDB-ITAU — CDB Itaú"));
     expect(optionLabels(origin)).not.toContainEqual(expect.stringMatching(/WEGE3/));

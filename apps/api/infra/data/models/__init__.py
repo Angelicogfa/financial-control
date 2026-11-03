@@ -59,10 +59,12 @@ from infra.data.models.simulation import (
     SimulationStudyModel,
 )
 from infra.data.models.tax import MonthlyTaxAssessmentModel, TaxRuleModel
+from infra.data.models.views import SavedViewModel
 from infra.data.models.watch import AlertRuleModel, AssetNoteModel
 
 __all__ = [
     "GoalModel",
+    "SavedViewModel",
     "MonthlyTaxAssessmentModel",
     "AlertRuleModel",
     "AssetNoteModel",

@@ -9,6 +9,7 @@ from fastapi import Depends
 
 from composition import get_portfolio_service, get_uow_factory
 from domain.portfolio.services.income import IncomeHandler
+from domain.portfolio.services.monthly_report import MonthlyReportHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.use_cases import PortfolioHandler
 from domain.shared.unit_of_work import UoWFactory
@@ -27,3 +28,10 @@ def get_income_handler(
 ) -> IncomeHandler:
     """Provide the IncomeHandler instance (Carteira › Proventos)."""
     return IncomeHandler(uow_factory=uow_factory)
+
+
+def get_monthly_report_handler(
+    uow_factory: UoWFactory = Depends(get_uow_factory),
+) -> MonthlyReportHandler:
+    """Provide the MonthlyReportHandler instance (Carteira › Relatório)."""
+    return MonthlyReportHandler(uow_factory=uow_factory)

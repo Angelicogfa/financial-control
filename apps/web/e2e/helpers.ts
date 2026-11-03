@@ -9,7 +9,7 @@ export async function login(page: Page): Promise<void> {
   const username = process.env.E2E_USERNAME ?? "e2e";
   const password = process.env.E2E_PASSWORD;
   if (!password) throw new Error("E2E_PASSWORD is not set (scripts/e2e.sh sets it)");
-  await page.goto("/home");
+  await page.goto("/inicio");
   await page.getByLabel("Usuário", { exact: true }).fill(username);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar" }).click();

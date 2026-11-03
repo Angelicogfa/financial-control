@@ -1,6 +1,6 @@
 /** Phase 48.R4: the asset page as chapters, for registered assets and for any ticker. */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -8,7 +8,7 @@ import { AppProviders, createQueryClient } from "../app/AppProviders";
 import { AppRoutes } from "../app/AppRoutes";
 import type { InstrumentLensesDTO, InstrumentViewDTO } from "../api/types";
 import { chapterFromQuery, lensHighlights } from "../features/instrument/chapters";
-import { analysis, asset, trackedInstrument } from "./fixtures";
+import { analysis, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
 
 function Where() {
@@ -144,28 +144,12 @@ describe("registered asset in chapters", () => {
   });
 });
 
-describe("old asset addresses", () => {
-  it("send /asset/:id to /ativo/:ticker with the old tab kept", async () => {
-    mockApi([
-      { path: "/assets/1", reply: asset({ id: 1, ticker: "WEGE3" }) },
-      trackedInstrument(),
-      { path: "/assets/1/analysis", reply: analysis() },
-    ]);
-    renderAt("/asset/1?tab=valuation");
+describe("chapter by query", () => {
+  it("an old ?tab= of an alert or a bookmark still opens its chapter", async () => {
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis() }]);
+    renderAt("/ativo/WEGE3?tab=valuation");
     expect(await screen.findByRole("region", { name: "Está barato?" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { hidden: true, name: "Endereço" })).toHaveTextContent("/ativo/WEGE3?tab=valuation");
     expect(screen.getByRole("button", { name: "Ocultar detalhes: Está barato?" })).toBeInTheDocument();
-  });
-
-  it("send /asset/:id/edit to the edit form by ticker", async () => {
-    mockApi([
-      { path: "/assets/1", reply: asset({ id: 1, ticker: "WEGE3" }) },
-      trackedInstrument(),
-    ]);
-    renderAt("/asset/1/edit");
-    await waitFor(() =>
-      expect(screen.getByRole("status", { hidden: true, name: "Endereço" })).toHaveTextContent("/ativo/WEGE3/editar"),
-    );
   });
 });
 

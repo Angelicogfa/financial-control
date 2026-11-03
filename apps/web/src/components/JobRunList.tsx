@@ -6,13 +6,13 @@ import { useEffect, useState } from "react";
 import { api } from "../api/endpoints";
 import { errorMessage } from "../api/http";
 import { JOB_LABELS, JOB_POLL_MS, JOB_STATUS_LABELS, JOB_TONES, type ManualJob } from "../api/jobs";
-import { useApi } from "../api/useApi";
+import { useScreenData } from "../api/query";
 import { dateTime } from "../utils/format";
 import { Badge } from "./Badge";
 import { Spinner } from "./States";
 
 export function JobRunList({ jobs, onChange }: Readonly<{ jobs: ManualJob[]; onChange?: () => void }>) {
-  const runs = useApi("job-runs", () => api.market.jobs());
+  const runs = useScreenData("job-runs", () => api.market.jobs());
   const [requesting, setRequesting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const lastRun = (name: string) => runs.data?.find((j) => j.job_name === name);

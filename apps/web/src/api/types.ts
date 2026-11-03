@@ -2063,6 +2063,26 @@ export interface MonthIncomeDTO {
   net_brl: number;
 }
 
+export interface MonthlyReportDTO {
+  month: string;
+  start_date: string | null;
+  end_date: string | null;
+  start_value_brl: number;
+  end_value_brl: number;
+  bought_brl: number;
+  sold_brl: number;
+  net_flow_brl: number;
+  income_brl: number;
+  result_brl: number;
+  month_return: number | null;
+  trades: ReportTradeDTO[];
+  earnings: ReportEarningDTO[];
+  allocation: ReportClassDTO[];
+  tax: ReportTaxDTO | null;
+  goals: ReportGoalDTO[];
+  data_gaps: string[];
+}
+
 export type OfferIndexer = "CDI_PERCENT" | "CDI_SPREAD" | "IPCA_SPREAD" | "PRE";
 
 export interface OfferOutcomeDTO {
@@ -2440,6 +2460,44 @@ export interface RegimePointDTO {
   stress_probability: number;
 }
 
+export interface ReportClassDTO {
+  arca_class: string;
+  value_brl: number;
+  current_pct: number;
+  target_pct: number | null;
+}
+
+export interface ReportEarningDTO {
+  payment_date: string;
+  ticker: string;
+  kind: string;
+  net_brl: number;
+}
+
+export interface ReportGoalDTO {
+  name: string;
+  status: string;
+  progress: number;
+  required_monthly_brl: number;
+}
+
+export interface ReportTaxDTO {
+  tax_brl: number;
+  darf_brl: number;
+  due_date: string;
+  paid_on: string | null;
+  exempt: boolean;
+  stock_sales_brl: number;
+}
+
+export interface ReportTradeDTO {
+  trade_date: string;
+  ticker: string;
+  kind: string;
+  quantity: number;
+  value_brl: number;
+}
+
 export interface ResolvedOfferDTO {
   label: string;
   asset_id?: number | null;
@@ -2533,6 +2591,21 @@ export interface SavedContributionPlanDTO {
   account_id?: number | null;
   transaction_ids?: number[];
   plan: ContributionPlanResponseDTO;
+}
+
+export interface SavedViewDTO {
+  id: number;
+  scope: ViewScope;
+  name: string;
+  filters: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface SavedViewRequest {
+  scope: ViewScope;
+  name: string;
+  filters?: Record<string, unknown>;
 }
 
 export interface ScoreLineDTO {
@@ -3166,6 +3239,8 @@ export interface VariantValidationDTO {
   verdict: string;
   notes?: string[];
 }
+
+export type ViewScope = "SCREENER" | "LEDGER" | "PORTFOLIO";
 
 export interface WatchlistAddRequest {
   ticker: string;

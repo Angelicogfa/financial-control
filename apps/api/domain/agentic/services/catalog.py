@@ -83,6 +83,7 @@ from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
     IncomeSummaryDTO,
+    MonthlyReportDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
@@ -90,7 +91,7 @@ from contracts.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from contracts.portfolio.serializers import to_income_summary_dto
+from contracts.portfolio.serializers import to_income_summary_dto, to_monthly_report_dto
 from contracts.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
@@ -167,6 +168,7 @@ from domain.planning.goals import Goal
 from domain.planning.services import GoalHandler, IncomeForecastHandler
 from domain.policy.services.use_cases import PolicyHandler
 from domain.portfolio.services.income import IncomeHandler
+from domain.portfolio.services.monthly_report import MonthlyReportHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.use_cases import PortfolioHandler
 from domain.recommendation.services import RecommendationHandler
@@ -702,6 +704,10 @@ class AgenticRuntimeHandlers:
     @property
     def income(self) -> IncomeHandler:
         return IncomeHandler(uow_factory=self.uow_factory)
+
+    @property
+    def monthly_report(self) -> MonthlyReportHandler:
+        return MonthlyReportHandler(uow_factory=self.uow_factory)
 
     @property
     def instruments(self) -> InstrumentHandler:
@@ -2230,6 +2236,23 @@ OPERATIONS = (
         input_model=IncomeForecastInput,
         output_type=IncomeForecastDTO,
         invoke=lambda h, p: to_income_forecast_dto(h.income_forecast.forecast(months=p.months)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    OperationSpec(
+        name="portfolio.monthly_report",
+        kind="query",
+        description=(
+            "Relatório de um mês da carteira (YYYY-MM): patrimônio no início e no fim, compras, "
+            "vendas, resultado e rentabilidade do mês (TWR com proventos), proventos recebidos, "
+            "negociações, alocação ARCA no fim do mês, imposto do mês e as metas. É o mesmo "
+            "relatório que a tela imprime em PDF."
+        ),
+        input_model=TaxMonthInput,
+        output_type=MonthlyReportDTO,
+        invoke=lambda h, p: to_monthly_report_dto(h.monthly_report.report(p.month)),
     ),
 )
 

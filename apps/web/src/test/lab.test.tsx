@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { LabDTO } from "../api/types";
-import { LabView } from "../pages/simulation/views";
+import { LabView } from "../features/simulation/views";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -102,7 +102,7 @@ describe("QualityPage", () => {
       { path: "/simulations/calibration", reply: { run_id: null } },
       { path: "/simulations/lab", reply: lab() },
     ]);
-    renderAt("/tools/simulation/quality");
+    renderAt("/planejar/qualidade");
     expect(screen.getByRole("heading", { name: "Qualidade dos modelos" })).toBeInTheDocument();
     expect(await screen.findByRole("table", { name: "Modelos do laboratório" })).toBeInTheDocument();
   });

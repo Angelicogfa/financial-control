@@ -1,18 +1,18 @@
-/** Phase 48.R3: new information architecture, redirects of every old address, global search
+/** Phase 48.R3: new information architecture (old addresses removed in R9), global search
  *  and the instrument page for any ticker. */
 
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { matchPath, MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { AppProviders, createQueryClient } from "../app/AppProviders";
 import { AppRoutes } from "../app/AppRoutes";
-import { LEGACY_PATTERNS, legacyTarget } from "../app/legacyRoutes";
 import type { InstrumentViewDTO, SearchResultDTO } from "../api/types";
 import { matchActions, QUICK_ACTIONS } from "../features/search/GlobalSearch";
 import { AppShell } from "../layout/AppShell";
 import { activeSection, DESTINATIONS, destinationOf } from "../layout/navigation";
 import { analysis } from "./fixtures";
+import { appRoutePaths, internalLinks } from "./links";
 import { mockApi } from "./mockApi";
 
 function Where() {
@@ -63,62 +63,27 @@ function view(overrides: Partial<InstrumentViewDTO> = {}): InstrumentViewDTO {
   };
 }
 
-describe("old addresses (Phase 48.R3)", () => {
-  const cases: [string, string][] = [
-    ["/", "/inicio"],
-    ["/home", "/inicio"],
-    ["/performance", "/carteira/rentabilidade"],
-    ["/health", "/carteira/raio-x"],
-    ["/portfolio", "/carteira"],
-    ["/asset/new", "/carteira/novo-ativo"],
-    ["/disclosures", "/explorar/fatos-relevantes"],
-    ["/research", "/explorar"],
-    ["/research/mining", "/explorar/garimpo"],
-    ["/recommendation", "/planejar/modelo"],
-    ["/contribute", "/aportar"],
-    ["/contribute/7", "/aportar/7"],
-    ["/ledger", "/lancamentos"],
-    ["/ledger/import", "/lancamentos/importar"],
-    ["/ledger/trades/new", "/lancamentos/negociacoes/nova"],
-    ["/ledger/trades/9/edit", "/lancamentos/negociacoes/9/editar"],
-    ["/ledger/earnings/new", "/lancamentos/proventos/novo"],
-    ["/ledger/earnings/4/edit", "/lancamentos/proventos/4/editar"],
-    ["/ledger/events/new", "/lancamentos/eventos/novo"],
-    ["/tools/fixed-income", "/planejar/renda-fixa"],
-    ["/tools/compare", "/explorar/comparar"],
-    ["/tools/simulation", "/planejar"],
-    ["/tools/simulation/new", "/planejar/estudos/novo"],
-    ["/tools/simulation/compare", "/planejar/estudos/comparar"],
-    ["/tools/simulation/quality", "/planejar/qualidade"],
-    ["/tools/simulation/12", "/planejar/estudos/12"],
-    ["/settings/strategy", "/configuracoes/estrategia"],
-    ["/settings/accounts", "/configuracoes/contas"],
-    ["/settings/market-data", "/configuracoes/dados-de-mercado"],
-    ["/settings/agentic", "/configuracoes/acesso-agentico"],
-    ["/settings/agentic/new", "/configuracoes/acesso-agentico/nova"],
-    ["/settings/agentic/3", "/configuracoes/acesso-agentico/3"],
-  ];
-
-  it.each(cases)("%s goes to %s", (from, to) => {
-    expect(legacyTarget(from)).toBe(to);
-  });
-
-  it("covers every old route pattern", () => {
-    expect(cases).toHaveLength(LEGACY_PATTERNS.length);
-  });
-
-  it("keeps the query string and sends the watchlist tab to Acompanhar", () => {
-    expect(legacyTarget("/tools/compare", "?tickers=WEGE3,ITSA4")).toBe("/explorar/comparar?tickers=WEGE3%2CITSA4");
-    expect(legacyTarget("/research", "?tab=watchlist")).toBe("/acompanhar");
-    expect(legacyTarget("/research", "?tab=treasury")).toBe("/explorar?tab=treasury");
-    expect(legacyTarget("/portfolio/")).toBe("/carteira");
-    expect(legacyTarget("/carteira")).toBeNull();
-  });
-
-  it("redirects in the router, filters included", async () => {
+describe("old addresses (removed in Phase 48.R9)", () => {
+  it("the root opens Início and an old address is not found", async () => {
     mockApi([]);
-    renderWithLocation("/tools/fixed-income?term=720");
-    expect(address()).toHaveTextContent("/planejar/renda-fixa?term=720");
+    renderWithLocation("/");
+    expect(address()).toHaveTextContent("/inicio");
+  });
+
+  it.each(["/portfolio", "/tools/fixed-income", "/asset/3", "/settings/strategy"])("%s is gone", async (from) => {
+    mockApi([]);
+    renderWithLocation(from);
+    expect(address()).toHaveTextContent(from);
+    expect(await screen.findByText(/não encontrada/i)).toBeInTheDocument();
+  });
+
+  it("every internal link points to a route of the app", () => {
+    const routes = appRoutePaths();
+    expect(routes.length).toBeGreaterThan(30);
+    expect(internalLinks().length).toBeGreaterThan(60);
+    expect(routes.some((path) => matchPath(path, "/portfolio"))).toBe(false);
+    const broken = internalLinks().filter((link) => !routes.some((path) => matchPath(path, link.path)));
+    expect(broken).toEqual([]);
   });
 });
 

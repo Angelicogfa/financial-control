@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { App } from "../App";
 import type { GrantOptionsDTO, PolicyDTO } from "../api/types";
-import { daysLeft, expiryState } from "../pages/settings/agentic/expiry";
-import { mcpClientConfig, mcpEndpoint } from "../pages/settings/agentic/mcpConnection";
-import { scopeSize } from "../pages/settings/agentic/scope";
+import { daysLeft, expiryState } from "../features/settings/agentic/expiry";
+import { mcpClientConfig, mcpEndpoint } from "../features/settings/agentic/mcpConnection";
+import { scopeSize } from "../features/settings/agentic/scope";
 import { alerts, analytics, report } from "./fixtures";
 import { pick } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
@@ -321,7 +321,7 @@ describe("session", () => {
       { path: "/portfolio/analytics", reply: analytics() },
       { path: "/alerts", reply: alerts() },
     ]);
-    window.history.pushState({}, "", "/home");
+    window.history.pushState({}, "", "/inicio");
     render(<App />);
     fireEvent.change(await screen.findByLabelText("Usuário"), { target: { value: "ana" } });
     fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "errada" } });
@@ -440,7 +440,7 @@ describe("agentic mcp settings", () => {
       },
     ]);
 
-    renderAt("/settings/agentic/new");
+    renderAt("/configuracoes/acesso-agentico/nova");
     const nameInput = await screen.findByLabelText("Nome da chave");
     expect(await screen.findByText("Carteira & Desempenho")).toBeInTheDocument();
 
@@ -516,7 +516,7 @@ describe("agentic mcp settings", () => {
       },
     ]);
 
-    renderAt("/settings/agentic/1");
+    renderAt("/configuracoes/acesso-agentico/1");
     expect(await screen.findByDisplayValue("Claude Desktop")).toBeInTheDocument();
 
     // Renew validity

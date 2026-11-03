@@ -73,6 +73,8 @@ drawdown e comparação com CDI, IPCA e IBOV) e `portfolio.snapshots` para a evo
 - `portfolio.health` dá o diagnóstico em sete pilares com ação sugerida; \
 `portfolio.earnings_agenda` lista os proventos anunciados e ainda não pagos; \
 `portfolio.treasury_market` compara o Tesouro Direto na curva × a mercado.
+- `portfolio.monthly_report` resume um mês (YYYY-MM): patrimônio, aportes, resultado, \
+rentabilidade, proventos, negociações, alocação, imposto e metas.
 
 Ativos e Análise Fundamentalista:
 - Use `assets.list` para buscar ativos cadastrados e `assets.get` para detalhes de um ativo.
