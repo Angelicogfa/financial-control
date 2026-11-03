@@ -184,14 +184,60 @@ class ClassMatrixDTO(BaseModel):
     construction: ConstructionDTO | None = None
     weights_source: Literal["AHP", "VALIDATED"] = "AHP"  # VALIDATED: by the data (Phase 45.7)
     cerrado_in_use: bool = True  # the policy's switch: off, the Cerrado lens left the weights
+    optimizer_in_use: bool = False  # its weights are this class's targets
 
 
 class MatrixBoardDTO(BaseModel):
     status: Literal["OK", "NOT_COMPUTED"]
     as_of: date | None = None
     classes: list[ClassMatrixDTO] = Field(default_factory=list)
-    # The optimizer passed its walk-forward test: its weights are the targets (Phase 45.8b).
+    # The optimizer passed its walk-forward test, which only covers Ações; each class says
+    # whether its targets follow it (Phase 34).
     optimizer_in_use: bool = False
+
+
+class TransitionLineDTO(BaseModel):
+    ticker: str
+    current_weight: float
+    target_weight: float
+    current_brl: float
+    target_brl: float
+    next_contribution_brl: float  # of the first month, contributions only
+    buy_brl: float  # with sales, what the proceeds buy
+
+
+class TransitionSaleDTO(BaseModel):
+    ticker: str
+    asset_type: str
+    quantity: float
+    value_brl: float
+    cost_brl: float
+    gain_brl: float
+
+
+class TransitionDTO(BaseModel):
+    """How to reach a class's targets (Phase 34.7): a study, nothing is saved or ordered."""
+
+    status: Literal["OK", "NOT_COMPUTED"]
+    arca_class: str
+    as_of: date | None = None
+    total_brl: float = 0.0
+    distance: float = 0.0  # share of the class that would have to change places
+    monthly_brl: float = 0.0
+    months: int | None = None  # contributions only; None when they never get there
+    tolerance: float = 0.0
+    lines: list[TransitionLineDTO] = Field(default_factory=list)
+    sales: list[TransitionSaleDTO] = Field(default_factory=list)
+    sold_brl: float = 0.0
+    tax_brl: float = 0.0  # selling everything this month
+    fees_brl: float = 0.0
+    cost_brl: float = 0.0
+    split_months: int | None = None  # months that keep the stock sales within the exemption
+    split_tax_brl: float | None = None
+    expected_gain_year_brl: float = 0.0
+    payback_months: float | None = None
+    pays_off: bool = False
+    payback_horizon_months: int = 0
 
 
 class LensDifferenceDTO(BaseModel):

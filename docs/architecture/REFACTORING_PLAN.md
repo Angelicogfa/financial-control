@@ -279,4 +279,4 @@ Ordem decidida: **R4** antes de **R5** (§7). Paralelismo possível: depois de R
 2. **Cache de dados no web:** **TanStack Query** substitui o `useApi` (primeira dependência de runtime além de React/Router), adotado na R3.
 3. **Ordem R4 × R5:** **R4 (página do ativo) primeiro**, depois R5 (hub da carteira e conferência).
 4. **Propostas 34, 36 e 47:** entram na **R8** (Planejar › Modelo / Simulações), desenhadas sobre a nova arquitetura; não são feitas como fases soltas antes dela.
-   *Na R8 (2026-11-02):* as três seguem com as decisões 34.0, 36.0 e 47.0 em aberto e não fecham a refatoração. A Fase 45 já entregou o otimizador (≈ 34.4) e o placar ao vivo com o fluxo espelhado (≈ 36.1–36.5); o restante entra em `features/planning` quando decidido.
+   *Na R8 (corrigido em 2026-11-03):* as três não fecham a refatoração. As decisões 34.0 e 36.0 já estavam tomadas na seção 10.1 da hierarquia, e a Fase 45 entregou o otimizador (≈ 34.4) e o placar ao vivo com o fluxo espelhado (≈ 36.1–36.5); só a 47.0 segue em aberto. O restante entra em `features/planning`.

@@ -45,6 +45,7 @@ Month = tuple[int, int]
 
 OK = "OK"
 NO_CANDIDATES = "NO_CANDIDATES"
+TESTED_CLASSES = frozenset({"ACOES"})  # where the walk-forward test runs
 DEFAULT_VOLATILITY = 0.30  # a year, when an asset has no history
 RIDGE = 1e-6
 
@@ -280,7 +281,9 @@ def _final(
     weights = {t: w / total for t, w in kept}
     sector_cap = _feasible_cap(params.sector_cap, [sectors[t] for t in weights])
     group_cap = _feasible_cap(params.group_cap, [groups[t] for t in weights])
+    asset_cap = _feasible_cap(params.asset_cap, list(weights))
     for _ in range(3):
+        weights = _cap(weights, {t: t for t in weights}, asset_cap)
         weights = _cap(weights, {t: groups[t] for t in weights}, group_cap)
         weights = _cap(weights, {t: sectors[t] for t in weights}, sector_cap)
     norm = sum(weights.values()) or 1.0
@@ -316,6 +319,7 @@ def optimize_class(
     sector_cap = _feasible_cap(params.sector_cap, [sectors[t] for t in tickers])
     group_cap = _feasible_cap(params.group_cap, [groups[t] for t in tickers])
     caps = [*_caps(tickers, sectors, sector_cap), *_caps(tickers, groups, group_cap)]
+    upper = min(sector_cap, _feasible_cap(params.asset_cap, tickers))
     mu = np.array([r.expected for r in rows], dtype=float)
     mu_all = np.concatenate([mu, np.zeros(len(extra))])
     spread = np.array([(1.0 - r.confidence) * max(abs(r.expected), 0.01) for r in rows])
@@ -344,10 +348,10 @@ def optimize_class(
             )
             limit = cvar(-(scen_all @ w_now), opts.cvar_level)
             scen = scen_all[:, :n]
-        w = solve(mu_b, cov_b, params.risk_aversion, caps, sector_cap, scen, limit, opts.cvar_level)
+        w = solve(mu_b, cov_b, params.risk_aversion, caps, upper, scen, limit, opts.cvar_level)
         if w is None and limit is not None:
             relaxed += 1
-            w = solve(mu_b, cov_b, params.risk_aversion, caps, sector_cap)
+            w = solve(mu_b, cov_b, params.risk_aversion, caps, upper)
         if w is not None:
             found.append(w)
     if relaxed:
@@ -422,6 +426,12 @@ def optimize_class(
     )
 
 
+def optimizer_applies(arca_class: str, passed: bool) -> bool:
+    """The walk-forward test only covers the classes with a point-in-time panel: passing it says
+    nothing about the others, which keep the construction."""
+    return passed and arca_class in TESTED_CLASSES
+
+
 def optimized_of(construction: ClassConstruction) -> OptimizedClass | None:
     """The optimizer's result stored with a construction (None before Phase 45.8b)."""
     data = construction.optimized
@@ -432,7 +442,8 @@ def target_weights(construction: ClassConstruction, optimizer_passed: bool) -> d
     """The class's target: the optimizer's weights once it passed its gate, else the
     construction's (decision 10.1.4)."""
     found = optimized_of(construction)
-    if optimizer_passed and found is not None and found.status == OK and found.assets:
+    applies = optimizer_applies(construction.arca_class, optimizer_passed)
+    if applies and found is not None and found.status == OK and found.assets:
         return found.weights
     return {s.ticker: s.weight for s in construction.selected}
 

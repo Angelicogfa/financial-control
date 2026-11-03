@@ -34,10 +34,15 @@ from contracts.recommendation.responses import (
     ScoreLineDTO,
     SelectedAssetDTO,
     SkippedAssetDTO,
+    TransitionDTO,
 )
 from domain.comparison.board import build_board
 from domain.policy.services.policy import current_policy
-from domain.portfolio.services.consolidation import AssetContributionOrder, plan_contribution
+from domain.portfolio.services.consolidation import (
+    LEDGER_VALID,
+    AssetContributionOrder,
+    plan_contribution,
+)
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.recommendation.backtest import Backtest
 from domain.recommendation.combination import ClassMatrix, MatrixRow, compare_rows
@@ -50,10 +55,14 @@ from domain.recommendation.keys import (
     RECOMMENDATION_BACKTEST,
 )
 from domain.recommendation.lenses import AssetLenses
-from domain.recommendation.optimizer import optimized_of, optimizer_passed
+from domain.recommendation.optimizer import optimized_of, optimizer_applies, optimizer_passed
 from domain.recommendation.switch import recommended_classes
+from domain.recommendation.transition import TransitionHolding, plan_transition
 from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
+from domain.shared.enums import ArcaClass, AssetPurpose
 from domain.shared.unit_of_work import UoWFactory
+from domain.tax.assessment import realized_sales
+from domain.tax.services.rules import rule_book
 
 
 def _asset_dto(item: AssetLenses, gates: AssetGates | None) -> AssetLensesDTO:
@@ -147,7 +156,9 @@ def _optimized_dto(c: ClassConstruction) -> OptimizedDTO | None:
     return OptimizedDTO.model_validate(found.to_dict()) if found is not None else None
 
 
-def _matrix_dto(m: ClassMatrix, construction: ClassConstruction | None = None) -> ClassMatrixDTO:
+def _matrix_dto(
+    m: ClassMatrix, construction: ClassConstruction | None = None, *, passed: bool = False
+) -> ClassMatrixDTO:
     return ClassMatrixDTO(
         arca_class=m.arca_class,
         objective=m.objective,  # type: ignore[arg-type]
@@ -171,6 +182,7 @@ def _matrix_dto(m: ClassMatrix, construction: ClassConstruction | None = None) -
         construction=_construction_dto(construction) if construction is not None else None,
         weights_source=m.weights_source,  # type: ignore[arg-type]
         cerrado_in_use=CERRADO in m.weights,
+        optimizer_in_use=optimizer_applies(m.arca_class, passed),
     )
 
 
@@ -222,12 +234,13 @@ class RecommendationHandler:
             stored = uow.forecasts.latest_model(RECOMMENDATION_BACKTEST)
         if not found:
             return MatrixBoardDTO(status="NOT_COMPUTED")
+        passed = optimizer_passed(stored.payload if stored else None)
         return MatrixBoardDTO(
             status="OK",
             as_of=found[0].as_of,
-            optimizer_in_use=optimizer_passed(stored.payload if stored else None),
+            optimizer_in_use=passed,
             classes=[
-                _matrix_dto(m, built.get(m.arca_class))
+                _matrix_dto(m, built.get(m.arca_class), passed=passed)
                 for m in found
                 if arca_class is None or m.arca_class == arca_class
             ],
@@ -354,6 +367,54 @@ class RecommendationHandler:
     def runs(self, limit: int = 52) -> list[RecommendationRunDTO]:
         """The history of the weekly runs, newest first."""
         return list_runs(self, limit)
+
+    def transition(self, arca_class: ArcaClass, monthly_brl: float = 0.0) -> TransitionDTO:
+        """How to reach the class's targets, the same ones the contribution follows (Phase 34.7);
+        nothing is saved."""
+        if self.portfolio_service is None:
+            raise RuntimeError("the transition needs the portfolio service")
+        today = date.today()
+        with self.uow_factory() as uow:
+            report = self.portfolio_service.build_portfolio_report(uow)
+            policy = current_policy(uow.policies)
+            recommended = recommended_classes(uow, report, policy).get(arca_class)
+            as_of = uow.recommendation.latest_lens_date()
+            if recommended is None or as_of is None:
+                return TransitionDTO(status="NOT_COMPUTED", arca_class=arca_class.value)
+            matrix = next(
+                (m for m in uow.recommendation.matrices(as_of) if m.arca_class == arca_class.value),
+                None,
+            )
+            past_sales = [
+                sale
+                for asset in uow.assets.list_all(active_only=False)
+                for sale in realized_sales(asset)[0]
+            ]
+            book = rule_book(uow.tax_rules.list_all())
+        found = plan_transition(
+            holdings=[
+                TransitionHolding(
+                    asset_id=p.asset_id,
+                    ticker=p.ticker,
+                    asset_type=p.asset_type,
+                    quantity=p.quantity,
+                    value_brl=p.gross_current_value_brl,
+                    invested_brl=p.invested_value_brl,
+                )
+                for p in report.positions
+                if p.arca_class == arca_class
+                and p.ledger_status == LEDGER_VALID
+                and p.purpose == AssetPurpose.ARCA
+                and p.quantity > 0
+            ],
+            targets=recommended.targets,
+            expected={r.ticker: r.expected for r in matrix.rows} if matrix else {},
+            monthly_brl=monthly_brl,
+            past_sales=past_sales,
+            book=book,
+            today=today,
+        )
+        return TransitionDTO(status="OK", arca_class=arca_class.value, as_of=as_of, **asdict(found))
 
     def contribution(self, amount_brl: float) -> ContributionComparisonDTO:
         """The contribution (which follows the recommendation, Phase 45.6b) next to what the

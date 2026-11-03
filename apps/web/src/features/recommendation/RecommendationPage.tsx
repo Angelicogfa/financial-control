@@ -23,6 +23,7 @@ import { Tabs, useTab, type TabSpec } from "../../components/Tabs";
 import { Pagination } from "../../components/Pagination";
 import { KpiGrid, Lead, Notes, Section, Segmented } from "../../components/Section";
 import { LiveScoreboard } from "./LiveScoreboard";
+import { Transition } from "./Transition";
 import { Optimized, OptimizerVerdict } from "./Optimized";
 import { Async, Empty, Spinner } from "../../components/States";
 import { brl, day, num, parseDecimal, pct, quantity } from "../../utils/format";
@@ -681,7 +682,7 @@ const TABS: TabSpec<TabKey>[] = [
 ];
 const CLASS_TABS: TabKey[] = ["chosen", "matrix", "compare"];
 
-function ChosenTab({ matrix, optimizerInUse }: Readonly<{ matrix: ClassMatrixDTO; optimizerInUse: boolean }>) {
+function ChosenTab({ matrix, optimizerPassed }: Readonly<{ matrix: ClassMatrixDTO; optimizerPassed: boolean }>) {
   const c = matrix.construction;
   return (
     <div className="app-page-stack">
@@ -712,7 +713,14 @@ function ChosenTab({ matrix, optimizerInUse }: Readonly<{ matrix: ClassMatrixDTO
         title="Otimizador"
         subtitle="Todos os pesos de uma vez, com o CVaR de 12 meses não pior que o da carteira atual; média de vários sorteios."
       >
-        <Optimized optimized={c?.optimized} inUse={optimizerInUse} />
+        <Optimized
+          optimized={c?.optimized}
+          inUse={matrix.optimizer_in_use ?? false}
+          passedElsewhere={optimizerPassed && !(matrix.optimizer_in_use ?? false)}
+        />
+      </Section>
+      <Section title="Como chegar lá" subtitle="Só com aportes ou com vendas e IR: um estudo, sem gravar nada.">
+        <Transition arcaClass={matrix.arca_class} />
       </Section>
     </div>
   );
@@ -815,7 +823,7 @@ function ClassTabs({
         />
       )}
       {tab === "chosen" && (
-        <ChosenTab key={matrix.arca_class} matrix={matrix} optimizerInUse={data.optimizer_in_use ?? false} />
+        <ChosenTab key={matrix.arca_class} matrix={matrix} optimizerPassed={data.optimizer_in_use ?? false} />
       )}
       {tab === "matrix" && <MatrixTab key={matrix.arca_class} matrix={matrix} refresh={refresh} />}
       {tab === "compare" && <CompareTab key={matrix.arca_class} matrix={matrix} />}

@@ -95,6 +95,14 @@ def test_caps_and_k_max_hold_and_noise_is_marked_unstable() -> None:
     assert all(0.0 <= a.low <= a.high <= 1.0 for a in found.assets)
 
 
+def test_the_limit_per_asset_holds() -> None:
+    rows = [_row(f"T{i}", i + 1, 0.9 - i * 0.1, f"S{i}") for i in range(8)]
+    returns = {r.ticker: _noise(30 + i, 0.06) for i, r in enumerate(rows)}
+    params = ConstructionParams(k_max=8, sector_cap=0.5, group_cap=0.5, asset_cap=0.2)
+    found = optimize_class(_matrix(rows), returns, params, options=FAST)
+    assert max(a.weight for a in found.assets) <= 0.2 + 1e-6
+
+
 def test_the_cvar_stays_at_most_that_of_the_current_holdings() -> None:
     rows = [_row(f"T{i}", i + 1, 0.9 - i * 0.02, f"S{i}") for i in range(5)]
     returns = {r.ticker: _noise(20 + i, 0.03 + 0.03 * i) for i, r in enumerate(rows)}

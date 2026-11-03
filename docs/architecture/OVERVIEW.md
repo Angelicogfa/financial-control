@@ -396,6 +396,10 @@ Acompanhar tem as abas Lista (watchlist), Alertas e Teses. As regras de alerta (
 
 A aba Carteira › Imposto mostra o IR da renda variável apurado a partir do livro (`domain/tax/assessment.py`). Cada venda sai pelo custo médio em reais, e o day trade é separado do swing. A apuração é mensal por categoria (operações comuns com a isenção de R$ 20 mil para ações, day trade e FII), com o prejuízo compensado dentro de cada categoria, o IRRF estimado descontado e o DARF 6015 com o vencimento. As aplicações no exterior têm apuração anual. `monthly_tax_assessments` guarda os valores e a data em que cada DARF foi pago; o alerta `DARF_DUE` avisa no Início.
 
+### Transição até os pesos-alvo (Fase 34.7)
+
+`domain/recommendation/transition.py` estuda como chegar aos mesmos alvos do aporte: só com aportes (em quantos meses) ou com vendas (o IR é a diferença na apuração real de `domain/tax/assessment.py`). Fica em `GET /recommendation/transition`, no MCP `recommendation.transition` e na seção "Como chegar lá" da Recomendação. Nada é gravado. O veredito do otimizador vale só para Ações (`optimizer_applies`), a classe que o teste no passado cobre, e o limite da Saúde por ativo vira um teto na classe (`class_params`).
+
 ### Fim do legado, visões salvas e relatório mensal (Fase 48.R9)
 
 As telas vivem em `apps/web/src/features/<área>/` (não há mais `pages/`), e os dados de tela vêm de `useScreenData` (`api/query.ts`) sobre o cache do TanStack Query. Os endereços da navegação antiga deixaram de existir; links e alertas usam os novos, e `src/test/links.ts` confere cada link do código contra as rotas. Visões salvas (`saved_views`, `/saved-views`) guardam os filtros do Screener, de Lançamentos e da Carteira com um nome. O relatório mensal (`GET /portfolio/monthly-report`, MCP `portfolio.monthly_report`, Carteira › Relatório) reúne o mês em uma página que o navegador salva em PDF.

@@ -4613,6 +4613,11 @@
             "title": "Objective Label",
             "type": "string"
           },
+          "optimizer_in_use": {
+            "default": false,
+            "title": "Optimizer In Use",
+            "type": "boolean"
+          },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/MatrixRowDTO"
@@ -18395,6 +18400,235 @@
         "title": "TransactionUpdateRequest",
         "type": "object"
       },
+      "TransitionDTO": {
+        "description": "How to reach a class's targets (Phase 34.7): a study, nothing is saved or ordered.",
+        "properties": {
+          "arca_class": {
+            "title": "Arca Class",
+            "type": "string"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "cost_brl": {
+            "default": 0.0,
+            "title": "Cost Brl",
+            "type": "number"
+          },
+          "distance": {
+            "default": 0.0,
+            "title": "Distance",
+            "type": "number"
+          },
+          "expected_gain_year_brl": {
+            "default": 0.0,
+            "title": "Expected Gain Year Brl",
+            "type": "number"
+          },
+          "fees_brl": {
+            "default": 0.0,
+            "title": "Fees Brl",
+            "type": "number"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TransitionLineDTO"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "monthly_brl": {
+            "default": 0.0,
+            "title": "Monthly Brl",
+            "type": "number"
+          },
+          "months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months"
+          },
+          "payback_horizon_months": {
+            "default": 0,
+            "title": "Payback Horizon Months",
+            "type": "integer"
+          },
+          "payback_months": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payback Months"
+          },
+          "pays_off": {
+            "default": false,
+            "title": "Pays Off",
+            "type": "boolean"
+          },
+          "sales": {
+            "items": {
+              "$ref": "#/components/schemas/TransitionSaleDTO"
+            },
+            "title": "Sales",
+            "type": "array"
+          },
+          "sold_brl": {
+            "default": 0.0,
+            "title": "Sold Brl",
+            "type": "number"
+          },
+          "split_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Months"
+          },
+          "split_tax_brl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Tax Brl"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "NOT_COMPUTED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tax_brl": {
+            "default": 0.0,
+            "title": "Tax Brl",
+            "type": "number"
+          },
+          "tolerance": {
+            "default": 0.0,
+            "title": "Tolerance",
+            "type": "number"
+          },
+          "total_brl": {
+            "default": 0.0,
+            "title": "Total Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "arca_class"
+        ],
+        "title": "TransitionDTO",
+        "type": "object"
+      },
+      "TransitionLineDTO": {
+        "properties": {
+          "buy_brl": {
+            "title": "Buy Brl",
+            "type": "number"
+          },
+          "current_brl": {
+            "title": "Current Brl",
+            "type": "number"
+          },
+          "current_weight": {
+            "title": "Current Weight",
+            "type": "number"
+          },
+          "next_contribution_brl": {
+            "title": "Next Contribution Brl",
+            "type": "number"
+          },
+          "target_brl": {
+            "title": "Target Brl",
+            "type": "number"
+          },
+          "target_weight": {
+            "title": "Target Weight",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "current_weight",
+          "target_weight",
+          "current_brl",
+          "target_brl",
+          "next_contribution_brl",
+          "buy_brl"
+        ],
+        "title": "TransitionLineDTO",
+        "type": "object"
+      },
+      "TransitionSaleDTO": {
+        "properties": {
+          "asset_type": {
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "cost_brl": {
+            "title": "Cost Brl",
+            "type": "number"
+          },
+          "gain_brl": {
+            "title": "Gain Brl",
+            "type": "number"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "value_brl": {
+            "title": "Value Brl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ticker",
+          "asset_type",
+          "quantity",
+          "value_brl",
+          "cost_brl",
+          "gain_brl"
+        ],
+        "title": "TransitionSaleDTO",
+        "type": "object"
+      },
       "TreasuryBondDTO": {
         "properties": {
           "asset_id": {
@@ -24297,6 +24531,59 @@
           }
         },
         "summary": "Get Runs",
+        "tags": [
+          "Recommendation"
+        ]
+      }
+    },
+    "/api/v1/recommendation/transition": {
+      "get": {
+        "description": "How to reach a class's targets: contributions only, or selling with the income tax.\nA study: nothing is saved or ordered.",
+        "operationId": "get_transition_api_v1_recommendation_transition_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "arca_class",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArcaClass"
+            }
+          },
+          {
+            "in": "query",
+            "name": "monthly_brl",
+            "required": false,
+            "schema": {
+              "default": 0.0,
+              "minimum": 0,
+              "title": "Monthly Brl",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitionDTO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Transition",
         "tags": [
           "Recommendation"
         ]

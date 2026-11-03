@@ -36,6 +36,7 @@ import type {
   GoalCreateRequest,
   GoalDTO,
   MonthlyReportDTO,
+  TransitionDTO,
   SavedViewDTO,
   SavedViewRequest,
   ViewScope,
@@ -296,6 +297,11 @@ export const api = {
       request<LensBoardDTO>("/recommendation/lenses", { query: { ...filters } }),
     matrix: (asOf?: string) => request<MatrixBoardDTO>("/recommendation/matrix", { query: { as_of: asOf } }),
     compare: (a: string, b: string) => request<RowComparisonDTO>("/recommendation/compare", { query: { a, b } }),
+    /** How to reach a class's targets: a study, nothing is saved (Phase 34.7). */
+    transition: (arcaClass: string, monthlyBrl: number) =>
+      request<TransitionDTO>("/recommendation/transition", {
+        query: { arca_class: arcaClass, monthly_brl: monthlyBrl },
+      }),
     contribution: (amount: number) =>
       request<ContributionComparisonDTO>("/recommendation/contribution", { query: { amount_brl: amount } }),
     runs: () => request<RecommendationRunDTO[]>("/recommendation/runs"),

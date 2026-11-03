@@ -295,7 +295,10 @@ def test_relevant_fact_alerts_ignore_read_and_other_categories() -> None:
     fact = CvmDocument("F", WEG, "WEG", "Fato Relevante", TODAY)
     alerts = relevant_fact_alerts([read, notice, fact], {WEG: ["WEGE3"]}, {})
     assert [a.key for a in alerts] == ["fact:F"]
-    assert alerts[0].kind == AlertKind.RELEVANT_FACT and alerts[0].route == "/explorar/fatos-relevantes"
+    assert (
+        alerts[0].kind == AlertKind.RELEVANT_FACT
+        and alerts[0].route == "/explorar/fatos-relevantes"
+    )
 
 
 def test_worker_job_and_mcp(api: SimpleNamespace) -> None:

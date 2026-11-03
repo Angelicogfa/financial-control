@@ -7,7 +7,11 @@ import { Badge } from "../../components/Badge";
 import { KpiGrid, Lead, Notes } from "../../components/Section";
 import { num, pct } from "../../utils/format";
 
-export function Optimized({ optimized, inUse }: Readonly<{ optimized: OptimizedDTO | null | undefined; inUse: boolean }>) {
+export function Optimized({
+  optimized,
+  inUse,
+  passedElsewhere = false,
+}: Readonly<{ optimized: OptimizedDTO | null | undefined; inUse: boolean; passedElsewhere?: boolean }>) {
   if (optimized == null) return <p className="app-muted">Esta rodada é anterior ao otimizador.</p>;
   if (optimized.status !== "OK")
     return <p className="app-muted">O otimizador não teve candidatos nesta classe.</p>;
@@ -22,7 +26,9 @@ export function Optimized({ optimized, inUse }: Readonly<{ optimized: OptimizedD
         )}{" "}
         {inUse
           ? "Venceu a construção no teste no passado: os pesos-alvo são estes."
-          : "Ainda não venceu a construção no teste no passado: o aporte segue a construção."}
+          : passedElsewhere
+            ? "O teste no passado só cobre Ações: nesta classe, o aporte segue a construção."
+            : "Ainda não venceu a construção no teste no passado: o aporte segue a construção."}
       </p>
       <KpiGrid
         label="Otimizador e construção"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -130,6 +131,9 @@ def test_the_optimizer_sets_the_targets_only_after_passing_its_test(api: SimpleN
         )
     assert set(target_weights(construction, False)) == built
     assert target_weights(construction, True) == optimized_of(construction).weights  # type: ignore[union-attr]
+    # The test only covers Ações: passing it does not move the other classes.
+    other = replace(construction, arca_class="REAL_ESTATE")
+    assert set(target_weights(other, True)) == built
 
     before = api.client.post("/api/v1/portfolio/contribution", json={"amount_brl": 50000}).json()
     assert {o["ticker"] for o in before["orders"] if o["arca_class"] == "ACOES"} == built

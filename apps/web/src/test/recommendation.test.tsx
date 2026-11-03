@@ -436,6 +436,7 @@ describe("Recomendação (Phase 45.5)", () => {
           optimizer_in_use: true,
           classes: [
             acoes({
+              optimizer_in_use: true,
               construction: {
                 ...base.construction!,
                 optimized: { status: "OK", assets: [], utility: 0, construction_utility: 0, draws: 16 },

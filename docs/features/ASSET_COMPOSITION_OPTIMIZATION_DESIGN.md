@@ -200,6 +200,18 @@ A Fase 28 traz os fatos relevantes (IPE). Para esta proposta, os dados abertos d
 9. **Aplicação:** a proposta é só leitura, ou o usuário pode copiá-la, com confirmação explícita, para os pesos manuais (`MANUAL_WEIGHT`) de uma classe na política (nova versão, como toda mudança de política)?
 10. **Ordem:** esperar a Fase 28 e a extensão da CVM, ou começar pelas etapas 34.1 e 34.2 com o selo "não point-in-time"?
 
+### 10.1 Escopo final (2026-11-03)
+
+As decisões acima seguem como respondidas na Fase 45. O que restava foi decidido assim:
+
+- **Decisão 9 (copiar para pesos manuais):** encerrada sem construir nada. A Recomendação substituiu a regra manual, e o otimizador chega ao aporte pelo próprio teste no passado.
+- **34.7 (transição):** feita como estudo, sem ordens (`domain/recommendation/transition.py`).
+- **34.8 (aba Composição e MCP `simulation.optimize` e `simulation.composition`):** cancelada. A seção "Otimizador" da Recomendação já cumpre esse papel.
+- **34.9 (point-in-time):** os fundamentos já entram pela data de entrega à CVM e os preços vão só até o mês (Fases 43.2 e 45.6a). Fica o viés de sobrevivência: o universo do teste é o catálogo de hoje, porque não há preços guardados de empresas que saíram da bolsa. O teste no passado avisa isso na tela.
+- **Objetivo pela chance de meta:** não substitui a utilidade da construção, porque o teste no passado não o valida.
+- **Veredito por classe (novo):** o teste no passado só cobre Ações, então passar nele só troca os alvos de Ações.
+- **Limite por ativo sobre a carteira (novo):** o alerta da Saúde (15% da carteira) vira um teto na classe, na construção e no otimizador; só aperta quando a meta da classe passa de 60%.
+
 ## 11. Referências
 
 - Markowitz, H. (1952). Portfolio Selection. *Journal of Finance* 7(1), 77–91.

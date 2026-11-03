@@ -734,6 +734,7 @@ export interface ClassMatrixDTO {
   construction?: ConstructionDTO | null;
   weights_source?: "AHP" | "VALIDATED";
   cerrado_in_use?: boolean;
+  optimizer_in_use?: boolean;
 }
 
 export interface ClassPolicyDTO {
@@ -3071,6 +3072,48 @@ export interface TransactionUpdateRequest {
   fx_rate?: number | string;
   notes?: string | null;
   account_id?: number | null;
+}
+
+export interface TransitionDTO {
+  status: "OK" | "NOT_COMPUTED";
+  arca_class: string;
+  as_of?: string | null;
+  total_brl?: number;
+  distance?: number;
+  monthly_brl?: number;
+  months?: number | null;
+  tolerance?: number;
+  lines?: TransitionLineDTO[];
+  sales?: TransitionSaleDTO[];
+  sold_brl?: number;
+  tax_brl?: number;
+  fees_brl?: number;
+  cost_brl?: number;
+  split_months?: number | null;
+  split_tax_brl?: number | null;
+  expected_gain_year_brl?: number;
+  payback_months?: number | null;
+  pays_off?: boolean;
+  payback_horizon_months?: number;
+}
+
+export interface TransitionLineDTO {
+  ticker: string;
+  current_weight: number;
+  target_weight: number;
+  current_brl: number;
+  target_brl: number;
+  next_contribution_brl: number;
+  buy_brl: number;
+}
+
+export interface TransitionSaleDTO {
+  ticker: string;
+  asset_type: string;
+  quantity: number;
+  value_brl: number;
+  cost_brl: number;
+  gain_brl: number;
 }
 
 export interface TreasuryBondDTO {

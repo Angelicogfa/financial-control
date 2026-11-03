@@ -101,6 +101,7 @@ from contracts.recommendation.responses import (
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
+    TransitionDTO,
 )
 from contracts.reconciliation.responses import ReconciliationDTO, ReconciliationSummaryDTO
 from contracts.reconciliation.serializers import to_reconciliation_dto, to_summary_dto
@@ -231,6 +232,13 @@ class MatrixInput(BaseModel):
 
     arca_class: Literal["ACOES", "REAL_ESTATE", "ATIVOS_INTERNACIONAIS"] | None = None
     as_of: date | None = None
+
+
+class TransitionInput(BaseModel):
+    """A class and how much of the monthly contribution goes to it."""
+
+    arca_class: ArcaClass
+    monthly_brl: float = Field(default=0.0, ge=0)
 
 
 class AmountInput(BaseModel):
@@ -1028,6 +1036,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AmountInput,
         output_type=ContributionComparisonDTO,
         invoke=lambda h, p: h.recommendation.contribution(p.amount_brl),
+    ),
+    OperationSpec(
+        name="recommendation.transition",
+        kind="query",
+        description=(
+            "Como chegar aos pesos-alvo de uma classe (Fase 34.7), em estudo: só com aportes "
+            "(em quantos meses, para um aporte mensal na classe) ou com vendas (o que vender, o "
+            "IR pela regra real, os custos, se dividir as vendas de ações em meses mantém a "
+            "isenção de R$ 20 mil e em quantos meses a melhora esperada paga o custo). Nada é "
+            "gravado e nenhuma ordem é dada."
+        ),
+        input_model=TransitionInput,
+        output_type=TransitionDTO,
+        invoke=lambda h, p: h.recommendation.transition(p.arca_class, p.monthly_brl),
     ),
     OperationSpec(
         name="recommendation.compare",
