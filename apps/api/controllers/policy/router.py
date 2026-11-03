@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.policy.dependencies import get_policy_handler
-from controllers.policy.requests import (
+from contracts.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
     PolicyUpdateRequest,
 )
-from controllers.policy.responses import PolicyDTO
+from contracts.policy.responses import PolicyDTO
+from controllers.policy.dependencies import get_policy_handler
 from domain.policy.services.use_cases import PolicyHandler
 
 settings_router = APIRouter(prefix="/settings", tags=["Settings"])

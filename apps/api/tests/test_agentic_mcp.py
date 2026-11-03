@@ -19,7 +19,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 from sqlalchemy import create_engine, inspect
 
-from controllers.agentic.requests import (
+from contracts.agentic.requests import (
     AgentKeyCreateRequest,
     AgentKeyRenewRequest,
     AgentKeyUpdateRequest,
@@ -449,6 +449,8 @@ async def test_mcp_tools_list_call_scoping_and_idempotency(api: SimpleNamespace)
             "portfolio.treasury_market",
             "portfolio.earnings_agenda",
             "portfolio.by_account",
+            "portfolio.income",
+            "portfolio.monthly_report",
             "assets.create",
             "assets.list",
         } == set(tool_map)

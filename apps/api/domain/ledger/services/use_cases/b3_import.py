@@ -9,15 +9,14 @@ from dataclasses import replace
 from datetime import date, timedelta
 from decimal import Decimal
 
-from controllers.ledger.requests import ImportNewAssetRequest
-from controllers.ledger.responses import (
+from contracts.ledger.requests import ImportNewAssetRequest
+from contracts.ledger.responses import (
     ImportCommitDTO,
     ImportFixedIncomeTermDTO,
     ImportLineDTO,
     ImportPreviewDTO,
     UnknownTickerDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import ValidationError
 from domain.accounts.services.use_cases import resolve_account_id
 from domain.assets.services.codes import generated_asset_code
@@ -51,7 +50,7 @@ from domain.shared.entities import (
     TransactionEntity,
 )
 from domain.shared.enums import AssetType, TransactionKind
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 MAX_STATEMENT_BYTES = 5 * 1024 * 1024
 

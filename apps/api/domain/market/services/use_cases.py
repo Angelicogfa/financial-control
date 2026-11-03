@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 
-from controllers.market.responses import (
+from contracts.market.responses import (
     JobRunDTO,
     QuoteDayDTO,
     QuoteStatusDTO,
@@ -15,11 +15,11 @@ from controllers.market.responses import (
     WorkerErrorsResponseDTO,
     WorkerRequestErrorDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError, ValidationError
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
 from domain.shared.entities import JobRunEntity
 from domain.shared.enums import JobRunStatus, Market
+from domain.shared.unit_of_work import UoWFactory
 
 # A stored quote of a holding older than this is shown as out of date (Phase 38).
 QUOTE_STALE_MINUTES = 30

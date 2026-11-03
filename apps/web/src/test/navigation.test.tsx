@@ -13,50 +13,55 @@ const e = (path: string, search = ""): TrailEntry => ({ path, search });
 
 describe("breadcrumb trail", () => {
   it("puts section pages under Início", () => {
-    expect(crumbsFor([e("/portfolio")])).toEqual([
-      { label: "Início", to: "/home" },
+    expect(crumbsFor([e("/carteira")])).toEqual([
+      { label: "Início", to: "/inicio" },
       { label: "Carteira", to: null },
+    ]);
+    expect(crumbsFor([e("/carteira/rentabilidade")]).map((c) => c.label)).toEqual([
+      "Início",
+      "Carteira",
+      "Rentabilidade",
     ]);
   });
 
   it("hangs a detail page from the page it was opened from, filters included", () => {
-    const trail = [e("/home"), e("/research", "?tab=screener"), e("/asset/5")];
+    const trail = [e("/inicio"), e("/explorar", "?tab=treasury"), e("/ativo/WEGE3")];
     expect(crumbsFor(trail)).toEqual([
-      { label: "Início", to: "/home" },
-      { label: "Pesquisar", to: "/research?tab=screener" },
+      { label: "Início", to: "/inicio" },
+      { label: "Explorar", to: "/explorar?tab=treasury" },
       { label: "Ativo", to: null },
     ]);
   });
 
   it("keeps the whole way from a contribution plan to the asset", () => {
-    const trail = [e("/contribute"), e("/contribute/7"), e("/asset/3")];
+    const trail = [e("/aportar"), e("/aportar/7"), e("/ativo/HGLG11")];
     expect(crumbsFor(trail).map((c) => [c.label, c.to])).toEqual([
-      ["Início", "/home"],
-      ["Aportar", "/contribute"],
-      ["Plano de aporte", "/contribute/7"],
+      ["Início", "/inicio"],
+      ["Aportar", "/aportar"],
+      ["Plano de aporte", "/aportar/7"],
       ["Ativo", null],
     ]);
   });
 
   it("goes back up when a page already in the trail is opened again", () => {
-    let trail = [e("/home"), e("/portfolio"), e("/asset/3")];
-    trail = nextTrail(trail, e("/asset/3/edit"), "PUSH");
-    expect(crumbsFor(trail).map((c) => c.label)).toEqual(["Início", "Carteira", "Ativo", "Editar ativo"]);
-    trail = nextTrail(trail, e("/asset/3"), "PUSH");
-    expect(trail.map((t) => t.path)).toEqual(["/home", "/portfolio", "/asset/3"]);
+    let trail = [e("/inicio"), e("/carteira"), e("/ativo/ITSA4")];
+    trail = nextTrail(trail, e("/ativo/ITSA4/editar"), "PUSH");
+    expect(crumbsFor(trail).map((c) => c.label)).toEqual(["Início", "Explorar", "Ativo", "Editar ativo"]);
+    trail = nextTrail(trail, e("/ativo/ITSA4"), "PUSH");
+    expect(trail.map((t) => t.path)).toEqual(["/inicio", "/carteira", "/ativo/ITSA4"]);
     // A filter changed with `replace` updates the address of the same page.
-    trail = nextTrail(trail, e("/asset/3", "?tab=market"), "REPLACE");
+    trail = nextTrail(trail, e("/ativo/ITSA4", "?tab=market"), "REPLACE");
     expect(trail[trail.length - 1].search).toBe("?tab=market");
   });
 });
 
 function Harness() {
   return (
-    <MemoryRouter initialEntries={["/research?sector=Bancos"]}>
+    <MemoryRouter initialEntries={["/explorar?sector=Bancos"]}>
       <Breadcrumbs />
       <Routes>
-        <Route path="/research" element={<Link to="/asset/5">Abrir WEGE3</Link>} />
-        <Route path="/asset/:id" element={<p>Página do ativo</p>} />
+        <Route path="/explorar" element={<Link to="/ativo/WEGE3">Abrir WEGE3</Link>} />
+        <Route path="/ativo/:ticker" element={<p>Página do ativo</p>} />
       </Routes>
     </MemoryRouter>
   );
@@ -66,11 +71,11 @@ describe("Breadcrumbs", () => {
   it("shows the trail and goes back to the page with its filters", () => {
     render(<Harness />);
     const nav = screen.getByRole("navigation", { name: "Trilha de navegação" });
-    expect(within(nav).getByText("Pesquisar")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByText("Explorar")).toHaveAttribute("aria-current", "page");
 
     fireEvent.click(screen.getByRole("link", { name: "Abrir WEGE3" }));
     expect(screen.getByText("Página do ativo")).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "Pesquisar" })).toHaveAttribute("href", "/research?sector=Bancos");
+    expect(within(nav).getByRole("link", { name: "Explorar" })).toHaveAttribute("href", "/explorar?sector=Bancos");
     expect(within(nav).getByText("Ativo")).toHaveAttribute("aria-current", "page");
 
     fireEvent.click(within(nav).getByRole("button", { name: /Voltar/ }));
@@ -79,17 +84,21 @@ describe("Breadcrumbs", () => {
 
   it("is in the topbar of every page", async () => {
     mockApi([]);
-    renderAt("/settings/accounts", { shell: true });
+    renderAt("/configuracoes/contas", { shell: true });
     const nav = screen.getByRole("navigation", { name: "Trilha de navegação" });
-    expect(within(nav).getByRole("link", { name: "Início" })).toHaveAttribute("href", "/home");
+    expect(within(nav).getByRole("link", { name: "Início" })).toHaveAttribute("href", "/inicio");
     expect(within(nav).getByText("Contas")).toHaveClass("app-topbar-title");
   });
 
-  it("lights only the nested menu item on its page", async () => {
+  it("lights the destination in the menu and the section in its tabs", async () => {
     mockApi([]);
-    renderAt("/research/mining", { shell: true });
-    expect(screen.getByRole("link", { name: "Garimpo" })).toHaveClass("active");
-    expect(screen.getByRole("link", { name: "Pesquisar" })).not.toHaveClass("active");
+    renderAt("/explorar/garimpo", { shell: true });
+    const menu = screen.getByRole("complementary", { name: "Menu principal" });
+    expect(within(menu).getByRole("link", { name: "Explorar" })).toHaveClass("active");
+    expect(within(menu).getByRole("link", { name: "Carteira" })).not.toHaveClass("active");
+    const sections = screen.getByRole("navigation", { name: "Seções de Explorar" });
+    expect(within(sections).getByRole("link", { name: "Garimpo" })).toHaveAttribute("aria-current", "page");
+    expect(within(sections).getByRole("link", { name: "Screener e Tesouro" })).not.toHaveAttribute("aria-current");
   });
 });
 
@@ -117,11 +126,11 @@ describe("page state kept for the session", () => {
       { path: "/portfolio/consolidated", reply: report() },
       { path: "/accounts", reply: [] },
     ]);
-    const first = renderAt("/contribute/7");
+    const first = renderAt("/aportar/7");
     fireEvent.change(await screen.findByLabelText("Quantidade de HGLG11"), { target: { value: "5" } });
-    expect(screen.getByRole("link", { name: "HGLG11" })).toHaveAttribute("href", "/asset/3");
+    expect(screen.getByRole("link", { name: "HGLG11" })).toHaveAttribute("href", "/ativo/HGLG11");
     first.unmount();
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     expect(await screen.findByLabelText("Quantidade de HGLG11")).toHaveValue("5");
   });
 });
@@ -151,12 +160,13 @@ describe("a page opened from the menu starts clean", () => {
     expect(readStored("test:counter", null)).toBeNull();
   });
 
-  it("opens Pesquisar from the menu without the last search", async () => {
+  it("opens Explorar from the menu without the last search", async () => {
     writeStored("research:screener-search", { filters: { q: "banco" }, page: 0, pageSize: 25 });
     const { calls } = mockApi([]);
-    renderAt("/research/mining", { shell: true });
-    fireEvent.click(screen.getByRole("link", { name: "Pesquisar" }));
-    expect(await screen.findByRole("heading", { name: "Pesquisar" })).toBeInTheDocument();
+    renderAt("/explorar/garimpo", { shell: true });
+    const menu = screen.getByRole("complementary", { name: "Menu principal" });
+    fireEvent.click(within(menu).getByRole("link", { name: "Explorar" }));
+    expect(await screen.findByRole("heading", { name: "Explorar" })).toBeInTheDocument();
     expect(readStored("research:screener-search", null)).toBeNull();
     expect(calls.some((c) => c.path === "/research/screener")).toBe(false);
   });

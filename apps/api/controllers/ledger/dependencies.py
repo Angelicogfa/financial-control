@@ -9,13 +9,13 @@ from fastapi import Depends
 
 from composition import get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
 from domain.ledger.services.use_cases.b3_import import ImportHandler
 from domain.ledger.services.use_cases.corporate_events import CorporateEventHandler
 from domain.ledger.services.use_cases.earnings import EarningHandler
 from domain.ledger.services.use_cases.transactions import TransactionHandler
+from domain.market.services.stored import distribution_lookup
 from domain.portfolio.services.service import PortfolioApplicationService
-from infra.providers.stored import distribution_lookup
+from domain.shared.unit_of_work import UoWFactory
 
 
 def get_import_handler(

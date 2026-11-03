@@ -7,13 +7,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
-from controllers.research.dependencies import (
-    get_mining_handler,
-    get_research_handler,
-    get_statement_refresher,
-)
-from controllers.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
-from controllers.research.responses import (
+from contracts.research.requests import WatchlistAddRequest, WatchlistClassifyRequest
+from contracts.research.responses import (
     AssetComparisonDTO,
     MiningOverviewDTO,
     MiningUniverseDTO,
@@ -21,6 +16,11 @@ from controllers.research.responses import (
     ScreenerResponseDTO,
     TreasurySearchResponseDTO,
     WatchlistItemDTO,
+)
+from controllers.research.dependencies import (
+    get_mining_handler,
+    get_research_handler,
+    get_statement_refresher,
 )
 from domain.mining.services import MiningHandler
 from domain.research.services.screener import ScreenerCriteria

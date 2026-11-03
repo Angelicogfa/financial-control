@@ -212,6 +212,12 @@ def set_weights(
     tickers = [r.ticker for r in rows]
     sector_cap = _feasible_cap(params.sector_cap, [sectors[t] for t in tickers])
     group_cap = _feasible_cap(params.group_cap, [groups[t] for t in tickers])
+    asset_cap = _feasible_cap(params.asset_cap, tickers)
+    if asset_cap > params.asset_cap:
+        notes.append(
+            f"Poucos ativos para o teto de {params.asset_cap:.0%} da classe por ativo: "
+            f"teto usado de {asset_cap:.0%}."
+        )
     if sector_cap > params.sector_cap:
         notes.append(
             f"Poucos setores para o teto de {params.sector_cap:.0%}: "
@@ -224,6 +230,7 @@ def set_weights(
     # The two caps interact; a few rounds settle them, the sector's last: when both cannot hold
     # together, the sector cap (the decision 10.9) prevails and the note says so.
     for _ in range(3):
+        weights = _cap(weights, {t: t for t in weights}, asset_cap)
         weights = _cap(weights, {t: groups[t] for t in weights}, group_cap)
         weights = _cap(weights, {t: sectors[t] for t in weights}, sector_cap)
     norm = sum(weights.values()) or 1.0

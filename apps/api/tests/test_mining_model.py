@@ -202,7 +202,7 @@ def test_mining_alert_is_opt_in(api: SimpleNamespace, real) -> None:
     assert not [a for a in off.list_alerts().alerts if a.kind == AlertKind.MINING_FINDING]
     on = AlertHandler(uow_factory=api.uow_factory, portfolio_service=service, mining_alerts=True)
     shown = [a for a in on.list_alerts().alerts if a.kind == AlertKind.MINING_FINDING]
-    assert len(shown) == FINDINGS and all(a.route == "/research/mining" for a in shown)
+    assert len(shown) == FINDINGS and all(a.route == "/explorar/garimpo" for a in shown)
     # A followed ticker and an untrusted ranking raise nothing.
     found = run_findings(signals, model, date(2026, 10, 30))
     assert len(mining_alerts(found, [found[0].ticker])) == FINDINGS - 1

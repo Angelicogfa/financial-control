@@ -4,7 +4,6 @@
 
 | ID | Título | Impacto | Plano de resolução |
 |---|---|---|---|
-| **TD-04** | Apuração mensal de IR (DARF) sobre vendas | O lucro realizado é consolidado, mas a isenção de R$ 20 mil/mês em ações e a compensação de prejuízos por categoria não são aplicadas | Módulo de apuração mensal de IR. |
 | **TD-05** | Sem limite de tentativas no login | Ferramenta pessoal atrás de rede doméstica; um ataque de força bruta não é contido pela API | Limitar tentativas por IP no `/auth/login` (Redis) quando a stack for exposta fora da rede local. |
 | **TD-06** | Provedores gratuitos limitados | Sem `BRAPI_TOKEN`, a brapi responde 429/401 para a maioria dos tickers e o Yahoo vira a fonte; indicadores do Yahoo às vezes vêm em escala inesperada (ex.: margem de holdings) | Configurar `BRAPI_TOKEN`. Desde a Fase 25 os indicadores fora da faixa plausível ou divergentes entre brapi e Yahoo são marcados como suspeitos e não disparam o alerta de preço abaixo do teto; falta só a cobertura de dados. |
 | **TD-07** | Desempenho por classe sem TWR próprio | Desempenho compara o resultado consolidado de cada classe (desde o início) com a referência da classe no período escolhido. Desde a Fase 29, a Saúde da carteira mostra um TWR aproximado por classe com o valor e o custo gravados no retrato (a variação do custo faz as vezes do fluxo; proventos por classe ficam de fora) | Gravar o valor e o fluxo por classe no retrato diário e calcular o TWR por classe. |
@@ -16,6 +15,7 @@
 
 | ID | Título | Como foi resolvido |
 |---|---|---|
+| **TD-04** | Apuração mensal de IR (DARF) sobre vendas | Fase 48.R7: `domain/tax/assessment.py` apura por mês e categoria (operações comuns com a isenção de R$ 20 mil só para ações, day trade, FII), compensa o prejuízo por categoria, desconta o IRRF estimado, acumula DARF abaixo de R$ 10 e apura o exterior por ano (Lei 14.754/2023); aba Carteira › Imposto, alerta de DARF e `monthly_tax_assessments` com a data do pagamento. |
 | **TD-02** | Renda fixa marcada na curva | Série diária do PU de venda do Tesouro (Tesouro Transparente + catálogo diário), valor a mercado ao lado da curva por compra, sinal de venda antecipada e opção na política de pesar o Tesouro pelo mercado (Fase 26). |
 | **TD-08** | Data ex dos eventos importados aproximada | A importação da B3 consulta os eventos e proventos declarados na página de empresas listadas da B3 e usa a data com declarada para a data ex (Fase 26); sem anúncio correspondente, a data do crédito é mantida. |
 | **TD-01** | Autenticação | Decisão: ferramenta pessoal de um usuário. Login com senha em Argon2 e JWT em cookie httpOnly SameSite=Strict (Fase 9); o limite de tentativas segue em TD-05. |

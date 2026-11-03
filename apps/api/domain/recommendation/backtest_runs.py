@@ -23,7 +23,7 @@ from domain.recommendation.backtest import RunPortfolios, run_backtest, scoreboa
 from domain.recommendation.keys import CERRADO, RECOMMENDATION_BACKTEST
 from domain.recommendation.lenses import CATALOG
 from domain.recommendation.optimizer import OptimizerParams
-from domain.recommendation.runs import monthly_returns
+from domain.recommendation.runs import class_params, monthly_returns
 from domain.recommendation.validation import LENS_WEIGHTS, validate_lens_weights
 from domain.shared.enums import ArcaClass
 from domain.shared.unit_of_work import AbstractUnitOfWork
@@ -65,7 +65,8 @@ def run_recommendation_backtest(
 ) -> dict[str, Any]:
     """Backtest the hierarchy on the Ações class and score the stored runs; store both."""
     as_of = today or date.today()
-    policy = current_policy(uow.policies).recommendation
+    investment = current_policy(uow.policies)
+    policy = investment.recommendation
     objective = policy.objectives.get(ArcaClass.ACOES)
     weights = priority(policy.matrices[objective]).weights if objective else {}
 
@@ -92,7 +93,7 @@ def run_recommendation_backtest(
         first_month=first_month,
         restructuring=restructuring,
         weights=weights,
-        params=policy.construction(),
+        params=class_params(investment, ArcaClass.ACOES),
         scale_annual=policy.score_scale_annual,
         optimizer=BACKTEST_OPTIMIZER,
     )

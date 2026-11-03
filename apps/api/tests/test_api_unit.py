@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from controllers.policy.requests import ArcaTargetItemDTO, ArcaTargetsUpdateRequest
+from contracts.policy.requests import ArcaTargetItemDTO, ArcaTargetsUpdateRequest
 from domain.policy.services.allocation import InvalidTargetsError
 from domain.policy.services.use_cases import PolicyHandler
 from domain.shared.enums import ArcaClass
@@ -39,7 +39,7 @@ def test_policy_handler_rejects_non_100_targets_without_committing() -> None:
 
 
 def test_every_feature_router_is_checked() -> None:
-    assert len(ROUTERS) == 16
+    assert len(ROUTERS) == 21
 
 
 @pytest.mark.parametrize("router_path", ROUTERS, ids=lambda p: p.parent.name)

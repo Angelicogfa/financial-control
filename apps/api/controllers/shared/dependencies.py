@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from fastapi import Query
 
 from core.helpers.pagination import PaginationParams
-from domain.shared.unit_of_work import AbstractUnitOfWork
-
-UoWFactory = Callable[[], AbstractUnitOfWork]
 
 
 def pagination_query(

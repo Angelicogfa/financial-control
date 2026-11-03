@@ -65,7 +65,7 @@ describe("Event study on the relevant-facts page (Phase 42.4)", () => {
       { path: "/disclosures/event-study", reply: study },
       { path: "/disclosures", reply: feed },
     ]);
-    renderAt("/disclosures");
+    renderAt("/explorar/fatos-relevantes");
     expect(await screen.findByText(/Reação além do mercado: \+2,1% no dia, \+3,4% em 5/, undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/costuma render \+1,2% em 20 pregões/)).toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Estudo de eventos" }, { timeout: 5000 });
@@ -83,7 +83,7 @@ describe("Event study on the relevant-facts page (Phase 42.4)", () => {
       { path: "/disclosures/event-study", reply: { status: "NOT_COMPUTED", events: 0, confounded: 0, classes: [] } },
       { path: "/disclosures", reply: { ...feed, items: [] } },
     ]);
-    renderAt("/disclosures");
+    renderAt("/explorar/fatos-relevantes");
     expect(await screen.findByText("Comunicados à CVM", undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Estudo de eventos" })).not.toBeInTheDocument();
   });

@@ -6,9 +6,8 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from controllers.simulation.dependencies import get_simulation_handler
-from controllers.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
-from controllers.simulation.responses import (
+from contracts.simulation.requests import BacktestRequest, CandidatesRequest, ProjectionRequest
+from contracts.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
     CoverageReportDTO,
@@ -18,6 +17,7 @@ from controllers.simulation.responses import (
     SimulationRunDetailDTO,
     SimulationRunDTO,
 )
+from controllers.simulation.dependencies import get_simulation_handler
 from domain.simulation.entities import SimulationKind
 from domain.simulation.services.use_cases import SimulationHandler
 

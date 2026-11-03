@@ -20,12 +20,12 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from enum import StrEnum
 
-from core.helpers.units import daily_rates, monthly_rates
 from domain.market.services.price_sanity import price_spikes
 from domain.shared.entities import AssetEntity
 from domain.shared.enums import Market
 from domain.shared.repositories import AbstractMarketSeriesRepository
 from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.units import daily_rates, monthly_rates
 from domain.simulation.market import MarketHistory, PriceSeries, accumulate_rate_index
 
 TR_PREFIX = "SIM:TR:"

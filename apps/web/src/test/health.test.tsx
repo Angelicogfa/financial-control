@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { PortfolioHealthDTO } from "../api/types";
-import { formatHealthValue } from "../pages/health/HealthPage";
+import { formatHealthValue } from "../features/health/HealthPage";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -69,7 +69,7 @@ const health: PortfolioHealthDTO = {
 describe("portfolio health", () => {
   it("shows pillars worst first with value, limits, action and the minimum window", async () => {
     mockApi([{ path: "/portfolio/health", reply: health }]);
-    renderAt("/health");
+    renderAt("/carteira/raio-x");
 
     const pillars = await screen.findAllByRole("region");
     const titles = pillars.map((p) => p.getAttribute("aria-label"));
@@ -118,7 +118,7 @@ describe("portfolio health", () => {
       ],
     };
     mockApi([{ path: "/portfolio/health", reply: report }]);
-    renderAt("/health");
+    renderAt("/carteira/raio-x");
     const pillar = (await screen.findAllByRole("region"))[0];
     const items = within(pillar).getAllByRole("listitem").filter((li) => li.closest(".health-check-items"));
     expect(items.map((li) => li.textContent)).toEqual([
@@ -133,7 +133,7 @@ describe("portfolio health", () => {
 
   it("shows the error state when the API fails", async () => {
     mockApi([{ path: "/portfolio/health", reply: { status: 503, json: { detail: "fora do ar" } } }]);
-    renderAt("/health");
+    renderAt("/carteira/raio-x");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
 

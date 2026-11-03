@@ -41,17 +41,27 @@ from infra.data.repositories.market import (
     SqlAlchemyTreasuryCatalogRepository,
 )
 from infra.data.repositories.mining import SqlAlchemyMiningRepository
+from infra.data.repositories.planning import SqlAlchemyGoalRepository
 from infra.data.repositories.policy import SqlAlchemyPolicyRepository
 from infra.data.repositories.portfolio import (
     SqlAlchemyContributionPlanRepository,
     SqlAlchemyPortfolioSnapshotRepository,
 )
 from infra.data.repositories.recommendation import SqlAlchemyRecommendationRepository
+from infra.data.repositories.reconciliation import SqlAlchemyReconciliationRepository
 from infra.data.repositories.simulation import (
     SqlAlchemySimulationRepository,
     SqlAlchemySimulationStudyRepository,
 )
-from infra.data.repositories.tax import SqlAlchemyTaxRuleRepository
+from infra.data.repositories.tax import (
+    SqlAlchemyTaxAssessmentRepository,
+    SqlAlchemyTaxRuleRepository,
+)
+from infra.data.repositories.views import SqlAlchemySavedViewRepository
+from infra.data.repositories.watch import (
+    SqlAlchemyAlertRuleRepository,
+    SqlAlchemyAssetNoteRepository,
+)
 
 
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
@@ -82,6 +92,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.alert_dismissals = SqlAlchemyAlertDismissalRepository(self.session)
         self.agent_keys = SqlAlchemyAgentKeyRepository(self.session)
         self.tax_rules = SqlAlchemyTaxRuleRepository(self.session)
+        self.tax_assessments = SqlAlchemyTaxAssessmentRepository(self.session)
         self.simulations = SqlAlchemySimulationRepository(self.session)
         self.simulation_studies = SqlAlchemySimulationStudyRepository(self.session)
         self.cvm_issuers = SqlAlchemyIssuerTickerRepository(self.session)
@@ -93,6 +104,11 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.mining = SqlAlchemyMiningRepository(self.session)
         self.recommendation = SqlAlchemyRecommendationRepository(self.session)
         self.comparison = SqlAlchemyComparisonRepository(self.session)
+        self.reconciliations = SqlAlchemyReconciliationRepository(self.session)
+        self.alert_rules = SqlAlchemyAlertRuleRepository(self.session)
+        self.asset_notes = SqlAlchemyAssetNoteRepository(self.session)
+        self.goals = SqlAlchemyGoalRepository(self.session)
+        self.saved_views = SqlAlchemySavedViewRepository(self.session)
         return self
 
     def __exit__(

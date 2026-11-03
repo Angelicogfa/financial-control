@@ -8,8 +8,8 @@ from __future__ import annotations
 from fastapi import Depends
 
 from composition import get_uow_factory
-from controllers.shared.dependencies import UoWFactory
 from domain.policy.services.use_cases import PolicyHandler
+from domain.shared.unit_of_work import UoWFactory
 
 
 def get_policy_handler(

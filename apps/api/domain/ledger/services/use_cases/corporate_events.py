@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from controllers.ledger.requests import CorporateEventRequest
-from controllers.ledger.responses import CorporateEventDTO
-from controllers.shared.dependencies import UoWFactory
+from contracts.ledger.requests import CorporateEventRequest
+from contracts.ledger.responses import CorporateEventDTO
 from core.errors import NotFoundError, ValidationError
 from domain.ledger.services.ledger import validate_ledger_change
 from domain.portfolio.services.snapshots import invalidate_snapshots_from
 from domain.shared.entities import AssetEntity, CorporateEventEntity
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 
 def to_event_dto(event: CorporateEventEntity, ticker: str | None) -> CorporateEventDTO:

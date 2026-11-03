@@ -9,12 +9,12 @@ from fastapi import Depends
 
 from composition import get_market_gateway, get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
 from core.settings import AppSettings, get_settings
 from domain.mining.services import MiningHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.research.services.service import StatementRefresher
 from domain.research.services.use_cases import ResearchHandler
+from domain.shared.unit_of_work import UoWFactory
 from infra.providers.gateway import CachedMarketGateway
 
 

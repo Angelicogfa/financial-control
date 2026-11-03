@@ -2,8 +2,8 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetTaxStatusDTO, FixedIncomeComparisonDTO, OfferOutcomeDTO, OfferProjectionDTO } from "../api/types";
-import { toOfferRequest } from "../pages/tools/FixedIncomeComparePage";
-import { analysis, asset } from "./fixtures";
+import { toOfferRequest } from "../features/tools/FixedIncomeComparePage";
+import { analysis, asset, trackedInstrument } from "./fixtures";
 import { optionLabels } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
@@ -131,11 +131,12 @@ function comparison(): FixedIncomeComparisonDTO {
 describe("asset tax tab", () => {
   it("shows the bracket, the next drop and the lot table for fixed income", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis({ asset: asset({ asset_type: "FIXED_INCOME" }) }) },
       { path: "/tax/assets/1/status", reply: fixedIncomeStatus() },
     ]);
-    renderAt("/asset/1?tab=tax");
-    expect(await screen.findByText("Próxima queda de faixa")).toBeInTheDocument();
+    renderAt("/ativo/WEGE3?tab=tax");
+    expect(await screen.findByText("Próxima queda de faixa", undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("IR estimado se resgatar hoje")).toBeInTheDocument();
     expect(screen.getByText("Tabela regressiva")).toBeInTheDocument();
     expect(screen.getByText("181 a 360 dias")).toBeInTheDocument();
@@ -145,13 +146,14 @@ describe("asset tax tab", () => {
     expect(within(table).getByText("em 1 dias")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Comparar com outro título" })).toHaveAttribute(
       "href",
-      "/tools/fixed-income?asset=1",
+      "/planejar/renda-fixa?asset=1",
     );
   });
 
   it("shows IOF still due and exempt positions", async () => {
     const base = fixedIncomeStatus();
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/tax/assets/1/status",
@@ -163,7 +165,7 @@ describe("asset tax tab", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=tax");
+    renderAt("/ativo/WEGE3?tab=tax");
     expect(await screen.findByText("zera em 01/02/2026")).toBeInTheDocument();
     expect(screen.getByText("Isento")).toBeInTheDocument();
     expect(screen.getByText("Renda fixa isenta")).toBeInTheDocument();
@@ -172,6 +174,7 @@ describe("asset tax tab", () => {
 
   it("shows the informative regimes of market assets", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/tax/assets/1/status",
@@ -186,7 +189,7 @@ describe("asset tax tab", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=tax");
+    renderAt("/ativo/WEGE3?tab=tax");
     expect(await screen.findByText("Ganho na venda de ações")).toBeInTheDocument();
     expect(screen.getByText("Juros sobre capital próprio")).toBeInTheDocument();
     expect(screen.getByText(/LC 224\/2025/)).toBeInTheDocument();
@@ -225,7 +228,7 @@ describe("fixed income comparator", () => {
       { path: "/assets", reply: page([]) },
       { method: "POST", path: "/tax/fixed-income/compare", reply: comparison() },
     ]);
-    renderAt("/tools/fixed-income");
+    renderAt("/planejar/renda-fixa");
     expect(await screen.findByRole("heading", { name: "Comparar renda fixa" })).toBeInTheDocument();
     fireEvent.change(screen.getAllByLabelText("Nome")[0], { target: { value: "CDB" } });
     fireEvent.change(screen.getAllByLabelText("Nome")[1], { target: { value: "LCA" } });
@@ -269,7 +272,7 @@ describe("fixed income comparator", () => {
         reply: { status: 400, json: { code: "INCOMPLETE_OFFER", detail: "Offer 3 needs indexer" } },
       },
     ]);
-    renderAt("/tools/fixed-income?asset=7");
+    renderAt("/planejar/renda-fixa?asset=7");
     const origin = (await screen.findAllByLabelText("Origem"))[0];
     await waitFor(() => expect(origin).toHaveValue("CDB-ITAU — CDB Itaú"));
     expect(optionLabels(origin)).not.toContainEqual(expect.stringMatching(/WEGE3/));

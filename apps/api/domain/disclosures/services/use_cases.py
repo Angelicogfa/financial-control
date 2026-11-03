@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import (
+from contracts.disclosures.requests import MarkReadRequest
+from contracts.disclosures.responses import (
     CvmDocumentDTO,
     DisclosureFeedDTO,
     EventClassDTO,
@@ -14,7 +14,6 @@ from controllers.disclosures.responses import (
     EventReactionDTO,
     EventStudyDTO,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError
 from domain.disclosures.entities import CvmDocument, EventEffect
 from domain.disclosures.events import EVENT_LABELS
@@ -22,7 +21,7 @@ from domain.disclosures.services.sync import COMPANY_TYPES, base_ticker, company
 from domain.forecast.event_runs import EVENTS
 from domain.forecast.events import EventStudy
 from domain.shared.entities import AssetEntity
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 NOT_COVERED_NOTE = (
     "FIIs e ETFs não são companhias abertas e não publicam no IPE da CVM: os comunicados "

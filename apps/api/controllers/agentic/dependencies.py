@@ -9,10 +9,10 @@ from fastapi import Depends
 
 from composition import get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
 from domain.agentic.services.catalog import AgenticRuntimeHandlers
 from domain.agentic.services.use_cases import AgentKeyHandler
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.unit_of_work import UoWFactory
 
 
 def get_agent_key_handler(

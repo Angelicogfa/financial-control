@@ -8,9 +8,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 
-from controllers.alerts.requests import AlertDismissRequest
-from controllers.alerts.responses import AlertDTO, AlertsResponseDTO
-from controllers.shared.dependencies import UoWFactory
+from contracts.alerts.requests import AlertDismissRequest
+from contracts.alerts.responses import AlertDTO, AlertsResponseDTO
 from core.settings import get_settings
 from domain.alerts.services.evaluator import (
     RELEVANT_FACT_WINDOW_DAYS,
@@ -25,6 +24,7 @@ from domain.alerts.services.evaluator import (
     maturity_alerts,
     mining_alerts,
     portfolio_alerts,
+    position_check_alerts,
     relevant_fact_alerts,
     tax_bracket_alerts,
     valuation_alerts,
@@ -33,13 +33,16 @@ from domain.alerts.services.evaluator import (
 from domain.disclosures.entities import RELEVANT_FACT
 from domain.disclosures.services.sync import base_ticker, company_assets
 from domain.market.services.series_status import TRACKED_SERIES, evaluate_series_status
+from domain.market.services.stored import stored_market_data
 from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AssetEntity
-from domain.shared.enums import AssetLifecycle
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.enums import AssetLifecycle, Market
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
+from domain.tax.services.monthly import compute as compute_tax
+from domain.tax.services.monthly import tax_alerts
 from domain.tax.services.status import asset_tax_status
-from infra.providers.stored import stored_market_data
+from domain.watch.services import current_readings, rule_alerts, thesis_alerts
 
 VALUED_STATUSES = frozenset({AssetLifecycle.HELD, AssetLifecycle.ELIGIBLE})
 
@@ -130,6 +133,29 @@ class AlertHandler:
                 ),
             ]
             alerts.extend(self._calendar_alerts(uow, report, assets, reference))
+            alerts.extend(rule_alerts(current_readings(uow, active_only=True)))
+            alerts.extend(
+                thesis_alerts(
+                    uow.asset_notes.list_all(),
+                    {a.id: t for t, a in assets.items() if a.id is not None},
+                    reference,
+                )
+            )
+            tax_months, _, _ = compute_tax(uow, reference)
+            alerts.extend(tax_alerts(tax_months, uow.tax_assessments.paid_months(), reference))
+            checks = uow.reconciliations.list_recent(1)
+            alerts.extend(
+                position_check_alerts(
+                    checks[0].reference_date if checks else None,
+                    checks[0].open_issues if checks else 0,
+                    has_b3_positions=any(
+                        p.quantity > 0 and t.market == Market.B3
+                        for p in report.positions
+                        if (t := assets.get(p.ticker)) is not None
+                    ),
+                    today=reference,
+                )
+            )
             alerts.extend(_disclosure_alerts(uow, assets, reference))
             if self.mining_alerts:
                 alerts.extend(mining_alerts(uow.mining.findings(), assets))

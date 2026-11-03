@@ -9,11 +9,12 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.portfolio.dependencies import get_portfolio_handler
-from controllers.portfolio.requests import ContributionSimulationRequest
-from controllers.portfolio.responses import (
+from contracts.portfolio.requests import ContributionSimulationRequest
+from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
+    IncomeSummaryDTO,
+    MonthlyReportDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
@@ -21,6 +22,14 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
+from contracts.portfolio.serializers import to_income_summary_dto, to_monthly_report_dto
+from controllers.portfolio.dependencies import (
+    get_income_handler,
+    get_monthly_report_handler,
+    get_portfolio_handler,
+)
+from domain.portfolio.services.income import IncomeHandler
+from domain.portfolio.services.monthly_report import MonthlyReportHandler
 from domain.portfolio.services.use_cases import PortfolioHandler
 
 portfolio_router = APIRouter(prefix="/portfolio", tags=["Portfolio & ARCA"])
@@ -116,3 +125,21 @@ def get_earnings_agenda(
     handler: PortfolioHandler = Depends(get_portfolio_handler),
 ) -> EarningsAgendaDTO:
     return handler.earnings_agenda(as_of_date=as_of_date)
+
+
+@portfolio_router.get("/income", response_model=IncomeSummaryDTO)
+def get_income(
+    months: int = Query(default=24, ge=1, le=120),
+    handler: IncomeHandler = Depends(get_income_handler),
+) -> IncomeSummaryDTO:
+    return to_income_summary_dto(handler.summary(months=months))
+
+
+@portfolio_router.get("/monthly-report", response_model=MonthlyReportDTO)
+def get_monthly_report(
+    month: str = Query(..., description="YYYY-MM"),
+    handler: MonthlyReportHandler = Depends(get_monthly_report_handler),
+) -> MonthlyReportDTO:
+    """One month of the portfolio on one page: wealth, flows, result, income, trades,
+    allocation, tax and goals."""
+    return to_monthly_report_dto(handler.report(month))

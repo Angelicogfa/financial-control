@@ -10,15 +10,14 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from controllers.shared.dependencies import UoWFactory
-from controllers.simulation.requests import (
+from contracts.simulation.requests import (
     BacktestRequest,
     CandidatesRequest,
     ProjectionRequest,
     StudyRequest,
     StudyVariationRequest,
 )
-from controllers.simulation.responses import (
+from contracts.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
     ProjectionDTO,
@@ -35,6 +34,7 @@ from controllers.simulation.responses import (
     StudyVersionDTO,
 )
 from core.errors import DomainError, NotFoundError, ValidationError
+from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.entities import SimulationRun, SimulationStatus, SimulationStudy
 from domain.simulation.services.use_cases import SimulationHandler
 from domain.simulation.studies import (

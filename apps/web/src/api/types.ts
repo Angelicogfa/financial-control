@@ -111,6 +111,36 @@ export interface AlertDismissRequest {
   days?: number | null;
 }
 
+export interface AlertRuleCreateRequest {
+  ticker: string;
+  metric: RuleMetric;
+  operator: RuleOperator;
+  threshold: number | string;
+  note?: string | null;
+}
+
+export interface AlertRuleDTO {
+  id: number;
+  ticker: string;
+  metric: RuleMetric;
+  operator: RuleOperator;
+  threshold: number;
+  is_active: boolean;
+  note?: string | null;
+  description: string;
+  current_value?: number | null;
+  triggered: boolean;
+  triggered_at?: string | null;
+  last_checked_at?: string | null;
+  created_at?: string | null;
+}
+
+export interface AlertRuleUpdateRequest {
+  threshold?: number | string | null;
+  is_active?: boolean | null;
+  note?: string | null;
+}
+
 export interface AlertsResponseDTO {
   alerts: AlertDTO[];
   dismissed: number;
@@ -230,6 +260,19 @@ export interface AssetHistoryDTO {
   points?: HistoryPointDTO[];
 }
 
+export interface AssetIncomeDTO {
+  asset_id: number;
+  ticker: string;
+  last_12m_brl: number;
+  yield_on_cost?: number | null;
+}
+
+export interface AssetIncomeForecastDTO {
+  asset_id: number;
+  ticker: string;
+  next_12m_brl: number;
+}
+
 export interface AssetLensesDTO {
   ticker: string;
   source: "PORTFOLIO" | "WATCHLIST" | "CATALOG";
@@ -242,6 +285,24 @@ export interface AssetLensesDTO {
 }
 
 export type AssetLifecycle = "WATCHLIST" | "ELIGIBLE" | "HELD" | "REVIEW" | "ARCHIVED";
+
+export interface AssetNoteDTO {
+  id: number;
+  asset_id: number;
+  ticker?: string | null;
+  written_on: string;
+  text: string;
+  review_at?: string | null;
+  due: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AssetNoteRequest {
+  text: string;
+  review_at?: string | null;
+  written_on?: string | null;
+}
 
 export interface AssetPriceHistoryDTO {
   range: "6mo" | "1y" | "2y" | "5y" | "max";
@@ -673,6 +734,7 @@ export interface ClassMatrixDTO {
   construction?: ConstructionDTO | null;
   weights_source?: "AHP" | "VALIDATED";
   cerrado_in_use?: boolean;
+  optimizer_in_use?: boolean;
 }
 
 export interface ClassPolicyDTO {
@@ -872,6 +934,10 @@ export interface CvmDocumentDTO {
   event_label?: string | null;
   reaction?: EventReactionDTO | null;
   typical_20?: number | null;
+}
+
+export interface DarfPaymentRequest {
+  paid_on?: string | null;
 }
 
 export interface DatedPriceDTO {
@@ -1131,6 +1197,14 @@ export interface FixedIncomeValuationDTO {
   curve_coverage?: number;
 }
 
+export interface ForecastBandDTO {
+  months: number;
+  p5: number;
+  p50: number;
+  p95: number;
+  up_probability: number;
+}
+
 export interface ForecastDriverDTO {
   key: "MARKET" | "OWN" | "VALUATION" | "EVENTS";
   label: string;
@@ -1161,6 +1235,13 @@ export interface ForecastHorizonDTO {
   fall_20: ForecastProbabilityDTO;
   thresholds?: ForecastThresholdDTO[];
   price_quantiles?: number[];
+}
+
+export interface ForecastMonthDTO {
+  month: string;
+  declared_brl: number;
+  estimated_brl: number;
+  total_brl: number;
 }
 
 export interface ForecastProbabilityDTO {
@@ -1215,6 +1296,17 @@ export interface ForecastValuationDTO {
   origins?: ValuationOriginDTO[];
 }
 
+export interface ForeignTaxYearDTO {
+  year: number;
+  sales_brl: number;
+  result_brl: number;
+  loss_in_brl: number;
+  loss_out_brl: number;
+  taxable_brl: number;
+  rate: number;
+  tax_brl: number;
+}
+
 export interface FundamentalSnapshotDTO {
   reference_date: string;
   period: string;
@@ -1258,6 +1350,39 @@ export interface GeneratorShareDTO {
   paths: number;
 }
 
+export interface GoalCreateRequest {
+  kind: GoalKind;
+  name: string;
+  target_brl: number | string;
+  target_date: string;
+  monthly_contribution_brl?: number | string;
+  annual_return?: number | string;
+  income_yield?: number | string;
+}
+
+export interface GoalDTO {
+  id: number;
+  kind: GoalKind;
+  name: string;
+  target_brl: number;
+  target_date: string;
+  monthly_contribution_brl: number;
+  annual_return: number;
+  income_yield: number;
+  is_active: boolean;
+  created_at?: string | null;
+  months_left: number;
+  current_brl: number;
+  target_wealth_brl: number;
+  current_wealth_brl: number;
+  progress: number;
+  projected_wealth_brl: number;
+  required_monthly_brl: number;
+  status: GoalStatus;
+}
+
+export type GoalKind = "WEALTH" | "PASSIVE_INCOME";
+
 export interface GoalOutcomeDTO {
   target: number;
   probability: number;
@@ -1266,6 +1391,18 @@ export interface GoalOutcomeDTO {
   low?: number;
   high?: number;
   by_generator?: Record<string, number>;
+}
+
+export type GoalStatus = "REACHED" | "ON_TRACK" | "OFF_TRACK" | "MISSED";
+
+export interface GoalUpdateRequest {
+  name?: string | null;
+  target_brl?: number | string | null;
+  target_date?: string | null;
+  monthly_contribution_brl?: number | string | null;
+  annual_return?: number | string | null;
+  income_yield?: number | string | null;
+  is_active?: boolean | null;
 }
 
 export interface GrantOptionsDTO {
@@ -1421,6 +1558,25 @@ export interface ImportPreviewDTO {
   lines: ImportLineDTO[];
 }
 
+export interface IncomeForecastDTO {
+  as_of: string;
+  months: ForecastMonthDTO[];
+  next_12m_brl: number;
+  declared_brl: number;
+  assets: AssetIncomeForecastDTO[];
+}
+
+export interface IncomeSummaryDTO {
+  as_of: string;
+  last_12m_brl: number;
+  previous_12m_brl: number;
+  total_brl: number;
+  yield_on_cost?: number | null;
+  months: MonthIncomeDTO[];
+  by_year: Record<string, number>;
+  assets: AssetIncomeDTO[];
+}
+
 export type IndicatorGroup = "VALUATION" | "DEBT" | "EFFICIENCY" | "PROFITABILITY" | "GROWTH";
 
 export interface IndicatorRatingDTO {
@@ -1435,6 +1591,81 @@ export interface InstitutionExposureDTO {
   value_brl: number;
   limit_brl: number;
   usage: number;
+}
+
+export interface InstrumentForecastDTO {
+  status: string;
+  seal_level: number;
+  seal_label: string;
+  as_of?: string | null;
+  price_now?: number | null;
+  bands?: ForecastBandDTO[];
+}
+
+export interface InstrumentIndicatorsDTO {
+  fetched_at?: string | null;
+  price_to_earnings?: number | null;
+  price_to_book?: number | null;
+  dividend_yield?: number | null;
+  return_on_equity?: number | null;
+  profit_margin?: number | null;
+  net_debt_to_ebitda?: number | null;
+  market_cap?: number | null;
+  avg_daily_volume?: number | null;
+  suspicious?: boolean;
+}
+
+export type InstrumentKind = "LISTED" | "TREASURY";
+
+export interface InstrumentLensDTO {
+  lens: string;
+  normalized?: number | null;
+  confidence: number;
+  note: string;
+}
+
+export interface InstrumentLensesDTO {
+  as_of: string;
+  source: string;
+  arca_class?: string | null;
+  sector: string;
+  eligible?: boolean | null;
+  items: InstrumentLensDTO[];
+}
+
+export interface InstrumentQuoteDTO {
+  price: number;
+  currency: string;
+  source: QuoteSource;
+  change_pct?: number | null;
+  as_of?: string | null;
+  freshness?: string | null;
+}
+
+export interface InstrumentTrackingDTO {
+  asset_id: number;
+  is_active: boolean;
+  holds_position: boolean;
+  arca_class?: string | null;
+  purpose: string;
+}
+
+export interface InstrumentViewDTO {
+  key: string;
+  kind: InstrumentKind;
+  ticker: string;
+  name: string;
+  asset_type?: string | null;
+  sector?: string | null;
+  logo_url?: string | null;
+  in_catalog: boolean;
+  quote?: InstrumentQuoteDTO | null;
+  indicators?: InstrumentIndicatorsDTO | null;
+  lenses?: InstrumentLensesDTO | null;
+  forecast?: InstrumentForecastDTO | null;
+  tracking?: InstrumentTrackingDTO | null;
+  treasury?: TreasuryTermsDTO | null;
+  data_gaps?: string[];
 }
 
 export type IntraClassStrategy = "CERRADO" | "MANUAL_WEIGHT" | "EQUAL_WEIGHT";
@@ -1542,6 +1773,15 @@ export interface LensWeightsDTO {
   probability?: number;
   lines?: LensWeightLineDTO[];
 }
+
+export type LineResolution = "OPEN" | "RESOLVED";
+
+export interface LineResolutionRequest {
+  resolution: LineResolution;
+  note?: string | null;
+}
+
+export type LineStatus = "MATCH" | "DIVERGENT" | "ONLY_B3" | "ONLY_LEDGER" | "NOT_COMPARED";
 
 export interface LiquidityDetailDTO {
   reserve_brl?: number;
@@ -1691,6 +1931,8 @@ export interface MarketHistoryPointDTO {
 
 export type MarketStatus = "NO_MARKET_DATA" | "BELOW_CURVE" | "NEUTRAL" | "OPPORTUNITY";
 
+export type MatchKind = "TICKER_EXACT" | "TICKER_PREFIX" | "NAME_PREFIX" | "NAME_CONTAINS";
+
 export interface MatrixBoardDTO {
   status: "OK" | "NOT_COMPUTED";
   as_of?: string | null;
@@ -1815,6 +2057,31 @@ export interface MiningWhyDTO {
   cutoff_annual?: number | null;
   signals?: Record<string, number>;
   reasons?: string[];
+}
+
+export interface MonthIncomeDTO {
+  month: string;
+  net_brl: number;
+}
+
+export interface MonthlyReportDTO {
+  month: string;
+  start_date: string | null;
+  end_date: string | null;
+  start_value_brl: number;
+  end_value_brl: number;
+  bought_brl: number;
+  sold_brl: number;
+  net_flow_brl: number;
+  income_brl: number;
+  result_brl: number;
+  month_return: number | null;
+  trades: ReportTradeDTO[];
+  earnings: ReportEarningDTO[];
+  allocation: ReportClassDTO[];
+  tax: ReportTaxDTO | null;
+  goals: ReportGoalDTO[];
+  data_gaps: string[];
 }
 
 export type OfferIndexer = "CDI_PERCENT" | "CDI_SPREAD" | "IPCA_SPREAD" | "PRE";
@@ -2089,6 +2356,8 @@ export interface QuoteDayDTO {
 
 export type QuoteFreshness = "LIVE" | "CACHED" | "FALLBACK" | "CURVE" | "MANUAL";
 
+export type QuoteSource = "STORED_QUOTE" | "CATALOG_CLOSE" | "TREASURY_PRICE" | "MANUAL";
+
 export interface QuoteStatusDTO {
   holdings: number;
   stored: number;
@@ -2144,9 +2413,90 @@ export interface RecommendationRunDTO {
   selected?: Record<string, string[]>;
 }
 
+export interface ReconciliationCountsDTO {
+  match: number;
+  divergent: number;
+  only_b3: number;
+  only_ledger: number;
+  not_compared: number;
+  open_issues: number;
+}
+
+export interface ReconciliationDTO {
+  id?: number | null;
+  reference_date: string;
+  file_name: string;
+  created_at?: string | null;
+  counts: ReconciliationCountsDTO;
+  lines: ReconciliationLineDTO[];
+}
+
+export interface ReconciliationLineDTO {
+  id?: number | null;
+  product: string;
+  ticker?: string | null;
+  asset_id?: number | null;
+  account_id?: number | null;
+  institution?: string | null;
+  b3_quantity: number;
+  ledger_quantity: number;
+  difference: number;
+  status: LineStatus;
+  note?: string;
+  resolution?: LineResolution;
+  resolution_note?: string | null;
+  resolved_at?: string | null;
+}
+
+export interface ReconciliationSummaryDTO {
+  id: number;
+  reference_date: string;
+  file_name: string;
+  created_at?: string | null;
+  counts: ReconciliationCountsDTO;
+}
+
 export interface RegimePointDTO {
   month: string;
   stress_probability: number;
+}
+
+export interface ReportClassDTO {
+  arca_class: string;
+  value_brl: number;
+  current_pct: number;
+  target_pct: number | null;
+}
+
+export interface ReportEarningDTO {
+  payment_date: string;
+  ticker: string;
+  kind: string;
+  net_brl: number;
+}
+
+export interface ReportGoalDTO {
+  name: string;
+  status: string;
+  progress: number;
+  required_monthly_brl: number;
+}
+
+export interface ReportTaxDTO {
+  tax_brl: number;
+  darf_brl: number;
+  due_date: string;
+  paid_on: string | null;
+  exempt: boolean;
+  stock_sales_brl: number;
+}
+
+export interface ReportTradeDTO {
+  trade_date: string;
+  ticker: string;
+  kind: string;
+  quantity: number;
+  value_brl: number;
 }
 
 export interface ResolvedOfferDTO {
@@ -2225,6 +2575,10 @@ export interface RowComparisonDTO {
   differences?: LensDifferenceDTO[];
 }
 
+export type RuleMetric = "PRICE" | "DIVIDEND_YIELD" | "PRICE_TO_EARNINGS" | "PRICE_TO_BOOK";
+
+export type RuleOperator = "ABOVE" | "BELOW";
+
 export type SaleSignal = "EXCESS_RETURN" | "REINVESTMENT";
 
 export interface SavedContributionPlanDTO {
@@ -2238,6 +2592,21 @@ export interface SavedContributionPlanDTO {
   account_id?: number | null;
   transaction_ids?: number[];
   plan: ContributionPlanResponseDTO;
+}
+
+export interface SavedViewDTO {
+  id: number;
+  scope: ViewScope;
+  name: string;
+  filters: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface SavedViewRequest {
+  scope: ViewScope;
+  name: string;
+  filters?: Record<string, unknown>;
 }
 
 export interface ScoreLineDTO {
@@ -2285,6 +2654,25 @@ export interface ScreenerResponseDTO {
   arca_classes?: ArcaClass[];
   catalog_size: number;
   catalog_updated_at?: string | null;
+}
+
+export interface SearchHitDTO {
+  key: string;
+  kind: InstrumentKind;
+  ticker: string;
+  name: string;
+  asset_type?: string | null;
+  sector?: string | null;
+  close?: number | null;
+  match: MatchKind;
+  tracked_asset_id?: number | null;
+  holds_position?: boolean;
+}
+
+export interface SearchResultDTO {
+  query: string;
+  hits: SearchHitDTO[];
+  total: number;
 }
 
 export interface SelectedAssetDTO {
@@ -2559,7 +2947,44 @@ export interface TaxBracketDTO {
   rate: number;
 }
 
+export interface TaxCategoryMonthDTO {
+  category: string;
+  sales_brl: number;
+  result_brl: number;
+  exempt_gain_brl: number;
+  loss_in_brl: number;
+  loss_used_brl: number;
+  loss_out_brl: number;
+  taxable_brl: number;
+  rate: number;
+  tax_brl: number;
+}
+
 export type TaxKind = "INCOME_TAX" | "IOF";
+
+export interface TaxLedgerIssueDTO {
+  ticker: string;
+  on: string;
+  message: string;
+}
+
+export interface TaxMonthDTO {
+  month: string;
+  categories: TaxCategoryMonthDTO[];
+  stock_sales_brl: number;
+  exempt: boolean;
+  tax_brl: number;
+  withheld_brl: number;
+  withheld_credit_in_brl: number;
+  withheld_credit_out_brl: number;
+  carried_darf_in_brl: number;
+  darf_brl: number;
+  carried_darf_out_brl: number;
+  due_date: string;
+  darf_code?: string;
+  paid_on?: string | null;
+  sales?: TaxSaleDTO[];
+}
 
 export type TaxRegime = "FIXED_INCOME_REGRESSIVE" | "FIXED_INCOME_EXEMPT" | "IOF_REGRESSIVE" | "STOCK_SWING_TRADE" | "ETF_BDR_SWING_TRADE" | "FII_CAPITAL_GAIN" | "FII_DISTRIBUTION" | "DIVIDEND_WITHHOLDING" | "JCP_WITHHOLDING" | "FOREIGN_ANNUAL" | "CRYPTO_CAPITAL_GAIN";
 
@@ -2583,6 +3008,29 @@ export interface TaxRuleDTO {
   valid_to?: string | null;
   legal_basis: string;
   description: string;
+}
+
+export interface TaxSaleDTO {
+  asset_id: number;
+  ticker: string;
+  on: string;
+  quantity: number;
+  sale_value_brl: number;
+  cost_brl: number;
+  fees_brl: number;
+  gain_brl: number;
+  day_trade: boolean;
+  category: string;
+}
+
+export interface TaxYearDTO {
+  year: number;
+  months: TaxMonthDTO[];
+  foreign?: ForeignTaxYearDTO | null;
+  tax_brl: number;
+  darf_brl: number;
+  open_darf_brl: number;
+  issues?: TaxLedgerIssueDTO[];
 }
 
 export interface TransactionCreateRequest {
@@ -2624,6 +3072,48 @@ export interface TransactionUpdateRequest {
   fx_rate?: number | string;
   notes?: string | null;
   account_id?: number | null;
+}
+
+export interface TransitionDTO {
+  status: "OK" | "NOT_COMPUTED";
+  arca_class: string;
+  as_of?: string | null;
+  total_brl?: number;
+  distance?: number;
+  monthly_brl?: number;
+  months?: number | null;
+  tolerance?: number;
+  lines?: TransitionLineDTO[];
+  sales?: TransitionSaleDTO[];
+  sold_brl?: number;
+  tax_brl?: number;
+  fees_brl?: number;
+  cost_brl?: number;
+  split_months?: number | null;
+  split_tax_brl?: number | null;
+  expected_gain_year_brl?: number;
+  payback_months?: number | null;
+  pays_off?: boolean;
+  payback_horizon_months?: number;
+}
+
+export interface TransitionLineDTO {
+  ticker: string;
+  current_weight: number;
+  target_weight: number;
+  current_brl: number;
+  target_brl: number;
+  next_contribution_brl: number;
+  buy_brl: number;
+}
+
+export interface TransitionSaleDTO {
+  ticker: string;
+  asset_type: string;
+  quantity: number;
+  value_brl: number;
+  cost_brl: number;
+  gain_brl: number;
 }
 
 export interface TreasuryBondDTO {
@@ -2680,6 +3170,18 @@ export interface TreasurySearchResponseDTO {
   catalog_size?: number;
   catalog_updated_at?: string | null;
   unavailable_reason?: string | null;
+}
+
+export interface TreasuryTermsDTO {
+  bond_type: string;
+  maturity_date: string;
+  indexer: string;
+  liquidity: string;
+  buy_rate?: number | null;
+  sell_rate?: number | null;
+  buy_price?: number | null;
+  sell_price?: number | null;
+  base_date?: string | null;
 }
 
 export interface UnknownTickerDTO {
@@ -2780,6 +3282,8 @@ export interface VariantValidationDTO {
   verdict: string;
   notes?: string[];
 }
+
+export type ViewScope = "SCREENER" | "LEDGER" | "PORTFOLIO";
 
 export interface WatchlistAddRequest {
   ticker: string;

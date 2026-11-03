@@ -10,7 +10,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
-from controllers.tax.requests import FixedIncomeCompareRequest
+from contracts.tax.requests import FixedIncomeCompareRequest
 from domain.agentic.services.catalog import CATALOG_BY_NAME, AgenticRuntimeHandlers
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.tax.entities import TaxBracket, TaxKind, TaxRegime, TaxRule

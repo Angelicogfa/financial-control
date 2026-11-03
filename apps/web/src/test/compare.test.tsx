@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetComparisonDTO } from "../api/types";
-import { compareLink, formatIndicator, parseTickers, searchFilters } from "../pages/tools/AssetComparePage";
+import { compareLink, formatIndicator, parseTickers, searchFilters } from "../features/tools/AssetComparePage";
 import { pickWhenLoaded } from "./combobox";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
@@ -87,7 +87,7 @@ describe("asset comparator", () => {
   it("parses and builds ticker lists", () => {
     expect(parseTickers(" wege3,HGLG11,wege3,,a1,b1,c1,d1")).toEqual(["WEGE3", "HGLG11", "A1", "B1", "C1"]);
     expect(parseTickers(null)).toEqual([]);
-    expect(compareLink("WEGE3", "ITUB4")).toBe("/tools/compare?tickers=WEGE3%2CITUB4");
+    expect(compareLink("WEGE3", "ITUB4")).toBe("/explorar/comparar?tickers=WEGE3%2CITUB4");
     expect(formatIndicator(0.123, "FRACTION")).toBe("12,3%");
     expect(formatIndicator(9.2, "MULTIPLE")).toBe("9,2");
     expect(formatIndicator(null, "MULTIPLE")).toBe("—");
@@ -108,19 +108,19 @@ describe("asset comparator", () => {
 
   it("asks for two tickers before calling the API", async () => {
     const { calls } = mockApi([]);
-    renderAt("/tools/compare?tickers=WEGE3");
+    renderAt("/explorar/comparar?tickers=WEGE3");
     expect(await screen.findByText("Escolha ao menos dois ativos")).toBeInTheDocument();
     expect(calls.some((c) => c.path === "/research/compare")).toBe(false);
   });
 
   it("shows assets side by side, the best of each row, warnings and lets indicators be hidden", async () => {
     const { calls } = mockApi([{ path: "/research/compare", reply: comparison }]);
-    renderAt("/tools/compare?tickers=WEGE3,HGLG11");
+    renderAt("/explorar/comparar?tickers=WEGE3,HGLG11");
 
     const table = await screen.findByRole("table");
     expect(calls.find((c) => c.path === "/research/compare")?.query.get("tickers")).toBe("WEGE3,HGLG11");
     expect(screen.getByRole("note")).toHaveTextContent("Perfis diferentes");
-    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/asset/7");
+    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/ativo/WEGE3");
 
     const pl = within(table).getByText("P/L").closest("tr") as HTMLElement;
     const cells = within(pl).getAllByRole("cell");
@@ -141,7 +141,7 @@ describe("asset comparator", () => {
 
   it("adds and removes tickers through the URL", async () => {
     const { calls } = mockApi([{ path: "/research/compare", reply: comparison }]);
-    renderAt("/tools/compare?tickers=WEGE3");
+    renderAt("/explorar/comparar?tickers=WEGE3");
     fireEvent.change(screen.getByLabelText("Ticker para comparar"), { target: { value: "hglg11" } });
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
     await screen.findByRole("table");
@@ -167,7 +167,7 @@ describe("asset comparator", () => {
       { path: "/research/sectors", reply: ["Finance", "Industrials"] },
       { path: "/research/compare", reply: comparison },
     ]);
-    renderAt("/tools/compare?tickers=WEGE3");
+    renderAt("/explorar/comparar?tickers=WEGE3");
 
     await pickWhenLoaded(screen.getByLabelText("Setor"), "Finance");
     fireEvent.click(screen.getByLabelText("Classe ARCA"));
@@ -193,7 +193,7 @@ describe("asset comparator", () => {
   it("does not run the Research page's last search when it opens", async () => {
     writeStored("research:screener-search", { filters: { q: "banco" }, page: 0, pageSize: 25 });
     const { calls } = mockApi([{ path: "/research/sectors", reply: ["Finance"] }]);
-    renderAt("/tools/compare");
+    renderAt("/explorar/comparar");
     expect(await screen.findByText("Escolha ao menos dois ativos")).toBeInTheDocument();
     await waitFor(() => expect(calls.some((c) => c.path === "/research/sectors")).toBe(true));
     expect(calls.some((c) => c.path === "/research/screener")).toBe(false);

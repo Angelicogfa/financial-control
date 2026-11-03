@@ -1,6 +1,8 @@
 /** Typed sample payloads for page tests. */
 
+import type { Call, Route } from "./mockApi";
 import type {
+  InstrumentViewDTO,
   AlertsResponseDTO,
   AssetAnalysisResponseDTO,
   AssetResponseDTO,
@@ -202,7 +204,7 @@ export function alerts(overrides: Partial<AlertsResponseDTO> = {}): AlertsRespon
         title: "Real Estate abaixo da banda",
         detail: "Peso atual 0,0% contra meta 25,0% ± 5,0%.",
         subject: "REAL_ESTATE",
-        route: "/contribute",
+        route: "/aportar",
       },
     ],
     dismissed: 0,
@@ -356,5 +358,27 @@ export function savedPlan(overrides: Partial<SavedContributionPlanDTO> = {}): Sa
       ],
     },
     ...overrides,
+  };
+}
+
+/** `/instruments/:key` of any ticker as a registered asset (the asset page, Phase 48.R4). */
+export function trackedInstrument(assetId = 1, overrides: Partial<InstrumentViewDTO> = {}): Route {
+  return {
+    path: /^\/instruments\/[^/]+$/,
+    reply: (call: Call) => {
+      const key = decodeURIComponent(call.path.split("/").pop() ?? "");
+      const view: InstrumentViewDTO = {
+        key,
+        kind: "LISTED",
+        ticker: key,
+        name: key,
+        in_catalog: true,
+        quote: null,
+        tracking: { asset_id: assetId, is_active: true, holds_position: true, purpose: "ARCA" },
+        data_gaps: [],
+        ...overrides,
+      };
+      return view;
+    },
   };
 }

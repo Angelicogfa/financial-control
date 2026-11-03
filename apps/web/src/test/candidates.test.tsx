@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { CandidateResultDTO, CandidatesDTO, SimulationRunDTO } from "../api/types";
-import { CandidatesView } from "../pages/simulation/views";
+import { CandidatesView } from "../features/simulation/views";
 
 const run: SimulationRunDTO = {
   id: 8,

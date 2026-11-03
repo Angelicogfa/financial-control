@@ -15,16 +15,16 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from controllers.accounts.requests import AccountRequest
-from controllers.accounts.responses import AccountDTO
-from controllers.alerts.requests import AlertDismissRequest
-from controllers.alerts.responses import AlertsResponseDTO
-from controllers.assets.requests import (
+from contracts.accounts.requests import AccountRequest
+from contracts.accounts.responses import AccountDTO
+from contracts.alerts.requests import AlertDismissRequest
+from contracts.alerts.responses import AlertsResponseDTO
+from contracts.assets.requests import (
     AssetCreateRequest,
     AssetUpdateRequest,
     CerradoUpdateRequest,
 )
-from controllers.assets.responses import (
+from contracts.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
     AssetForecastDTO,
@@ -32,16 +32,22 @@ from controllers.assets.responses import (
     AssetResponseDTO,
     ForecastQualityDTO,
 )
-from controllers.contributions.requests import ContributionConfirmRequest
-from controllers.contributions.responses import SavedContributionPlanDTO
-from controllers.disclosures.requests import MarkReadRequest
-from controllers.disclosures.responses import (
+from contracts.contributions.requests import ContributionConfirmRequest
+from contracts.contributions.responses import SavedContributionPlanDTO
+from contracts.disclosures.requests import MarkReadRequest
+from contracts.disclosures.responses import (
     AssetStatementsDTO,
     DisclosureFeedDTO,
     EventStudyDTO,
     MarkReadResultDTO,
 )
-from controllers.ledger.requests import (
+from contracts.instruments.responses import InstrumentViewDTO, SearchResultDTO
+from contracts.instruments.serializers import (
+    to_instrument_view_dto,
+    to_price_history_dto,
+    to_search_result_dto,
+)
+from contracts.ledger.requests import (
     CorporateEventRequest,
     EarningCreateRequest,
     EarningUpdateRequest,
@@ -49,30 +55,35 @@ from controllers.ledger.requests import (
     TransactionCreateRequest,
     TransactionUpdateRequest,
 )
-from controllers.ledger.responses import (
+from contracts.ledger.responses import (
     CorporateEventDTO,
     EarningResponseDTO,
     ImportCommitDTO,
     ImportPreviewDTO,
     TransactionResponseDTO,
 )
-from controllers.market.responses import (
+from contracts.market.responses import (
     JobRunDTO,
     QuoteDayDTO,
     QuoteStatusDTO,
     SeriesStatusDTO,
     WorkerErrorsResponseDTO,
 )
-from controllers.policy.requests import (
+from contracts.planning.requests import GoalCreateRequest
+from contracts.planning.responses import GoalDTO, IncomeForecastDTO
+from contracts.planning.serializers import to_goal_dto, to_income_forecast_dto
+from contracts.policy.requests import (
     ArcaTargetItemDTO,
     ArcaTargetsUpdateRequest,
     PolicyUpdateRequest,
 )
-from controllers.policy.responses import PolicyDTO
-from controllers.portfolio.requests import ContributionSimulationRequest
-from controllers.portfolio.responses import (
+from contracts.policy.responses import PolicyDTO
+from contracts.portfolio.requests import ContributionSimulationRequest
+from contracts.portfolio.responses import (
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
+    IncomeSummaryDTO,
+    MonthlyReportDTO,
     PortfolioAnalyticsResponseDTO,
     PortfolioHealthDTO,
     PortfolioReportResponseDTO,
@@ -80,7 +91,8 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from controllers.recommendation.responses import (
+from contracts.portfolio.serializers import to_income_summary_dto, to_monthly_report_dto
+from contracts.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
     LensBoardDTO,
@@ -89,9 +101,12 @@ from controllers.recommendation.responses import (
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
+    TransitionDTO,
 )
-from controllers.research.requests import WatchlistAddRequest
-from controllers.research.responses import (
+from contracts.reconciliation.responses import ReconciliationDTO, ReconciliationSummaryDTO
+from contracts.reconciliation.serializers import to_reconciliation_dto, to_summary_dto
+from contracts.research.requests import WatchlistAddRequest
+from contracts.research.responses import (
     AssetComparisonDTO,
     MiningOverviewDTO,
     MiningRecordDTO,
@@ -100,16 +115,15 @@ from controllers.research.responses import (
     ScreenerResponseDTO,
     WatchlistItemDTO,
 )
-from controllers.shared.dependencies import UoWFactory
-from controllers.shared.responses import PaginatedResponse
-from controllers.simulation.requests import (
+from contracts.shared.responses import PaginatedResponse
+from contracts.simulation.requests import (
     BacktestRequest,
     CandidatesRequest,
     ProjectionRequest,
     StudyRequest,
     StudyVariationRequest,
 )
-from controllers.simulation.responses import (
+from contracts.simulation.responses import (
     CalibrationDTO,
     CandidatesDTO,
     CoverageReportDTO,
@@ -122,8 +136,18 @@ from controllers.simulation.responses import (
     StudyDTO,
     StudySummaryDTO,
 )
-from controllers.tax.requests import FixedIncomeCompareRequest
-from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
+from contracts.tax.requests import FixedIncomeCompareRequest
+from contracts.tax.responses import (
+    AssetTaxStatusDTO,
+    FixedIncomeComparisonDTO,
+    TaxMonthDTO,
+    TaxRuleDTO,
+    TaxYearDTO,
+)
+from contracts.tax.serializers import to_tax_month_dto, to_tax_year_dto
+from contracts.watch.requests import AlertRuleCreateRequest
+from contracts.watch.responses import AlertRuleDTO, AssetNoteDTO
+from contracts.watch.serializers import to_note_dto, to_rule_dto
 from core.errors import ValidationError
 from core.helpers.pagination import PaginationParams
 from domain.accounts.services.use_cases import AccountHandler
@@ -133,25 +157,34 @@ from domain.contributions.services.use_cases import ContributionHandler
 from domain.disclosures.services.statements_view import StatementsHandler
 from domain.disclosures.services.use_cases import DisclosureHandler
 from domain.forecast.services import ForecastHandler
+from domain.instruments.services import InstrumentHandler, SearchHandler
 from domain.ledger.services.use_cases.b3_import import ImportHandler
 from domain.ledger.services.use_cases.corporate_events import CorporateEventHandler
 from domain.ledger.services.use_cases.earnings import EarningHandler
 from domain.ledger.services.use_cases.transactions import TransactionHandler
+from domain.market.services.stored import distribution_lookup
 from domain.market.services.use_cases import MarketDataHandler
 from domain.mining.services import MiningHandler
+from domain.planning.goals import Goal
+from domain.planning.services import GoalHandler, IncomeForecastHandler
 from domain.policy.services.use_cases import PolicyHandler
+from domain.portfolio.services.income import IncomeHandler
+from domain.portfolio.services.monthly_report import MonthlyReportHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.portfolio.services.use_cases import PortfolioHandler
 from domain.recommendation.services import RecommendationHandler
+from domain.reconciliation.services import ReconciliationHandler
 from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.entities import AgentGrant, context_of
 from domain.shared.enums import ArcaClass, AssetType, ContributionPlanStatus
+from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.entities import SimulationKind
 from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
+from domain.tax.services.monthly import MonthlyTaxHandler
 from domain.tax.services.use_cases import TaxHandler
-from infra.providers.stored import distribution_lookup
+from domain.watch.services import AlertRuleHandler, AssetNoteHandler
 
 OperationKind = Literal["query", "command"]
 
@@ -173,6 +206,11 @@ CONTEXT_LABELS: dict[str, str] = {
     "study": "Estudos de simulação",
     "disclosures": "Comunicados da CVM",
     "recommendation": "Recomendação",
+    "instruments": "Instrumentos & Busca",
+    "reconciliation": "Conferência de posição (B3)",
+    "watch": "Acompanhar · regras de alerta e teses",
+    "tax": "Imposto mensal (IR e DARF)",
+    "planning": "Planejar · metas e renda futura",
 }
 
 
@@ -194,6 +232,13 @@ class MatrixInput(BaseModel):
 
     arca_class: Literal["ACOES", "REAL_ESTATE", "ATIVOS_INTERNACIONAIS"] | None = None
     as_of: date | None = None
+
+
+class TransitionInput(BaseModel):
+    """A class and how much of the monthly contribution goes to it."""
+
+    arca_class: ArcaClass
+    monthly_brl: float = Field(default=0.0, ge=0)
 
 
 class AmountInput(BaseModel):
@@ -322,6 +367,53 @@ class AssetListInput(BaseModel):
     active_only: bool = True
 
 
+class AlertRuleIdInput(BaseModel):
+    rule_id: int
+
+
+class NotesInput(BaseModel):
+    due_only: bool = False
+
+
+class AssetNoteToolInput(BaseModel):
+    asset_id: int
+    text: str = Field(min_length=1, max_length=4000)
+    review_at: date | None = None
+
+
+class TaxYearInput(BaseModel):
+    year: int | None = Field(default=None, ge=2000, description="Current year when omitted")
+
+
+class TaxMonthInput(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
+
+
+class DarfPaidInput(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
+    paid_on: date | None = Field(default=None, description="Null marks the DARF as not paid")
+
+
+class IncomeForecastInput(BaseModel):
+    months: Literal[12, 24, 36] = 12
+
+
+class InstrumentKeyInput(BaseModel):
+    """A ticker (any B3 or international code) or a Tesouro symbol (tesouro-ipca-15052035)."""
+
+    key: str = Field(min_length=1, max_length=64)
+
+
+class InstrumentPricesInput(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+    range: Literal["6mo", "1y", "2y", "5y", "max"] = "1y"
+
+
+class InstrumentSearchInput(BaseModel):
+    q: str = Field(min_length=1, max_length=64)
+    limit: int = Field(default=10, ge=1, le=50)
+
+
 class AssetIdInput(BaseModel):
     asset_id: int
 
@@ -425,6 +517,20 @@ class B3ImportPreviewToolInput(BaseModel):
         default_factory=list,
         description="Statement line numbers (line_no in the preview) to leave out",
     )
+
+
+class ReconciliationToolInput(B3ImportPreviewToolInput):
+    """The B3 Posição statement and its data-base (taken from the B3 file name if omitted)."""
+
+    reference_date: date | None = None
+
+
+class ReconciliationIdInput(BaseModel):
+    reconciliation_id: int
+
+
+class IncomeInput(BaseModel):
+    months: int = Field(default=24, ge=1, le=120)
 
 
 class B3ImportCommitToolInput(B3ImportPreviewToolInput):
@@ -576,6 +682,48 @@ class AgenticRuntimeHandlers:
     @property
     def mining(self) -> MiningHandler:
         return MiningHandler(uow_factory=self.uow_factory)
+
+    @property
+    def alert_rules(self) -> AlertRuleHandler:
+        return AlertRuleHandler(uow_factory=self.uow_factory)
+
+    @property
+    def notes(self) -> AssetNoteHandler:
+        return AssetNoteHandler(uow_factory=self.uow_factory)
+
+    @property
+    def monthly_tax(self) -> MonthlyTaxHandler:
+        return MonthlyTaxHandler(uow_factory=self.uow_factory)
+
+    @property
+    def goals(self) -> GoalHandler:
+        return GoalHandler(uow_factory=self.uow_factory)
+
+    @property
+    def income_forecast(self) -> IncomeForecastHandler:
+        return IncomeForecastHandler(
+            uow_factory=self.uow_factory, portfolio_service=self.portfolio_service
+        )
+
+    @property
+    def reconciliation(self) -> ReconciliationHandler:
+        return ReconciliationHandler(uow_factory=self.uow_factory)
+
+    @property
+    def income(self) -> IncomeHandler:
+        return IncomeHandler(uow_factory=self.uow_factory)
+
+    @property
+    def monthly_report(self) -> MonthlyReportHandler:
+        return MonthlyReportHandler(uow_factory=self.uow_factory)
+
+    @property
+    def instruments(self) -> InstrumentHandler:
+        return InstrumentHandler(uow_factory=self.uow_factory)
+
+    @property
+    def search(self) -> SearchHandler:
+        return SearchHandler(uow_factory=self.uow_factory)
 
     @property
     def recommendation(self) -> RecommendationHandler:
@@ -888,6 +1036,20 @@ OPERATIONS: tuple[OperationSpec, ...] = (
         input_model=AmountInput,
         output_type=ContributionComparisonDTO,
         invoke=lambda h, p: h.recommendation.contribution(p.amount_brl),
+    ),
+    OperationSpec(
+        name="recommendation.transition",
+        kind="query",
+        description=(
+            "Como chegar aos pesos-alvo de uma classe (Fase 34.7), em estudo: só com aportes "
+            "(em quantos meses, para um aporte mensal na classe) ou com vendas (o que vender, o "
+            "IR pela regra real, os custos, se dividir as vendas de ações em meses mantém a "
+            "isenção de R$ 20 mil e em quantos meses a melhora esperada paga o custo). Nada é "
+            "gravado e nenhuma ordem é dada."
+        ),
+        input_model=TransitionInput,
+        output_type=TransitionDTO,
+        invoke=lambda h, p: h.recommendation.transition(p.arca_class, p.monthly_brl),
     ),
     OperationSpec(
         name="recommendation.compare",
@@ -1857,6 +2019,262 @@ OPERATIONS = (
         input_model=MarkReadRequest,
         output_type=MarkReadResultDTO,
         invoke=lambda h, p: MarkReadResultDTO(updated=h.disclosures.mark_read(p)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 16. Instruments and global search (Phase 48.R2)
+    OperationSpec(
+        name="instruments.search",
+        kind="query",
+        description=(
+            "Busca global por ticker ou nome em uma só chamada: ativos cadastrados, catálogo da "
+            "B3 e títulos do Tesouro Direto, com o tipo de correspondência, o fechamento, se "
+            "está cadastrado (`tracked_asset_id`) e se há posição. Use a `key` de um resultado "
+            "em instruments.get."
+        ),
+        input_model=InstrumentSearchInput,
+        output_type=SearchResultDTO,
+        invoke=lambda h, p: to_search_result_dto(h.search.search(p.q, limit=p.limit)),
+    ),
+    OperationSpec(
+        name="instruments.get",
+        kind="query",
+        description=(
+            "Página de QUALQUER ativo, cadastrado ou não, pela `key` (ticker ou símbolo do "
+            "Tesouro): nome, tipo, setor, cotação guardada (ou o fechamento do catálogo), "
+            "indicadores, lentes da recomendação, faixa da previsão (só com selo a partir de "
+            "“Use com cautela”), termos do título do Tesouro e, se cadastrado, `tracking` com o "
+            "`asset_id` para assets.get, assets.checklist, assets.tax_status e os lançamentos. "
+            "Não cadastra nada e não chama provedor; `data_gaps` diz o que ainda falta no banco."
+        ),
+        input_model=InstrumentKeyInput,
+        output_type=InstrumentViewDTO,
+        invoke=lambda h, p: to_instrument_view_dto(h.instruments.view(p.key)),
+    ),
+    OperationSpec(
+        name="instruments.prices",
+        kind="query",
+        description=(
+            "Fechamentos diários guardados de qualquer ticker (6 meses, 1, 2 ou 5 anos, ou todo "
+            "o histórico), limpos como no gráfico do ativo, sem precisar de cadastro."
+        ),
+        input_model=InstrumentPricesInput,
+        output_type=AssetPriceHistoryDTO,
+        invoke=lambda h, p: to_price_history_dto(h.instruments.prices(p.key, p.range)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 17. Position check and earnings received (Phase 48.R5)
+    OperationSpec(
+        name="reconciliation.preview",
+        kind="query",
+        description=(
+            "Confere o extrato de POSIÇÃO da Área do Investidor da B3 (.xlsx com uma aba por "
+            "produto, ou .csv) contra a posição do livro na data-base, por ticker e conta: "
+            "MATCH, DIVERGENT, ONLY_B3, ONLY_LEDGER ou NOT_COMPARED (Tesouro e renda fixa, "
+            "sem código de negociação), com a diferença. Não grava nada e nunca altera o livro."
+        ),
+        input_model=ReconciliationToolInput,
+        output_type=ReconciliationDTO,
+        invoke=lambda h, p: to_reconciliation_dto(
+            h.reconciliation.preview(p.filename, _decode_statement_bytes(p), p.reference_date)
+        ),
+    ),
+    OperationSpec(
+        name="reconciliation.commit",
+        kind="command",
+        description=(
+            "Grava a conferência do extrato de Posição (o mesmo arquivo na mesma data-base não "
+            "duplica). Não altera o livro: para corrigir, lance em ledger.trades.create."
+        ),
+        input_model=ReconciliationToolInput,
+        output_type=ReconciliationDTO,
+        invoke=lambda h, p: to_reconciliation_dto(
+            h.reconciliation.commit(p.filename, _decode_statement_bytes(p), p.reference_date)
+        ),
+    ),
+    OperationSpec(
+        name="reconciliation.list",
+        kind="query",
+        description="Conferências de posição gravadas, da mais recente: data-base e contagens.",
+        input_model=EmptyInput,
+        output_type=list[ReconciliationSummaryDTO],
+        invoke=lambda h, p: [to_summary_dto(r) for r in h.reconciliation.list_recent()],
+    ),
+    OperationSpec(
+        name="reconciliation.get",
+        kind="query",
+        description="Uma conferência de posição gravada, com todas as linhas e resoluções.",
+        input_model=ReconciliationIdInput,
+        output_type=ReconciliationDTO,
+        invoke=lambda h, p: to_reconciliation_dto(h.reconciliation.get(p.reconciliation_id)),
+    ),
+    OperationSpec(
+        name="portfolio.income",
+        kind="query",
+        description=(
+            "Proventos recebidos, líquidos e em R$: por mês (últimos `months`), por ano, total "
+            "dos últimos 12 meses contra os 12 anteriores, yield on cost e quanto cada ativo "
+            "pagou. Para os anunciados e ainda não pagos, use portfolio.earnings_agenda."
+        ),
+        input_model=IncomeInput,
+        output_type=IncomeSummaryDTO,
+        invoke=lambda h, p: to_income_summary_dto(h.income.summary(months=p.months)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 18. Acompanhar: alert rules and thesis notes (Phase 48.R6)
+    OperationSpec(
+        name="watch.rules_list",
+        kind="query",
+        description=(
+            "Regras de alerta do investidor (preço, dividend yield, P/L ou P/VP acima ou abaixo "
+            "de um limite, em qualquer ticker), com o valor lido agora do banco e se dispararam."
+        ),
+        input_model=EmptyInput,
+        output_type=list[AlertRuleDTO],
+        invoke=lambda h, p: [to_rule_dto(r) for r in h.alert_rules.list()],
+    ),
+    OperationSpec(
+        name="watch.rules_create",
+        kind="command",
+        description=(
+            "Cria uma regra de alerta: `metric` PRICE, DIVIDEND_YIELD (fração: 0.08 = 8%), "
+            "PRICE_TO_EARNINGS ou PRICE_TO_BOOK; `operator` ABOVE ou BELOW; `threshold`. Ao "
+            "disparar, vira um alerta comum em alerts.list."
+        ),
+        input_model=AlertRuleCreateRequest,
+        output_type=AlertRuleDTO,
+        invoke=lambda h, p: to_rule_dto(
+            h.alert_rules.create(p.ticker, p.metric, p.operator, p.threshold, p.note)
+        ),
+    ),
+    OperationSpec(
+        name="watch.rules_delete",
+        kind="command",
+        description="Apaga uma regra de alerta.",
+        input_model=AlertRuleIdInput,
+        output_type=OperationStatusDTO,
+        invoke=lambda h, p: (h.alert_rules.delete(p.rule_id), OperationStatusDTO())[1],
+    ),
+    OperationSpec(
+        name="watch.notes_list",
+        kind="query",
+        description=(
+            "Teses dos ativos (notas com data de revisão), as vencidas primeiro; `due_only` "
+            "traz só as que chegaram à data de revisão."
+        ),
+        input_model=NotesInput,
+        output_type=list[AssetNoteDTO],
+        invoke=lambda h, p: [to_note_dto(n, t) for n, t in h.notes.list_all(due_only=p.due_only)],
+    ),
+    OperationSpec(
+        name="watch.notes_create",
+        kind="command",
+        description="Escreve uma nota na tese de um ativo, com a data em que revisá-la.",
+        input_model=AssetNoteToolInput,
+        output_type=AssetNoteDTO,
+        invoke=lambda h, p: to_note_dto(h.notes.create(p.asset_id, p.text, review_at=p.review_at)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 19. Monthly income tax and DARF (Phase 48.R7)
+    OperationSpec(
+        name="tax.monthly_year",
+        kind="query",
+        description=(
+            "Apuração mensal do IR sobre a renda variável num ano: por mês e categoria "
+            "(COMMON = ações, ETF e BDR em operações comuns; DAY_TRADE; FII), isenção de R$ 20 "
+            "mil em vendas de ações no mês, prejuízo acumulado por categoria, IRRF estimado, "
+            "DARF 6015 (abaixo de R$ 10 acumula) com vencimento e se foi pago; e a apuração "
+            "anual das aplicações no exterior (Lei 14.754/2023). Calculado do livro."
+        ),
+        input_model=TaxYearInput,
+        output_type=TaxYearDTO,
+        invoke=lambda h, p: to_tax_year_dto(h.monthly_tax.year(p.year or date.today().year)),
+    ),
+    OperationSpec(
+        name="tax.monthly_month",
+        kind="query",
+        description="Um mês da apuração com cada venda: custo médio, resultado e categoria.",
+        input_model=TaxMonthInput,
+        output_type=TaxMonthDTO,
+        invoke=lambda h, p: to_tax_month_dto(h.monthly_tax.month(p.month)),
+    ),
+    OperationSpec(
+        name="tax.darf_paid",
+        kind="command",
+        description="Marca (ou desmarca, com paid_on nulo) o DARF de um mês como pago.",
+        input_model=DarfPaidInput,
+        output_type=TaxMonthDTO,
+        invoke=lambda h, p: to_tax_month_dto(h.monthly_tax.set_paid(p.month, p.paid_on)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    # 20. Planejar: goals and future income (Phase 48.R8)
+    OperationSpec(
+        name="planning.goals_list",
+        kind="query",
+        description=(
+            "Metas do investidor (patrimônio, ou renda passiva por mês) com o progresso: valor "
+            "de hoje, o patrimônio que a meta pede, a projeção na data com o aporte planejado, "
+            "o aporte mensal necessário e se está no caminho (REACHED, ON_TRACK, OFF_TRACK, "
+            "MISSED). As premissas de retorno e de yield são de cada meta."
+        ),
+        input_model=EmptyInput,
+        output_type=list[GoalDTO],
+        invoke=lambda h, p: [to_goal_dto(g) for g in h.goals.list()],
+    ),
+    OperationSpec(
+        name="planning.goals_create",
+        kind="command",
+        description=(
+            "Cria uma meta: `kind` WEALTH (patrimônio em R$) ou PASSIVE_INCOME (renda por mês "
+            "em R$), `target_date`, `monthly_contribution_brl` e, opcionais, `annual_return` e "
+            "`income_yield` como frações (0.06 = 6% ao ano)."
+        ),
+        input_model=GoalCreateRequest,
+        output_type=GoalDTO,
+        invoke=lambda h, p: to_goal_dto(h.goals.create(Goal(**p.model_dump()))),
+    ),
+    OperationSpec(
+        name="planning.income_forecast",
+        kind="query",
+        description=(
+            "Renda passiva futura mês a mês (12, 24 ou 36 meses): proventos já anunciados e a "
+            "estimativa pelo que cada ativo pagou nos últimos 12 meses, na quantidade de hoje, "
+            "sem contar duas vezes. Para o que já foi recebido, use portfolio.income."
+        ),
+        input_model=IncomeForecastInput,
+        output_type=IncomeForecastDTO,
+        invoke=lambda h, p: to_income_forecast_dto(h.income_forecast.forecast(months=p.months)),
+    ),
+)
+
+OPERATIONS = (
+    *OPERATIONS,
+    OperationSpec(
+        name="portfolio.monthly_report",
+        kind="query",
+        description=(
+            "Relatório de um mês da carteira (YYYY-MM): patrimônio no início e no fim, compras, "
+            "vendas, resultado e rentabilidade do mês (TWR com proventos), proventos recebidos, "
+            "negociações, alocação ARCA no fim do mês, imposto do mês e as metas. É o mesmo "
+            "relatório que a tela imprime em PDF."
+        ),
+        input_model=TaxMonthInput,
+        output_type=MonthlyReportDTO,
+        invoke=lambda h, p: to_monthly_report_dto(h.monthly_report.report(p.month)),
     ),
 )
 

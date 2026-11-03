@@ -56,7 +56,7 @@ URL desconhecida mostra **404**. O detalhe do ativo usa `/asset/` (singular) por
 
 - `src/api/http.ts`: `request<T>()` com cookie de sessão, `ApiError` (status, código, mensagem), evento de sessão expirada, mensagem de servidor fora do ar e validação 422 resumida.
 - `src/api/endpoints.ts`: chamadas tipadas por contexto (`api.portfolio`, `api.research`, `api.contributions`, `api.ledger`, `api.policy`, …). `ImportNewAssetRequest` é declarado ali à mão porque viaja como JSON dentro do campo multipart `new_assets` e por isso não está entre os schemas gerados (`types.ts` vem de `scripts/gen_web_types.py`).
-- `src/api/useApi.ts`: `useApi(key, load)` com `data`, `error`, `loading` e `reload`; trocar a `key` recarrega.
+- `src/api/query.ts` (Fase 48.R9, substitui o `useApi`): `useScreenData(key, load)` com `data`, `error`, `loading` e `reload`, sobre o cache do TanStack Query; trocar a `key` recarrega, a mesma `key` em duas telas divide a requisição e a tela sempre revalida ao abrir. Telas novas usam `useQuery` direto.
 
 ## 6. Qualidade
 

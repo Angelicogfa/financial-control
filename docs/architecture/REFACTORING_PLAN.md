@@ -1,7 +1,7 @@
 # Plano de Refatoração Sistêmica e de Experiência
 
 *Data: 2026-11-01. Diagnóstico e benchmark em [REBUILD_ANALYSIS.md](./REBUILD_ANALYSIS.md).*
-*Status: `[ ]` Proposta — registrada como Fase 48 em [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md).*
+*Status: Aprovada em 2026-11-01 (decisões na §7) — registrada como Fase 48 em [IMPLEMENTATION_PLAN.md](../todo/IMPLEMENTATION_PLAN.md).*
 
 ---
 
@@ -34,6 +34,8 @@ infra/providers, infra/mcp    inalterados; MCP passa a serializar read models co
 worker/                       inalterado + jobs dos novos read models
 ```
 
+> **Decisão da R1 (2026-11-01, [ADR 0010](./adr/0010-contracts-package-and-domain-ports.md)):** os schemas Pydantic e os serializadores saíram de `controllers` para `contracts/<context>/`, que controllers, handlers e MCP compartilham. Read models em dataclass só para as formas novas (`InstrumentView`, `PortfolioHub`…) e quando um handler for reescrito. A tabela de imports valendo é a do ADR 0010.
+
 **Regras novas, verificadas por teste de arquitetura** (`tests/test_architecture_contracts.py`, sobre o grafo de imports que `test_import_graph.py` já percorre):
 
 | De | Pode importar | Não pode importar |
@@ -57,9 +59,9 @@ Hoje o ativo só tem página depois de cadastrado (`assets.id`). O mercado abre 
 
 | Rota | Handler | Compõe |
 |---|---|---|
-| `GET /search?q=&limit=` | `SearchQueryHandler` | `assets` (por ticker/nome) + `instrument_catalog` + catálogo do Tesouro; marca "na carteira", "acompanhando" |
-| `GET /instruments/{ticker}` | `InstrumentViewHandler` | §2.2 — resumo, veredito das lentes, faixa da previsão, posição |
-| `GET /instruments/{ticker}/{section}` | idem | `fundamentals`, `valuation`, `earnings`, `disclosures`, `prices?range=`, `forecast`, `checklist`, `tax`, `ledger` — delegam aos use cases atuais quando há `asset_id` |
+| `GET /search?q=&limit=` | `SearchHandler` | `assets` (por ticker/nome) + `instrument_catalog` + catálogo do Tesouro; marca "na carteira", "acompanhando" |
+| `GET /instruments/{key}` (ticker ou símbolo do Tesouro) | `InstrumentHandler` | §2.2 — resumo, veredito das lentes, faixa da previsão, posição |
+| `GET /instruments/{key}/prices?range=` | idem | fechamentos guardados de qualquer ticker. *Feito na R2:* indicadores, lentes e faixa da previsão vêm na própria view; as seções que exigem cadastro (checklist, IR, lançamentos, valuation) ficam em `/assets/{id}`, usando o `tracking.asset_id` da view |
 | `GET /portfolio/hub?tab=` | `PortfolioHubHandler` | consolidação + analytics + health + by-account num read model por aba |
 | `POST /reconciliation/b3/preview`, `POST /reconciliation/b3/commit`, `GET /reconciliation` | `PositionReconciliation*` | extrato de **Posição** da Área do Investidor × posição do livro por ticker e conta |
 | `GET /tax/monthly?year=`, `GET /tax/monthly/{yyyy-mm}` | `MonthlyTaxAssessment*` | lucro realizado do livro + regras de `domain/tax` (fecha TD-04) |
@@ -73,11 +75,13 @@ Hoje o ativo só tem página depois de cadastrado (`assets.id`). O mercado abre 
 | Migration | Tabela | Uso |
 |---|---|---|
 | `script_00040_position_reconciliations` | `position_reconciliations`, `position_reconciliation_lines` | cada conferência (data-base, arquivo, hash) e cada linha (ticker, conta, qtd B3, qtd livro, diferença, status `MATCH`/`DIVERGENT`/`ONLY_B3`/`ONLY_LEDGER`, resolução) |
-| `script_00041_monthly_tax_assessments` | `monthly_tax_assessments` | apuração por mês e categoria (`STOCK_SWING`, `DAY_TRADE`, `FII`, `FOREIGN_ANNUAL`), prejuízo acumulado, imposto devido, status do DARF |
-| `script_00042_goals` | `goals` | tipo (`WEALTH`, `PASSIVE_INCOME`), alvo, prazo, aporte mensal planejado |
-| `script_00043_alert_rules` | `alert_rules` | ticker, métrica, operador, limite, ativo/inativo; disparo vira alerta comum em `GET /alerts` |
-| `script_00044_asset_notes` | `asset_notes` | `asset_id`, data, texto, `review_at` |
+| `script_00043_monthly_tax_assessments` | `monthly_tax_assessments` | apuração por mês e categoria (`STOCK_SWING`, `DAY_TRADE`, `FII`, `FOREIGN_ANNUAL`), prejuízo acumulado, imposto devido, status do DARF |
+| `script_00044_goals` | `goals` | tipo (`WEALTH`, `PASSIVE_INCOME`), alvo, prazo, aporte mensal planejado |
+| `script_00041_alert_rules` | `alert_rules` | ticker, métrica, operador, limite, ativo/inativo; disparo vira alerta comum em `GET /alerts` |
+| `script_00042_asset_notes` | `asset_notes` | `asset_id`, data, texto, `review_at` |
 | `script_00045_saved_views` | `saved_views` | filtros salvos do screener e da carteira (hoje em `sessionStorage`) |
+
+> **Numeração (decidida na R6, 2026-11-02):** o Alembic exige uma cadeia linear, e os números seguem a ordem em que as fases entram — R5 `00040`, R6 `00041`/`00042`, R7 `00043`, R8 `00044`, R9 `00045`.
 
 Cada migration tem teste de `upgrade`/`downgrade` (como `test_phase8_migrations.py`) e roda contra uma cópia restaurada da base real antes do merge.
 
@@ -220,18 +224,20 @@ Cada fase termina com: testes de unidade e integração (`uv run pytest`, `npm t
 
 | Fase | Nome | Entregas | Critério de pronto | Depende |
 |---|---|---|---|---|
-| **R0** | Guarda-corpos | `tests/test_architecture_contracts.py` (inicialmente com a lista de violações atual como *allowlist* que só pode diminuir); snapshot do OpenAPI versionado; script de restauração de cópia da base para teste de migração; smoke E2E Playwright das 10 jornadas atuais | CI local verde; allowlist com 25 + 10 entradas | — |
+| **R0** | Guarda-corpos | `tests/test_architecture_contracts.py` (inicialmente com a lista de violações atual como *allowlist* que só pode diminuir); snapshot do OpenAPI versionado; script de restauração de cópia da base para teste de migração; smoke E2E Playwright das 10 jornadas atuais | CI local verde; allowlist com 25 + 10 módulos de `domain` (no total 29 módulos e 118 imports, incluindo `infra → worker/controllers` e `core → domain`) | — |
 | **R1** | Unificação das camadas | use cases devolvem read models; DTOs só em `controllers`; portas no lugar de `infra` dentro de `domain`; MCP serializando read models; `health.py` dividido por pilar; `OVERVIEW.md` §2.1 corrigido | allowlist vazia; **diff de OpenAPI = 0**; golden e caracterização iguais | R0 |
-| **R2** | Instrumento por ticker e busca | `InstrumentView`, `GET /instruments/{ticker}[/section]`, `GET /search`; MCP `instruments.get`, `search` | qualquer ticker do catálogo abre sem cadastro; nenhum provedor chamado na requisição | R1 |
-| **R3** | Novo shell e arquitetura de informação | `app/` + `features/`; cache de dados; busca global `Ctrl+K`; 7 destinos; rotas em pt-BR (`/carteira`, `/ativo/:ticker`, `/explorar`, `/acompanhar`, `/aportar`, `/planejar`, `/lancamentos`) com **redirecionamento** de todas as rotas antigas | toda URL antiga leva ao lugar novo; testes de navegação | R2 |
-| **R4** | Página do ativo em capítulos | §3.3 com as abas atuais reaproveitadas como seções; "Como entraria" para não possuído | `/asset/:id` redireciona; mesmo dado que as abas atuais (teste contra `mockApi`) | R3 |
+| **R2** | Instrumento por ticker e busca | `InstrumentView`, `GET /instruments/{ticker}[/section]`, `GET /search`; MCP `instruments.get`, `instruments.prices`, `instruments.search` | qualquer ticker do catálogo abre sem cadastro; nenhum provedor chamado na requisição | R1 |
+| **R3** | Novo shell e arquitetura de informação | `app/` (rotas, legado, providers) + `features/` (busca, instrumento, acompanhar; as páginas existentes seguem em `pages/` até a R9); cache de dados; busca global `Ctrl+K`; 7 destinos; rotas em pt-BR (`/carteira`, `/ativo/:ticker`, `/explorar`, `/acompanhar`, `/aportar`, `/planejar`, `/lancamentos`) com **redirecionamento** de todas as rotas antigas | toda URL antiga leva ao lugar novo; testes de navegação | R2 |
+| **R4** | Página do ativo em capítulos | §3.3 com as abas atuais reaproveitadas como seções; "Como entraria" para não possuído; os links internos passam de `/asset/:id` para `/ativo/:ticker` | `/asset/:id` redireciona; mesmo dado que as abas atuais (teste contra `mockApi`) | R3 |
 | **R5** | Hub da carteira + Conferir | abas §3.4 (Posições, Rentabilidade, Proventos, Raio-X); `script_00040`; conferência de posição §3.5 | conferência do extrato real bate ou explica cada diferença; Desempenho e Saúde redirecionam | R3 |
-| **R6** | Acompanhar e Aportar unificados | watchlist + alertas + teses; `script_00043`, `script_00044`; worker avalia `alert_rules`; Aportar §3.6; Recomendação técnica → Planejar › Modelo | mesmo plano de aporte que hoje para o mesmo valor (teste de regressão) | R4 |
-| **R7** | Imposto mensal | `script_00041`; apuração por categoria, isenção de R$ 20 mil em ações, compensação, exterior anual (Lei 14.754/2023); aba Imposto; alerta de DARF; **fecha TD-04** | casos de teste da Receita/golden de IR | R5 |
-| **R8** | Planejar | `script_00042`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima) e **36** (carteiras de comparação) se aprovadas | meta mostra progresso e aporte necessário | R5 |
+| **R6** | Acompanhar e Aportar unificados | watchlist + alertas + teses; `script_00041`, `script_00042`; worker avalia `alert_rules`; Aportar §3.6; Recomendação técnica → Planejar › Modelo | mesmo plano de aporte que hoje para o mesmo valor (teste de regressão) | R4 |
+| **R7** | Imposto mensal | `script_00043`; apuração por categoria, isenção de R$ 20 mil em ações, compensação, exterior anual (Lei 14.754/2023); aba Imposto; alerta de DARF; **fecha TD-04** | casos de teste da Receita/golden de IR | R5 |
+| **R8** | Planejar | `script_00044`, metas; renda futura; simulações reposicionadas; incorpora as propostas **34** (composição ótima), **36** (carteiras de comparação) e **47** (recomendações externas) | meta mostra progresso e aporte necessário | R5 |
 | **R9** | Remoção do legado | apaga `pages/` antigas, `useApi`, rotas de redirecionamento com mais de 2 fases; `saved_views` (`script_00045`); relatório mensal em PDF | nenhum import de `pages/`; docs atualizados | R4–R8 |
 
-Paralelismo possível: depois de R3, **R4** (ativo) e **R5** (carteira) não tocam os mesmos arquivos; **R7** e **R8** são independentes entre si.
+**Estado (2026-11-02):** R0 a R9 concluídas; a refatoração está fechada. O relatório mensal sai em PDF pela impressão do navegador (sem biblioteca de PDF no backend).
+
+Ordem decidida: **R4** antes de **R5** (§7). Paralelismo possível: depois de R3, R4 (ativo) e R5 (carteira) não tocam os mesmos arquivos; **R7** e **R8** são independentes entre si.
 
 ---
 
@@ -267,9 +273,10 @@ Paralelismo possível: depois de R3, **R4** (ativo) e **R5** (carteira) não toc
 
 ---
 
-## 7. Itens para aprovação
+## 7. Decisões (aprovadas em 2026-11-01)
 
-1. Renomear as rotas para pt-BR (`/carteira`, `/ativo/:ticker`) ou manter em inglês (`/portfolio`, `/instrument/:ticker`)? *(o AGENTS.md exige inglês em rotas da API; rotas do SPA são UI — recomendação: pt-BR no web, inglês na API.)*
-2. Adotar TanStack Query no web (primeira dependência de runtime além de React/Router) ou manter cache próprio?
-3. Ordem R4 × R5: começar pela página do ativo (encontrar) ou pela conferência de posição (validar)?
-4. As propostas 34, 36 e 47 entram em R8 ou ficam como estão?
+1. **Rotas:** pt-BR no SPA (`/carteira`, `/ativo/:ticker`, `/explorar`, `/acompanhar`, `/aportar`, `/planejar`, `/lancamentos`); inglês na API (`/instruments`, `/search`…), como exige o AGENTS.md.
+2. **Cache de dados no web:** **TanStack Query** substitui o `useApi` (primeira dependência de runtime além de React/Router), adotado na R3.
+3. **Ordem R4 × R5:** **R4 (página do ativo) primeiro**, depois R5 (hub da carteira e conferência).
+4. **Propostas 34, 36 e 47:** entram na **R8** (Planejar › Modelo / Simulações), desenhadas sobre a nova arquitetura; não são feitas como fases soltas antes dela.
+   *Na R8 (corrigido em 2026-11-03):* as três não fecham a refatoração. As decisões 34.0 e 36.0 já estavam tomadas na seção 10.1 da hierarquia, e a Fase 45 entregou o otimizador (≈ 34.4) e o placar ao vivo com o fluxo espelhado (≈ 36.1–36.5); só a 47.0 segue em aberto. O restante entra em `features/planning`.

@@ -1,17 +1,35 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { api } from "../api/endpoints";
 import { CloseIcon, LogoutIcon, MenuIcon, MoonIcon, SunIcon } from "./icons";
 import { Breadcrumbs } from "./Breadcrumbs";
-import { DESKTOP_QUERY, NAV_SECTIONS } from "./navigation";
+import { GlobalSearch } from "../features/search/GlobalSearch";
+import { activeSection, DESKTOP_QUERY, destinationOf, NAV_SECTIONS } from "./navigation";
 import { applyTheme, currentTheme, type Theme } from "./theme";
 import { FRESH_ENTRY } from "../utils/storedState";
 
-/** Items with another menu item under their path (Pesquisar and Garimpo) are active only on
- *  their own page, so the nested one does not light both. */
-const NAV_PATHS = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.to));
-const NESTED_ITEMS = new Set(NAV_PATHS.filter((to) => NAV_PATHS.some((other) => other.startsWith(`${to}/`))));
+/** The sections of the current destination as tabs (Carteira › Posições, Rentabilidade…). */
+function DestinationTabs({ path }: Readonly<{ path: string }>) {
+  const destination = destinationOf(path);
+  if (!destination || destination.sections.length < 2) return null;
+  const current = activeSection(path, destination);
+  return (
+    <nav className="app-destination-tabs" aria-label={`Seções de ${destination.label}`}>
+      {destination.sections.map((section) => (
+        <Link
+          key={section.to}
+          to={section.to}
+          state={FRESH_ENTRY}
+          aria-current={current?.to === section.to ? "page" : undefined}
+          className={`app-destination-tab${current?.to === section.to ? " active" : ""}`}
+        >
+          {section.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
 
 function matchesDesktop(): boolean {
   return typeof window.matchMedia === "function" ? window.matchMedia(DESKTOP_QUERY).matches : true;
@@ -64,6 +82,7 @@ export function AppShell({
     return () => window.removeEventListener("fincontrol:worker-errors-changed", onChanged);
   }, [refreshWorkerErrorCount]);
 
+  const currentDestination = destinationOf(location.pathname);
   const overlay = !desktop && menuOpen;
   useEffect(() => {
     if (!overlay) return;
@@ -120,9 +139,10 @@ export function AppShell({
                   key={item.to}
                   to={item.to}
                   state={FRESH_ENTRY}
-                  end={NESTED_ITEMS.has(item.to)}
                   onClick={closeIfOverlay}
-                  className={({ isActive }) => `app-nav-item${isActive ? " active" : ""}`}
+                  className={({ isActive }) =>
+                    `app-nav-item${isActive || currentDestination?.to === item.to ? " active" : ""}`
+                  }
                 >
                   <item.icon width={17} height={17} />
                   {item.label}
@@ -181,7 +201,9 @@ export function AppShell({
             <MenuIcon width={17} height={17} />
           </button>
           <Breadcrumbs />
+          <GlobalSearch />
         </header>
+        <DestinationTabs path={location.pathname} />
         <main className="app-main">{children}</main>
       </div>
     </div>

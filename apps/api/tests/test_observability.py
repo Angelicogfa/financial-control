@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 from composition import get_database_probe
 from controllers.assets.dependencies import get_asset_handler
 from core.logging import JsonFormatter, request_id_var
-from infra.data.health import DatabaseStatus, check_database, head_revision
+from domain.system.entities import DatabaseStatus
+from infra.data.health import check_database, head_revision
 
 
 def test_request_id_is_echoed_or_generated(api: SimpleNamespace) -> None:

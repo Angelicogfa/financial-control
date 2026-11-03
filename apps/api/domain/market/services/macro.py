@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from core.helpers.units import rate_fraction
 from domain.shared.entities import MarketSeriesPoint
+from domain.shared.units import rate_fraction
 
 
 def annual_cdi_rate(points: Sequence[MarketSeriesPoint]) -> float | None:

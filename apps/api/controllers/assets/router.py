@@ -7,13 +7,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from controllers.assets.dependencies import (
-    get_asset_handler,
-    get_forecast_handler,
-    get_statements_handler,
-)
-from controllers.assets.requests import AssetCreateRequest, AssetUpdateRequest, CerradoUpdateRequest
-from controllers.assets.responses import (
+from contracts.assets.requests import AssetCreateRequest, AssetUpdateRequest, CerradoUpdateRequest
+from contracts.assets.responses import (
     ArcaSuggestionDTO,
     AssetAnalysisResponseDTO,
     AssetForecastDTO,
@@ -21,9 +16,14 @@ from controllers.assets.responses import (
     AssetResponseDTO,
     PriceRange,
 )
-from controllers.disclosures.responses import AssetStatementsDTO
+from contracts.disclosures.responses import AssetStatementsDTO
+from contracts.shared.responses import PaginatedResponse
+from controllers.assets.dependencies import (
+    get_asset_handler,
+    get_forecast_handler,
+    get_statements_handler,
+)
 from controllers.shared.dependencies import pagination_query
-from controllers.shared.responses import PaginatedResponse
 from core.helpers.pagination import PaginationParams
 from domain.assets.services.use_cases import AssetHandler
 from domain.disclosures.services.statements_view import StatementsHandler

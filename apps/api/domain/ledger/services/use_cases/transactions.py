@@ -5,12 +5,11 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 
-from controllers.ledger.requests import TransactionCreateRequest, TransactionUpdateRequest
-from controllers.ledger.responses import TransactionResponseDTO
-from controllers.ledger.serializers import to_transaction_dto
-from controllers.shared.dependencies import UoWFactory
-from controllers.shared.responses import PaginatedResponse
-from controllers.shared.serializers import to_page_meta_dto
+from contracts.ledger.requests import TransactionCreateRequest, TransactionUpdateRequest
+from contracts.ledger.responses import TransactionResponseDTO
+from contracts.ledger.serializers import to_transaction_dto
+from contracts.shared.responses import PaginatedResponse
+from contracts.shared.serializers import to_page_meta_dto
 from core.helpers.pagination import PaginationParams
 from domain.accounts.services.use_cases import resolve_account_id
 from domain.ledger.services.ledger import (
@@ -26,7 +25,7 @@ from domain.shared.entities import (
     AssetEntity,
     TransactionEntity,
 )
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 
 
 class TransactionHandler:

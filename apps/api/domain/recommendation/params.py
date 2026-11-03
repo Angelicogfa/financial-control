@@ -15,3 +15,4 @@ class ConstructionParams:
     group_cap: float = 0.25
     max_per_sector: int = 2
     sector_margin_sd: float = 0.5
+    asset_cap: float = 1.0  # of the class; the portfolio's limit seen from the class

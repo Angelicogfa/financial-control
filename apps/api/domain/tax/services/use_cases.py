@@ -8,18 +8,18 @@ from __future__ import annotations
 
 from datetime import date
 
-from controllers.shared.dependencies import UoWFactory
-from controllers.tax.requests import FixedIncomeCompareRequest, FixedIncomeOfferRequest
-from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
-from controllers.tax.serializers import (
+from contracts.tax.requests import FixedIncomeCompareRequest, FixedIncomeOfferRequest
+from contracts.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
+from contracts.tax.serializers import (
     to_asset_tax_status_dto,
     to_comparison_dto,
     to_tax_rule_dto,
 )
 from core.errors import NotFoundError, ValidationError
+from domain.market.services.stored import stored_macro_rates
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.enums import FixedIncomeIndexer, FixedIncomeLiquidity
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 from domain.tax.services.comparator import (
     FixedIncomeOffer,
     OfferIndexer,
@@ -28,7 +28,6 @@ from domain.tax.services.comparator import (
     default_scenarios,
 )
 from domain.tax.services.status import asset_tax_status
-from infra.providers.stored import stored_macro_rates
 
 DEFAULT_OPEN_TERM_DAYS = 365
 

@@ -25,7 +25,11 @@ from domain.disclosures.services.sync import base_ticker
 from domain.market.services.price_sanity import plausible_month, price_spikes
 from domain.mining.universe import MIN_DAILY_VOLUME, mining_universe
 from domain.policy.services.lifecycle import has_position
-from domain.policy.services.policy import RecommendationPolicy, current_policy
+from domain.policy.services.policy import (
+    InvestmentPolicy,
+    RecommendationPolicy,
+    current_policy,
+)
 from domain.portfolio.services.positions import (
     InsufficientQuantityError,
     build_position,
@@ -48,6 +52,7 @@ from domain.recommendation.lenses import (
     asset_lenses,
 )
 from domain.recommendation.optimizer import optimize_class
+from domain.recommendation.params import ConstructionParams
 from domain.recommendation.repositories import RecommendationRun
 from domain.recommendation.switch import _price
 from domain.recommendation.validation import LENS_WEIGHTS, LensWeights
@@ -239,6 +244,14 @@ def _matrices(
 RETURN_MONTHS = 40  # the 36 of the correlations and a margin
 
 
+def class_params(policy: InvestmentPolicy, arca_class: ArcaClass) -> ConstructionParams:
+    """The construction's parameters of a class: the portfolio's limit per asset (the Saúde
+    warning) seen from the class, so the targets do not build what the Saúde then flags."""
+    target = policy.arca.classes[arca_class].target_pct / 100.0
+    cap = policy.health.max_asset_weight_warning / target if target > 0 else 1.0
+    return replace(policy.recommendation.construction(), asset_cap=min(cap, 1.0))
+
+
 def monthly_returns(
     uow: AbstractUnitOfWork, tickers: list[str], as_of: date
 ) -> dict[str, dict[tuple[int, int], float]]:
@@ -334,9 +347,9 @@ def refresh_lenses(
     held = _held_values(uow, universe, as_of)
     tickers = {r.ticker for m in matrices for r in m.rows} | {t for c in held.values() for t in c}
     returns = monthly_returns(uow, sorted(tickers), as_of)
-    params = policy.recommendation.construction()
     constructions = {}
     for m in matrices:
+        params = class_params(policy, ArcaClass(m.arca_class))
         built = build_class(m, returns, params)
         optimized = optimize_class(
             m, returns, params, current=held.get(m.arca_class), construction=built

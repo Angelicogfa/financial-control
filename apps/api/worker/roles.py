@@ -51,6 +51,7 @@ PROCESS_JOBS = frozenset(
         "refresh_asset_lenses",
         "backtest_recommendation",
         "update_comparison_portfolios",
+        "evaluate_alert_rules",
     }
 )
 

@@ -7,17 +7,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
 
-from controllers.agentic.dependencies import get_agent_key_handler
-from controllers.agentic.requests import (
+from contracts.agentic.requests import (
     AgentKeyCreateRequest,
     AgentKeyRenewRequest,
     AgentKeyUpdateRequest,
 )
-from controllers.agentic.responses import (
+from contracts.agentic.responses import (
     AgentKeyCreatedDTO,
     AgentKeyDTO,
     GrantOptionsDTO,
 )
+from controllers.agentic.dependencies import get_agent_key_handler
 from controllers.auth.dependencies import require_user
 from domain.agentic.services.use_cases import AgentKeyHandler
 

@@ -119,21 +119,29 @@ Rotinas do worker (cada execução fica em `job_runs`, com trava no Redis e nova
 
 Além da rotina semanal, a API busca os demonstrativos de um ativo **logo após cadastrá-lo** pela Pesquisa ou pela importação B3 (`StatementRefresher`, em `BackgroundTasks`, sem atrasar a resposta).
 
-### 2.1 Estrutura do backend (ADR 0008)
+### 2.1 Estrutura do backend (ADRs 0009 e 0010)
 
 ```text
-apps/api/src/fincontrol_api/
+apps/api/
   main.py            app factory: middleware, erros e routers
-  composition.py     raiz de composição (SqlAlchemyUnitOfWork, gateway, sonda do banco)
-  core/              config, security, deps, middleware, http_errors
-  modules/<feature>/ router → use_cases → service, com schemas, dependencies e serializers
-apps/packages/
-  config/            Settings compartilhado (espelha o .env.example)
-  core/              domínio puro e portas (repositórios, Unit of Work, gateway)
-  persistence/       core/ (Unit of Work), models/, repositories/, mappers/ por feature, migrations/
+  composition.py     raiz de composição (SqlAlchemyUnitOfWork, gateway, sonda do banco, serviços)
+  controllers/<ctx>/ router.py e dependencies.py: validam o HTTP e chamam o handler
+  contracts/<ctx>/   requests.py, responses.py e serializers.py (Pydantic, sem FastAPI)
+  domain/<ctx>/      entities/, services/ (handlers e motores puros), repositories/ (portas)
+  domain/shared/     entidades e enums comuns, unit_of_work.py (UoW e UoWFactory), gateways.py
+  infra/             data/ (models, mappers, UoW, repositórios, migrations), cache/, providers/, mcp/
+  core/              settings, logging, middleware, security, erros, helpers sem domínio
+  worker/            scheduler, runner e jobs (papéis de ingestão e processamento)
 ```
 
-A API e o worker usam os mesmos pacotes de `apps/packages/`; o worker nunca importa a API.
+A API, o MCP e o worker compõem os mesmos handlers. O domínio depende apenas de portas: o UoW e a `MarketDataGateway`, implementada pelo `CachedMarketGateway`.
+
+**Guarda-corpos (Fases 48.R0 e 48.R1):**
+
+- `tests/test_architecture_contracts.py` verifica o contrato de imports entre camadas (tabela no ADR 0010). A allowlist (`tests/architecture_allowlist.py`) foi zerada na R1 e continua vazia.
+- `tests/test_openapi_snapshot.py` congela o contrato da API em `tests/snapshots/openapi.json`. Uma mudança intencional regenera o snapshot com `scripts/update_openapi_snapshot.py`.
+- `scripts/migration_rehearsal.sh` restaura um dump da base real num Postgres descartável e roda `infra/data/migration_rehearsal.py`, que confere se as migrations são só aditivas (nenhuma tabela, coluna ou linha perdida) e faz a ida e volta `downgrade`/`upgrade`.
+- `apps/web/e2e/navigation.spec.ts` abre cada tela listada em `e2e/routes.ts`; essas URLs precisam continuar funcionando, ou redirecionar, durante a reconstrução.
 
 Falhas de provedor viram **fallback sinalizado** (cotação pelo preço médio, taxas padrão) e são lembradas por `MARKET_MISS_CACHE_TTL` para as telas responderem na hora; os alertas avisam o usuário.
 
@@ -364,3 +372,38 @@ A ferramenta trabalha com **estudos** (`simulation_studies`): uma pergunta, prem
 
 `domain/mining` procura achados nas ações líquidas de todo o catálogo. O universo (`universe.py`) são as ações brasileiras com CNPJ no mapa da CVM e volume médio acima de `MINING_MIN_DAILY_VOLUME`, uma classe por empresa; `sync_mining_universe` mantém o histórico longo delas (com desdobramentos). `run_mining` monta toda semana o painel mensal e grava em `mining_signals` quatro sinais point-in-time, cada um um z frente ao setor: valor (o z da 42.3), qualidade, melhora dos resultados e momentum. O mesmo job estima os pesos dos sinais (Fama-MacBeth com prior cético), testa a carteira dos 10 melhores por origem móvel contra o universo, com custos e CSCV, e grava os achados da semana em `mining_findings` (achados se o portão passou; senão, ranking em observação) e o placar no modelo (`forecast_models`, `MINING`). A página "Garimpo" e o MCP só leem essas tabelas.
 
+### Instrumento por ticker e busca global (Fase 48.R2)
+
+`GET /instruments/{key}` abre qualquer ticker ou título do Tesouro (`tesouro-ipca-15052035`) sem cadastrá-lo. A view junta a cotação guardada (ou, na falta dela, o fechamento do catálogo da B3), os indicadores, as lentes da recomendação, a faixa da previsão (só com selo a partir de "Use com cautela") e, se o ativo estiver cadastrado, o `tracking` com o `asset_id`. `GET /search` procura ao mesmo tempo nos ativos cadastrados, no catálogo da B3 e no Tesouro. Os dois só leem o banco (`domain/instruments`); o MCP expõe `instruments.get`, `instruments.prices` e `instruments.search`.
+
+### Navegação por tarefa e busca global (Fase 48.R3)
+
+O menu tem sete destinos, cada um com a sua pergunta: Início (como estou?), Carteira (está tudo certo?), Explorar (o que existe por aí?), Acompanhar (o que estou vigiando?), Aportar (o que faço com o dinheiro?), Planejar (para onde vou?) e Lançamentos (o que eu fiz?), além de Configurações. As seções de cada destino aparecem como abas abaixo da barra superior. As rotas do web estão em pt-BR (`app/AppRoutes.tsx`); os redirecionamentos das rotas antigas existiram da R3 à R9 e foram removidos (`/` leva a `/inicio`). `Ctrl+K` ou `/` abre a busca global (`features/search`), que usa `GET /search` e o cache do TanStack Query; `/ativo/:ticker` abre qualquer ativo.
+
+### Página do ativo em capítulos (Fase 48.R4)
+
+`/ativo/:ticker` conta a história do ativo em capítulos, com um índice lateral: Em resumo (lentes), Na minha carteira (ou Como entraria), Preço, Vale a pena?, Está barato?, Resultados, Proventos, O que pode acontecer, Notícias e eventos, Imposto e lançamentos. Cada capítulo abre com a conclusão; "Ver detalhes" monta a tabela, que só busca seus dados quando é aberta. Os links do app usam o ticker, e `/asset/:id` redireciona.
+
+### Hub da carteira e conferência com a B3 (Fase 48.R5)
+
+A Carteira tem as abas Posições, Rentabilidade, Proventos, Raio-X e Conferir. Proventos lê `GET /portfolio/income` (recebidos por mês e ano e yield on cost) e a agenda declarada. Conferir envia o extrato de **Posição** da Área do Investidor: `domain/reconciliation` lê as abas por produto e compara cada ticker e conta com a posição do livro na data-base. A conferência gravada (`position_reconciliations`, `position_reconciliation_lines`) **nunca altera o livro**: cada diferença leva ao lançamento pré-preenchido ou é marcada como explicada. O alerta `POSITION_NOT_CHECKED` lembra de conferir todo mês.
+
+### Acompanhar e Aportar com o porquê (Fase 48.R6)
+
+Acompanhar tem as abas Lista (watchlist), Alertas e Teses. As regras de alerta (`alert_rules`) valem para qualquer ticker: são lidas do banco a cada `GET /alerts`, e o job `evaluate_alert_rules` guarda quando cada uma disparou. As teses (`asset_notes`) ficam no capítulo "Minha tese" de cada ativo, com data de revisão, e geram alerta quando vencem. No Aportar, cada linha do plano mostra as lentes do ativo, e um plano confirmado termina na etapa Conferir.
+
+### Imposto mensal (Fase 48.R7)
+
+A aba Carteira › Imposto mostra o IR da renda variável apurado a partir do livro (`domain/tax/assessment.py`). Cada venda sai pelo custo médio em reais, e o day trade é separado do swing. A apuração é mensal por categoria (operações comuns com a isenção de R$ 20 mil para ações, day trade e FII), com o prejuízo compensado dentro de cada categoria, o IRRF estimado descontado e o DARF 6015 com o vencimento. As aplicações no exterior têm apuração anual. `monthly_tax_assessments` guarda os valores e a data em que cada DARF foi pago; o alerta `DARF_DUE` avisa no Início.
+
+### Transição até os pesos-alvo (Fase 34.7)
+
+`domain/recommendation/transition.py` estuda como chegar aos mesmos alvos do aporte: só com aportes (em quantos meses) ou com vendas (o IR é a diferença na apuração real de `domain/tax/assessment.py`). Fica em `GET /recommendation/transition`, no MCP `recommendation.transition` e na seção "Como chegar lá" da Recomendação. Nada é gravado. O veredito do otimizador vale só para Ações (`optimizer_applies`), a classe que o teste no passado cobre, e o limite da Saúde por ativo vira um teto na classe (`class_params`).
+
+### Fim do legado, visões salvas e relatório mensal (Fase 48.R9)
+
+As telas vivem em `apps/web/src/features/<área>/` (não há mais `pages/`), e os dados de tela vêm de `useScreenData` (`api/query.ts`) sobre o cache do TanStack Query. Os endereços da navegação antiga deixaram de existir; links e alertas usam os novos, e `src/test/links.ts` confere cada link do código contra as rotas. Visões salvas (`saved_views`, `/saved-views`) guardam os filtros do Screener, de Lançamentos e da Carteira com um nome. O relatório mensal (`GET /portfolio/monthly-report`, MCP `portfolio.monthly_report`, Carteira › Relatório) reúne o mês em uma página que o navegador salva em PDF.
+
+### Planejar: metas e renda futura (Fase 48.R8)
+
+Planejar começa pelas Metas (`goals`): patrimônio ou renda passiva por mês até uma data, com o aporte planejado e as premissas de retorno real e de yield. O progresso parte do último retrato e da renda dos últimos 12 meses; a meta mostra a projeção na data e o aporte mensal necessário, que o Aportar sugere. A Renda futura (`GET /portfolio/income-forecast`) junta os proventos anunciados à estimativa pelo histórico de cada ativo na quantidade de hoje. Simulações, Comparar renda fixa, Modelo e Qualidade seguem como as outras abas de Planejar.

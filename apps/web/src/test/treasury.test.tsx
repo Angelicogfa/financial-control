@@ -1,13 +1,13 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { EarningsAgendaDTO, TreasuryMarketDTO } from "../api/types";
-import { DeclaredEarnings } from "../pages/home/DeclaredEarnings";
-import { TreasuryMarketPanel } from "../pages/portfolio/TreasuryMarketPanel";
-import { analysis, asset } from "./fixtures";
+import { DeclaredEarnings } from "../features/home/DeclaredEarnings";
+import { TreasuryMarketPanel } from "../features/portfolio/TreasuryMarketPanel";
+import { analysis, asset, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
-import { renderAt } from "./render";
+import { render, renderAt } from "./render";
 
 const market: TreasuryMarketDTO = {
   asset_id: 1,
@@ -95,18 +95,18 @@ const agenda: EarningsAgendaDTO = {
 };
 
 describe("treasury at market", () => {
-  it("shows the market tab only for Treasury bonds, with lots and history", async () => {
+  it("shows the market for Treasury bonds in the price chapter, with lots and history", async () => {
     mockApi([
+      trackedInstrument(),
       {
         path: "/assets/1/analysis",
         reply: analysis({ asset: asset({ asset_type: "TREASURY", ticker: "PRE29", name: "Tesouro Prefixado 2029" }) }),
       },
       { path: "/portfolio/treasury-market/1", reply: market },
     ]);
-    renderAt("/asset/1?tab=market");
+    renderAt("/ativo/WEGE3?tab=market");
 
     expect(await screen.findByText("Venda antecipada pode compensar")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Mercado" })).toBeInTheDocument();
     expect(screen.getByText("O mercado está R$ 78,48 acima da curva.")).toBeInTheDocument();
     const lots = screen.getByRole("table");
     expect(within(lots).getByText("Rende mais que a curva")).toBeInTheDocument();
@@ -114,11 +114,11 @@ describe("treasury at market", () => {
     expect(screen.getByRole("img", { name: "Valor na curva e a mercado desde a primeira compra" })).toBeInTheDocument();
   });
 
-  it("hides the market tab for other assets", async () => {
-    mockApi([{ path: "/assets/1/analysis", reply: analysis() }]);
-    renderAt("/asset/1");
-    await screen.findByRole("tab", { name: "Resumo" });
-    expect(screen.queryByRole("tab", { name: "Mercado" })).not.toBeInTheDocument();
+  it("hides the market for other assets", async () => {
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis() }]);
+    renderAt("/ativo/WEGE3");
+    await screen.findByRole("navigation", { name: "Capítulos" });
+    expect(screen.queryByText("Venda antecipada pode compensar")).not.toBeInTheDocument();
   });
 
   it("lists the bonds on the portfolio panel", async () => {
@@ -128,7 +128,7 @@ describe("treasury at market", () => {
         <TreasuryMarketPanel />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("link", { name: "Tesouro Prefixado 2029" })).toHaveAttribute("href", "/asset/1?tab=market");
+    expect(await screen.findByRole("link", { name: "Tesouro Prefixado 2029" })).toHaveAttribute("href", "/ativo/PRE29?capitulo=preco");
     expect(screen.getByText("Abaixo da curva")).toBeInTheDocument();
   });
 });
@@ -144,7 +144,7 @@ describe("declared earnings", () => {
     const card = await screen.findByRole("region", { name: "Proventos anunciados" });
     expect(within(card).getByText("Direito garantido")).toBeInTheDocument();
     expect(within(card).getByText("Watchlist")).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "ITSA4" })).toHaveAttribute("href", "/asset/7");
+    expect(within(card).getByRole("link", { name: "ITSA4" })).toHaveAttribute("href", "/ativo/ITSA4");
     expect(within(card).getAllByText("R$ 10,00").length).toBeGreaterThan(0);
   });
 

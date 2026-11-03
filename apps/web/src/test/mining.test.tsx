@@ -66,11 +66,11 @@ function overview(overrides: Partial<MiningOverviewDTO> = {}): MiningOverviewDTO
 describe("Garimpo (Phase 43)", () => {
   it("shows the findings, why they appeared, the weights and the record", async () => {
     mockApi([{ path: "/research/mining", reply: overview() }]);
-    renderAt("/research/mining");
+    renderAt("/explorar/garimpo");
     const table = await screen.findByRole("table", { name: "Achados da semana" }, { timeout: 5000 });
     expect(within(table).getByText("ABCD3")).toBeInTheDocument();
     expect(within(table).getByText("Barata frente ao próprio histórico e ao setor (z +1,8)")).toBeInTheDocument();
-    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/asset/7");
+    expect(within(table).getByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/ativo/WEGE3");
     expect(within(table).queryByRole("link", { name: "ABCD3" })).not.toBeInTheDocument();
     expect(within(table).queryByRole("link", { name: "Ver ativo" })).not.toBeInTheDocument();
     expect(screen.getByText("Chance de perder do universo")).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe("Garimpo (Phase 43)", () => {
         reply: overview({ trusted: false, reason: "Só 3 anos fora da amostra; são precisos 5." }),
       },
     ]);
-    renderAt("/research/mining");
+    renderAt("/explorar/garimpo");
     expect(await screen.findByRole("table", { name: "Ranking em observação" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/ainda não são achados confiáveis/)).toBeInTheDocument();
   });
@@ -124,9 +124,9 @@ describe("Garimpo (Phase 43)", () => {
         },
       },
     ]);
-    renderAt("/research/mining");
+    renderAt("/explorar/garimpo");
     fireEvent.click(await screen.findByRole("button", { name: "Seguir" }, { timeout: 5000 }));
-    await waitFor(() => expect(screen.getByRole("link", { name: "ABCD3" })).toHaveAttribute("href", "/asset/9"));
+    await waitFor(() => expect(screen.getByRole("link", { name: "ABCD3" })).toHaveAttribute("href", "/ativo/ABCD3"));
     expect(screen.queryByRole("button", { name: "Seguir" })).not.toBeInTheDocument();
     const post = calls.find((c) => c.method === "POST");
     expect(post?.body).toMatchObject({ ticker: "ABCD3", asset_type: "STOCK_BR" });
@@ -140,7 +140,7 @@ describe("Garimpo (Phase 43)", () => {
 
   it("says when it has not run yet", async () => {
     mockApi([{ path: "/research/mining", reply: overview({ status: "NOT_RUN", reason: "Ainda não rodou." }) }]);
-    renderAt("/research/mining");
+    renderAt("/explorar/garimpo");
     expect(await screen.findByText("O garimpo ainda não rodou", undefined, { timeout: 5000 })).toBeInTheDocument();
   });
 });

@@ -12,6 +12,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from core.logging import configure_logging
 from core.settings import Settings, get_settings
 from domain.market.services.use_cases import MANUAL_JOBS
+from infra.cache.job_lock import JobLock, build_job_lock
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
 from infra.providers.factory import build_market_gateway
 from infra.providers.gateway import CachedMarketGateway
@@ -23,6 +24,7 @@ from worker.jobs import (
     calibrate_forecasts_job,
     ensure_series_coverage_job,
     estimate_forecast_models_job,
+    evaluate_alert_rules_job,
     has_pending_simulations,
     record_checklist_evaluations_job,
     record_daily_snapshot_job,
@@ -48,7 +50,7 @@ from worker.jobs import (
     warm_portfolio_quotes_job,
 )
 from worker.roles import runs_here
-from worker.runner import JobLock, RetryPolicy, build_job_lock, run_job, run_requested
+from worker.runner import RetryPolicy, run_job, run_requested
 
 logger = logging.getLogger("fincontrol_worker")
 
@@ -221,6 +223,14 @@ def create_scheduler(
         hour=(cfg.snapshot_cron_hour + 1) % 24,
         minute=cfg.snapshot_cron_minute,
         id="update_comparison_portfolios",
+        replace_existing=True,
+        **defaults,
+    )
+    scheduler.add_job(
+        guard("evaluate_alert_rules", evaluate_alert_rules_job),
+        trigger="interval",
+        minutes=cfg.quote_refresh_minutes,
+        id="evaluate_alert_rules",
         replace_existing=True,
         **defaults,
     )

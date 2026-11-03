@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from controllers.portfolio.requests import ContributionSimulationRequest
-from controllers.portfolio.responses import (
+from contracts.portfolio.requests import ContributionSimulationRequest
+from contracts.portfolio.responses import (
     AccountWealthDTO,
     ContributionPlanResponseDTO,
     EarningsAgendaDTO,
@@ -20,7 +20,7 @@ from controllers.portfolio.responses import (
     TreasuryMarketDTO,
     WealthByAccountDTO,
 )
-from controllers.portfolio.serializers import (
+from contracts.portfolio.serializers import (
     to_contribution_plan_dto,
     to_earnings_agenda_dto,
     to_portfolio_health_dto,
@@ -28,11 +28,11 @@ from controllers.portfolio.serializers import (
     to_risk_summary_dto,
     to_treasury_market_dto,
 )
-from controllers.shared.dependencies import UoWFactory
 from core.errors import NotFoundError
 from domain.accounts.services.use_cases import resolve_account_id
 from domain.portfolio.services.market_split import MarketGroup, market_groups
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.unit_of_work import UoWFactory
 
 
 def _group_dto(group: MarketGroup) -> MarketGroupDTO:

@@ -24,6 +24,15 @@ from domain.assets.services.ratings import rate_indicators
 from domain.assets.services.valuation import AssetValuation, value_asset
 from domain.market.entities import Fundamentals
 from domain.market.services.price_chart import PriceChart, price_chart
+from domain.market.services.stored import (
+    stored_distributions,
+    stored_fundamentals,
+    stored_histories,
+    stored_history,
+    stored_macro_rates,
+    stored_market_data,
+    stored_usd_brl,
+)
 from domain.market.services.treasury_prices import (
     RATE_SUFFIX,
     asset_price_symbol,
@@ -79,20 +88,11 @@ from domain.shared.enums import (
     AssetType,
     IntraClassStrategy,
 )
+from domain.shared.gateways import MarketDataGateway
 from domain.shared.unit_of_work import AbstractUnitOfWork
 from domain.tax.entities import TaxRuleBook
 from domain.tax.services.rules import rule_book
 from domain.tax.services.status import asset_tax_status
-from infra.providers.gateway import CachedMarketGateway
-from infra.providers.stored import (
-    stored_distributions,
-    stored_fundamentals,
-    stored_histories,
-    stored_history,
-    stored_macro_rates,
-    stored_market_data,
-    stored_usd_brl,
-)
 
 
 def _restrict_to_account(assets: list[AssetEntity], account_id: int) -> list[AssetEntity]:
@@ -130,7 +130,7 @@ class PortfolioApplicationService:
 
     def __init__(
         self,
-        gateway: CachedMarketGateway,
+        gateway: MarketDataGateway,
         *,
         fetch_workers: int = 8,
         fetch_timeout_seconds: float = 20.0,

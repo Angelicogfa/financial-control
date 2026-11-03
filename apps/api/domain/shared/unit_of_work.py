@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from types import TracebackType
 
 from domain.comparison.repositories import AbstractComparisonRepository
@@ -17,7 +18,9 @@ from domain.market.repositories import (
     AbstractPriceHistoryRepository,
 )
 from domain.mining.repositories import AbstractMiningRepository
+from domain.planning.repositories import AbstractGoalRepository
 from domain.recommendation.repositories import AbstractRecommendationRepository
+from domain.reconciliation.repositories import AbstractReconciliationRepository
 from domain.shared.repositories import (
     AbstractAccountRepository,
     AbstractAgentKeyRepository,
@@ -42,7 +45,9 @@ from domain.simulation.repositories import (
     AbstractSimulationRepository,
     AbstractSimulationStudyRepository,
 )
-from domain.tax.repositories import AbstractTaxRuleRepository
+from domain.tax.repositories import AbstractTaxAssessmentRepository, AbstractTaxRuleRepository
+from domain.views.repositories import AbstractSavedViewRepository
+from domain.watch.repositories import AbstractAlertRuleRepository, AbstractAssetNoteRepository
 
 
 class AbstractUnitOfWork(ABC):
@@ -67,6 +72,7 @@ class AbstractUnitOfWork(ABC):
     alert_dismissals: AbstractAlertDismissalRepository
     agent_keys: AbstractAgentKeyRepository
     tax_rules: AbstractTaxRuleRepository
+    tax_assessments: AbstractTaxAssessmentRepository
     simulations: AbstractSimulationRepository
     simulation_studies: AbstractSimulationStudyRepository
     cvm_issuers: AbstractIssuerTickerRepository
@@ -78,6 +84,11 @@ class AbstractUnitOfWork(ABC):
     mining: AbstractMiningRepository
     recommendation: AbstractRecommendationRepository
     comparison: AbstractComparisonRepository
+    reconciliations: AbstractReconciliationRepository
+    alert_rules: AbstractAlertRuleRepository
+    asset_notes: AbstractAssetNoteRepository
+    goals: AbstractGoalRepository
+    saved_views: AbstractSavedViewRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
         return self
@@ -100,3 +111,7 @@ class AbstractUnitOfWork(ABC):
     def rollback(self) -> None:
         """Roll back any uncommitted changes in the current transaction."""
         raise NotImplementedError
+
+
+# What handlers receive: a callable that opens a fresh Unit of Work (`with uow_factory() as uow`).
+UoWFactory = Callable[[], AbstractUnitOfWork]

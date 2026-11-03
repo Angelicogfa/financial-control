@@ -6,9 +6,9 @@ from fastapi import Depends
 
 from composition import get_uow_factory
 from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
 from core.settings import AppSettings, get_settings
 from domain.portfolio.services.service import PortfolioApplicationService
+from domain.shared.unit_of_work import UoWFactory
 from domain.simulation.services.studies import StudyHandler
 from domain.simulation.services.use_cases import SimulationHandler
 

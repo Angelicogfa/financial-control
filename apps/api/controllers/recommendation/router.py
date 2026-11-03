@@ -7,8 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.recommendation.dependencies import get_recommendation_handler
-from controllers.recommendation.responses import (
+from contracts.recommendation.responses import (
     BacktestDTO,
     ContributionComparisonDTO,
     LensBoardDTO,
@@ -17,8 +16,11 @@ from controllers.recommendation.responses import (
     MatrixBoardDTO,
     RecommendationRunDTO,
     RowComparisonDTO,
+    TransitionDTO,
 )
+from controllers.recommendation.dependencies import get_recommendation_handler
 from domain.recommendation.services import RecommendationHandler
+from domain.shared.enums import ArcaClass
 
 recommendation_router = APIRouter(prefix="/recommendation", tags=["Recommendation"])
 
@@ -74,6 +76,17 @@ def get_contribution(
 ) -> ContributionComparisonDTO:
     """The contribution the recommendation would make, next to the current one (nothing saved)."""
     return handler.contribution(amount_brl)
+
+
+@recommendation_router.get("/transition", response_model=TransitionDTO)
+def get_transition(
+    arca_class: ArcaClass = Query(...),
+    monthly_brl: float = Query(default=0.0, ge=0),
+    handler: RecommendationHandler = Depends(get_recommendation_handler),
+) -> TransitionDTO:
+    """How to reach a class's targets: contributions only, or selling with the income tax.
+    A study: nothing is saved or ordered."""
+    return handler.transition(arca_class, monthly_brl)
 
 
 @recommendation_router.get("/backtest", response_model=BacktestDTO)

@@ -16,6 +16,7 @@ from controllers.auth.dependencies import require_user
 from controllers.auth.router import auth_router
 from controllers.contributions.router import contributions_router
 from controllers.disclosures.router import disclosures_router
+from controllers.instruments.router import instruments_router, search_router
 from controllers.ledger.router import (
     earnings_router,
     events_router,
@@ -23,14 +24,18 @@ from controllers.ledger.router import (
     transactions_router,
 )
 from controllers.market.router import market_router
+from controllers.planning.router import goals_router, income_forecast_router
 from controllers.policy.router import policy_router, settings_router
 from controllers.portfolio.router import portfolio_router
 from controllers.recommendation.router import recommendation_router
+from controllers.reconciliation.router import reconciliation_router
 from controllers.research.router import research_router
 from controllers.simulation.router import simulation_router
 from controllers.simulation.study_router import study_router
 from controllers.system.router import health_router
 from controllers.tax.router import tax_router
+from controllers.views.router import saved_views_router
+from controllers.watch.router import alert_rules_router, notes_router
 from core.http_errors import install_error_handlers
 from core.logging import configure_logging
 from core.middleware import install_middleware
@@ -61,6 +66,14 @@ PROTECTED_ROUTERS = (
     simulation_router,
     disclosures_router,
     recommendation_router,
+    instruments_router,
+    search_router,
+    reconciliation_router,
+    alert_rules_router,
+    notes_router,
+    goals_router,
+    income_forecast_router,
+    saved_views_router,
 )
 
 

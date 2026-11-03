@@ -14,7 +14,6 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from core.helpers.units import daily_rates
 from domain.market.entities import Quote
 from domain.policy.services.allocation import ArcaTargets
 from domain.portfolio.services.analytics import beta_alpha, time_weighted_return
@@ -40,6 +39,7 @@ from domain.shared.enums import (
     SeriesUnit,
     TransactionKind,
 )
+from domain.shared.units import daily_rates
 from infra.providers.brapi import BrapiProvider
 
 

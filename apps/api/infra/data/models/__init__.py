@@ -40,6 +40,7 @@ from infra.data.models.market import (
     TreasuryCatalogModel,
 )
 from infra.data.models.mining import MiningFindingModel, MiningSignalModel
+from infra.data.models.planning import GoalModel
 from infra.data.models.policy import InvestmentPolicyModel
 from infra.data.models.portfolio import ContributionPlanModel, PortfolioSnapshotModel
 from infra.data.models.recommendation import (
@@ -48,14 +49,27 @@ from infra.data.models.recommendation import (
     RecommendationMatrixModel,
     RecommendationRunModel,
 )
+from infra.data.models.reconciliation import (
+    PositionReconciliationLineModel,
+    PositionReconciliationModel,
+)
 from infra.data.models.simulation import (
     SimulationResultModel,
     SimulationRunModel,
     SimulationStudyModel,
 )
-from infra.data.models.tax import TaxRuleModel
+from infra.data.models.tax import MonthlyTaxAssessmentModel, TaxRuleModel
+from infra.data.models.views import SavedViewModel
+from infra.data.models.watch import AlertRuleModel, AssetNoteModel
 
 __all__ = [
+    "GoalModel",
+    "SavedViewModel",
+    "MonthlyTaxAssessmentModel",
+    "AlertRuleModel",
+    "AssetNoteModel",
+    "PositionReconciliationLineModel",
+    "PositionReconciliationModel",
     "AccountModel",
     "AssetGateModel",
     "AssetLensModel",

@@ -5,7 +5,7 @@ Scope: single-user login session.
 
 from __future__ import annotations
 
-from controllers.auth.requests import LoginRequest
+from contracts.auth.requests import LoginRequest
 from core import security
 from core.settings import Settings
 

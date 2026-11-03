@@ -34,9 +34,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import Receive, Scope, Send
 
-from composition import get_market_gateway, get_uow_factory
-from controllers.portfolio.dependencies import get_portfolio_service
-from controllers.shared.dependencies import UoWFactory
+from composition import get_market_gateway, get_portfolio_service, get_uow_factory
 from core.errors import ConflictError, DomainError
 from core.http_errors import error_body
 from core.security import AuthenticationError
@@ -51,6 +49,7 @@ from domain.agentic.services.catalog import (
 from domain.agentic.services.use_cases import AgentKeyHandler
 from domain.portfolio.services.service import PortfolioApplicationService
 from domain.shared.entities import AgentApiKeyEntity
+from domain.shared.unit_of_work import UoWFactory
 
 logger = logging.getLogger("fincontrol_api")
 
@@ -74,6 +73,10 @@ drawdown e comparação com CDI, IPCA e IBOV) e `portfolio.snapshots` para a evo
 - `portfolio.health` dá o diagnóstico em sete pilares com ação sugerida; \
 `portfolio.earnings_agenda` lista os proventos anunciados e ainda não pagos; \
 `portfolio.treasury_market` compara o Tesouro Direto na curva × a mercado.
+- `recommendation.transition` estuda como chegar aos pesos-alvo de uma classe, só com aportes \
+ou com vendas e IR, sem gravar nada.
+- `portfolio.monthly_report` resume um mês (YYYY-MM): patrimônio, aportes, resultado, \
+rentabilidade, proventos, negociações, alocação, imposto e metas.
 
 Ativos e Análise Fundamentalista:
 - Use `assets.list` para buscar ativos cadastrados e `assets.get` para detalhes de um ativo.
@@ -105,6 +108,32 @@ Lançamentos (Ledger) e Extrato B3:
 `ledger.events.create`, `ledger.events.delete`.
 - Importação de extrato B3: envie o conteúdo para `ledger.imports.preview` antes de confirmar \
 com `ledger.imports.commit`.
+
+Busca e página de qualquer ativo (Fase 48):
+- `instruments.search` acha por ticker ou nome entre os ativos cadastrados, o catálogo da B3 e \
+o Tesouro Direto; `instruments.get` abre qualquer um deles pela `key`, sem cadastrar (cotação \
+guardada, indicadores, lentes, faixa da previsão e, se cadastrado, o `asset_id`); \
+`instruments.prices` traz os fechamentos guardados.
+
+Conferência de posição e proventos (Fase 48.R5):
+- `reconciliation.preview` confere o extrato de Posição da B3 contra o livro, por ticker e \
+conta, sem gravar; `reconciliation.commit` grava a conferência (nunca altera o livro); \
+`reconciliation.list` e `reconciliation.get` consultam as gravadas. `portfolio.income` traz os \
+proventos recebidos por mês e ano e o yield on cost.
+
+Acompanhar (Fase 48.R6):
+- `watch.rules_list`, `watch.rules_create` e `watch.rules_delete` cuidam das regras de alerta \
+(preço, DY, P/L, P/VP); as que disparam aparecem em `alerts.list`. `watch.notes_list` e \
+`watch.notes_create` guardam a tese de cada ativo com a data de revisão.
+
+Imposto mensal (Fase 48.R7):
+- `tax.monthly_year` apura o IR da renda variável mês a mês (isenção de R$ 20 mil em ações, \
+prejuízo por categoria, DARF 6015) e o exterior por ano; `tax.monthly_month` mostra as vendas de \
+um mês; `tax.darf_paid` marca o DARF como pago.
+
+Planejar (Fase 48.R8):
+- `planning.goals_list` e `planning.goals_create` cuidam das metas (patrimônio ou renda passiva) \
+com progresso e aporte necessário; `planning.income_forecast` projeta a renda passiva mês a mês.
 
 Pesquisa B3, Estratégia, Contas e Alertas:
 - Screener e Watchlist B3: `research.screener`, `research.watchlist`, `research.follow`, \

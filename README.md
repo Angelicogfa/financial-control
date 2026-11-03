@@ -208,6 +208,18 @@ Depois de mudar um DTO da API, regenere os tipos do frontend:
 uv run python scripts/gen_web_types.py
 ```
 
+O contrato da API fica congelado em `apps/api/tests/snapshots/openapi.json` (`test_openapi_snapshot.py`). Se a mudança for intencional, regenere o snapshot junto com os tipos:
+
+```bash
+uv run python scripts/update_openapi_snapshot.py
+```
+
+Antes de fazer merge de uma migration, ensaie-a numa cópia da base real. O script só lê a base com `pg_dump`, restaura o dump num Postgres descartável e confere se a migration é aditiva e se a ida e volta funciona:
+
+```bash
+scripts/migration_rehearsal.sh
+```
+
 ### Testes e portão de qualidade
 
 O workflow `.github/workflows/ci.yml` roda o mesmo portão no GitHub, mas hoje os jobs não chegam a iniciar (a conta está sem crédito de Actions). Enquanto isso, o portão roda localmente e é ele que valida cada PR:

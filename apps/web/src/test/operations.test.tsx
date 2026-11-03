@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { analysis, asset, report, savedPlan } from "./fixtures";
+import { analysis, asset, report, savedPlan, trackedInstrument } from "./fixtures";
 import { optionLabels, pick, pickWhenLoaded } from "./combobox";
 import { mockApi, type Call } from "./mockApi";
 import { renderAt } from "./render";
@@ -16,28 +16,28 @@ const last = (calls: Call[], method: string, path: string) =>
 
 describe("asset detail", () => {
   it("shows the current price of an asset without a position", async () => {
-    mockApi([{ path: "/assets/1/analysis", reply: analysis({ position: null }) }]);
-    renderAt("/asset/1");
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis({ position: null }) }]);
+    renderAt("/ativo/WEGE3");
     expect(await screen.findByText("Sem posição: o ativo está em observação.")).toBeInTheDocument();
     expect(screen.getByText("Preço atual").nextElementSibling).toHaveTextContent("R$ 50,00");
   });
 
   it("falls back to the last stored close, dated, when no price is known", async () => {
     const base = analysis();
-    mockApi([{ path: "/assets/1/analysis", reply: analysis({ position: null, valuation: { ...base.valuation, price: null } }) }]);
-    renderAt("/asset/1");
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis({ position: null, valuation: { ...base.valuation, price: null } }) }]);
+    renderAt("/ativo/WEGE3");
     await screen.findByText("Sem posição: o ativo está em observação.");
     expect(screen.getByText("Preço atual").nextElementSibling).toHaveTextContent("R$ 50,00 · fechamento de 02/03/2026");
   });
 
   it("shows summary, fundamentals and valuation by tab", async () => {
-    mockApi([{ path: "/assets/1/analysis", reply: analysis() }]);
-    renderAt("/asset/1");
+    mockApi([trackedInstrument(), { path: "/assets/1/analysis", reply: analysis() }]);
+    renderAt("/ativo/WEGE3");
     expect(await screen.findByText("Posição")).toBeInTheDocument();
     expect(screen.getByText("Descontado", { selector: ".app-badge" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Preço de WEGE3/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Fundamentos" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalhes: Resultados" }));
     expect(screen.getByText("ROE médio")).toBeInTheDocument();
     const peHelp = screen.getByRole("button", { name: "Ajuda sobre P/L" });
     fireEvent.mouseEnter(peHelp);
@@ -45,13 +45,14 @@ describe("asset detail", () => {
     expect(screen.getByRole("button", { name: "Ajuda sobre Payout médio" })).toHaveAccessibleDescription(/parcela do lucro líquido distribuída/);
     expect(screen.getByRole("img", { name: /Lucro líquido anual/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Valuation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalhes: Está barato?" }));
     expect(screen.getByText("Preço justo de Graham")).toBeInTheDocument();
     expect(screen.getByText("Não passa")).toBeInTheDocument();
   });
 
   it("explains when valuation does not apply", async () => {
     mockApi([
+      trackedInstrument(),
       {
         path: "/assets/1/analysis",
         reply: analysis({
@@ -59,16 +60,17 @@ describe("asset detail", () => {
         }),
       },
     ]);
-    renderAt("/asset/1?tab=valuation");
+    renderAt("/ativo/WEGE3?tab=valuation");
     expect(await screen.findByText("ETFs replicam índices.")).toBeInTheDocument();
   });
 
   it("saves checklist answers with evidence and the chosen profile", async () => {
     const { calls } = mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       { method: "PUT", path: "/assets/1/checklist", reply: asset() },
     ]);
-    renderAt("/asset/1?tab=checklist");
+    renderAt("/ativo/WEGE3?tab=checklist");
     expect(await screen.findByText(/automática: ROE médio 18,0%/)).toBeInTheDocument();
     const governance = screen.getByRole("group", { name: "Tem boa governança?" });
     fireEvent.click(within(governance).getByRole("button", { name: "Sim" }));
@@ -88,6 +90,7 @@ describe("asset detail", () => {
 
   it("lists the asset's trades and earnings", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/transactions",
@@ -99,9 +102,9 @@ describe("asset detail", () => {
         reply: page([{ id: 9, asset_id: 1, kind: "DIVIDEND", payment_date: "2025-03-01", gross_amount: 12, withholding_tax: 0, net_amount: 12, net_amount_brl: 12 }]),
       },
     ]);
-    renderAt("/asset/1?tab=ledger");
-    expect(await screen.findByRole("link", { name: "Editar" })).toHaveAttribute("href", "/ledger/trades/5/edit");
-    fireEvent.click(screen.getByRole("tab", { name: "Proventos" }));
+    renderAt("/ativo/WEGE3?tab=ledger");
+    expect(await screen.findByRole("link", { name: "Editar" })).toHaveAttribute("href", "/lancamentos/negociacoes/5/editar");
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalhes: Proventos" }));
     expect(await screen.findByRole("img", { name: "Proventos líquidos recebidos por ano" })).toBeInTheDocument();
   });
 });
@@ -109,7 +112,7 @@ describe("asset detail", () => {
 describe("asset form", () => {
   it("creates a fixed income asset converting the typed rate", async () => {
     const { calls } = mockApi([{ method: "POST", path: "/assets", reply: asset({ id: 4 }) }]);
-    renderAt("/asset/new");
+    renderAt("/carteira/novo-ativo");
     pick(screen.getByLabelText("Tipo"), "Renda fixa");
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "CDB Banco X" } });
     fireEvent.change(screen.getByLabelText("Taxa (%)"), { target: { value: "112,5" } });
@@ -153,7 +156,7 @@ describe("asset form", () => {
       { path: "/research/treasury", reply: treasuryReply },
       { method: "POST", path: "/assets", reply: asset({ id: 13, asset_type: "TREASURY" }) },
     ]);
-    renderAt("/asset/new");
+    renderAt("/carteira/novo-ativo");
     pick(screen.getByLabelText("Tipo"), "Tesouro Direto");
     fireEvent.change(screen.getByLabelText("Título ou vencimento"), { target: { value: "2035" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
@@ -206,7 +209,7 @@ describe("asset form", () => {
       { path: "/research/treasury", reply: treasuryReply },
       { method: "POST", path: "/assets", reply: asset({ id: 12, asset_type: "TREASURY" }) },
     ]);
-    renderAt("/asset/new");
+    renderAt("/carteira/novo-ativo");
     pick(screen.getByLabelText("Tipo"), "Tesouro Direto");
     fireEvent.change(screen.getByLabelText("Título ou vencimento"), { target: { value: "2035" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar títulos" }));
@@ -256,7 +259,7 @@ describe("research", () => {
         reply: { status: 201, json: { asset_id: 9, ticker: "ITUB4", arca_class: "ATIVOS_INTERNACIONAIS" } },
       },
     ]);
-    renderAt("/research");
+    renderAt("/explorar");
     fireEvent.change(screen.getByLabelText("DY mínimo (%)"), { target: { value: "5" } });
     fireEvent.click(screen.getByLabelText("Tipo"));
     fireEvent.click(screen.getByRole("checkbox", { name: "Fundo imobiliário" }));
@@ -298,7 +301,7 @@ describe("research", () => {
       catalog_size: 7,
     };
     const { calls } = mockApi([{ path: "/research/screener", reply: result }]);
-    renderAt("/research");
+    renderAt("/explorar");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     fireEvent.click(await screen.findByRole("button", { name: "Observar" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -330,8 +333,8 @@ describe("research", () => {
       { method: "POST", path: "/research/watchlist", reply: { status: 201, json: { ...item, asset_id: 10, ticker: "TAEE11" } } },
       { method: "DELETE", path: "/research/watchlist/9", reply: { status: 204 } },
     ]);
-    renderAt("/research?tab=watchlist");
-    expect(await screen.findByRole("link", { name: "BBAS3" })).toHaveAttribute("href", "/asset/9");
+    renderAt("/acompanhar");
+    expect(await screen.findByRole("link", { name: "BBAS3" })).toHaveAttribute("href", "/ativo/BBAS3");
     expect(screen.getByText("Elegível")).toBeInTheDocument();
 
     // Reclassify in place.
@@ -390,7 +393,7 @@ describe("research", () => {
         reply: { status: 201, json: asset({ id: 25, ticker: "TESOURO_SELIC-TESOURONAC-20310301", name: "Tesouro Selic 2031", asset_type: "TREASURY" }) },
       },
     ]);
-    renderAt("/research?tab=treasury");
+    renderAt("/explorar?tab=treasury");
     pick(screen.getByLabelText("Indexador"), "SELIC");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("Tesouro Selic 2031")).toBeInTheDocument();
@@ -427,7 +430,7 @@ describe("research", () => {
         },
       },
     ]);
-    renderAt("/research?tab=treasury");
+    renderAt("/explorar?tab=treasury");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("Tesouro Direto e renda fixa requer o plano Pro.")).toBeInTheDocument();
   });
@@ -442,7 +445,7 @@ describe("contribute", () => {
       { path: "/portfolio/consolidated", reply: report() },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/contribute");
+    renderAt("/aportar");
     expect(await screen.findByRole("link", { name: "#3" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Quanto vai aportar (R$)"), { target: { value: "1.000,00" } });
     fireEvent.click(screen.getByRole("button", { name: "Sugerir distribuição" }));
@@ -464,7 +467,7 @@ describe("contribute", () => {
         },
       },
     ]);
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     expect(await screen.findByRole("list", { name: "Peso de cada classe antes e depois do aporte" })).toBeInTheDocument();
     expect(screen.getByText(/ficam sem destino: a classe/)).toBeInTheDocument();
     // The lead says where the money goes before the bars.
@@ -488,7 +491,7 @@ describe("contribute", () => {
       { path: "/portfolio/consolidated", reply: report() },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     const filter = await screen.findByLabelText(/Só os sugeridos para comprar \(1 de 2\)/);
     expect(filter).toBeChecked();
     expect(screen.getByLabelText("Comprar HGLG11")).toBeInTheDocument();
@@ -518,7 +521,7 @@ describe("contribute", () => {
       { path: "/portfolio/consolidated", reply: report() },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     const filter = await screen.findByLabelText(/Só os sugeridos para comprar \(1 de 2\)/);
     expect(screen.queryByLabelText("Comprar RESV11")).not.toBeInTheDocument();
     fireEvent.click(filter);
@@ -532,7 +535,7 @@ describe("contribute", () => {
       { path: "/portfolio/consolidated", reply: report() },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/contribute/7");
+    renderAt("/aportar/7");
     fireEvent.click(await screen.findByLabelText("Comprar HGLG11"));
     fireEvent.click(screen.getByRole("button", { name: "Confirmar 0 compras" }));
     expect(await screen.findByText("Escolha ao menos um ativo com quantidade maior que zero.")).toBeInTheDocument();
@@ -554,7 +557,7 @@ describe("ledger", () => {
         reply: { status: 409, json: { detail: "This change would leave WEGE3 with an invalid ledger", code: "LEDGER_CONFLICT" } },
       },
     ]);
-    renderAt("/ledger");
+    renderAt("/lancamentos");
     expect(await screen.findByRole("link", { name: "WEGE3" })).toBeInTheDocument();
     await pickWhenLoaded(screen.getByLabelText("Ativo"), "WEGE3");
     await waitFor(() => expect(last(calls, "GET", "/transactions")?.query.get("asset_id")).toBe("1"));
@@ -569,7 +572,7 @@ describe("ledger", () => {
       { method: "POST", path: "/transactions", reply: { status: 201, json: trade } },
       { path: "/transactions", reply: page([trade]) },
     ]);
-    renderAt("/ledger/trades/new?asset=1");
+    renderAt("/lancamentos/negociacoes/nova?asset=1");
     await screen.findByDisplayValue(/WEGE3/);
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText(/Preço unitário/), { target: { value: "40,5" } });
@@ -584,7 +587,7 @@ describe("ledger", () => {
       { path: "/assets", reply: page([asset(), usfr]) },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/ledger/trades/new?asset=7");
+    renderAt("/lancamentos/negociacoes/nova?asset=7");
     const fx = await screen.findByLabelText("Câmbio USD/BRL do dia");
     expect(screen.getByLabelText(/Preço unitário \(USD\)/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "10" } });
@@ -599,7 +602,7 @@ describe("ledger", () => {
       { path: "/assets", reply: page([asset(), usfr]) },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/ledger/trades/new?asset=7");
+    renderAt("/lancamentos/negociacoes/nova?asset=7");
     await screen.findByLabelText("Câmbio USD/BRL do dia");
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText(/Preço unitário/), { target: { value: "50" } });
@@ -615,7 +618,7 @@ describe("ledger", () => {
       { path: "/assets", reply: page([asset(), usfr]) },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/ledger/earnings/9/edit");
+    renderAt("/lancamentos/proventos/9/editar");
     fireEvent.change(await screen.findByLabelText("Câmbio do pagamento"), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Informe o câmbio USD/BRL da data do pagamento.");
@@ -631,7 +634,7 @@ describe("ledger", () => {
       { method: "PUT", path: "/transactions/6", reply: usdTrade },
       { path: "/transactions", reply: page([usdTrade]) },
     ]);
-    renderAt("/ledger/trades/6/edit");
+    renderAt("/lancamentos/negociacoes/6/editar");
     expect(await screen.findByLabelText("Câmbio USD/BRL do dia")).toHaveValue("5,5");
     expect(screen.getByText(/Total em reais/)).toHaveTextContent("R$ 550,00");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
@@ -643,7 +646,7 @@ describe("ledger", () => {
       { path: "/assets", reply: page([asset(), usfr]) },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/ledger/trades/new?asset=1");
+    renderAt("/lancamentos/negociacoes/nova?asset=1");
     await screen.findByDisplayValue(/WEGE3/);
     expect(screen.queryByLabelText(/Câmbio/)).not.toBeInTheDocument();
   });
@@ -657,7 +660,7 @@ describe("ledger", () => {
       { method: "PUT", path: "/earnings/9", reply: earning },
       { path: "/earnings", reply: page([earning]) },
     ]);
-    renderAt("/ledger/earnings/9/edit");
+    renderAt("/lancamentos/proventos/9/editar");
     expect(await screen.findByLabelText("Câmbio do pagamento")).toHaveValue("5");
     expect(screen.getByText(/Líquido em reais/)).toHaveTextContent("R$ 35,00");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
@@ -696,7 +699,7 @@ describe("ledger", () => {
         reply: { kind: "NEGOTIATION", created: { TRADE: 2, EARNING: 0, EVENT: 0 }, skipped: {}, created_assets: ["ITSA4"] },
       },
     ]);
-    renderAt("/ledger/import");
+    renderAt("/lancamentos/importar");
     const file = new File(["x"], "negociacao.xlsx");
     fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [file] } });
     expect(await screen.findByText("Ativos que ainda não estão cadastrados")).toBeInTheDocument();
@@ -749,7 +752,7 @@ describe("ledger", () => {
         reply: { kind: "NEGOTIATION", created: { TRADE: 0, EARNING: 0, EVENT: 0 }, skipped: { IGNORED: 1, INVALID: 1 }, created_assets: [] },
       },
     ]);
-    renderAt("/ledger/import");
+    renderAt("/lancamentos/importar");
     fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [new File(["x"], "negociacao.xlsx")] } });
     expect(await screen.findByRole("button", { name: "Importar 2 linha(s)" })).toBeEnabled();
 
@@ -792,7 +795,7 @@ describe("ledger", () => {
         reply: { kind: "MOVEMENT", created: { TRADE: 1, EARNING: 0, EVENT: 0 }, skipped: {}, created_assets: ["CDB-ITAUUNIBAN-LIQ"] },
       },
     ]);
-    renderAt("/ledger/import");
+    renderAt("/lancamentos/importar");
     fireEvent.change(screen.getByLabelText("Arquivo (.xlsx ou .csv)"), { target: { files: [new File(["x"], "movimentacao.xlsx")] } });
 
     const security = await screen.findByRole("checkbox", { name: /CDB-ITAUUNIBANCO/ });

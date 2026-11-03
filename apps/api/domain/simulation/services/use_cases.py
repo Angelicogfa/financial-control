@@ -5,13 +5,12 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 
-from controllers.shared.dependencies import UoWFactory
-from controllers.simulation.requests import (
+from contracts.simulation.requests import (
     BacktestRequest,
     CandidatesRequest,
     ProjectionRequest,
 )
-from controllers.simulation.responses import (
+from contracts.simulation.responses import (
     CalibrationDTO,
     CandidateResultDTO,
     CandidatesDTO,
@@ -33,6 +32,7 @@ from controllers.simulation.responses import (
     WindowOutcomeDTO,
 )
 from core.errors import NotFoundError, ValidationError
+from domain.market.services.stored import stored_macro_rates, stored_market_data
 from domain.policy.services.assumptions import ProjectionAssumptions
 from domain.policy.services.policy import current_policy
 from domain.portfolio.services.consolidation import ConsolidatedPortfolioReport
@@ -40,7 +40,7 @@ from domain.portfolio.services.service import PortfolioApplicationService
 from domain.research.services.screener import ScreenerCriteria
 from domain.research.services.use_cases import ResearchHandler
 from domain.shared.enums import ArcaClass, AssetPurpose
-from domain.shared.unit_of_work import AbstractUnitOfWork
+from domain.shared.unit_of_work import AbstractUnitOfWork, UoWFactory
 from domain.simulation.candidate_runs import (
     CandidateOption,
     CandidatesParams,
@@ -98,7 +98,6 @@ from domain.simulation.runs import (
     pending_calibration,
     queue_calibration,
 )
-from infra.providers.stored import stored_macro_rates, stored_market_data
 
 
 def to_run_dto(run: SimulationRun) -> SimulationRunDTO:

@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AssetStatementsDTO } from "../api/types";
-import { analysis } from "./fixtures";
+import { analysis, trackedInstrument } from "./fixtures";
 import { mockApi } from "./mockApi";
 import { renderAt } from "./render";
 
@@ -44,10 +44,11 @@ function statements(overrides: Partial<AssetStatementsDTO> = {}): AssetStatement
 describe("CVM statements in the Fundamentals tab (Phase 42.2)", () => {
   it("lists each delivery with its date and today's indicators", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       { path: "/assets/1/statements", reply: statements() },
     ]);
-    renderAt("/asset/1?tab=fundamentals");
+    renderAt("/ativo/WEGE3?tab=fundamentals");
     const table = await screen.findByRole("table", { name: "Balanços entregues à CVM" }, { timeout: 5000 });
     expect(within(table).getByText("29/10/2025")).toBeInTheDocument();
     expect(within(table).getByText("· versão 2")).toBeInTheDocument();
@@ -59,10 +60,11 @@ describe("CVM statements in the Fundamentals tab (Phase 42.2)", () => {
 
   it("hides company-only columns for a bank and explains a missing load", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       { path: "/assets/1/statements", reply: statements({ template: "FINANCIAL" }) },
     ]);
-    renderAt("/asset/1?tab=fundamentals");
+    renderAt("/ativo/WEGE3?tab=fundamentals");
     const table = await screen.findByRole("table", { name: "Balanços entregues à CVM" }, { timeout: 5000 });
     expect(within(table).queryByText("Dívida líquida")).not.toBeInTheDocument();
     expect(within(table).queryByText("EBITDA 12m")).not.toBeInTheDocument();
@@ -70,13 +72,14 @@ describe("CVM statements in the Fundamentals tab (Phase 42.2)", () => {
 
   it("says when the statements are not loaded yet", async () => {
     mockApi([
+      trackedInstrument(),
       { path: "/assets/1/analysis", reply: analysis() },
       {
         path: "/assets/1/statements",
         reply: statements({ status: "NOT_LOADED", deliveries: [], valuation: null, notes: ["Ainda não carregados."] }),
       },
     ]);
-    renderAt("/asset/1?tab=fundamentals");
+    renderAt("/ativo/WEGE3?tab=fundamentals");
     expect(await screen.findByText("Balanços ainda não carregados", undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("Ainda não carregados.")).toBeInTheDocument();
   });

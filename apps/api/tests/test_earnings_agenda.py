@@ -290,7 +290,7 @@ def test_new_alert_rules() -> None:
     )
     sale = early_sale_alerts([opportunity, below])
     assert [a.subject for a in sale] == ["PRE29"]
-    assert sale[0].route == "/asset/4?tab=market"
+    assert sale[0].route == "/ativo/PRE29?capitulo=preco"
 
 
 # --- integration -------------------------------------------------------------------------------

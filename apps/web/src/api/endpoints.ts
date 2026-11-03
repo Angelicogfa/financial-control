@@ -28,6 +28,29 @@ import type {
   AssetCreateRequest,
   AssetResponseDTO,
   AssetTaxStatusDTO,
+  AlertRuleCreateRequest,
+  AlertRuleDTO,
+  AlertRuleUpdateRequest,
+  AssetNoteDTO,
+  AssetNoteRequest,
+  GoalCreateRequest,
+  GoalDTO,
+  MonthlyReportDTO,
+  TransitionDTO,
+  SavedViewDTO,
+  SavedViewRequest,
+  ViewScope,
+  GoalUpdateRequest,
+  IncomeForecastDTO,
+  IncomeSummaryDTO,
+  TaxMonthDTO,
+  TaxYearDTO,
+  InstrumentViewDTO,
+  LineResolutionRequest,
+  ReconciliationDTO,
+  ReconciliationLineDTO,
+  ReconciliationSummaryDTO,
+  SearchResultDTO,
   AssetType,
   AssetUpdateRequest,
   BacktestRequest,
@@ -169,6 +192,13 @@ async function listAllAssets(activeOnly: boolean): Promise<PaginatedResponse_Ass
 
 export const api = {
   portfolio: {
+    /** Earnings received by month and year, net in BRL (Phase 48.R5). */
+    income: (months = 24) => request<IncomeSummaryDTO>("/portfolio/income", { query: { months } }),
+    /** Declared plus estimated passive income, month by month (Phase 48.R8). */
+    incomeForecast: (months: 12 | 24 | 36 = 12) =>
+      request<IncomeForecastDTO>("/portfolio/income-forecast", { query: { months } }),
+    /** One month of the portfolio on one page, printed or saved as PDF (Phase 48.R9). */
+    monthlyReport: (month: string) => request<MonthlyReportDTO>("/portfolio/monthly-report", { query: { month } }),
     report: (accountId?: number) =>
       request<PortfolioReportResponseDTO>("/portfolio/consolidated", {
         query: { account_id: accountId },
@@ -193,7 +223,7 @@ export const api = {
   },
   assets: {
     list: (activeOnly = true) => listAllAssets(activeOnly),
-    get: (id: number) => request<AssetResponseDTO>(`/assets/${id}`),
+    get: (id: number, signal?: AbortSignal) => request<AssetResponseDTO>(`/assets/${id}`, { signal }),
     analysis: (id: number) => request<AssetAnalysisResponseDTO>(`/assets/${id}/analysis`),
     prices: (id: number, range: AssetPriceHistoryDTO["range"]) =>
       request<AssetPriceHistoryDTO>(`/assets/${id}/prices`, { query: { range } }),
@@ -256,12 +286,22 @@ export const api = {
     assetStatus: (id: number) => request<AssetTaxStatusDTO>(`/tax/assets/${id}/status`),
     compare: (body: FixedIncomeCompareRequest) =>
       request<FixedIncomeComparisonDTO>("/tax/fixed-income/compare", { method: "POST", body }),
+    /** Monthly income tax of a year and the DARF of each month (Phase 48.R7). */
+    monthly: (year?: number) => request<TaxYearDTO>("/tax/monthly", { query: { year } }),
+    month: (month: string) => request<TaxMonthDTO>(`/tax/monthly/${month}`),
+    markDarfPaid: (month: string, paidOn: string | null) =>
+      request<TaxMonthDTO>(`/tax/monthly/${month}/darf`, { method: "PUT", body: { paid_on: paidOn } }),
   },
   recommendation: {
     lenses: (filters: { arca_class?: string; source?: string; ticker?: string; eligible?: boolean } = {}) =>
       request<LensBoardDTO>("/recommendation/lenses", { query: { ...filters } }),
     matrix: (asOf?: string) => request<MatrixBoardDTO>("/recommendation/matrix", { query: { as_of: asOf } }),
     compare: (a: string, b: string) => request<RowComparisonDTO>("/recommendation/compare", { query: { a, b } }),
+    /** How to reach a class's targets: a study, nothing is saved (Phase 34.7). */
+    transition: (arcaClass: string, monthlyBrl: number) =>
+      request<TransitionDTO>("/recommendation/transition", {
+        query: { arca_class: arcaClass, monthly_brl: monthlyBrl },
+      }),
     contribution: (amount: number) =>
       request<ContributionComparisonDTO>("/recommendation/contribution", { query: { amount_brl: amount } }),
     runs: () => request<RecommendationRunDTO[]>("/recommendation/runs"),
@@ -392,5 +432,65 @@ export const api = {
         body: { expires_in_days: expiresInDays },
       }),
     revoke: (id: number) => request<void>(`/agents/keys/${id}`, { method: "DELETE" }),
+  },
+  /** Any ticker or Tesouro bond, registered or not (Phase 48.R2): only reads the database. */
+  instruments: {
+    get: (key: string, signal?: AbortSignal) =>
+      request<InstrumentViewDTO>(`/instruments/${encodeURIComponent(key)}`, { signal }),
+    prices: (key: string, range: AssetPriceHistoryDTO["range"]) =>
+      request<AssetPriceHistoryDTO>(`/instruments/${encodeURIComponent(key)}/prices`, {
+        query: { range },
+      }),
+  },
+  search: (q: string, limit = 8, signal?: AbortSignal) =>
+    request<SearchResultDTO>("/search", { query: { q, limit }, signal }),
+  /** Ledger x the B3 Posição statement (Phase 48.R5); never writes to the ledger. */
+  reconciliation: {
+    preview: (file: File, referenceDate?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (referenceDate) form.append("reference_date", referenceDate);
+      return request<ReconciliationDTO>("/reconciliation/b3/preview", { method: "POST", form });
+    },
+    commit: (file: File, referenceDate?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (referenceDate) form.append("reference_date", referenceDate);
+      return request<ReconciliationDTO>("/reconciliation/b3/commit", { method: "POST", form });
+    },
+    list: (limit = 20) => request<ReconciliationSummaryDTO[]>("/reconciliation", { query: { limit } }),
+    get: (id: number) => request<ReconciliationDTO>(`/reconciliation/${id}`),
+    resolve: (id: number, lineId: number, body: LineResolutionRequest) =>
+      request<ReconciliationLineDTO>(`/reconciliation/${id}/lines/${lineId}`, { method: "PUT", body }),
+  },
+  /** Acompanhar (Phase 48.R6): alert rules on any ticker and the thesis of each asset. */
+  watch: {
+    rules: () => request<AlertRuleDTO[]>("/alert-rules"),
+    createRule: (body: AlertRuleCreateRequest) =>
+      request<AlertRuleDTO>("/alert-rules", { method: "POST", body }),
+    updateRule: (id: number, body: AlertRuleUpdateRequest) =>
+      request<AlertRuleDTO>(`/alert-rules/${id}`, { method: "PUT", body }),
+    deleteRule: (id: number) => request<void>(`/alert-rules/${id}`, { method: "DELETE" }),
+    notes: (dueOnly = false) => request<AssetNoteDTO[]>("/notes", { query: { due_only: dueOnly } }),
+    assetNotes: (assetId: number) => request<AssetNoteDTO[]>(`/assets/${assetId}/notes`),
+    createNote: (assetId: number, body: AssetNoteRequest) =>
+      request<AssetNoteDTO>(`/assets/${assetId}/notes`, { method: "POST", body }),
+    updateNote: (assetId: number, noteId: number, body: AssetNoteRequest) =>
+      request<AssetNoteDTO>(`/assets/${assetId}/notes/${noteId}`, { method: "PUT", body }),
+    deleteNote: (assetId: number, noteId: number) =>
+      request<void>(`/assets/${assetId}/notes/${noteId}`, { method: "DELETE" }),
+  },
+  /** Planejar (Phase 48.R8): goals with progress and the required contribution. */
+  goals: {
+    list: () => request<GoalDTO[]>("/goals"),
+    create: (body: GoalCreateRequest) => request<GoalDTO>("/goals", { method: "POST", body }),
+    update: (id: number, body: GoalUpdateRequest) => request<GoalDTO>(`/goals/${id}`, { method: "PUT", body }),
+    remove: (id: number) => request<void>(`/goals/${id}`, { method: "DELETE" }),
+  },
+  /** Named filters of a screen, kept in the database (Phase 48.R9). */
+  savedViews: {
+    list: (scope: ViewScope) => request<SavedViewDTO[]>("/saved-views", { query: { scope } }),
+    save: (body: SavedViewRequest) => request<SavedViewDTO>("/saved-views", { method: "PUT", body }),
+    remove: (id: number) => request<void>(`/saved-views/${id}`, { method: "DELETE" }),
   },
 };

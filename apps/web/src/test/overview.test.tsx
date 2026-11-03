@@ -31,12 +31,14 @@ function overviewApi(overrides: Record<string, unknown> = {}) {
 describe("shell", () => {
   it("shows the menu sections, the page title and the alert count", async () => {
     overviewApi();
-    renderAt("/portfolio", { shell: true });
+    renderAt("/carteira", { shell: true });
     const nav = screen.getByRole("complementary", { name: "Menu principal" });
-    for (const label of ["Visão geral", "Operação", "Configuração"]) {
-      expect(within(nav).getByText(label)).toBeInTheDocument();
+    // Seven destinations by task plus the settings (Phase 48.R3).
+    for (const label of ["Início", "Carteira", "Explorar", "Acompanhar", "Aportar", "Planejar", "Lançamentos"]) {
+      expect(within(nav).getByRole("link", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
     }
-    expect(within(nav).getByRole("link", { name: /Carteira/ })).toHaveClass("active");
+    expect(within(nav).getByText("Configurações")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: /^Carteira/ })).toHaveClass("active");
     expect(screen.getByText("Carteira", { selector: ".app-topbar-title" })).toBeInTheDocument();
     expect(await within(nav).findByLabelText("1 alertas")).toBeInTheDocument();
     expect(await within(nav).findByLabelText("2 erros do worker")).toBeInTheDocument();
@@ -52,7 +54,7 @@ describe("shell", () => {
 
   it("toggles the theme", () => {
     overviewApi();
-    renderAt("/settings/accounts", { shell: true });
+    renderAt("/configuracoes/contas", { shell: true });
     const before = document.documentElement.getAttribute("data-theme");
     fireEvent.click(screen.getByRole("button", { name: /Usar tema/ }));
     expect(document.documentElement.getAttribute("data-theme")).not.toBe(before);
@@ -62,7 +64,7 @@ describe("shell", () => {
 describe("home (analytics)", () => {
   it("tells the story: headline, indicators, allocation, alerts and evolution", async () => {
     const { calls } = overviewApi();
-    renderAt("/home");
+    renderAt("/inicio");
     expect(await screen.findByText(/Real Estate está abaixo da banda/)).toBeInTheDocument();
     expect(screen.getByText("Patrimônio")).toBeInTheDocument();
     expect(screen.getByTitle(/^R\$\s5\.000,00$/)).toBeInTheDocument(); // full value, not "mil"
@@ -78,7 +80,7 @@ describe("home (analytics)", () => {
     expect(await screen.findByText("+5,0%")).toBeInTheDocument(); // TWR from the base-100 curve
     expect(screen.getByText("CDI no período: 0,1%")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Peso atual de cada classe contra a meta" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Real Estate abaixo da banda" })).toHaveAttribute("href", "/contribute");
+    expect(await screen.findByRole("link", { name: "Real Estate abaixo da banda" })).toHaveAttribute("href", "/aportar");
     expect(await screen.findByRole("img", { name: /Evolução da carteira/ })).toBeInTheDocument();
     expect(screen.queryByText("Proventos por mês")).not.toBeInTheDocument(); // lives in Desempenho
 
@@ -94,7 +96,7 @@ describe("home (analytics)", () => {
       { path: "/portfolio/snapshots", reply: [] },
       { path: "/portfolio/analytics", reply: analytics() },
     ]);
-    renderAt("/home");
+    renderAt("/inicio");
     expect(await screen.findByRole("alert")).toHaveTextContent("Banco indisponível");
     expect(screen.queryByText("R$ 0,00")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
@@ -102,7 +104,7 @@ describe("home (analytics)", () => {
 
   it("explains insufficient history", async () => {
     overviewApi({ analytics: analytics({ status: "INSUFFICIENT_HISTORY", available_points: 1 }) });
-    renderAt("/home");
+    renderAt("/inicio");
     expect(await screen.findByText(/Histórico insuficiente: o gráfico aparece/)).toBeInTheDocument();
   });
 });
@@ -110,7 +112,7 @@ describe("home (analytics)", () => {
 describe("performance", () => {
   it("shows the base-100 chart, risk and the class comparison", async () => {
     overviewApi();
-    renderAt("/performance");
+    renderAt("/carteira/rentabilidade");
     expect(await screen.findByRole("img", { name: /Carteira e referências/ })).toBeInTheDocument();
     expect(screen.getByText("Índice de Sharpe")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Drawdown da carteira/ })).toBeInTheDocument();
@@ -122,7 +124,7 @@ describe("performance", () => {
 
   it("says when the history is insufficient", async () => {
     overviewApi({ analytics: analytics({ status: "INSUFFICIENT_HISTORY", available_points: 1 }) });
-    renderAt("/performance");
+    renderAt("/carteira/rentabilidade");
     expect(await screen.findByText(/Histórico insuficiente para medir a carteira/)).toBeInTheDocument();
     expect(screen.queryByText("Índice de Sharpe")).not.toBeInTheDocument();
   });
@@ -139,8 +141,8 @@ describe("portfolio", () => {
         ],
       }),
     });
-    renderAt("/portfolio");
-    expect(await screen.findByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/asset/1");
+    renderAt("/carteira");
+    expect(await screen.findByRole("link", { name: "WEGE3" })).toHaveAttribute("href", "/ativo/WEGE3");
     expect(screen.getByText(/Ações · R\$/)).toBeInTheDocument();
     expect(screen.getByText("Em revisão")).toBeInTheDocument();
     expect(screen.getByText("Sem cotação")).toBeInTheDocument();
@@ -158,8 +160,8 @@ describe("portfolio", () => {
 
   it("guides an empty portfolio", async () => {
     overviewApi({ report: report({ positions: [] }) });
-    renderAt("/portfolio");
+    renderAt("/carteira");
     expect(await screen.findByText("Nenhuma posição ainda")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Importar extrato" })).toHaveAttribute("href", "/ledger/import");
+    expect(screen.getByRole("link", { name: "Importar extrato" })).toHaveAttribute("href", "/lancamentos/importar");
   });
 });

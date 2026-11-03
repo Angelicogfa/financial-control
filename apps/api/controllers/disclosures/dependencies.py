@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import Depends
 
 from composition import get_uow_factory
-from controllers.shared.dependencies import UoWFactory
 from domain.disclosures.services.use_cases import DisclosureHandler
+from domain.shared.unit_of_work import UoWFactory
 
 
 def get_disclosure_handler(

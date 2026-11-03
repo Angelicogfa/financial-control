@@ -27,6 +27,8 @@ export interface RequestOptions {
   body?: unknown;
   form?: FormData;
   query?: Query;
+  /** Cancels the request (a newer search replaced it, the screen closed). */
+  signal?: AbortSignal;
 }
 
 export function buildUrl(path: string, query?: Query): string {
@@ -55,7 +57,7 @@ function detailOf(body: unknown, status: number): { message: string; code?: stri
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, form, query } = options;
+  const { method = "GET", body, form, query, signal } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
   let payload: BodyInit | undefined;
   if (form) payload = form;
@@ -71,8 +73,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers,
       body: payload,
       credentials: "same-origin",
+      signal,
     });
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error; // cancelled on purpose, not offline
     throw new ApiError(0, OFFLINE_MESSAGE, "OFFLINE");
   }
 

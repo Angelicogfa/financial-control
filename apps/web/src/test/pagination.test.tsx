@@ -182,6 +182,16 @@ const trade = (id: number) => ({
 });
 
 describe("paged ledger", () => {
+  it("opens filtered by the asset of an alert's link", async () => {
+    const { calls } = mockApi([
+      { path: "/transactions", reply: { items: [], meta: meta(1, 10, 0) } },
+      { path: "/assets", reply: { items: [asset()], meta: meta(1, 200, 1) } },
+      { path: "/accounts", reply: accounts },
+    ]);
+    renderAt("/lancamentos?asset=7");
+    await waitFor(() => expect(last(calls, "GET", "/transactions")?.query.get("asset_id")).toBe("7"));
+  });
+
   it("asks the API for one page of trades at a time and starts over on a new filter", async () => {
     const { calls } = mockApi([
       {
@@ -197,7 +207,7 @@ describe("paged ledger", () => {
       { path: "/assets", reply: { items: [asset()], meta: meta(1, 200, 1) } },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/ledger");
+    renderAt("/lancamentos");
     expect(await screen.findByRole("link", { name: "T1" })).toBeInTheDocument();
     expect(last(calls, "GET", "/transactions")?.query.get("page")).toBe("1");
     expect(last(calls, "GET", "/transactions")?.query.get("page_size")).toBe("10");
@@ -237,7 +247,7 @@ describe("paged ledger", () => {
       { path: "/assets", reply: { items: [asset()], meta: meta(1, 200, 1) } },
       { path: "/accounts", reply: accounts },
     ]);
-    renderAt("/ledger?tab=events");
+    renderAt("/lancamentos?tab=events");
     expect(await screen.findByText("E10")).toBeInTheDocument();
     expect(screen.queryByText("E11")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
@@ -278,7 +288,7 @@ describe("paged research", () => {
       { path: "/research/sectors", reply: [] },
     ]);
     const screenerCalls = () => calls.filter((c) => c.path === "/research/screener");
-    renderAt("/research");
+    renderAt("/explorar");
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     expect(await screen.findByText("AAAA10")).toBeInTheDocument();
     expect(last(calls, "GET", "/research/screener")?.query.get("page")).toBe("1");
@@ -325,7 +335,7 @@ describe("paged research", () => {
       margin: null,
     }));
     mockApi([{ path: "/research/watchlist", reply: watched }]);
-    renderAt("/research?tab=watchlist");
+    renderAt("/acompanhar");
     expect(await screen.findByRole("link", { name: "WWWW6" })).toBeInTheDocument();
     pick(screen.getByLabelText("Itens por página"), "5");
     expect(screen.queryByRole("link", { name: "WWWW6" })).not.toBeInTheDocument();

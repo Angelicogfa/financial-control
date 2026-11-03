@@ -20,7 +20,6 @@ from sqlalchemy.orm import sessionmaker
 
 from composition import get_market_gateway, get_uow_factory
 from controllers.auth.dependencies import require_user
-from core.helpers.units import daily_rates, monthly_rates
 from domain.market.entities import Quote
 from domain.policy.services.allocation import ArcaTargets
 from domain.portfolio.services.consolidation import (
@@ -43,6 +42,7 @@ from domain.shared.enums import (
     SeriesUnit,
     TransactionKind,
 )
+from domain.shared.units import daily_rates, monthly_rates
 from infra.cache.redis_cache import InMemoryCache
 from infra.data.unit_of_work import SqlAlchemyUnitOfWork
 from infra.providers.b3_listed import B3ListedProvider

@@ -43,7 +43,8 @@ This file serves as the primary authoritative guide for AI coding agents (Gemini
    - Direct `Base.metadata.create_all()` is forbidden in production/Docker startup; the `migrate` service runs `alembic upgrade head`.
 
 8. **Strict Backend Layering: Controllers $\rightarrow$ Handlers / Services $\rightarrow$ UnitOfWork $\rightarrow$ Repositories (`isolamento de camadas no backend`)**
-   - **Where each layer lives**: API routers in `apps/api/controllers/<domain>/router.py`, DTOs in `apps/api/controllers/<domain>/{requests,responses}/`, handlers & application services in `apps/api/domain/<domain>/services/` (or dedicated handlers), abstract domain ports in `apps/api/domain/<domain>/repositories/`; infrastructure & concrete repositories in `apps/api/infra/data/repositories/<domain>/`; ORM models in `apps/api/infra/data/models/<domain>/`; cross-cutting foundations in `apps/api/core/`; and composition root in `apps/api/composition.py` (which chooses the concrete Unit of Work). Background worker and scheduler live in `apps/api/worker/`. See ADR 0009.
+   - **Where each layer lives**: API routers in `apps/api/controllers/<domain>/router.py`, request/response schemas and their serializers in `apps/api/contracts/<domain>/{requests,responses,serializers}.py` (shared by controllers, use cases and the MCP; ADR 0010), handlers & application services in `apps/api/domain/<domain>/services/` (or dedicated handlers), abstract domain ports in `apps/api/domain/<domain>/repositories/` and `apps/api/domain/shared/{unit_of_work,gateways}.py`; infrastructure & concrete repositories in `apps/api/infra/data/repositories/<domain>/`; ORM models in `apps/api/infra/data/models/<domain>/`; cross-cutting foundations in `apps/api/core/`; and composition root in `apps/api/composition.py` (which chooses the concrete Unit of Work). Background worker and scheduler live in `apps/api/worker/`. See ADR 0009.
+   - **Import contract** (enforced by `apps/api/tests/test_architecture_contracts.py`): `domain` and `contracts` never import `controllers`, `infra`, `worker` or FastAPI; `controllers` never import `infra.data` or `worker` (infrastructure arrives through `composition.py`); `infra` and `worker` never import `controllers`; `core` imports no other layer. The allowlist stays empty.
    - **Controllers / FastAPI Routers** MUST ONLY parse/validate HTTP requests, invoke an Application **Handler** or **Service**, and serialize the HTTP response.
    - **Controllers MUST NEVER**:
      - Access `Session` / database connections directly;
@@ -100,7 +101,8 @@ financial-control/
 │   │   ├── alembic.ini       # Alembic migrations configuration
 │   │   ├── Dockerfile        # Unified Dockerfile for api, worker, and migrate
 │   │   ├── pyproject.toml    # Backend dependencies & tools configuration
-│   │   ├── controllers/      # Presentation: router.py, serializers.py, requests/, responses/
+│   │   ├── controllers/      # Presentation: router.py, dependencies.py
+│   │   ├── contracts/        # Request/response schemas and serializers (Pydantic, no FastAPI)
 │   │   ├── domain/           # Pure Domain: entities/, services/, repositories/
 │   │   ├── infra/            # Concrete Infra: data/{db, models, mappers, uow, repos, migrations}, cache, providers
 │   │   ├── core/             # Cross-cutting: settings, logging, middleware, security, http_errors, helpers

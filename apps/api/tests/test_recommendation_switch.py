@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -17,8 +18,9 @@ from tests.conftest import offline_gateway
 from tests.test_mining_signals import seed_panel
 from worker.jobs import refresh_asset_lenses_job, run_mining_job
 
-TODAY = date.today()
 NOW = datetime.now(UTC)
+# The run is dated in UTC: date.today() (local) differs from 21h to midnight in Brasília.
+TODAY = NOW.date()
 
 
 def _prepare(api: SimpleNamespace) -> int:
@@ -129,6 +131,9 @@ def test_the_optimizer_sets_the_targets_only_after_passing_its_test(api: SimpleN
         )
     assert set(target_weights(construction, False)) == built
     assert target_weights(construction, True) == optimized_of(construction).weights  # type: ignore[union-attr]
+    # The test only covers Ações: passing it does not move the other classes.
+    other = replace(construction, arca_class="REAL_ESTATE")
+    assert set(target_weights(other, True)) == built
 
     before = api.client.post("/api/v1/portfolio/contribution", json={"amount_brl": 50000}).json()
     assert {o["ticker"] for o in before["orders"] if o["arca_class"] == "ACOES"} == built

@@ -15,8 +15,7 @@ test("data survives a restart of the containers", async ({ page }) => {
   await page.getByRole("tab", { name: "Eventos corporativos" }).click();
   await expect(page.getByRole("row").filter({ hasText: "Desdobramento" })).toBeVisible();
   await navigate(page, "Estratégia");
-  await expect(page.getByLabel("Meta de Ações")).toHaveValue("30");
-  await navigate(page, "Pesquisar");
-  await page.getByRole("tab", { name: "Em observação" }).click();
+  await expect(page.getByLabel("Meta de Ações", { exact: true })).toHaveValue("30");
+  await navigate(page, "Acompanhar");
   await expect(page.getByRole("link", { name: "BBAS3" })).toBeVisible();
 });

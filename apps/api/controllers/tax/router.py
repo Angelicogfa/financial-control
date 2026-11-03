@@ -1,6 +1,7 @@
 """HTTP controllers (routers) of the tax module; they only delegate to use cases.
 
-Scope: tax rule registry, per-asset tax status and the fixed income comparator.
+Scope: tax rule registry, per-asset tax status, the fixed income comparator and the monthly
+income tax with its DARF (Phase 48.R7).
 """
 
 from __future__ import annotations
@@ -9,9 +10,17 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.tax.dependencies import get_tax_handler
-from controllers.tax.requests import FixedIncomeCompareRequest
-from controllers.tax.responses import AssetTaxStatusDTO, FixedIncomeComparisonDTO, TaxRuleDTO
+from contracts.tax.requests import DarfPaymentRequest, FixedIncomeCompareRequest
+from contracts.tax.responses import (
+    AssetTaxStatusDTO,
+    FixedIncomeComparisonDTO,
+    TaxMonthDTO,
+    TaxRuleDTO,
+    TaxYearDTO,
+)
+from contracts.tax.serializers import to_tax_month_dto, to_tax_year_dto
+from controllers.tax.dependencies import get_monthly_tax_handler, get_tax_handler
+from domain.tax.services.monthly import MonthlyTaxHandler
 from domain.tax.services.use_cases import TaxHandler
 
 tax_router = APIRouter(prefix="/tax", tags=["Tax"])
@@ -40,3 +49,28 @@ def compare_fixed_income(
 ) -> FixedIncomeComparisonDTO:
     """Taxed vs. exempt comparison: net value and rate, bracket equivalences, break-even."""
     return handler.compare_fixed_income(payload)
+
+
+@tax_router.get("/monthly", response_model=TaxYearDTO)
+def get_monthly_tax(
+    year: int | None = Query(default=None, ge=2000),
+    handler: MonthlyTaxHandler = Depends(get_monthly_tax_handler),
+) -> TaxYearDTO:
+    return to_tax_year_dto(handler.year(year or date.today().year))
+
+
+@tax_router.get("/monthly/{month}", response_model=TaxMonthDTO)
+def get_tax_month(
+    month: str,
+    handler: MonthlyTaxHandler = Depends(get_monthly_tax_handler),
+) -> TaxMonthDTO:
+    return to_tax_month_dto(handler.month(month))
+
+
+@tax_router.put("/monthly/{month}/darf", response_model=TaxMonthDTO)
+def mark_darf_paid(
+    month: str,
+    payload: DarfPaymentRequest,
+    handler: MonthlyTaxHandler = Depends(get_monthly_tax_handler),
+) -> TaxMonthDTO:
+    return to_tax_month_dto(handler.set_paid(month, payload.paid_on))
